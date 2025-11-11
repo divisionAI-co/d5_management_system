@@ -194,7 +194,9 @@ export default function DashboardPage() {
                         {report.hoursWorked !== null ? `${report.hoursWorked} hrs` : '— hrs'}
                       </span>
                       <span className="rounded-full bg-muted/80 px-2.5 py-1 text-muted-foreground">
-                        Submitted {formatDateTime(report.submittedAt)}
+                        {report.submittedAt
+                          ? `Submitted ${formatDateTime(report.submittedAt)}`
+                          : 'Draft'}
                       </span>
                     </div>
                   </div>

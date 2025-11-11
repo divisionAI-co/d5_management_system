@@ -65,12 +65,18 @@ export class EodReportsService {
       throw new ForbiddenException('EOD report must be linked to the associated employee user');
     }
 
-    const tasks = createDto.tasks ?? [];
+    const { submit, tasks = [], ...rest } = createDto;
     if (!tasks.length) {
       throw new BadRequestException('tasksWorkedOn must contain at least 1 entry');
     }
 
-    const isLate = await this.computeIsLate(createDto.date);
+    let isLate = false;
+    let submittedAt: Date | null = null;
+
+    if (submit) {
+      isLate = await this.computeIsLate(rest.date);
+      submittedAt = new Date();
+    }
 
     try {
       const tasksJson = tasks.map((task) => ({ ...task })) as Prisma.InputJsonValue;
@@ -78,14 +84,15 @@ export class EodReportsService {
       return await this.prisma.eodReport.create({
         data: {
           userId,
-          date: new Date(createDto.date),
-          summary: createDto.summary,
+          date: new Date(rest.date),
+          summary: rest.summary,
           tasksWorkedOn: tasksJson,
           hoursWorked:
-            createDto.hoursWorked !== undefined && createDto.hoursWorked !== null
-              ? new Prisma.Decimal(createDto.hoursWorked)
+            rest.hoursWorked !== undefined && rest.hoursWorked !== null
+              ? new Prisma.Decimal(rest.hoursWorked)
               : null,
           isLate,
+          submittedAt,
         },
         include: {
           user: {
@@ -182,23 +189,46 @@ export class EodReportsService {
       }
     }
 
+    if (report.submittedAt && !canManageOthers) {
+      throw new BadRequestException('This EOD report has already been submitted.');
+    }
+
+    const { submit, ...rest } = updateDto;
     const data: Prisma.EodReportUpdateInput = {};
 
-    if (updateDto.summary !== undefined) {
-      data.summary = updateDto.summary;
+    if (rest.summary !== undefined) {
+      data.summary = rest.summary;
     }
 
-    if (updateDto.tasks) {
-      if (!updateDto.tasks.length) {
+    let nextTasks: EodReportTaskDto[] | undefined;
+
+    if (rest.tasks) {
+      if (!rest.tasks.length) {
         throw new BadRequestException('tasksWorkedOn must contain at least 1 entry');
       }
-      data.tasksWorkedOn = updateDto.tasks.map((task) => ({ ...task })) as Prisma.InputJsonValue;
+      nextTasks = rest.tasks;
+      data.tasksWorkedOn = rest.tasks.map((task) => ({ ...task })) as Prisma.InputJsonValue;
     }
 
-    if (updateDto.hoursWorked !== undefined) {
-      data.hoursWorked = updateDto.hoursWorked !== null
-        ? new Prisma.Decimal(updateDto.hoursWorked)
+    if (rest.hoursWorked !== undefined) {
+      data.hoursWorked = rest.hoursWorked !== null
+        ? new Prisma.Decimal(rest.hoursWorked)
         : null;
+    }
+
+    if (submit) {
+      const currentTasks =
+        nextTasks ??
+        (Array.isArray(report.tasksWorkedOn)
+          ? (report.tasksWorkedOn as EodReportTaskDto[])
+          : []);
+
+      if (!currentTasks.length) {
+        throw new BadRequestException('Add at least one task before submitting the report.');
+      }
+
+      data.submittedAt = new Date();
+      data.isLate = await this.computeIsLate(report.date.toISOString());
     }
 
     return this.prisma.eodReport.update({

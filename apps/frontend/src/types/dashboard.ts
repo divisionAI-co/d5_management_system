@@ -15,7 +15,7 @@ export interface DashboardTimeframe {
 export interface DashboardEodReport {
   id: string;
   date: string;
-  submittedAt: string;
+  submittedAt?: string | null;
   summary: string;
   hoursWorked: number | null;
   isLate: boolean;

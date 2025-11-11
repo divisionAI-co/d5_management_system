@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, TaskPriority, TaskStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -372,6 +377,8 @@ export class TasksService {
     const dateString = now.toISOString().split('T')[0];
     const reportDate = new Date(`${dateString}T00:00:00.000Z`);
 
+    const defaultEntryLabel = `Task "${task.title}" added to your ${dateString} EOD report.`;
+
     const eodEntry: Prisma.JsonObject = {
       clientDetails: task.title,
       ticket: task.id,
@@ -397,49 +404,96 @@ export class TasksService {
         id: true,
         tasksWorkedOn: true,
         date: true,
+        updatedAt: true,
+        submittedAt: true,
       },
     });
 
-    const entryLabel = `Task "${task.title}" added to your ${dateString} EOD report.`;
-
     if (existingReport) {
-      const tasksWorkedOn: Prisma.JsonArray = Array.isArray(
-        existingReport.tasksWorkedOn,
-      )
-        ? [...(existingReport.tasksWorkedOn as Prisma.JsonArray)]
-        : [];
+      let currentReport = existingReport;
+      let attempts = 0;
 
-      const alreadyExists = tasksWorkedOn.some((item) => {
-        if (item && typeof item === 'object' && 'ticket' in item) {
-          try {
-            const parsed = item as Record<string, unknown>;
-            return parsed.ticket === task.id;
-          } catch {
-            return false;
-          }
+      while (attempts < 3) {
+        attempts += 1;
+
+        const reportDateString = currentReport.date
+          ? currentReport.date.toISOString().split('T')[0]
+          : dateString;
+
+        if (currentReport.submittedAt) {
+          throw new BadRequestException(
+            `The EOD report for ${reportDateString} has already been submitted.`,
+          );
         }
-        return false;
-      });
 
-      if (!alreadyExists) {
-        tasksWorkedOn.push(eodEntry);
+        const currentTasks: Prisma.JsonArray = Array.isArray(
+          currentReport.tasksWorkedOn,
+        )
+          ? [...(currentReport.tasksWorkedOn as Prisma.JsonArray)]
+          : [];
 
-        await this.prisma.eodReport.update({
-          where: { id: existingReport.id },
+        const alreadyExists = currentTasks.some((item) => {
+          if (item && typeof item === 'object' && 'ticket' in item) {
+            try {
+              const parsed = item as Record<string, unknown>;
+              return parsed.ticket === task.id;
+            } catch {
+              return false;
+            }
+          }
+          return false;
+        });
+
+        if (alreadyExists) {
+          return {
+            reportId: currentReport.id,
+            reportDate: reportDateString,
+            isNewReport: false,
+            message: `Task "${task.title}" is already part of your EOD report for ${reportDateString}.`,
+          };
+        }
+
+        currentTasks.push(eodEntry);
+
+        const updateResult = await this.prisma.eodReport.updateMany({
+          where: {
+            id: currentReport.id,
+            updatedAt: currentReport.updatedAt,
+          },
           data: {
-            tasksWorkedOn,
+            tasksWorkedOn: currentTasks as Prisma.InputJsonValue,
           },
         });
+
+        if (updateResult.count > 0) {
+          return {
+            reportId: currentReport.id,
+            reportDate: reportDateString,
+            isNewReport: false,
+            message: `Task "${task.title}" added to your ${reportDateString} EOD report.`,
+          };
+        }
+
+        const refreshedReport = await this.prisma.eodReport.findUnique({
+          where: { id: currentReport.id },
+          select: {
+            id: true,
+            tasksWorkedOn: true,
+            date: true,
+            updatedAt: true,
+          },
+        });
+
+        if (!refreshedReport) {
+          break;
+        }
+
+        currentReport = refreshedReport;
       }
 
-      return {
-        reportId: existingReport.id,
-        reportDate: dateString,
-        isNewReport: false,
-        message: alreadyExists
-          ? `Task "${task.title}" is already part of your EOD report for ${dateString}.`
-          : entryLabel,
-      };
+      throw new BadRequestException(
+        'Unable to add the task to your EOD report due to a concurrent update. Please try again.',
+      );
     }
 
     const createdReport = await this.prisma.eodReport.create({
@@ -457,9 +511,11 @@ export class TasksService {
 
     return {
       reportId: createdReport.id,
-      reportDate: dateString,
+      reportDate: createdReport.date
+        ? createdReport.date.toISOString().split('T')[0]
+        : dateString,
       isNewReport: true,
-      message: `${entryLabel} A new draft report was created for you.`,
+      message: `${defaultEntryLabel} A new draft report was created for you.`,
     };
   }
 

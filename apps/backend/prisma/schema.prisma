@@ -745,7 +745,7 @@ model EodReport {
   hoursWorked Decimal? @db.Decimal(4, 2)
   
   // Submission tracking
-  submittedAt DateTime @default(now())
+  submittedAt DateTime?
   isLate      Boolean  @default(false)
   
   createdAt   DateTime @default(now())

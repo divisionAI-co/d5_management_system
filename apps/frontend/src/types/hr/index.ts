@@ -51,7 +51,7 @@ export interface EodReport {
   summary: string;
   tasksWorkedOn: Array<string | EodReportTask>;
   hoursWorked?: number | null;
-  submittedAt: string;
+  submittedAt?: string | null;
   isLate: boolean;
   createdAt: string;
   updatedAt: string;
@@ -206,6 +206,7 @@ export interface CreateEodReportDto {
   summary: string;
   tasks: EodReportTask[];
   hoursWorked?: number;
+  submit?: boolean;
 }
 
 export interface UpdateEodReportDto extends Partial<CreateEodReportDto> {}

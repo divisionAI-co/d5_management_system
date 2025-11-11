@@ -8,6 +8,7 @@ import {
   IsDateString,
   IsEnum,
   ValidateNested,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -87,6 +88,13 @@ export class CreateEodReportDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsOptional()
   hoursWorked?: number;
+
+  @ApiPropertyOptional({
+    description: 'Set to true to submit the report immediately after saving.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  submit?: boolean;
 }
 
 

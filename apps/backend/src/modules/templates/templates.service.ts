@@ -236,6 +236,23 @@ export class TemplatesService {
 
       return format(date, dateFormat);
     });
+
+    this.handlebars.registerHelper('formatCurrency', (value: unknown, currency = 'USD') => {
+      const amount = typeof value === 'number' ? value : Number(value);
+
+      if (Number.isNaN(amount)) {
+        return '';
+      }
+
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+      }).format(amount);
+    });
+
+    this.handlebars.registerHelper('eq', (a: unknown, b: unknown) => a === b);
+    this.handlebars.registerHelper('gt', (a: number, b: number) => Number(a) > Number(b));
+    this.handlebars.registerHelper('lt', (a: number, b: number) => Number(a) < Number(b));
   }
 
   private serializeVariables(variables?: TemplateVariableDto[]): Prisma.InputJsonValue | undefined {

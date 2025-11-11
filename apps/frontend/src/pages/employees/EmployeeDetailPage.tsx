@@ -462,7 +462,9 @@ export default function EmployeeDetailPage() {
                     <div>
                       <p className="text-sm font-semibold text-foreground">{formatDisplayDate(report.date)}</p>
                       <p className="text-xs text-muted-foreground">
-                        Submitted {format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}
+                        {report.submittedAt
+                          ? `Submitted ${format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}`
+                          : 'Draft'}
                       </p>
                     </div>
                     <span

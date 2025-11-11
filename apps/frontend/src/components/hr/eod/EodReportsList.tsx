@@ -100,7 +100,9 @@ export function EodReportsList({
                       {format(new Date(report.date), 'EEEE, MMM dd, yyyy')}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Submitted {format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}
+                      {report.submittedAt
+                        ? `Submitted ${format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}`
+                        : 'Draft'}
                     </p>
                     {!filterUserId && report.user && (
                       <p className="text-xs text-muted-foreground">
@@ -111,10 +113,14 @@ export function EodReportsList({
                   <div className="flex items-center gap-2">
                     <span
                       className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                        report.isLate ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                        report.submittedAt
+                          ? report.isLate
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                          : 'bg-yellow-100 text-yellow-700'
                       }`}
                     >
-                      {report.isLate ? 'Late' : 'On time'}
+                      {report.submittedAt ? (report.isLate ? 'Late' : 'On time') : 'Draft'}
                     </span>
                     {canEdit && (
                       <button
