@@ -1,13 +1,15 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
   UseGuards,
+  Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { EmployeesService } from './employees.service';
@@ -79,6 +81,21 @@ export class EmployeesController {
   @ApiOperation({ summary: 'Get employee by user ID' })
   findByUserId(@Param('userId') userId: string) {
     return this.employeesService.findByUserId(userId);
+  }
+
+  @Get('me/direct-reports')
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER)
+  @ApiOperation({ summary: 'Get direct reports for the current user' })
+  async getMyDirectReports(@Request() req: any) {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new ForbiddenException('Unable to resolve current user.');
+    }
+
+    const manager = await this.employeesService.findByUserId(userId);
+
+    return this.employeesService.findDirectReports(manager.id);
   }
 
   @Patch(':id')

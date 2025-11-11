@@ -139,6 +139,19 @@ export class EmployeesService {
             role: true,
           },
         },
+        directReports: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -147,6 +160,56 @@ export class EmployeesService {
     }
 
     return employee;
+  }
+
+  async findByUserIdNullable(userId: string) {
+    return this.prisma.employee.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        directReports: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async getManagedEmployeeIds(managerId: string) {
+    const reports = await this.prisma.employee.findMany({
+      where: { managerId },
+      select: { id: true },
+    });
+
+    return reports.map((report) => report.id);
+  }
+
+  async isManagerOf(managerId: string, targetEmployeeId: string) {
+    const count = await this.prisma.employee.count({
+      where: {
+        id: targetEmployeeId,
+        managerId,
+      },
+    });
+
+    return count > 0;
   }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto) {
@@ -184,6 +247,32 @@ export class EmployeesService {
 
     return this.prisma.employee.delete({
       where: { id },
+    });
+  }
+
+  async findDirectReports(managerId: string) {
+    return this.prisma.employee.findMany({
+      where: { managerId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            leaveRequests: true,
+            performanceReviews: true,
+          },
+        },
+      },
+      orderBy: {
+        firstName: 'asc',
+      },
     });
   }
 

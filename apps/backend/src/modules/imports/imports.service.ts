@@ -19,7 +19,7 @@ import {
 
 type ContactFieldMapping = Partial<Record<ContactImportField, string>>;
 
-interface UploadResult {
+export interface UploadContactsResult {
   id: string;
   type: string;
   fileName: string;
@@ -36,7 +36,7 @@ export interface ImportFieldMetadata {
   required: boolean;
 }
 
-interface ContactImportSummary {
+export interface ContactImportSummary {
   importId: string;
   totalRows: number;
   processedRows: number;
@@ -184,7 +184,7 @@ export class ImportsService {
 
   async uploadContactsImport(
     file: Express.Multer.File,
-  ): Promise<UploadResult> {
+  ): Promise<UploadContactsResult> {
     if (!file) {
       throw new BadRequestException('A CSV file must be provided.');
     }

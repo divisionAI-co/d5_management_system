@@ -11,7 +11,9 @@ import type {
 import { ContactsTable } from '@/components/crm/contacts/ContactsTable';
 import { ContactForm } from '@/components/crm/contacts/ContactForm';
 import { ContactDetailPanel } from '@/components/crm/contacts/ContactDetailPanel';
-import { Filter, Plus } from 'lucide-react';
+import { ContactImportDialog } from '@/components/crm/contacts/ContactImportDialog';
+import { Filter, Plus, UploadCloud } from 'lucide-react';
+import { useAuthStore } from '@/lib/stores/auth-store';
 
 const SORT_OPTIONS: Array<{ label: string; value: NonNullable<ContactFilters['sortBy']> }> = [
   { label: 'Created', value: 'createdAt' },
@@ -35,6 +37,9 @@ export default function ContactsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<ContactSummary | undefined>();
   const [detailContactId, setDetailContactId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const { user } = useAuthStore();
 
   const contactsQuery = useQuery<ContactsListResponse>({
     queryKey: ['contacts', filters],
@@ -123,6 +128,7 @@ export default function ContactsPage() {
 
   const pagination = useMemo(() => contactsQuery.data?.meta, [contactsQuery.data?.meta]);
   const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
+  const canImport = user?.role === 'ADMIN';
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-6">
@@ -133,13 +139,24 @@ export default function ContactsPage() {
             Manage stakeholder relationships, link contacts to accounts, and stay on top of follow-ups.
           </p>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          New Contact
-        </button>
+        <div className="flex flex-wrap gap-3">
+          {canImport && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Import Contacts
+            </button>
+          )}
+          <button
+            onClick={handleOpenCreate}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            New Contact
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleFilterApply} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -283,6 +300,12 @@ export default function ContactsPage() {
           onClose={() => setDetailContactId(null)}
         />
       )}
+
+      <ContactImportDialog
+        open={importOpen}
+        customers={customers}
+        onClose={() => setImportOpen(false)}
+      />
     </div>
   );
 }

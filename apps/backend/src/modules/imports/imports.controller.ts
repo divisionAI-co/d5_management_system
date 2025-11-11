@@ -19,13 +19,20 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 
-import { ImportsService } from './imports.service';
+import {
+  ContactImportSummary,
+  ImportsService,
+  UploadContactsResult,
+} from './imports.service';
 import { MapImportDto } from './dto/map-import.dto';
 import { ExecuteImportDto } from './dto/execute-import.dto';
 
 @ApiTags('Imports')
 @ApiBearerAuth()
-@Controller('imports')
+@Controller({
+  path: 'imports',
+  version: '1',
+})
 export class ImportsController {
   constructor(private readonly importsService: ImportsService) {}
 
@@ -56,7 +63,7 @@ export class ImportsController {
   uploadContacts(
     @Body('type') type: string,
     @UploadedFile() file: Express.Multer.File,
-  ) {
+  ): Promise<UploadContactsResult> {
     const normalizedType = type?.trim().toLowerCase();
     if (normalizedType !== 'contacts') {
       throw new BadRequestException(
@@ -98,7 +105,7 @@ export class ImportsController {
   executeImport(
     @Param('id') id: string,
     @Body() dto: ExecuteImportDto,
-  ) {
+  ): Promise<ContactImportSummary> {
     return this.importsService.executeImport(id, dto);
   }
 }

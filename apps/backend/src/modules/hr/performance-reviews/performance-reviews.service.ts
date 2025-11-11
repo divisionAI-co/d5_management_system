@@ -56,10 +56,14 @@ export class PerformanceReviewsService {
     });
   }
 
-  async findAll(filters?: { employeeId?: string }) {
+  async findAll(filters?: { employeeId?: string; employeeIds?: string[] }) {
     const where: any = {};
 
-    if (filters?.employeeId) {
+    if (filters?.employeeIds && filters.employeeIds.length > 0) {
+      where.employeeId = {
+        in: filters.employeeIds,
+      };
+    } else if (filters?.employeeId) {
       where.employeeId = filters.employeeId;
     }
 
