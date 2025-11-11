@@ -87,7 +87,7 @@ export default function InvoiceDetailPage() {
 
   if (!id) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Invoice identifier is missing.
         </div>
@@ -97,9 +97,9 @@ export default function InvoiceDetailPage() {
 
   if (invoiceQuery.isLoading) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-12 shadow-sm">
-          <p className="text-sm text-gray-500">Loading invoice...</p>
+      <div className="py-12">
+        <div className="flex items-center justify-center rounded-lg border border-border bg-card py-12 shadow-sm">
+          <p className="text-sm text-muted-foreground">Loading invoice...</p>
         </div>
       </div>
     );
@@ -107,14 +107,14 @@ export default function InvoiceDetailPage() {
 
   if (invoiceQuery.isError || !invoice) {
     return (
-      <div className="container mx-auto px-4 py-12">
+      <div className="py-12">
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
           <p className="text-sm text-red-700">
             We couldn&apos;t find this invoice. It may have been deleted or you may not have access.
           </p>
           <button
             onClick={() => navigate('/invoices')}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to invoices
@@ -125,19 +125,19 @@ export default function InvoiceDetailPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{invoice.invoiceNumber}</h1>
-            <p className="text-sm text-gray-600">
+            <h1 className="text-2xl font-bold text-foreground">{invoice.invoiceNumber}</h1>
+            <p className="text-sm text-muted-foreground">
               Issued {formatDate(invoice.issueDate)} · Due {formatDate(invoice.dueDate)}
             </p>
           </div>
@@ -146,21 +146,21 @@ export default function InvoiceDetailPage() {
           <InvoiceStatusBadge status={invoice.status} />
           <button
             onClick={() => invoiceQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
           </button>
           <button
             onClick={() => setIsFormOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <Pencil className="h-4 w-4" />
             Edit
           </button>
           <button
             onClick={() => setIsSendOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <Send className="h-4 w-4" />
             Send
@@ -168,7 +168,7 @@ export default function InvoiceDetailPage() {
           {(invoice.status !== 'PAID' && invoice.status !== 'CANCELLED') && (
             <button
               onClick={() => setIsMarkPaidOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               <CheckCircle className="h-4 w-4" />
               Mark Paid
@@ -193,82 +193,82 @@ export default function InvoiceDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Billing Details
             </h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500">Customer</p>
-                <p className="mt-1 text-sm font-medium text-gray-900">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Customer</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
                   {invoice.customer?.name ?? '—'}
                 </p>
-                <p className="text-sm text-gray-500">{invoice.customer?.email ?? ''}</p>
+                <p className="text-sm text-muted-foreground">{invoice.customer?.email ?? ''}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500">Account Manager</p>
-                <p className="mt-1 text-sm font-medium text-gray-900">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Account Manager</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
                   {invoice.createdBy
                     ? `${invoice.createdBy.firstName} ${invoice.createdBy.lastName}`
                     : '—'}
                 </p>
-                <p className="text-sm text-gray-500">{invoice.createdBy?.email ?? ''}</p>
+                <p className="text-sm text-muted-foreground">{invoice.createdBy?.email ?? ''}</p>
               </div>
             </div>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500">Issue Date</p>
-                <p className="mt-1 text-sm text-gray-900">{formatDate(invoice.issueDate)}</p>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Issue Date</p>
+                <p className="mt-1 text-sm text-foreground">{formatDate(invoice.issueDate)}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500">Due Date</p>
-                <p className="mt-1 text-sm text-gray-900">{formatDate(invoice.dueDate)}</p>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Due Date</p>
+                <p className="mt-1 text-sm text-foreground">{formatDate(invoice.dueDate)}</p>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500">Currency</p>
-                <p className="mt-1 text-sm text-gray-900">{invoice.currency}</p>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Currency</p>
+                <p className="mt-1 text-sm text-foreground">{invoice.currency}</p>
               </div>
             </div>
           </section>
 
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Line Items
             </h2>
             <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Description
                     </th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Quantity
                     </th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Unit Price
                     </th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Line Total
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {invoice.items.map((item, index) => {
                     const quantity = item.quantity ?? 0;
                     const unitPrice = item.unitPrice ?? 0;
                     const lineTotal =
                       item.lineTotal ?? Number(quantity) * Number(unitPrice);
                     return (
-                      <tr key={`${item.description}-${index}`} className="bg-white">
-                        <td className="px-4 py-2 text-sm text-gray-700">{item.description}</td>
-                        <td className="px-4 py-2 text-right text-sm text-gray-700">
+                      <tr key={`${item.description}-${index}`} className="bg-card">
+                        <td className="px-4 py-2 text-sm text-muted-foreground">{item.description}</td>
+                        <td className="px-4 py-2 text-right text-sm text-muted-foreground">
                           {quantity}
                         </td>
-                        <td className="px-4 py-2 text-right text-sm text-gray-700">
+                        <td className="px-4 py-2 text-right text-sm text-muted-foreground">
                           {formatCurrency(unitPrice, invoice.currency)}
                         </td>
-                        <td className="px-4 py-2 text-right text-sm font-medium text-gray-900">
+                        <td className="px-4 py-2 text-right text-sm font-medium text-foreground">
                           {formatCurrency(lineTotal, invoice.currency)}
                         </td>
                       </tr>
@@ -278,7 +278,7 @@ export default function InvoiceDetailPage() {
               </table>
             </div>
             <div className="mt-6 flex justify-end">
-              <dl className="w-full max-w-sm space-y-2 text-sm text-gray-700">
+              <dl className="w-full max-w-sm space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <dt>Subtotal</dt>
                   <dd className="font-medium">
@@ -294,7 +294,7 @@ export default function InvoiceDetailPage() {
                     {formatCurrency(totals.taxAmount, invoice.currency)}
                   </dd>
                 </div>
-                <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base">
+                <div className="flex items-center justify-between border-t border-border pt-2 text-base">
                   <dt>Total</dt>
                   <dd className="font-semibold">
                     {formatCurrency(totals.total, invoice.currency)}
@@ -304,33 +304,33 @@ export default function InvoiceDetailPage() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Notes & History
             </h2>
-            <div className="mt-4 space-y-4 text-sm text-gray-700">
+            <div className="mt-4 space-y-4 text-sm text-muted-foreground">
               <div>
-                <p className="text-xs font-semibold uppercase text-gray-500">Internal Notes</p>
-                <p className="mt-1 whitespace-pre-wrap text-gray-700">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Internal Notes</p>
+                <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
                   {invoice.notes?.trim() ? invoice.notes : '—'}
                 </p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500">Reminders Sent</p>
-                  <p className="mt-1 text-gray-700">{invoice.remindersSent}</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Reminders Sent</p>
+                  <p className="mt-1 text-muted-foreground">{invoice.remindersSent}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500">Last Reminder</p>
-                  <p className="mt-1 text-gray-700">{formatDate(invoice.lastReminderAt)}</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Last Reminder</p>
+                  <p className="mt-1 text-muted-foreground">{formatDate(invoice.lastReminderAt)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500">Paid Date</p>
-                  <p className="mt-1 text-gray-700">{formatDate(invoice.paidDate)}</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Paid Date</p>
+                  <p className="mt-1 text-muted-foreground">{formatDate(invoice.paidDate)}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500">Last Updated</p>
-                  <p className="mt-1 text-gray-700">{formatDate(invoice.updatedAt)}</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Last Updated</p>
+                  <p className="mt-1 text-muted-foreground">{formatDate(invoice.updatedAt)}</p>
                 </div>
               </div>
             </div>
@@ -338,11 +338,11 @@ export default function InvoiceDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Recurrence
             </h2>
-            <div className="mt-4 text-sm text-gray-700">
+            <div className="mt-4 text-sm text-muted-foreground">
               <p>
                 <span className="font-semibold">Recurring:</span>{' '}
                 {invoice.isRecurring ? 'Yes' : 'No'}
@@ -356,11 +356,11 @@ export default function InvoiceDetailPage() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Summary
             </h2>
-            <dl className="mt-4 space-y-3 text-sm text-gray-700">
+            <dl className="mt-4 space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center justify-between">
                 <dt>Status</dt>
                 <dd>
@@ -384,21 +384,21 @@ export default function InvoiceDetailPage() {
             </dl>
           </section>
 
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Actions
             </h2>
-            <div className="mt-4 space-y-2 text-sm text-gray-700">
+            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
               <button
                 onClick={() => setIsSendOpen(true)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left transition hover:bg-gray-50"
+                className="w-full rounded-lg border border-border px-3 py-2 text-left transition hover:bg-muted"
               >
                 Email invoice to customer
               </button>
               {(invoice.status !== 'PAID' && invoice.status !== 'CANCELLED') && (
                 <button
                   onClick={() => setIsMarkPaidOpen(true)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left transition hover:bg-gray-50"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-left transition hover:bg-muted"
                 >
                   Record payment
                 </button>
@@ -406,7 +406,7 @@ export default function InvoiceDetailPage() {
               <button
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full rounded-lg border border-border px-3 py-2 text-left transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isDownloading ? 'Preparing PDF...' : 'Download PDF'}
               </button>

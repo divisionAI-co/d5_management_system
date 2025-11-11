@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { ConvertContactToLeadDto } from './dto/convert-contact-to-lead.dto';
 
 @ApiTags('CRM - Contacts')
 @ApiBearerAuth()
@@ -59,5 +60,15 @@ export class ContactsController {
   @ApiOperation({ summary: 'Delete a contact' })
   remove(@Param('id') id: string) {
     return this.contactsService.remove(id);
+  }
+
+  @Post(':id/convert-to-lead')
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @ApiOperation({ summary: 'Convert contact into a lead' })
+  convertToLead(
+    @Param('id') id: string,
+    @Body() payload: ConvertContactToLeadDto,
+  ) {
+    return this.contactsService.convertToLead(id, payload);
   }
 }

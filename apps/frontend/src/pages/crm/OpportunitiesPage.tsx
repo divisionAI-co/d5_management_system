@@ -1,21 +1,24 @@
 import { useCallback, useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DropResult } from '@hello-pangea/dnd';
-import { Filter, Plus } from 'lucide-react';
-import { opportunitiesApi } from '@/lib/api/crm';
+import { Filter, Plus, UploadCloud } from 'lucide-react';
+import { customersApi, opportunitiesApi } from '@/lib/api/crm';
 import { usersApi } from '@/lib/api/users';
 import type {
   CustomerType,
+  CustomerSummary,
   Opportunity,
   OpportunityFilters,
   OpportunitiesListResponse,
   UpdateOpportunityPayload,
 } from '@/types/crm';
 import type { UserSummary } from '@/types/users';
+import { ContactImportDialog } from '@/components/crm/contacts/ContactImportDialog';
 import { OpportunitiesTable } from '@/components/crm/opportunities/OpportunitiesTable';
 import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm';
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
 import { OpportunitiesBoard } from '@/components/crm/opportunities/OpportunitiesBoard';
+import { useAuthStore } from '@/lib/stores/auth-store';
 
 const TYPE_FILTERS: Array<{ label: string; value?: CustomerType }> = [
   { label: 'All types', value: undefined },
@@ -87,11 +90,26 @@ export default function OpportunitiesPage() {
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [closingOpportunity, setClosingOpportunity] = useState<Opportunity | undefined>(undefined);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
 
   const usersQuery = useQuery({
     queryKey: ['users', 'options'],
     queryFn: () => usersApi.list({ page: 1, pageSize: 100 }),
     placeholderData: keepPreviousData,
+  });
+
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'opportunity-import-options'],
+    queryFn: () =>
+      customersApi.list({
+        page: 1,
+        pageSize: 100,
+        sortBy: 'name',
+        sortOrder: 'asc',
+      }),
+    enabled: isAdmin,
   });
 
   const effectivePage = viewMode === 'board' ? 1 : page;
@@ -208,6 +226,7 @@ export default function OpportunitiesPage() {
   });
 
   const users = (usersQuery.data?.data ?? []) as UserSummary[];
+  const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
   const opportunities = opportunitiesQuery.data?.data ?? [];
   const meta = opportunitiesQuery.data?.meta;
 
@@ -340,21 +359,30 @@ export default function OpportunitiesPage() {
   }, [opportunities]);
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Opportunities</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Opportunities</h1>
+          <p className="text-sm text-muted-foreground">
             Keep your pipeline organised, monitor ownership, and close deals faster.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Import Opportunities
+            </button>
+          )}
+          <div className="rounded-lg border border-border bg-card p-1 shadow-sm">
             <button
               type="button"
               onClick={() => setViewMode('table')}
               className={`rounded-md px-3 py-1 text-sm font-medium transition ${
-                viewMode === 'table' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
+                viewMode === 'table' ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground'
               }`}
             >
               Table
@@ -366,7 +394,7 @@ export default function OpportunitiesPage() {
                 setPage(1);
               }}
               className={`rounded-md px-3 py-1 text-sm font-medium transition ${
-                viewMode === 'board' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-600'
+                viewMode === 'board' ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground'
               }`}
             >
               Board
@@ -384,11 +412,11 @@ export default function OpportunitiesPage() {
 
       <form
         onSubmit={handleApplySearch}
-        className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+        className="rounded-lg border border-border bg-card p-4 shadow-sm"
       >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Search
             </label>
             <div className="relative">
@@ -397,13 +425,13 @@ export default function OpportunitiesPage() {
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by title, customer or notes"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Type
             </label>
             <select
@@ -411,7 +439,7 @@ export default function OpportunitiesPage() {
               onChange={(event) =>
                 setTypeFilter((event.target.value || undefined) as CustomerType | undefined)
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {TYPE_FILTERS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -421,7 +449,7 @@ export default function OpportunitiesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Stage
             </label>
             <select
@@ -431,7 +459,7 @@ export default function OpportunitiesPage() {
                 setStageFilter(value === 'All stages' ? undefined : value);
                 setPage(1);
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {STAGE_OPTIONS.map((stage) => (
                 <option key={stage} value={stage}>
@@ -441,7 +469,7 @@ export default function OpportunitiesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Status
             </label>
             <select
@@ -450,7 +478,7 @@ export default function OpportunitiesPage() {
                 setStatusFilter(event.target.value as 'all' | 'open' | 'closed');
                 setPage(1);
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {STATUS_FILTER_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -460,7 +488,7 @@ export default function OpportunitiesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Result
             </label>
             <select
@@ -469,7 +497,7 @@ export default function OpportunitiesPage() {
                 setResultFilter(event.target.value as 'all' | 'won' | 'lost');
                 setPage(1);
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {RESULT_FILTER_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -479,7 +507,7 @@ export default function OpportunitiesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Owner
             </label>
             <select
@@ -488,7 +516,7 @@ export default function OpportunitiesPage() {
                 setAssignedFilter(event.target.value || undefined);
                 setPage(1);
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All owners</option>
               {users.map((user) => (
@@ -499,7 +527,7 @@ export default function OpportunitiesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Sort By
             </label>
             <select
@@ -508,7 +536,7 @@ export default function OpportunitiesPage() {
                 setSortBy(event.target.value as NonNullable<OpportunityFilters['sortBy']>);
                 setPage(1);
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -518,7 +546,7 @@ export default function OpportunitiesPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Direction
             </label>
             <button
@@ -527,7 +555,7 @@ export default function OpportunitiesPage() {
                 setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
                 setPage(1);
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
             </button>
@@ -543,7 +571,7 @@ export default function OpportunitiesPage() {
           <button
             type="button"
             onClick={handleResetFilters}
-            className="text-sm font-medium text-gray-500 hover:text-gray-700"
+            className="text-sm font-medium text-muted-foreground hover:text-muted-foreground"
           >
             Reset
           </button>
@@ -551,26 +579,26 @@ export default function OpportunitiesPage() {
       </form>
 
       {viewMode === 'table' ? (
-        <div className="flex flex-col gap-2 text-sm text-gray-500 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
           <span>{paginationInfo}</span>
           {meta && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handlePageChange(meta.page - 1)}
                 disabled={meta.page === 1}
-                className="rounded-lg border border-gray-300 px-3 py-1 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-border px-3 py-1 transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Previous
               </button>
               <span>
                 Page{' '}
-                <span className="font-semibold text-gray-900">{meta.page}</span> of{' '}
-                <span className="font-semibold text-gray-900">{meta.pageCount || 1}</span>
+                <span className="font-semibold text-foreground">{meta.page}</span> of{' '}
+                <span className="font-semibold text-foreground">{meta.pageCount || 1}</span>
               </span>
               <button
                 onClick={() => handlePageChange(meta.page + 1)}
                 disabled={meta.page >= (meta.pageCount || 1)}
-                className="rounded-lg border border-gray-300 px-3 py-1 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-border px-3 py-1 transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
               </button>
@@ -636,6 +664,13 @@ export default function OpportunitiesPage() {
           }}
         />
       ) : null}
+
+      <ContactImportDialog
+        open={importOpen}
+        importType="opportunities"
+        customers={customers}
+        onClose={() => setImportOpen(false)}
+      />
     </div>
   );
 }

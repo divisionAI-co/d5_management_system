@@ -3,6 +3,8 @@ import type {
   Candidate,
   CandidateFilters,
   CandidatePositionsResponse,
+  ConvertCandidateToEmployeePayload,
+  ConvertCandidateToEmployeeResponse,
   CreateCandidateDto,
   LinkCandidatePositionDto,
   PaginatedResponse,
@@ -63,6 +65,14 @@ export const candidatesApi = {
   async getPositions(id: string) {
     const { data } = await apiClient.get<CandidatePositionsResponse[]>(
       `/recruitment/candidates/${id}/positions`,
+    );
+    return data;
+  },
+
+  async convertToEmployee(id: string, payload: ConvertCandidateToEmployeePayload) {
+    const { data } = await apiClient.post<ConvertCandidateToEmployeeResponse>(
+      `/recruitment/candidates/${id}/convert-to-employee`,
+      payload,
     );
     return data;
   },

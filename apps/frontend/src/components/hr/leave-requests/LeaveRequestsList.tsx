@@ -42,7 +42,7 @@ export function LeaveRequestsList({
       PENDING: 'bg-yellow-100 text-yellow-800',
       APPROVED: 'bg-green-100 text-green-800',
       REJECTED: 'bg-red-100 text-red-800',
-      CANCELLED: 'bg-gray-100 text-gray-800',
+      CANCELLED: 'bg-muted/70 text-foreground',
     };
     return colors[status];
   };
@@ -52,10 +52,10 @@ export function LeaveRequestsList({
       ANNUAL: 'bg-blue-100 text-blue-800',
       SICK: 'bg-red-100 text-red-800',
       PERSONAL: 'bg-purple-100 text-purple-800',
-      UNPAID: 'bg-gray-100 text-gray-800',
+      UNPAID: 'bg-muted/70 text-foreground',
       MATERNITY: 'bg-pink-100 text-pink-800',
       PATERNITY: 'bg-indigo-100 text-indigo-800',
-      BEREAVEMENT: 'bg-gray-100 text-gray-800',
+      BEREAVEMENT: 'bg-muted/70 text-foreground',
     };
     return colors[type];
   };
@@ -66,8 +66,8 @@ export function LeaveRequestsList({
         <div className="flex items-center gap-3">
           <Calendar className="w-8 h-8 text-blue-600" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Leave Requests</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-foreground">Leave Requests</h1>
+            <p className="text-sm text-muted-foreground">
               {contextLabel ? `Viewing requests for ${contextLabel}` : 'Manage time-off requests'}
             </p>
           </div>
@@ -90,7 +90,7 @@ export function LeaveRequestsList({
       ) : leaveRequests && leaveRequests.length > 0 ? (
         <div className="grid gap-4">
           {leaveRequests.map((request) => (
-            <div key={request.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div key={request.id} className="bg-card p-6 rounded-lg shadow-sm border border-border">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
@@ -104,12 +104,12 @@ export function LeaveRequestsList({
                       {request.status}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     {format(new Date(request.startDate), 'MMM dd, yyyy')} - {format(new Date(request.endDate), 'MMM dd, yyyy')}
                     <span className="ml-2 font-medium">({request.totalDays} days)</span>
                   </p>
                   {request.reason && (
-                    <p className="text-sm text-gray-700 mt-2">{request.reason}</p>
+                    <p className="text-sm text-muted-foreground mt-2">{request.reason}</p>
                   )}
                 </div>
                 {request.status === 'PENDING' && canManage && onApprove && onReject && (
@@ -133,7 +133,7 @@ export function LeaveRequestsList({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
           {contextLabel
             ? `No leave requests found for ${contextLabel}.`
             : 'No leave requests have been submitted yet.'}

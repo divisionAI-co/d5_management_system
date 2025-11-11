@@ -33,11 +33,11 @@ export default function EodReportsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       {employeeIdFilter && (
         <button
           onClick={() => navigate(`/employees/${employeeIdFilter}`)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           Back to {employeeName || 'Employee'}
         </button>

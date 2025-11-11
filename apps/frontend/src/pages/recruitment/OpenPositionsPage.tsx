@@ -155,8 +155,8 @@ export default function OpenPositionsPage() {
     <div className="py-8 space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Open Positions</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Open Positions</h1>
+          <p className="text-sm text-muted-foreground">
             Overview of delivery commitments sourced from opportunities. Track candidate
             coverage, hiring progress and timeline to fulfil staffing needs.
           </p>
@@ -164,7 +164,7 @@ export default function OpenPositionsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => positionsQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
           >
             Refresh
           </button>
@@ -177,10 +177,10 @@ export default function OpenPositionsPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4 md:items-end">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Search
             </label>
             <input
@@ -193,12 +193,12 @@ export default function OpenPositionsPage() {
                 }))
               }
               placeholder="Search by title, opportunity or client..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Status
             </label>
             <select
@@ -209,7 +209,7 @@ export default function OpenPositionsPage() {
                   status: event.target.value as PositionStatus | 'ALL',
                 }))
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             >
               {STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -278,17 +278,17 @@ interface PositionDetailDrawerProps {
 function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, statusUpdating }: PositionDetailDrawerProps) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Position Details</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-semibold text-foreground">Position Details</h2>
+            <p className="text-sm text-muted-foreground">
               Review role requirements and candidate pipeline health.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -296,7 +296,7 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
 
         {isLoading ? (
           <div className="flex h-60 items-center justify-center">
-            <div className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-500">
+            <div className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
               Loading position...
             </div>
@@ -305,36 +305,36 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
           <div className="max-h-[70vh] overflow-y-auto px-6 py-6 space-y-6">
             <section className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-2xl font-semibold text-gray-900">{position.title}</h3>
+                <h3 className="text-2xl font-semibold text-foreground">{position.title}</h3>
                 <select
                   value={position.status}
                   onChange={(event) => onChangeStatus(position, event.target.value as PositionStatus)}
                   disabled={statusUpdating}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 >
                   <option value="Open">Open</option>
                   <option value="Filled">Filled</option>
                   <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-muted-foreground">
                 {position.description || 'No description provided.'}
               </div>
               {position.requirements && (
-                <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <div className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Requirements
                   </p>
                   <p className="mt-2 whitespace-pre-wrap">{position.requirements}</p>
                 </div>
               )}
               {position.opportunity && (
-                <div className="rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-700 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Opportunity
                   </p>
-                  <p className="mt-1 text-gray-900">{position.opportunity.title}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                  <p className="mt-1 text-foreground">{position.opportunity.title}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <UserRound className="h-3.5 w-3.5" />
                       {position.opportunity.customer?.name ?? 'Unassigned client'}
@@ -346,7 +346,7 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
                 </div>
               )}
 
-              <div className="grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
+              <div className="grid gap-3 text-xs text-muted-foreground sm:grid-cols-2">
                 <div className="inline-flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Created {new Date(position.createdAt).toLocaleDateString()}
@@ -365,8 +365,8 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
             </section>
 
             <section>
-              <h3 className="text-lg font-semibold text-gray-900">Candidate Pipeline</h3>
-              <p className="text-sm text-gray-500">
+              <h3 className="text-lg font-semibold text-foreground">Candidate Pipeline</h3>
+              <p className="text-sm text-muted-foreground">
                 Candidates linked to this position via recruitment workflow.
               </p>
               <div className="mt-4 space-y-3">
@@ -374,14 +374,14 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
                   position.candidates.map((link) => (
                     <div
                       key={link.id}
-                      className="rounded-xl border border-gray-100 bg-gray-50 p-4 shadow-sm"
+                      className="rounded-xl border border-border bg-muted p-4 shadow-sm"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">
+                          <p className="text-sm font-semibold text-foreground">
                             {link.candidate.firstName} {link.candidate.lastName}
                           </p>
-                          <p className="text-xs text-gray-500">{link.candidate.email}</p>
+                          <p className="text-xs text-muted-foreground">{link.candidate.email}</p>
                         </div>
                         <span
                           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${CANDIDATE_STAGE_COLORS[link.candidate.stage]}`}
@@ -389,7 +389,7 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
                           {CANDIDATE_STAGE_LABELS[link.candidate.stage]}
                         </span>
                       </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span>
                           Applied{' '}
                           {new Date(link.appliedAt).toLocaleDateString(undefined, {
@@ -408,15 +408,15 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
                           )}
                       </div>
                       {link.notes && (
-                        <div className="mt-2 rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-600">
-                          <p className="font-semibold text-gray-700">Notes</p>
+                        <div className="mt-2 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">
+                          <p className="font-semibold text-muted-foreground">Notes</p>
                           <p className="mt-1 whitespace-pre-wrap">{link.notes}</p>
                         </div>
                       )}
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
+                  <div className="rounded-xl border border-dashed border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
                     No candidates linked yet. Link candidates from the recruitment board.
                   </div>
                 )}
@@ -424,7 +424,7 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
             </section>
           </div>
         ) : (
-          <div className="flex h-60 items-center justify-center text-sm text-gray-500">
+          <div className="flex h-60 items-center justify-center text-sm text-muted-foreground">
             Position not found or was removed.
           </div>
         )}

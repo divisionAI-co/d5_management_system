@@ -54,21 +54,21 @@ export function IntegrationsSettingsSection() {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">Integrations</h2>
-        <p className="text-sm text-gray-500">
+    <div className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-6 py-4">
+        <h2 className="text-lg font-semibold text-foreground">Integrations</h2>
+        <p className="text-sm text-muted-foreground">
           Connect third-party services to keep data in sync.
         </p>
       </div>
 
       <div className="space-y-4 px-6 py-6">
         {isLoading && (
-          <p className="text-sm text-gray-500">Loading integrations...</p>
+          <p className="text-sm text-muted-foreground">Loading integrations...</p>
         )}
 
         {!isLoading && integrations.length === 0 && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             No integrations configured yet.
           </p>
         )}
@@ -76,18 +76,18 @@ export function IntegrationsSettingsSection() {
         {integrations.map((integration) => (
           <div
             key={integration.id}
-            className="flex flex-col gap-3 rounded-lg border border-gray-200 px-4 py-4 transition hover:bg-gray-50 md:flex-row md:items-center md:justify-between"
+            className="flex flex-col gap-3 rounded-lg border border-border px-4 py-4 transition hover:bg-muted md:flex-row md:items-center md:justify-between"
           >
             <div>
-              <p className="text-sm font-semibold text-gray-900">
+              <p className="text-sm font-semibold text-foreground">
                 {integration.friendlyName}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 {integration.description}
               </p>
-              <p className="mt-2 text-xs text-gray-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 Status:{' '}
-                <span className="font-medium text-gray-600">
+                <span className="font-medium text-muted-foreground">
                   {integration.isActive ? 'Enabled' : 'Disabled'}
                 </span>
               </p>

@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
   BadRequestException,
@@ -22,7 +23,8 @@ import { UserRole } from '@prisma/client';
 import {
   ContactImportSummary,
   ImportsService,
-  UploadContactsResult,
+  ImportType,
+  UploadImportResult,
 } from './imports.service';
 import { MapImportDto } from './dto/map-import.dto';
 import { ExecuteImportDto } from './dto/execute-import.dto';
@@ -38,9 +40,7 @@ export class ImportsController {
 
   @Post('upload')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({
-    summary: 'Upload a CSV file exported from Odoo for contact import',
-  })
+  @ApiOperation({ summary: 'Upload a CSV file exported from Odoo for CRM import' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -49,7 +49,7 @@ export class ImportsController {
       properties: {
         type: {
           type: 'string',
-          enum: ['contacts'],
+          enum: ['contacts', 'leads'],
           default: 'contacts',
         },
         file: {
@@ -63,21 +63,32 @@ export class ImportsController {
   uploadContacts(
     @Body('type') type: string,
     @UploadedFile() file: Express.Multer.File,
-  ): Promise<UploadContactsResult> {
-    const normalizedType = type?.trim().toLowerCase();
-    if (normalizedType !== 'contacts') {
-      throw new BadRequestException(
-        'Only contact imports are currently supported.',
-      );
+  ): Promise<UploadImportResult> {
+    const normalizedType = (type ?? 'contacts').trim().toLowerCase();
+    if (
+      normalizedType !== 'contacts' &&
+      normalizedType !== 'leads' &&
+      normalizedType !== 'opportunities'
+    ) {
+      throw new BadRequestException('Unsupported import type provided.');
     }
-    return this.importsService.uploadContactsImport(file);
+    return this.importsService.uploadImport(
+      normalizedType as ImportType,
+      file,
+    );
   }
 
   @Get()
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'List recent contact import jobs' })
-  listImports() {
-    return this.importsService.listImports();
+  @ApiOperation({ summary: 'List recent CRM import jobs' })
+  listImports(@Query('type') type?: ImportType) {
+    const normalizedType: ImportType =
+      type === 'leads'
+        ? 'leads'
+        : type === 'opportunities'
+        ? 'opportunities'
+        : 'contacts';
+    return this.importsService.listImports(normalizedType);
   }
 
   @Get(':id')
@@ -91,7 +102,7 @@ export class ImportsController {
   @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary:
-      'Submit the field mapping between CSV columns and contact properties',
+      'Submit the field mapping between CSV columns and CRM fields',
   })
   saveMapping(@Param('id') id: string, @Body() dto: MapImportDto) {
     return this.importsService.saveMapping(id, dto);

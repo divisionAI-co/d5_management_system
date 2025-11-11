@@ -8,6 +8,7 @@ interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthStore {

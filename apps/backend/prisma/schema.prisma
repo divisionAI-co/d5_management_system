@@ -53,6 +53,7 @@ model User {
   assignedTasks         Task[] @relation("AssignedTasks")
   createdTasks          Task[] @relation("CreatedTasks")
   activities            Activity[]
+  assignedActivities    Activity[] @relation("AssignedActivities")
   notifications         Notification[]
   notificationSettings  NotificationSettings?
   eodReports            EodReport[]
@@ -60,6 +61,8 @@ model User {
   remoteWorkLogs        RemoteWorkLog[]
   createdInvoices       Invoice[] @relation("InvoiceCreator")
   sentCampaigns         EmailCampaign[]
+  passwordResetTokens   PasswordResetToken[]
+  createdActivityTypes  ActivityType[] @relation("ActivityTypeCreatedBy")
   
   @@map("users")
 }
@@ -817,20 +820,18 @@ model Task {
 // UNIVERSAL ACTIVITY MODULE
 // ============================================
 
-enum ActivityType {
-  NOTE
-  CALL
-  EMAIL
-  MEETING
-  TASK_UPDATE
-  STATUS_CHANGE
-}
-
 model Activity {
-  id          String       @id @default(uuid())
-  type        ActivityType
-  title       String
-  description String?      @db.Text
+  id             String        @id @default(uuid())
+  activityTypeId String
+  activityType   ActivityType  @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
+  subject        String
+  body           String?       @db.Text
+  activityDate DateTime?
+  reminderAt  DateTime?
+  isReminderSent Boolean   @default(false)
+  isPinned    Boolean      @default(false)
+  isCompleted Boolean      @default(false)
+  visibility  ActivityVisibility @default(PUBLIC)
   
   // Relations (polymorphic-style)
   customerId    String?
@@ -853,6 +854,9 @@ model Activity {
   
   taskId        String?
   task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  assignedToId  String?
+  assignedTo    User?        @relation("AssignedActivities", fields: [assignedToId], references: [id], onDelete: SetNull)
   
   // Creator
   createdById   String
@@ -864,6 +868,7 @@ model Activity {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   
+  @@index([activityTypeId])
   @@index([customerId])
   @@index([leadId])
   @@index([opportunityId])
@@ -872,7 +877,38 @@ model Activity {
   @@index([contactId])
   @@index([taskId])
   @@index([createdById])
+  @@index([assignedToId])
   @@map("activities")
+}
+
+enum ActivityVisibility {
+  PUBLIC
+  TEAM
+  PRIVATE
+}
+
+model ActivityType {
+  id          String   @id @default(uuid())
+  name        String
+  key         String   @unique
+  description String?
+  color       String?  @default("#2563EB")
+  icon        String?  // Icon key
+  isActive    Boolean  @default(true)
+  isSystem    Boolean  @default(false)
+  order       Int      @default(0)
+
+  createdById String?
+  createdBy   User?    @relation("ActivityTypeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activities  Activity[]
+
+  @@index([isActive])
+  @@index([order])
+  @@map("activity_types")
 }
 
 // ============================================
@@ -980,6 +1016,20 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@map("notifications")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  reason    String   @default("RESET")
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 // ============================================

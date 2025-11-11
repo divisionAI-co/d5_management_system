@@ -142,19 +142,19 @@ export function PerformanceReviewForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit Performance Review' : 'New Performance Review'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit ? 'Update the review details.' : 'Complete the form to create a review.'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -165,10 +165,10 @@ export function PerformanceReviewForm({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {!employeeId && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Employee *</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Employee *</label>
                 <select
                   {...register('employeeId', { required: 'Please select an employee' })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select an employee</option>
                   {employees?.map((employee) => (
@@ -184,21 +184,21 @@ export function PerformanceReviewForm({
             )}
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Reviewer Name</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Reviewer Name</label>
               <input
                 type="text"
                 {...register('reviewerName')}
                 placeholder="Jane Smith"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Period Start *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Period Start *</label>
               <input
                 type="date"
                 {...register('reviewPeriodStart', { required: 'Start date is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.reviewPeriodStart && (
                 <p className="mt-1 text-sm text-red-600">{errors.reviewPeriodStart.message}</p>
@@ -206,11 +206,11 @@ export function PerformanceReviewForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Period End *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Period End *</label>
               <input
                 type="date"
                 {...register('reviewPeriodEnd', { required: 'End date is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.reviewPeriodEnd && (
                 <p className="mt-1 text-sm text-red-600">{errors.reviewPeriodEnd.message}</p>
@@ -218,7 +218,7 @@ export function PerformanceReviewForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Overall Rating</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Overall Rating</label>
               <input
                 type="number"
                 step="0.1"
@@ -230,7 +230,7 @@ export function PerformanceReviewForm({
                   max: { value: 5, message: 'Rating must be 5 or less' },
                 })}
                 placeholder="4.5"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.overallRating && (
                 <p className="mt-1 text-sm text-red-600">{errors.overallRating.message}</p>
@@ -238,20 +238,20 @@ export function PerformanceReviewForm({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Reviewed At</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Reviewed At</label>
               <input
                 type="date"
                 {...register('reviewedAt')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <h3 className="text-sm font-semibold text-gray-700">Core Competencies (1-5)</h3>
+          <div className="rounded-lg border border-border bg-muted p-4">
+            <h3 className="text-sm font-semibold text-muted-foreground">Core Competencies (1-5)</h3>
             <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-600">
+                <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
                   Communication
                 </label>
                 <input
@@ -259,11 +259,11 @@ export function PerformanceReviewForm({
                   min={1}
                   max={5}
                   {...register('communication', { valueAsNumber: true, required: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-600">
+                <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
                   Technical
                 </label>
                 <input
@@ -271,11 +271,11 @@ export function PerformanceReviewForm({
                   min={1}
                   max={5}
                   {...register('technical', { valueAsNumber: true, required: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-600">
+                <label className="mb-1 block text-xs font-medium uppercase text-muted-foreground">
                   Leadership
                 </label>
                 <input
@@ -283,7 +283,7 @@ export function PerformanceReviewForm({
                   min={1}
                   max={5}
                   {...register('leadership', { valueAsNumber: true, required: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -291,42 +291,42 @@ export function PerformanceReviewForm({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Strengths</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Strengths</label>
               <textarea
                 rows={4}
                 {...register('strengths')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="Key strengths demonstrated during the review period..."
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Areas for Improvement
               </label>
               <textarea
                 rows={4}
                 {...register('improvements')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="Development opportunities and areas for growth..."
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Goals</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Goals</label>
             <textarea
               rows={4}
               {...register('goals')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               placeholder="Objectives and goals for the next review cycle..."
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

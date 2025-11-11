@@ -48,9 +48,9 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
       ACTIVE: 'bg-green-100 text-green-800',
       ON_LEAVE: 'bg-yellow-100 text-yellow-800',
       TERMINATED: 'bg-red-100 text-red-800',
-      RESIGNED: 'bg-gray-100 text-gray-800',
+      RESIGNED: 'bg-muted/70 text-foreground',
     };
-    return styles[status] || 'bg-gray-100 text-gray-800';
+    return styles[status] || 'bg-muted/70 text-foreground';
   };
 
   return (
@@ -60,8 +60,8 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
         <div className="flex items-center gap-3">
           <Users className="w-8 h-8 text-blue-600" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
-            <p className="text-sm text-gray-500">Manage your team members</p>
+            <h1 className="text-2xl font-bold text-foreground">Employees</h1>
+            <p className="text-sm text-muted-foreground">Manage your team members</p>
           </div>
         </div>
         <button
@@ -74,17 +74,17 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-card p-4 rounded-lg shadow-sm border border-border">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search employees..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
@@ -92,7 +92,7 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -105,7 +105,7 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Departments</option>
             {departments?.map((dept) => (
@@ -121,13 +121,13 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-500">Loading employees...</p>
+          <p className="mt-4 text-muted-foreground">Loading employees...</p>
         </div>
       ) : filteredEmployees?.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow-sm border border-gray-200">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No employees found</h3>
-          <p className="text-gray-500 mb-6">Get started by adding your first employee</p>
+        <div className="text-center py-12 bg-card rounded-lg shadow-sm border border-border">
+          <Users className="mx-auto mb-4 h-16 w-16 text-border" />
+          <h3 className="text-lg font-medium text-foreground mb-2">No employees found</h3>
+          <p className="text-muted-foreground mb-6">Get started by adding your first employee</p>
           <button
             onClick={onCreateNew}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -137,36 +137,36 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Employee
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Job Title
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Department
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Hire Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Reviews/Leaves
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-border">
               {filteredEmployees?.map((employee) => (
-                <tr key={employee.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={employee.id} className="hover:bg-muted transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
@@ -177,18 +177,18 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
                         </div>
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className="text-sm font-medium text-foreground">
                           {employee.user?.firstName} {employee.user?.lastName}
                         </div>
-                        <div className="text-sm text-gray-500">{employee.employeeNumber}</div>
+                        <div className="text-sm text-muted-foreground">{employee.employeeNumber}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{employee.jobTitle}</div>
-                    <div className="text-sm text-gray-500">{employee.contractType}</div>
+                    <div className="text-sm text-foreground">{employee.jobTitle}</div>
+                    <div className="text-sm text-muted-foreground">{employee.contractType}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                     {employee.department || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -196,10 +196,10 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
                       {employee.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {format(new Date(employee.hireDate), 'MMM dd, yyyy')}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     <div className="flex gap-3">
                       <span>{employee._count?.performanceReviews || 0} reviews</span>
                       <span>•</span>

@@ -92,15 +92,15 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-card rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">
+        <div className="flex justify-between items-center p-6 border-b border-border">
+          <h2 className="text-2xl font-bold text-foreground">
             {isEdit ? 'Edit Employee' : 'Add New Employee'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 p-2 rounded-lg hover:bg-gray-100"
+            className="text-muted-foreground hover:text-muted-foreground p-2 rounded-lg hover:bg-muted/70"
           >
             <X className="w-6 h-6" />
           </button>
@@ -110,15 +110,15 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+            <h3 className="text-lg font-semibold text-foreground">Basic Information</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Assign User *
                 </label>
                 {isUsersLoading ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
                     <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
                     Loading users...
                   </div>
@@ -126,7 +126,7 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
                   <select
                     {...register('userId', { required: 'User is required' })}
                     disabled={isEdit}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                    className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-muted/70 disabled:text-muted-foreground"
                   >
                     <option value="">Select a user</option>
                     {availableUsers.map((user) => (
@@ -147,13 +147,13 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Employee Number *
                 </label>
                 <input
                   type="text"
                   {...register('employeeNumber', { required: 'Employee number is required' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="EMP001"
                 />
                 {errors.employeeNumber && (
@@ -162,13 +162,13 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Job Title *
                 </label>
                 <input
                   type="text"
                   {...register('jobTitle', { required: 'Job title is required' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Senior Developer"
                 />
                 {errors.jobTitle && (
@@ -177,24 +177,24 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Department
                 </label>
                 <input
                   type="text"
                   {...register('department')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Engineering"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Contract Type *
                 </label>
                 <select
                   {...register('contractType', { required: 'Contract type is required' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="FULL_TIME">Full Time</option>
                   <option value="PART_TIME">Part Time</option>
@@ -204,12 +204,12 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Employment Status *
                 </label>
                 <select
                   {...register('status')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="ACTIVE">Active</option>
                   <option value="ON_LEAVE">On Leave</option>
@@ -219,13 +219,13 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Hire Date *
                 </label>
                 <input
                   type="date"
                   {...register('hireDate', { required: 'Hire date is required' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {errors.hireDate && (
                   <p className="mt-1 text-sm text-red-600">{errors.hireDate.message}</p>
@@ -233,13 +233,13 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Termination Date
                 </label>
                 <input
                   type="date"
                   {...register('terminationDate')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
             </div>
@@ -247,11 +247,11 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
 
           {/* Compensation */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Compensation</h3>
+            <h3 className="text-lg font-semibold text-foreground">Compensation</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Salary *
                 </label>
                 <input
@@ -261,7 +261,7 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
                     required: 'Salary is required',
                     valueAsNumber: true,
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="75000"
                 />
                 {errors.salary && (
@@ -270,12 +270,12 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Currency
                 </label>
                 <select
                   {...register('salaryCurrency')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -288,41 +288,41 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
 
           {/* Emergency Contact */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Emergency Contact</h3>
+            <h3 className="text-lg font-semibold text-foreground">Emergency Contact</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Contact Name
                 </label>
                 <input
                   type="text"
                   {...register('emergencyContactName')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="John Doe"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Contact Phone
                 </label>
                 <input
                   type="tel"
                   {...register('emergencyContactPhone')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="+1234567890"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Relationship
                 </label>
                 <input
                   type="text"
                   {...register('emergencyContactRelation')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Spouse"
                 />
               </div>
@@ -330,11 +330,11 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-6 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-muted-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
             >
               Cancel
             </button>

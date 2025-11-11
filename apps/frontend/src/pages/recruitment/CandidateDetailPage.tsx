@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Link2, MapPin, Pencil, Star } from 'lucide-react';
+import { ArrowLeft, FileText, Link2, MapPin, PenSquare, Pencil, Star } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
 import type { CandidateStage, CandidatePositionsResponse } from '@/types/recruitment';
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/recruitment/CandidateBoard';
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
+import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 
 export default function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ export default function CandidateDetailPage() {
   const [showForm, setShowForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showActivitySidebar, setShowActivitySidebar] = useState(false);
 
   const candidateQuery = useQuery({
     queryKey: ['candidate', id],
@@ -59,7 +61,7 @@ export default function CandidateDetailPage() {
   if (candidateQuery.isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <div className="flex items-center gap-2 rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
           Loading candidate profile...
         </div>
@@ -76,7 +78,7 @@ export default function CandidateDetailPage() {
         <div className="text-center">
           <button
             onClick={() => navigate('/recruitment/candidates')}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Candidates
@@ -92,16 +94,16 @@ export default function CandidateDetailPage() {
         <div className="space-y-3">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-gray-700"
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition hover:text-muted-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-foreground">
               {candidate.firstName} {candidate.lastName}
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {candidate.currentTitle ?? 'Role pending'} •{' '}
               {candidate.yearsOfExperience ?? 0} yrs experience
             </p>
@@ -120,7 +122,7 @@ export default function CandidateDetailPage() {
             ) : null}
             {candidate.expectedSalary !== undefined &&
               candidate.expectedSalary !== null && (
-                <span className="inline-flex items-center rounded-full bg-gray-100 px-4 py-1 text-xs font-semibold text-gray-700">
+                <span className="inline-flex items-center rounded-full bg-muted/70 px-4 py-1 text-xs font-semibold text-muted-foreground">
                   Expected {candidate.salaryCurrency ?? 'USD'}{' '}
                   {candidate.expectedSalary.toLocaleString()}
                 </span>
@@ -134,7 +136,7 @@ export default function CandidateDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            className="rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             value={candidate.stage}
             onChange={(event) =>
               stageMutation.mutate({
@@ -152,10 +154,17 @@ export default function CandidateDetailPage() {
 
           <button
             onClick={() => setShowLinkModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
           >
             <Link2 className="h-4 w-4" />
             Link Position
+          </button>
+          <button
+            onClick={() => setShowActivitySidebar(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
+          >
+            <PenSquare className="h-4 w-4" />
+            Activities
           </button>
           <button
             onClick={() => setShowForm(true)}
@@ -181,15 +190,15 @@ export default function CandidateDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="space-y-6 lg:col-span-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Profile Overview</h2>
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Profile Overview</h2>
             <div className="mt-4 grid gap-6 md:grid-cols-2">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Contact
                   </p>
-                  <div className="mt-1 text-sm text-gray-600">
+                  <div className="mt-1 text-sm text-muted-foreground">
                     <p>
                       <a
                         href={`mailto:${candidate.email}`}
@@ -202,18 +211,18 @@ export default function CandidateDetailPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 text-gray-400" />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span>
                     {candidate.city || 'City TBD'}, {candidate.country || 'Country TBD'}
                   </span>
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Experience
                   </p>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {candidate.yearsOfExperience ?? 0} years overall experience
                   </p>
                 </div>
@@ -221,7 +230,7 @@ export default function CandidateDetailPage() {
 
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Assets
                   </p>
                   <ul className="mt-2 space-y-2 text-sm text-blue-600">
@@ -279,7 +288,7 @@ export default function CandidateDetailPage() {
                     !candidate.linkedinUrl &&
                     !candidate.githubUrl &&
                     !candidate.portfolioUrl && (
-                      <p className="mt-2 text-sm text-gray-500">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         No external resources attached yet.
                       </p>
                     )}
@@ -289,83 +298,54 @@ export default function CandidateDetailPage() {
 
             {candidate.notes && (
               <div className="mt-6">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Recruiter Notes
                 </p>
-                <div className="mt-2 whitespace-pre-wrap rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
+                <div className="mt-2 whitespace-pre-wrap rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
                   {candidate.notes}
                 </div>
               </div>
             )}
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Skills & Strengths</h2>
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Skills & Strengths</h2>
             <div className="mt-3 flex flex-wrap gap-2">
               {skills.length ? (
                 skills.map((skill) => (
                   <span
                     key={skill}
-                    className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700"
+                    className="inline-flex items-center rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground"
                   >
                     {skill}
                   </span>
                 ))
               ) : (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Skills not captured. Update the candidate profile to add core skills.
                 </p>
               )}
             </div>
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Activity Timeline</h2>
-            <div className="mt-4 space-y-4">
-              {candidate.activities && candidate.activities.length > 0 ? (
-                candidate.activities.map((activity) => (
-                  <div key={activity.id} className="relative pl-6">
-                    <span className="absolute left-1 top-2 h-2 w-2 rounded-full bg-blue-500" />
-                    <p className="text-sm font-semibold text-gray-900">
-                      {activity.title}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(activity.createdAt).toLocaleString()} by{' '}
-                      {activity.createdBy
-                        ? `${activity.createdBy.firstName} ${activity.createdBy.lastName}`
-                        : 'System'}
-                    </p>
-                    {activity.description && (
-                      <p className="mt-1 text-sm text-gray-600">{activity.description}</p>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-gray-500">
-                  No activity logged yet. Notes from interviews and decisions will show
-                  up here.
-                </p>
-              )}
-            </div>
-          </div>
         </section>
 
         <aside className="space-y-6">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Linked Positions</h2>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Linked Positions</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               See which opportunities this candidate is being considered for.
             </p>
             <div className="mt-4 space-y-4">
               {linkedPositions.length > 0 ? (
                 linkedPositions.map((link: CandidatePositionsResponse) => (
-                  <div key={link.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                  <div key={link.id} className="rounded-xl border border-border bg-muted p-4 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {link.position.title}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {link.position.opportunity?.customer?.name ?? '—'}
                         </p>
                       </div>
@@ -373,7 +353,7 @@ export default function CandidateDetailPage() {
                         {link.status}
                       </span>
                     </div>
-                    <div className="mt-3 space-y-2 text-xs text-gray-500">
+                    <div className="mt-3 space-y-2 text-xs text-muted-foreground">
                       <p>
                         Applied{' '}
                         {new Date(link.appliedAt).toLocaleDateString(undefined, {
@@ -396,7 +376,7 @@ export default function CandidateDetailPage() {
                         View position
                       </button>
                       {link.notes && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-muted-foreground">
                           Note: {link.notes.slice(0, 60)}
                           {link.notes.length > 60 ? '…' : ''}
                         </span>
@@ -405,7 +385,7 @@ export default function CandidateDetailPage() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">
+                <div className="rounded-xl border border-dashed border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
                   No positions linked. Use &ldquo;Link Position&rdquo; above to connect
                   an opportunity.
                 </div>
@@ -438,6 +418,14 @@ export default function CandidateDetailPage() {
           }}
         />
       )}
+
+      <ActivitySidebar
+        open={showActivitySidebar}
+        onClose={() => setShowActivitySidebar(false)}
+        entityId={id!}
+        entityType="candidate"
+        title="Activity Timeline"
+      />
     </div>
   );
 }

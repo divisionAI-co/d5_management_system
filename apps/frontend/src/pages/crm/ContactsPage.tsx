@@ -6,6 +6,7 @@ import type {
   ContactFilters,
   ContactSummary,
   ContactsListResponse,
+  ConvertContactToLeadPayload,
   CustomerSummary,
 } from '@/types/crm';
 import { ContactsTable } from '@/components/crm/contacts/ContactsTable';
@@ -62,12 +63,34 @@ export default function ContactsPage() {
     queryKey: ['contact', detailContactId],
     queryFn: () => contactsApi.getById(detailContactId!),
     enabled: Boolean(detailContactId),
+    placeholderData: keepPreviousData,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => contactsApi.remove(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    },
+  });
+
+  const convertMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ConvertContactToLeadPayload }) =>
+      contactsApi.convertToLead(id, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      if (variables?.id) {
+      queryClient.invalidateQueries({ queryKey: ['contact', variables.id] });
+      queryClient.refetchQueries({ queryKey: ['contact', variables.id], exact: true });
+      }
+      window.alert('Contact converted to lead.');
+    },
+    onError: (error: unknown) => {
+      if (error instanceof Error) {
+        window.alert(error.message);
+      } else {
+        window.alert('Failed to convert contact to lead.');
+      }
     },
   });
 
@@ -126,16 +149,39 @@ export default function ContactsPage() {
     setDetailContactId(contact.id);
   };
 
+  const handleConvertContact = (contact: ContactDetail) => {
+    if (convertMutation.isPending) {
+      return;
+    }
+
+    const suggestedTitle = contact.companyName
+      ? `${contact.companyName} - ${contact.firstName} ${contact.lastName}`
+      : `${contact.firstName} ${contact.lastName} Lead`;
+
+    const title = window.prompt('Lead title', suggestedTitle);
+    if (!title) {
+      return;
+    }
+
+    const payload: ConvertContactToLeadPayload = {
+      title: title.trim(),
+      description: contact.notes ?? undefined,
+      prospectCompanyName: contact.companyName ?? undefined,
+    };
+
+    convertMutation.mutate({ id: contact.id, payload });
+  };
+
   const pagination = useMemo(() => contactsQuery.data?.meta, [contactsQuery.data?.meta]);
   const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
   const canImport = user?.role === 'ADMIN';
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Contacts</h1>
+          <p className="text-sm text-muted-foreground">
             Manage stakeholder relationships, link contacts to accounts, and stay on top of follow-ups.
           </p>
         </div>
@@ -143,7 +189,7 @@ export default function ContactsPage() {
           {canImport && (
             <button
               onClick={() => setImportOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground"
             >
               <UploadCloud className="h-4 w-4" />
               Import Contacts
@@ -159,27 +205,27 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      <form onSubmit={handleFilterApply} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <form onSubmit={handleFilterApply} className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Search</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Search</label>
             <div className="relative">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by name, email, phone or company"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Customer</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Customer</label>
             <select
               value={selectedCustomer ?? ''}
               onChange={(event) => setSelectedCustomer(event.target.value || undefined)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All customers</option>
               {customers.map((customer) => (
@@ -188,7 +234,7 @@ export default function ContactsPage() {
                 </option>
               ))}
             </select>
-            <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
+            <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
               <input
                 type="checkbox"
                 checked={showUnassigned}
@@ -199,11 +245,11 @@ export default function ContactsPage() {
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Sort By</label>
+              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Sort By</label>
               <select
                 value={filters.sortBy ?? 'createdAt'}
                 onChange={(event) => handleSortChange(event.target.value as NonNullable<ContactFilters['sortBy']>)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -213,11 +259,11 @@ export default function ContactsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Direction</label>
+              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Direction</label>
               <button
                 type="button"
                 onClick={handleSortDirection}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
               </button>
@@ -234,14 +280,14 @@ export default function ContactsPage() {
           <button
             type="button"
             onClick={handleReset}
-            className="text-sm font-medium text-gray-500 hover:text-gray-700"
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
           >
             Reset
           </button>
         </div>
       </form>
 
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
           {pagination
             ? `${(pagination.page - 1) * pagination.pageSize + 1}-${Math.min(
@@ -255,18 +301,18 @@ export default function ContactsPage() {
             <button
               onClick={() => handlePageChange(pagination.page - 1)}
               disabled={pagination.page === 1}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border px-3 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
             <span>
-              Page <span className="font-semibold text-gray-900">{pagination.page}</span> of{' '}
-              <span className="font-semibold text-gray-900">{pagination.pageCount || 1}</span>
+              Page <span className="font-semibold text-foreground">{pagination.page}</span> of{' '}
+              <span className="font-semibold text-foreground">{pagination.pageCount || 1}</span>
             </span>
             <button
               onClick={() => handlePageChange(pagination.page + 1)}
               disabled={pagination.page >= (pagination.pageCount || 1)}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border px-3 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>
@@ -298,6 +344,8 @@ export default function ContactsPage() {
         <ContactDetailPanel
           contact={contactDetailQuery.data}
           onClose={() => setDetailContactId(null)}
+          onConvertToLead={handleConvertContact}
+          isConverting={convertMutation.isPending}
         />
       )}
 

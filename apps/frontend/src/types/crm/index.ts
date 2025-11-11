@@ -1,3 +1,5 @@
+import type { Activity } from '@/types/activities';
+
 export type CustomerType = 'STAFF_AUGMENTATION' | 'SOFTWARE_SUBSCRIPTION' | 'BOTH';
 export type CustomerStatus = 'ONBOARDING' | 'ACTIVE' | 'AT_RISK' | 'PAUSED' | 'CHURNED';
 export type CustomerSentiment = 'HAPPY' | 'NEUTRAL' | 'UNHAPPY';
@@ -96,19 +98,7 @@ export interface ContactLeadSummary {
   createdAt: string;
 }
 
-export interface ContactActivitySummary {
-  id: string;
-  type: string;
-  title: string;
-  description?: string | null;
-  createdAt: string;
-  createdBy: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-}
+export type ContactActivitySummary = Activity;
 
 export interface ContactSummary extends Contact {
   customer?: ContactCustomer | null;
@@ -130,20 +120,7 @@ export interface CustomerDetail extends CustomerSummary {
   invoices: CustomerInvoice[];
 }
 
-export interface CustomerActivity {
-  id: string;
-  type: string;
-  title: string;
-  description?: string | null;
-  metadata?: Record<string, unknown> | null;
-  createdAt: string;
-  createdBy: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
-}
+export type CustomerActivity = Activity;
 
 export interface CustomersListResponse {
   data: CustomerSummary[];
@@ -229,6 +206,20 @@ export interface CreateContactPayload {
 }
 
 export interface UpdateContactPayload extends Partial<CreateContactPayload> {}
+
+export interface ConvertContactToLeadPayload {
+  title: string;
+  description?: string;
+  status?: LeadStatus;
+  value?: number;
+  probability?: number;
+  assignedToId?: string;
+  source?: string;
+  expectedCloseDate?: string;
+  prospectCompanyName?: string;
+  prospectWebsite?: string;
+  prospectIndustry?: string;
+}
 
 export interface Lead {
   id: string;

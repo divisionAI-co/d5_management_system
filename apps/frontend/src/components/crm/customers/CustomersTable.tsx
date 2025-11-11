@@ -23,7 +23,7 @@ interface CustomersTableProps {
 
 const sentimentClass = {
   HAPPY: 'bg-green-100 text-green-700',
-  NEUTRAL: 'bg-gray-100 text-gray-700',
+  NEUTRAL: 'bg-muted/70 text-muted-foreground',
   UNHAPPY: 'bg-red-100 text-red-700',
 };
 
@@ -56,7 +56,7 @@ export function CustomersTable({
       <ArrowUpDown
         className={clsx('h-4 w-4 transition', {
           'text-blue-600': isActive,
-          'text-gray-400': !isActive,
+          'text-muted-foreground': !isActive,
         })}
       />
     );
@@ -72,7 +72,7 @@ export function CustomersTable({
 
   if (!response || response.data.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
         No customers found. Try adjusting your filters or add a new customer.
       </div>
     );
@@ -82,11 +82,11 @@ export function CustomersTable({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <button
                   type="button"
                   onClick={() => handleSort('name')}
@@ -96,16 +96,16 @@ export function CustomersTable({
                   {renderSortIcon('name')}
                 </button>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Type
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Sentiment
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Monthly Value
                 <button
                   type="button"
@@ -115,10 +115,10 @@ export function CustomersTable({
                   {renderSortIcon('monthlyValue')}
                 </button>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Contacts / Opps
               </th>
-              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Updated
                 <button
                   type="button"
@@ -128,19 +128,19 @@ export function CustomersTable({
                   {renderSortIcon('updatedAt')}
                 </button>
               </th>
-              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+              <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 bg-white">
+          <tbody className="divide-y divide-border bg-card">
             {data.map((customer) => (
-              <tr key={customer.id} className="transition hover:bg-gray-50">
+              <tr key={customer.id} className="transition hover:bg-muted">
                 <td className="whitespace-nowrap px-6 py-4 text-sm">
-                  <div className="font-semibold text-gray-900">{customer.name}</div>
-                  <div className="text-xs text-gray-500">{customer.email}</div>
+                  <div className="font-semibold text-foreground">{customer.name}</div>
+                  <div className="text-xs text-muted-foreground">{customer.email}</div>
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-muted-foreground">
                   {customer.type.replace('_', ' ')}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-sm">
@@ -163,13 +163,13 @@ export function CustomersTable({
                     {customer.sentiment}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-muted-foreground">
                   {customer.monthlyValue !== null && customer.monthlyValue !== undefined
                     ? `${(customer.currency ?? 'USD')} ${customer.monthlyValue.toLocaleString()}`
                     : '—'}
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 font-medium text-blue-700">
                       C: {customer._count?.contacts ?? 0}
                     </span>
@@ -178,34 +178,34 @@ export function CustomersTable({
                     </span>
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-muted-foreground">
                   {format(new Date(customer.updatedAt), 'MMM dd, yyyy')}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-blue-200 hover:text-blue-600"
+                      className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-200 hover:text-blue-600"
                       title="View details"
                       onClick={() => onView(customer)}
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
-                      className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-emerald-200 hover:text-emerald-600"
+                      className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-emerald-200 hover:text-emerald-600"
                       title="Update status"
                       onClick={() => onUpdateStatus(customer)}
                     >
                       <FileBarChart2 className="h-4 w-4" />
                     </button>
                     <button
-                      className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-blue-200 hover:text-blue-600"
+                      className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-200 hover:text-blue-600"
                       title="Edit"
                       onClick={() => onEdit(customer)}
                     >
                       <Edit3 className="h-4 w-4" />
                     </button>
                     <button
-                      className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                      className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-red-200 hover:text-red-600"
                       title="Delete"
                       onClick={() => onDelete(customer)}
                     >
@@ -219,31 +219,31 @@ export function CustomersTable({
         </table>
       </div>
 
-      <div className="flex flex-col items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm md:flex-row">
+      <div className="flex flex-col items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm md:flex-row">
         <div>
           Showing{' '}
-          <span className="font-semibold text-gray-900">
+          <span className="font-semibold text-foreground">
             {(meta.page - 1) * meta.pageSize + 1}-
             {Math.min(meta.page * meta.pageSize, meta.total)}
           </span>{' '}
-          of <span className="font-semibold text-gray-900">{meta.total}</span> customers
+          of <span className="font-semibold text-foreground">{meta.total}</span> customers
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => onChangePage(meta.page - 1)}
             disabled={meta.page === 1}
-            className="rounded-lg border border-gray-300 px-3 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             Previous
           </button>
           <span className="text-sm">
-            Page <span className="font-semibold text-gray-900">{meta.page}</span> of{' '}
-            <span className="font-semibold text-gray-900">{meta.pageCount || 1}</span>
+            Page <span className="font-semibold text-foreground">{meta.page}</span> of{' '}
+            <span className="font-semibold text-foreground">{meta.pageCount || 1}</span>
           </span>
           <button
             onClick={() => onChangePage(meta.page + 1)}
             disabled={meta.page >= (meta.pageCount || 1)}
-            className="rounded-lg border border-gray-300 px-3 py-1 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             Next
           </button>

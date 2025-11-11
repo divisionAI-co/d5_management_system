@@ -53,6 +53,7 @@ interface CandidateBoardProps {
   onMoveStage?: (candidate: Candidate, stage: CandidateStage) => void;
   onLinkPosition?: (candidate: Candidate) => void;
   onCandidateMove?: (result: DropResult, candidate: Candidate) => void;
+  onConvertToEmployee?: (candidate: Candidate) => void;
 }
 
 export function CandidateBoard({
@@ -65,6 +66,7 @@ export function CandidateBoard({
   onMoveStage,
   onLinkPosition,
   onCandidateMove,
+  onConvertToEmployee,
 }: CandidateBoardProps) {
   const grouped = useMemo(() => {
     const map = new Map<CandidateStage, Candidate[]>();
@@ -104,8 +106,8 @@ export function CandidateBoard({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Recruitment Board</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Recruitment Board</h1>
+          <p className="text-sm text-muted-foreground">
             Track candidates as they progress from screening to contract
             signing. Use the actions on each card to advance stages, update
             details or link to open positions.
@@ -115,7 +117,7 @@ export function CandidateBoard({
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition"
             >
               <MoveRight className={`h-4 w-4 ${isLoading ? 'animate-pulse' : ''}`} />
               Refresh
@@ -144,28 +146,28 @@ export function CandidateBoard({
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex h-full flex-col rounded-xl border border-gray-200 bg-gray-50 shadow-sm transition ${
+                    className={`flex h-full flex-col rounded-xl border border-border bg-muted shadow-sm transition ${
                       snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
                     }`}
                   >
-                    <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STAGE_COLORS[stage]}`}>
                         {STAGE_LABELS[stage]}
                       </span>
-                      <span className="text-xs font-medium text-gray-500">
+                      <span className="text-xs font-medium text-muted-foreground">
                         {items.length} {items.length === 1 ? 'candidate' : 'candidates'}
                       </span>
                     </div>
                     <div className="flex flex-1 flex-col gap-3 p-4">
                       {isLoading && items.length === 0 ? (
-                        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50">
-                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border bg-muted">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                             Loading candidates...
                           </div>
                         </div>
                       ) : items.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-center text-sm text-gray-500">
+                        <div className="rounded-lg border border-dashed border-border bg-muted p-4 text-center text-sm text-muted-foreground">
                           No candidates in this stage yet.
                         </div>
                       ) : null}
@@ -181,7 +183,7 @@ export function CandidateBoard({
                                 width: '100%',
                                 ...(dragProvided.draggableProps.style ?? {}),
                               }}
-                              className={`space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition ${
+                              className={`space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm transition ${
                                 dragSnapshot.isDragging ? 'border-blue-300 shadow-lg' : 'hover:shadow-md'
                               }`}
                             >
@@ -191,6 +193,7 @@ export function CandidateBoard({
                                 onEdit={onEdit}
                                 onMoveStage={onMoveStage}
                                 onLinkPosition={onLinkPosition}
+                                onConvertToEmployee={onConvertToEmployee}
                               />
                             </div>
                           )}
@@ -215,6 +218,7 @@ interface CandidateCardProps {
   onEdit?: (candidate: Candidate) => void;
   onMoveStage?: (candidate: Candidate, stage: CandidateStage) => void;
   onLinkPosition?: (candidate: Candidate) => void;
+  onConvertToEmployee?: (candidate: Candidate) => void;
 }
 
 function CandidateCard({
@@ -223,6 +227,7 @@ function CandidateCard({
   onEdit,
   onMoveStage,
   onLinkPosition,
+  onConvertToEmployee,
 }: CandidateCardProps) {
   const nextStages = STAGE_ORDER.filter((stage) => stage !== candidate.stage);
 
@@ -230,12 +235,12 @@ function CandidateCard({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-foreground">
             {candidate.firstName} {candidate.lastName}
           </h3>
-          <p className="text-sm text-gray-500">{candidate.currentTitle || 'Title pending'}</p>
+          <p className="text-sm text-muted-foreground">{candidate.currentTitle || 'Title pending'}</p>
         </div>
-        <div className="flex flex-col items-end gap-1 text-xs text-gray-500">
+        <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
           {candidate.yearsOfExperience !== undefined && candidate.yearsOfExperience !== null && (
             <span>{candidate.yearsOfExperience} yrs exp</span>
           )}
@@ -251,35 +256,35 @@ function CandidateCard({
         {(candidate.skills ?? []).slice(0, 4).map((skill) => (
           <span
             key={skill}
-            className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600"
+            className="rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground"
           >
             {skill}
           </span>
         ))}
         {(candidate.skills?.length ?? 0) > 4 && (
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
+          <span className="rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground">
             +{(candidate.skills?.length ?? 0) - 4} more
           </span>
         )}
       </div>
 
-      <div className="space-y-2 text-sm text-gray-600">
+      <div className="space-y-2 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
-          <UserRound className="h-4 w-4 text-gray-400" />
+          <UserRound className="h-4 w-4 text-muted-foreground" />
           <a href={`mailto:${candidate.email}`} className="truncate hover:underline">
             {candidate.email}
           </a>
         </div>
         {candidate.phone && (
           <div className="flex items-center gap-2">
-            <span className="text-gray-400">📞</span>
+            <span className="text-muted-foreground">📞</span>
             <span>{candidate.phone}</span>
           </div>
         )}
         {candidate.expectedSalary !== undefined && candidate.expectedSalary !== null && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Expected Salary:{' '}
-            <span className="font-medium text-gray-700">
+            <span className="font-medium text-muted-foreground">
               {candidate.salaryCurrency ?? 'USD'}{' '}
               {candidate.expectedSalary.toLocaleString()}
             </span>
@@ -291,7 +296,7 @@ function CandidateCard({
         {onView && (
           <button
             onClick={() => onView(candidate)}
-            className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"
+            className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
           >
             View
           </button>
@@ -316,6 +321,16 @@ function CandidateCard({
           </button>
         )}
 
+        {onConvertToEmployee && (
+          <button
+            onClick={() => onConvertToEmployee(candidate)}
+            className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={Boolean(candidate.employee)}
+          >
+            {candidate.employee ? 'Already an Employee' : 'Convert to Employee'}
+          </button>
+        )}
+
         {onMoveStage && (
           <select
             onChange={(event) => {
@@ -326,7 +341,7 @@ function CandidateCard({
               }
             }}
             defaultValue=""
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
           >
             <option value="">Move to stage...</option>
             {nextStages.map((stage) => (

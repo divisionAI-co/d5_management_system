@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldAlert, ShieldCheck, UserPlus, RefreshCcw, Trash2, X } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, RefreshCcw, Trash2, X, Wand2 } from 'lucide-react';
 
 import { usersApi } from '@/lib/api/users';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type {
   CreateUserPayload,
+  UserDetail,
   UserListFilters,
   UserRole,
   UserSortField,
@@ -17,7 +18,6 @@ const DEFAULT_FORM: CreateUserPayload = {
   firstName: '',
   lastName: '',
   email: '',
-  password: '',
   role: 'EMPLOYEE',
   phone: '',
 };
@@ -61,6 +61,7 @@ export function UserManagementPanel() {
   const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [formState, setFormState] = useState<CreateUserPayload>(DEFAULT_FORM);
   const [formPassword, setFormPassword] = useState('');
+  const [formSendInvite, setFormSendInvite] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -90,11 +91,15 @@ export function UserManagementPanel() {
     placeholderData: keepPreviousData,
   });
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<UserDetail, unknown, CreateUserPayload>({
     mutationFn: usersApi.create,
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      setFeedback('User invited successfully.');
+      setFeedback(
+        variables?.sendInvite
+          ? 'Invitation email sent successfully.'
+          : 'User created with temporary password.',
+      );
       closeForm();
     },
     onError: (error: any) => {
@@ -128,7 +133,7 @@ export function UserManagementPanel() {
 
   if (user?.role !== 'ADMIN') {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 rounded-lg bg-white p-8 shadow-sm">
+      <div className="mx-auto max-w-3xl space-y-6 rounded-lg bg-card p-8 shadow-sm">
         <div className="flex items-center gap-3 text-amber-600">
           <ShieldAlert className="h-8 w-8" />
           <div>
@@ -148,6 +153,7 @@ export function UserManagementPanel() {
     setSelectedUser(null);
     setFormState(DEFAULT_FORM);
     setFormPassword('');
+    setFormSendInvite(false);
     setShowForm(true);
     setErrorMessage(null);
   };
@@ -159,17 +165,44 @@ export function UserManagementPanel() {
       firstName: userRecord.firstName,
       lastName: userRecord.lastName,
       email: userRecord.email,
-      password: '',
       role: userRecord.role,
       phone: userRecord.phone ?? '',
     });
     setFormPassword('');
+    setFormSendInvite(false);
     setErrorMessage(null);
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
+    setFormPassword('');
+    setFormSendInvite(false);
+  };
+
+  const generateStrongPassword = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*()';
+    const length = 16;
+
+    try {
+      const randomValues = new Uint32Array(length);
+      if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+        window.crypto.getRandomValues(randomValues);
+      } else {
+        for (let i = 0; i < length; i += 1) {
+          randomValues[i] = Math.floor(Math.random() * alphabet.length);
+        }
+      }
+
+      let password = '';
+      for (let i = 0; i < length; i += 1) {
+        password += alphabet[randomValues[i] % alphabet.length];
+      }
+      setFormPassword(password);
+    } catch {
+      const fallback = Array.from({ length }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+      setFormPassword(fallback);
+    }
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -177,15 +210,30 @@ export function UserManagementPanel() {
     setErrorMessage(null);
 
     if (formMode === 'create') {
+      const payloadBase: CreateUserPayload = {
+        firstName: formState.firstName.trim(),
+        lastName: formState.lastName.trim(),
+        email: formState.email.trim(),
+        role: formState.role,
+        phone: formState.phone?.trim() || undefined,
+      };
+
+      if (formSendInvite) {
+        createMutation.mutate({
+          ...payloadBase,
+          sendInvite: true,
+        });
+        return;
+      }
+
       if (!formPassword || formPassword.length < 8) {
         setErrorMessage('Password must be at least 8 characters long.');
         return;
       }
 
       createMutation.mutate({
-        ...formState,
+        ...payloadBase,
         password: formPassword,
-        phone: formState.phone?.trim() || undefined,
       });
     } else if (formMode === 'edit' && selectedUser) {
       const payload: Partial<CreateUserPayload> & { password?: string } = {
@@ -242,13 +290,13 @@ export function UserManagementPanel() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-3">
           <ShieldCheck className="h-10 w-10 text-blue-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-            <p className="text-sm text-gray-600">
+            <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+            <p className="text-sm text-muted-foreground">
               Invite teammates, assign roles and deactivate accounts from a single workspace.
             </p>
           </div>
@@ -257,7 +305,7 @@ export function UserManagementPanel() {
           <button
             type="button"
             onClick={() => usersQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <RefreshCcw className="h-4 w-4" />
             Refresh
@@ -291,20 +339,20 @@ export function UserManagementPanel() {
         </div>
       )}
 
-      <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="space-y-6 rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Search</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Search</label>
             <input
               type="text"
               value={filters.search ?? ''}
               onChange={(event) => handleFilterChange('search', event.target.value)}
               placeholder="Search by name or email"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Role</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Role</label>
             <select
               value={filters.role ?? ''}
               onChange={(event) =>
@@ -313,7 +361,7 @@ export function UserManagementPanel() {
                   (event.target.value || undefined) as UserRole | undefined,
                 )
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {ROLE_FILTERS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -323,7 +371,7 @@ export function UserManagementPanel() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Status
             </label>
             <select
@@ -332,7 +380,7 @@ export function UserManagementPanel() {
                 const value = event.target.value;
                 handleFilterChange('isActive', value === '' ? undefined : value === 'active');
               }}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {STATUS_FILTERS.map((option) => (
                 <option
@@ -345,11 +393,11 @@ export function UserManagementPanel() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Sort</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Sort</label>
             <select
               value={sort.sortBy}
               onChange={(event) => handleSortChange(event.target.value as UserSortField)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {SORT_FIELDS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -361,8 +409,8 @@ export function UserManagementPanel() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+          <table className="min-w-full divide-y divide-border text-sm">
+            <thead className="bg-muted text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold">Name</th>
                 <th className="px-4 py-3 text-left font-semibold">Email</th>
@@ -371,23 +419,23 @@ export function UserManagementPanel() {
                 <th className="px-4 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white text-gray-700">
+            <tbody className="divide-y divide-border bg-card text-muted-foreground">
               {usersQuery.isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                     Loading users...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                     No users found. Adjust filters or invite a new user.
                   </td>
                 </tr>
               ) : (
                 users.map((userRecord) => (
                   <tr key={userRecord.id}>
-                    <td className="px-4 py-3 font-semibold text-gray-900">
+                    <td className="px-4 py-3 font-semibold text-foreground">
                       {userRecord.firstName} {userRecord.lastName}
                     </td>
                     <td className="px-4 py-3">{userRecord.email}</td>
@@ -401,7 +449,7 @@ export function UserManagementPanel() {
                         className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
                           userRecord.isActive
                             ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-gray-200 text-gray-600'
+                            : 'bg-muted/80 text-muted-foreground'
                         }`}
                       >
                         {userRecord.isActive ? 'Active' : 'Inactive'}
@@ -412,7 +460,7 @@ export function UserManagementPanel() {
                         <button
                           type="button"
                           onClick={() => openEditForm(userRecord)}
-                          className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50"
+                          className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
                         >
                           Edit
                         </button>
@@ -434,7 +482,7 @@ export function UserManagementPanel() {
         </div>
 
         {meta && (
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-200 pt-4 text-sm text-gray-600 md:flex-row">
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-4 text-sm text-muted-foreground md:flex-row">
             <div>
               Showing {(meta.page - 1) * meta.pageSize + 1}-
               {Math.min(meta.page * meta.pageSize, meta.total)} of {meta.total} users
@@ -444,7 +492,7 @@ export function UserManagementPanel() {
                 type="button"
                 disabled={meta.page === 1}
                 onClick={() => handlePageChange((meta?.page ?? 1) - 1)}
-                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Previous
               </button>
@@ -455,7 +503,7 @@ export function UserManagementPanel() {
                 type="button"
                 disabled={meta.page >= meta.totalPages}
                 onClick={() => handlePageChange((meta?.page ?? 1) + 1)}
-                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
               </button>
@@ -466,13 +514,13 @@ export function UserManagementPanel() {
 
       {showForm && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-gray-900/50 px-4">
-          <div className="w-full max-w-xl rounded-lg bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xl rounded-lg bg-card p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">
+                <h2 className="text-xl font-semibold text-foreground">
                   {formMode === 'create' ? 'Invite New User' : 'Edit User'}
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {formMode === 'create'
                     ? 'Send an invitation by supplying initial credentials.'
                     : 'Update the user profile or reset their password.'}
@@ -481,7 +529,7 @@ export function UserManagementPanel() {
               <button
                 type="button"
                 onClick={closeForm}
-                className="rounded-full p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -496,7 +544,7 @@ export function UserManagementPanel() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                     First Name
                   </label>
                   <input
@@ -506,11 +554,11 @@ export function UserManagementPanel() {
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, firstName: event.target.value }))
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                     Last Name
                   </label>
                   <input
@@ -520,11 +568,11 @@ export function UserManagementPanel() {
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, lastName: event.target.value }))
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                     Email
                   </label>
                   <input
@@ -534,11 +582,11 @@ export function UserManagementPanel() {
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, email: event.target.value }))
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                     Phone
                   </label>
                   <input
@@ -547,11 +595,11 @@ export function UserManagementPanel() {
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, phone: event.target.value }))
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                     Role
                   </label>
                   <select
@@ -559,7 +607,7 @@ export function UserManagementPanel() {
                     onChange={(event) =>
                       setFormState((prev) => ({ ...prev, role: event.target.value as UserRole }))
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   >
                     {ROLE_FILTERS.slice(1).map((option) => (
                       <option key={option.label} value={option.value}>
@@ -570,40 +618,74 @@ export function UserManagementPanel() {
                 </div>
               </div>
 
-              {formMode === 'create' ? (
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
-                    Temporary Password
+              {formMode === 'create' && (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
+                  <label className="flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={formSendInvite}
+                      onChange={(event) => setFormSendInvite(event.target.checked)}
+                      className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Send invitation email so the user can set their own password</span>
                   </label>
-                  <input
-                    type="password"
-                    required
-                    value={formPassword}
-                    onChange={(event) => setFormPassword(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                    placeholder="Minimum 8 characters"
-                  />
+                  <p className="text-xs text-muted-foreground">
+                    We&apos;ll generate a secure, one-time password setup link that expires after a few days.
+                  </p>
                 </div>
+              )}
+
+              {formMode === 'create' ? (
+                formSendInvite ? (
+                  <div className="rounded-lg border border-dashed border-border bg-muted/30 px-4 py-5 text-sm text-muted-foreground">
+                    An invitation email with a password setup link will be delivered to the user as soon as you click
+                    &ldquo;Invite User&rdquo;.
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-1 flex items-center justify-between">
+                      <label className="block text-xs font-semibold uppercase text-muted-foreground">
+                        Temporary Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={generateStrongPassword}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      >
+                        <Wand2 className="h-3.5 w-3.5" />
+                        Generate
+                      </button>
+                    </div>
+                    <input
+                      type="password"
+                      required
+                      value={formPassword}
+                      onChange={(event) => setFormPassword(event.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      placeholder="Minimum 8 characters"
+                    />
+                  </div>
+                )
               ) : (
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                     Reset Password
                   </label>
                   <input
                     type="password"
                     value={formPassword}
                     onChange={(event) => setFormPassword(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     placeholder="Leave blank to keep current password"
                   />
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+              <div className="flex justify-end gap-3 border-t border-border pt-4">
                 <button
                   type="button"
                   onClick={closeForm}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+                  className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 >
                   Cancel
                 </button>

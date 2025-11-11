@@ -191,13 +191,13 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit EOD Report' : 'New EOD Report'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit
                 ? 'Update the details of your submitted report.'
                 : 'Summarize the work completed for the selected day.'}
@@ -205,7 +205,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -214,23 +214,23 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Report Date *</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Report Date *</label>
             <input
               type="date"
               {...register('date', { required: 'Report date is required' })}
               disabled={isEdit}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
             {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>}
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Summary *</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Summary *</label>
             <textarea
               rows={4}
               {...register('summary', { required: 'Summary is required' })}
               placeholder="What were the highlights of your day?"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
             {errors.summary && (
               <p className="mt-1 text-sm text-red-600">{errors.summary.message}</p>
@@ -239,7 +239,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-muted-foreground">
                 Tasks *
               </label>
               <button
@@ -256,38 +256,38 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
             </div>
 
             {fields.map((field, index) => (
-              <div key={field.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+              <div key={field.id} className="rounded-lg border border-border p-4 space-y-3">
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Client / Project *
                     </label>
                     <input
                       type="text"
                       {...register(`tasks.${index}.clientDetails`, { required: true })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Ticket Reference *
                     </label>
                     <input
                       type="text"
                       {...register(`tasks.${index}.ticket`, { required: true })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Type of Work *
                     </label>
                     <select
                       {...register(`tasks.${index}.typeOfWorkDone`, { required: true })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="PLANNING">Planning</option>
                       <option value="RESEARCH">Research</option>
@@ -296,24 +296,24 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Lifecycle *
                     </label>
                     <select
                       {...register(`tasks.${index}.taskLifecycle`, { required: true })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="NEW">New</option>
                       <option value="RETURNED">Returned</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Status *
                     </label>
                     <select
                       {...register(`tasks.${index}.taskStatus`, { required: true })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="IN_PROGRESS">In progress</option>
                       <option value="DONE">Done</option>
@@ -323,7 +323,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Estimated Time (h)
                     </label>
                     <input
@@ -331,11 +331,11 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       step="0.25"
                       min="0"
                       {...register(`tasks.${index}.taskEstimatedTime`)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Time Spent Today (h) *
                     </label>
                     <input
@@ -343,7 +343,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       step="0.25"
                       min="0"
                       {...register(`tasks.${index}.timeSpentOnTicket`, { required: true })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -368,22 +368,22 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Hours Worked</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Hours Worked</label>
             <input
               type="number"
               step="0.25"
               min="0"
               {...register('hoursWorked')}
               placeholder="8"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

@@ -86,8 +86,8 @@ export function OpportunitiesBoard({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Board</h2>
-          <p className="text-xs text-gray-500">Drag opportunities to update their pipeline stage.</p>
+          <h2 className="text-lg font-semibold text-foreground">Board</h2>
+          <p className="text-xs text-muted-foreground">Drag opportunities to update their pipeline stage.</p>
         </div>
         <button
           onClick={onCreate}
@@ -98,8 +98,8 @@ export function OpportunitiesBoard({
       </div>
 
       {isLoading ? (
-        <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-gray-200 bg-white">
-          <span className="inline-flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-border bg-card">
+          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading opportunities...
           </span>
@@ -116,21 +116,21 @@ export function OpportunitiesBoard({
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`flex min-h-[320px] flex-col rounded-xl border border-gray-200 bg-gray-50 transition ${
+                      className={`flex min-h-[320px] flex-col rounded-xl border border-border bg-muted transition ${
                         snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
                       }`}
                     >
-                      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                      <div className="flex items-center justify-between border-b border-border px-4 py-3">
                         <div>
-                          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                             {stage}
                           </h3>
-                          <p className="text-xs text-gray-500">{columnItems.length} deal(s)</p>
+                          <p className="text-xs text-muted-foreground">{columnItems.length} deal(s)</p>
                         </div>
                       </div>
                       <div className="flex flex-1 flex-col gap-3 p-3">
                         {columnItems.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-xs text-gray-400">
+                          <div className="rounded-lg border border-dashed border-border bg-card px-4 py-8 text-center text-xs text-muted-foreground">
                             Drop opportunities here
                           </div>
                         ) : null}
@@ -145,20 +145,20 @@ export function OpportunitiesBoard({
                                   width: '100%',
                                   ...(dragProvided.draggableProps.style ?? {}),
                                 }}
-                                className={`rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition ${
+                                className={`rounded-lg border border-border bg-card p-4 shadow-sm transition ${
                                   dragSnapshot.isDragging ? 'border-blue-300 shadow-lg' : ''
                                 }`}
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <div>
-                                    <h4 className="text-sm font-semibold text-gray-900">
+                                    <h4 className="text-sm font-semibold text-foreground">
                                       {opportunity.title}
                                     </h4>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                       {opportunity.customer?.name ?? `Lead: ${opportunity.lead.title}`}
                                     </p>
                                   </div>
-                                  <span className="rounded-full bg-gray-100 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-gray-600">
+                                  <span className="rounded-full bg-muted/70 px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground">
                                     {opportunity.type === 'STAFF_AUGMENTATION'
                                       ? 'Staff Aug'
                                       : opportunity.type === 'SOFTWARE_SUBSCRIPTION'
@@ -166,27 +166,27 @@ export function OpportunitiesBoard({
                                       : 'Hybrid'}
                                   </span>
                                 </div>
-                                <div className="mt-3 flex flex-col gap-2 text-xs text-gray-600">
+                                <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground">
                                   <div className="flex items-center justify-between">
-                                    <span className="font-medium text-gray-700">Value</span>
-                                    <span className="font-semibold text-gray-900">
+                                    <span className="font-medium text-muted-foreground">Value</span>
+                                    <span className="font-semibold text-foreground">
                                       {opportunity.value !== null
                                         ? VALUE_FORMATTER.format(opportunity.value)
                                         : 'TBD'}
                                     </span>
                                   </div>
                                   <div className="flex items-center justify-between">
-                                    <span className="font-medium text-gray-700">Owner</span>
+                                    <span className="font-medium text-muted-foreground">Owner</span>
                                     {opportunity.assignedTo ? (
                                       <span>
                                         {opportunity.assignedTo.firstName}{' '}
                                         {opportunity.assignedTo.lastName}
                                       </span>
                                     ) : (
-                                      <span className="italic text-gray-400">Unassigned</span>
+                                      <span className="italic text-muted-foreground">Unassigned</span>
                                     )}
                                   </div>
-                                  <div className="flex items-center justify-between text-[0.7rem] text-gray-400">
+                                  <div className="flex items-center justify-between text-[0.7rem] text-muted-foreground">
                                     <span>
                                       Created {new Date(opportunity.createdAt).toLocaleDateString()}
                                     </span>
@@ -198,7 +198,7 @@ export function OpportunitiesBoard({
                                 <div className="mt-3 flex items-center gap-2">
                                   <button
                                     onClick={() => onEdit(opportunity)}
-                                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+                                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
                                   >
                                     <Edit className="h-3.5 w-3.5" />
                                     Edit

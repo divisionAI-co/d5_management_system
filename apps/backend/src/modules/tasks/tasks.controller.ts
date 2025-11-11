@@ -24,6 +24,7 @@ import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Task Management')
 @ApiBearerAuth()
@@ -69,6 +70,23 @@ export class TasksController {
   @ApiOperation({ summary: 'Get a task by ID' })
   findOne(@Param('id') id: string) {
     return this.tasksService.findOne(id);
+  }
+
+  @Post(':id/add-to-eod')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.ACCOUNT_MANAGER,
+    UserRole.SALESPERSON,
+    UserRole.HR,
+    UserRole.EMPLOYEE,
+  )
+  @ApiOperation({ summary: 'Add task to current user EOD report' })
+  addTaskToEodReport(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: UserRole,
+  ) {
+    return this.tasksService.addTaskToEodReport(id, userId, role);
   }
 
   @Patch(':id')

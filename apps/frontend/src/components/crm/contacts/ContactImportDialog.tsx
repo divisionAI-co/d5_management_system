@@ -5,7 +5,8 @@ import { UploadCloud, ArrowLeft, Loader2 } from 'lucide-react';
 import { importsApi } from '@/lib/api/imports';
 import type {
   ContactImportSummary,
-  UploadContactsResult,
+  CrmImportType,
+  UploadImportResult,
 } from '@/types/imports';
 import type { CustomerSummary } from '@/types/crm';
 
@@ -15,19 +16,21 @@ interface ContactImportDialogProps {
   open: boolean;
   customers: CustomerSummary[];
   onClose: () => void;
+  importType?: CrmImportType;
 }
 
 type FieldMapping = Record<string, string>;
 
 interface PendingState {
   importId: string;
-  upload: UploadContactsResult;
+  upload: UploadImportResult;
 }
 
 export function ContactImportDialog({
   open,
   customers,
   onClose,
+  importType = 'contacts',
 }: ContactImportDialogProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<ImportStep>('upload');
@@ -37,6 +40,13 @@ export function ContactImportDialog({
   const [summary, setSummary] = useState<ContactImportSummary | null>(null);
   const [updateExisting, setUpdateExisting] = useState(true);
   const [defaultCustomerId, setDefaultCustomerId] = useState<string>('');
+
+  const isContactImport = importType === 'contacts';
+  const entityPlural = isContactImport ? 'Contacts' : 'Leads';
+  const entityLowerPlural = entityPlural.toLowerCase();
+  const duplicateHint = isContactImport
+    ? 'Matches on email. When disabled, duplicates will be skipped.'
+    : 'Matches on contact email and lead title. When disabled, duplicates will be skipped.';
 
   const resetState = () => {
     setStep('upload');
@@ -54,7 +64,7 @@ export function ContactImportDialog({
   };
 
   const uploadMutation = useMutation({
-    mutationFn: importsApi.uploadContacts,
+    mutationFn: (file: File) => importsApi.upload(importType, file),
     onSuccess: (data) => {
       setPending({ importId: data.id, upload: data });
       setStep('map');
@@ -90,7 +100,19 @@ export function ContactImportDialog({
     onSuccess: (result) => {
       setSummary(result);
       setStep('result');
-      queryClient.invalidateQueries({ queryKey: ['contacts'] });
+      const invalidateKeys: string[] = [];
+      if (importType === 'contacts' || importType === 'leads' || importType === 'opportunities') {
+        invalidateKeys.push('contacts');
+      }
+      if (importType === 'leads' || importType === 'opportunities') {
+        invalidateKeys.push('leads');
+      }
+      if (importType === 'opportunities') {
+        invalidateKeys.push('opportunities');
+      }
+      Array.from(new Set(invalidateKeys)).forEach((key) => {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      });
     },
   });
 
@@ -176,9 +198,9 @@ export function ContactImportDialog({
 
   const renderUploadStep = () => (
     <form onSubmit={handleUpload} className="space-y-6">
-      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
+      <div className="rounded-lg border border-dashed border-border bg-muted p-6 text-center">
         <UploadCloud className="mx-auto h-10 w-10 text-blue-500" />
-        <p className="mt-4 text-sm text-gray-600">
+        <p className="mt-4 text-sm text-muted-foreground">
           Upload the CSV file exported from Odoo. Only the first sheet will be
           processed.
         </p>
@@ -192,14 +214,14 @@ export function ContactImportDialog({
           Choose CSV File
         </label>
         {selectedFile && (
-          <p className="mt-3 text-sm text-gray-700">{selectedFile.name}</p>
+          <p className="mt-3 text-sm text-muted-foreground">{selectedFile.name}</p>
         )}
       </div>
       <div className="flex justify-end gap-3">
         <button
           type="button"
           onClick={closeDialog}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
         >
           Cancel
         </button>
@@ -231,18 +253,18 @@ export function ContactImportDialog({
           Back to upload
         </button>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground">
             Map CSV Columns
           </h3>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-muted-foreground">
             Map each CRM field to a column from your CSV. Required fields must
             be mapped before continuing.
           </p>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+            <table className="min-w-full divide-y divide-border text-sm">
+              <thead className="bg-muted text-xs uppercase text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left font-semibold">Field</th>
                   <th className="px-4 py-2 text-left font-semibold">
@@ -253,10 +275,10 @@ export function ContactImportDialog({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {fieldDefinitions.map((field) => (
                   <tr key={field.key}>
-                    <td className="px-4 py-2 font-medium text-gray-900">
+                    <td className="px-4 py-2 font-medium text-foreground">
                       {field.label}{' '}
                       {field.required && (
                         <span className="text-xs font-semibold uppercase text-red-500">
@@ -264,7 +286,7 @@ export function ContactImportDialog({
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-gray-600">
+                    <td className="px-4 py-2 text-muted-foreground">
                       {field.description}
                     </td>
                     <td className="px-4 py-2">
@@ -273,7 +295,7 @@ export function ContactImportDialog({
                         onChange={(event) =>
                           handleMappingChange(field.key, event.target.value)
                         }
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Not mapped</option>
                         {availableColumns.map((column) => (
@@ -290,13 +312,13 @@ export function ContactImportDialog({
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h4 className="text-sm font-semibold text-gray-900">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <h4 className="text-sm font-semibold text-foreground">
             Sample Records
           </h4>
           <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-xs">
-              <thead className="bg-gray-50 text-gray-600">
+            <table className="min-w-full divide-y divide-border text-xs">
+              <thead className="bg-muted text-muted-foreground">
                 <tr>
                   {availableColumns.map((column) => (
                     <th key={column} className="px-3 py-2 text-left font-medium">
@@ -305,7 +327,7 @@ export function ContactImportDialog({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {pending.upload.sampleRows.map((row, index) => (
                   <tr key={index}>
                     {availableColumns.map((column) => (
@@ -324,7 +346,7 @@ export function ContactImportDialog({
           <button
             type="button"
             onClick={closeDialog}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             Cancel
           </button>
@@ -357,12 +379,12 @@ export function ContactImportDialog({
           Back to mapping
         </button>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground">
             Execution Options
           </h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Choose how records should be handled when contacts already exist in
+          <p className="mt-1 text-sm text-muted-foreground">
+            Choose how records should be handled when matches already exist in
             the CRM.
           </p>
 
@@ -372,26 +394,26 @@ export function ContactImportDialog({
                 type="checkbox"
                 checked={updateExisting}
                 onChange={(event) => setUpdateExisting(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
               />
               <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Update existing contacts
+                <p className="text-sm font-medium text-foreground">
+                  Update existing records
                 </p>
-                <p className="text-xs text-gray-600">
-                  Matches on email. When disabled, duplicates will be skipped.
+                <p className="text-xs text-muted-foreground">
+                  {duplicateHint}
                 </p>
               </div>
             </label>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Default customer (optional)
               </label>
               <select
                 value={defaultCustomerId}
                 onChange={(event) => setDefaultCustomerId(event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Do not set</option>
                 {customers.map((customer) => (
@@ -400,9 +422,9 @@ export function ContactImportDialog({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
-                Contacts will be linked to this customer when no customer name
-                is provided in the file.
+              <p className="mt-1 text-xs text-muted-foreground">
+                Associated contacts will be linked to this customer when no
+                customer name is provided in the file.
               </p>
             </div>
           </div>
@@ -412,7 +434,7 @@ export function ContactImportDialog({
           <button
             type="button"
             onClick={closeDialog}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             Cancel
           </button>
@@ -436,24 +458,24 @@ export function ContactImportDialog({
 
     return (
       <div className="space-y-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground">
             Import Summary
           </h3>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-muted-foreground">
             Import ID: <span className="font-mono">{summary.importId}</span>
           </p>
 
           <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 p-3">
-              <dt className="text-xs uppercase text-gray-500">Total rows</dt>
-              <dd className="text-lg font-semibold text-gray-900">
+            <div className="rounded-lg bg-muted p-3">
+              <dt className="text-xs uppercase text-muted-foreground">Total rows</dt>
+              <dd className="text-lg font-semibold text-foreground">
                 {summary.totalRows}
               </dd>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3">
-              <dt className="text-xs uppercase text-gray-500">Processed</dt>
-              <dd className="text-lg font-semibold text-gray-900">
+            <div className="rounded-lg bg-muted p-3">
+              <dt className="text-xs uppercase text-muted-foreground">Processed</dt>
+              <dd className="text-lg font-semibold text-foreground">
                 {summary.processedRows}
               </dd>
             </div>
@@ -494,7 +516,7 @@ export function ContactImportDialog({
             </p>
             <ul className="mt-3 space-y-2 text-sm text-red-700">
               {summary.errors.map((error, index) => (
-                <li key={index} className="rounded bg-white/60 p-2">
+                <li key={index} className="rounded bg-card/60 p-2">
                   <span className="font-medium">Row {error.row}:</span>{' '}
                   {error.message}
                 </li>
@@ -522,14 +544,14 @@ export function ContactImportDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4">
-      <div className="relative flex w-full max-w-5xl flex-col gap-6 rounded-2xl bg-white p-6 shadow-xl">
+      <div className="relative flex w-full max-w-5xl flex-col gap-6 rounded-2xl bg-card p-6 shadow-xl max-h-[90vh] overflow-hidden">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">
-            Import Contacts from Odoo
+          <h2 className="text-2xl font-semibold text-foreground">
+            Import {entityPlural} from Odoo
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Follow the steps below to upload your Odoo export, map columns, and
-            import contacts into the CRM.
+            import {entityLowerPlural} into the CRM.
           </p>
         </div>
 
@@ -553,7 +575,7 @@ export function ContactImportDialog({
                     ? 'bg-blue-600 text-white'
                     : completed
                     ? 'bg-blue-100 text-blue-700'
-                    : 'bg-gray-100 text-gray-500'
+                    : 'bg-muted/70 text-muted-foreground'
                 }`}
               >
                 {item.label}
@@ -562,10 +584,12 @@ export function ContactImportDialog({
           })}
         </ol>
 
-        {step === 'upload' && renderUploadStep()}
-        {step === 'map' && renderMappingStep()}
-        {step === 'execute' && renderExecuteStep()}
-        {step === 'result' && renderResultStep()}
+        <div className="flex-1 overflow-y-auto pr-1">
+          {step === 'upload' && renderUploadStep()}
+          {step === 'map' && renderMappingStep()}
+          {step === 'execute' && renderExecuteStep()}
+          {step === 'result' && renderResultStep()}
+        </div>
 
         {(uploadMutation.isError ||
           mappingMutation.isError ||

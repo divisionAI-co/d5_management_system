@@ -32,14 +32,14 @@ import { HrModule } from './modules/hr/hr.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 
 // Universal
-// import { ActivitiesModule } from './modules/activities/activities.module';
+import { ActivitiesModule } from './modules/activities/activities.module';
 // import { NotificationsModule } from './modules/notifications/notifications.module';
 // import { MeetingsModule } from './modules/meetings/meetings.module';
 // import { ReportsModule } from './modules/reports/reports.module';
-// import { TemplatesModule } from './modules/templates/templates.module';
+import { TemplatesModule } from './modules/templates/templates.module';
 
 // Integrations & Imports
-// import { ImportsModule } from './modules/imports/imports.module';
+import { ImportsModule } from './modules/imports/imports.module';
 // import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 // Services
@@ -94,14 +94,14 @@ import { PdfModule } from './common/pdf/pdf.module';
     TasksModule,
 
     // Universal
-    // ActivitiesModule,
+    ActivitiesModule,
     // NotificationsModule,
     // MeetingsModule,
     // ReportsModule,
-    // TemplatesModule,
+    TemplatesModule,
 
     // Integrations
-    // ImportsModule,
+    ImportsModule,
     // IntegrationsModule,
 
     // Services

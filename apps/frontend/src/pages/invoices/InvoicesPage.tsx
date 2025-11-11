@@ -232,18 +232,18 @@ export default function InvoicesPage() {
   const customers: CustomerSummary[] = customersQuery.data?.data ?? [];
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Invoices</h1>
+          <p className="text-sm text-muted-foreground">
             Manage billing, track payment status and send invoices to customers.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => invoicesQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <RefreshCw className="h-4 w-4" />
             Refresh
@@ -258,15 +258,15 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase text-gray-500">
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase text-muted-foreground">
           <Filter className="h-4 w-4" />
           Filters
         </div>
 
         <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Search
             </label>
             <input
@@ -274,12 +274,12 @@ export default function InvoicesPage() {
               value={filters.search ?? ''}
               onChange={(event) => handleSearchChange(event.target.value)}
               placeholder="Invoice number, customer name, email..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Status
             </label>
             <select
@@ -289,7 +289,7 @@ export default function InvoicesPage() {
                   event.target.value ? (event.target.value as InvoiceStatus) : undefined,
                 )
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {STATUS_FILTERS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -300,13 +300,13 @@ export default function InvoicesPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Customer
             </label>
             <select
               value={filters.customerId ?? ''}
               onChange={(event) => handleCustomerFilter(event.target.value || undefined)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All customers</option>
               {customers.map((customer) => (
@@ -318,7 +318,7 @@ export default function InvoicesPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Recurring Only
             </label>
             <div className="flex items-center gap-2">
@@ -326,14 +326,14 @@ export default function InvoicesPage() {
                 type="checkbox"
                 checked={Boolean(filters.isRecurring)}
                 onChange={(event) => handleToggle('isRecurring', event.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-600">Show recurring invoices</span>
+              <span className="text-sm text-muted-foreground">Show recurring invoices</span>
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Overdue Only
             </label>
             <div className="flex items-center gap-2">
@@ -341,14 +341,14 @@ export default function InvoicesPage() {
                 type="checkbox"
                 checked={Boolean(filters.overdue)}
                 onChange={(event) => handleToggle('overdue', event.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-sm text-gray-600">Require follow-up</span>
+              <span className="text-sm text-muted-foreground">Require follow-up</span>
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Issue Date From
             </label>
             <div className="relative">
@@ -356,14 +356,14 @@ export default function InvoicesPage() {
                 type="date"
                 value={filters.issueDateFrom ?? ''}
                 onChange={(event) => handleDateFilter('issueDateFrom', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Issue Date To
             </label>
             <div className="relative">
@@ -371,14 +371,14 @@ export default function InvoicesPage() {
                 type="date"
                 value={filters.issueDateTo ?? ''}
                 onChange={(event) => handleDateFilter('issueDateTo', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Due Date From
             </label>
             <div className="relative">
@@ -386,14 +386,14 @@ export default function InvoicesPage() {
                 type="date"
                 value={filters.dueDateFrom ?? ''}
                 onChange={(event) => handleDateFilter('dueDateFrom', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Due Date To
             </label>
             <div className="relative">
@@ -401,20 +401,20 @@ export default function InvoicesPage() {
                 type="date"
                 value={filters.dueDateTo ?? ''}
                 onChange={(event) => handleDateFilter('dueDateTo', event.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
             </div>
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold uppercase text-gray-500">Sort</label>
+            <label className="text-xs font-semibold uppercase text-muted-foreground">Sort</label>
             <select
               value={filters.sortBy}
               onChange={(event) => handleSortFieldChange(event.target.value as InvoiceSortField)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -425,7 +425,7 @@ export default function InvoicesPage() {
             <button
               type="button"
               onClick={handleSortOrderToggle}
-              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               <ArrowUpRight
                 className={`h-3.5 w-3.5 transition-transform ${
@@ -441,7 +441,7 @@ export default function InvoicesPage() {
           <button
             type="button"
             onClick={handleResetFilters}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             Reset Filters
           </button>
@@ -465,7 +465,7 @@ export default function InvoicesPage() {
       />
 
       {pagination && (
-        <div className="flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-4 text-sm text-gray-600 md:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-border pt-4 text-sm text-muted-foreground md:flex-row">
           <div>
             Showing{' '}
             <span className="font-semibold">
@@ -481,7 +481,7 @@ export default function InvoicesPage() {
             <button
               onClick={() => handlePageChange((filters.page ?? 1) - 1)}
               disabled={(filters.page ?? 1) === 1}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg border border-border px-3 py-1.5 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Previous
             </button>
@@ -491,7 +491,7 @@ export default function InvoicesPage() {
             <button
               onClick={() => handlePageChange((filters.page ?? 1) + 1)}
               disabled={(filters.page ?? 1) >= pagination.pageCount}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg border border-border px-3 py-1.5 text-sm transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               Next
             </button>
@@ -503,7 +503,7 @@ export default function InvoicesPage() {
         <>
           {formInvoiceId && formInvoiceQuery.isLoading && (
             <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-              <div className="rounded-lg bg-white px-6 py-4 text-sm text-gray-600 shadow-lg">
+              <div className="rounded-lg bg-card px-6 py-4 text-sm text-muted-foreground shadow-lg">
                 Loading invoice details...
               </div>
             </div>

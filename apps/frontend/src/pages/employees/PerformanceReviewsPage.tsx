@@ -68,12 +68,12 @@ export default function PerformanceReviewsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="py-8">
       {employeeIdFilter && (
         <div className="mb-4">
           <button
             onClick={() => navigate(`/employees/${employeeIdFilter}`)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             Back to {employeeName || 'Employee'}
           </button>
@@ -115,9 +115,9 @@ export default function PerformanceReviewsPage() {
 
       {deleteReview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Delete Performance Review</h3>
-            <p className="mt-2 text-sm text-gray-600">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-foreground">Delete Performance Review</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
               Are you sure you want to delete the review for{' '}
               <span className="font-semibold">
                 {deleteReview.employee?.user.firstName} {deleteReview.employee?.user.lastName}
@@ -127,7 +127,7 @@ export default function PerformanceReviewsPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setDeleteReview(null)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+                className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 Cancel
               </button>

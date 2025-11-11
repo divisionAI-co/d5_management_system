@@ -46,6 +46,10 @@ import SettingsPage from '@/pages/settings/SettingsPage';
 import CompanySettingsPage from '@/pages/settings/CompanySettingsPage';
 import NotificationSettingsPage from '@/pages/settings/NotificationSettingsPage';
 import IntegrationsSettingsPage from '@/pages/settings/IntegrationsSettingsPage';
+import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
+import TemplatesPage from '@/pages/settings/TemplatesPage';
+import ActivityTypesPage from '@/pages/settings/ActivityTypesPage';
+import ProfilePage from '@/pages/profile/ProfilePage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -78,6 +82,7 @@ function App() {
           }
         >
           <Route index element={<DashboardPage />} />
+          <Route path="profile" element={<ProfilePage />} />
 
           {/* CRM */}
           <Route path="crm">
@@ -119,8 +124,11 @@ function App() {
             <Route index element={<SettingsPage />} />
             <Route path="company" element={<CompanySettingsPage />} />
             <Route path="notifications" element={<NotificationSettingsPage />} />
+            <Route path="appearance" element={<AppearanceSettingsPage />} />
             <Route path="integrations" element={<IntegrationsSettingsPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
+            <Route path="templates" element={<TemplatesPage />} />
+            <Route path="activity-types" element={<ActivityTypesPage />} />
           </Route>
         </Route>
 

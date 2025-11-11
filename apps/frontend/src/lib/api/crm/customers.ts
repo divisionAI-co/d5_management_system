@@ -1,6 +1,5 @@
 import { apiClient } from '../client';
 import type {
-  CustomerActivity,
   CustomerDetail,
   CustomerFilters,
   CustomerOpportunity,
@@ -9,6 +8,7 @@ import type {
   UpdateCustomerPayload,
   UpdateCustomerStatusPayload,
 } from '@/types/crm';
+import type { Activity } from '@/types/activities';
 
 export const customersApi = {
   list: async (filters: CustomerFilters = {}) => {
@@ -44,7 +44,7 @@ export const customersApi = {
   },
 
   getActivities: async (id: string, take?: number) => {
-    const { data } = await apiClient.get<CustomerActivity[]>(`/crm/customers/${id}/activities`, {
+    const { data } = await apiClient.get<Activity[]>(`/crm/customers/${id}/activities`, {
       params: take ? { take } : undefined,
     });
     return data;

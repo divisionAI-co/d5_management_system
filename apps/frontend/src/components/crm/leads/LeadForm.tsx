@@ -164,19 +164,19 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit Lead' : 'New Lead'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit ? 'Update the lead details.' : 'Capture a new prospect opportunity.'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -184,9 +184,9 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
-          <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="space-y-4 rounded-lg border border-border bg-muted p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase text-gray-600">Contact</h3>
+              <h3 className="text-sm font-semibold uppercase text-muted-foreground">Contact</h3>
               <div className="flex items-center gap-3 text-xs">
                 <label className="flex items-center gap-1">
                   <input
@@ -216,13 +216,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                   placeholder="Search contacts by name, email, or company"
                   value={contactSearch}
                   onChange={(event) => setContactSearch(event.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
                 <select
                   {...register('contactId', {
                     required: contactMode === 'existing' ? 'Please select a contact' : false,
                   })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   defaultValue={selectedContactId || ''}
                 >
                   <option value="">Select a contact</option>
@@ -239,60 +239,60 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">First Name *</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">First Name *</label>
                   <input
                     type="text"
                     {...register('contact.firstName', { required: 'Required' })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                   {errors.contact?.firstName && (
                     <p className="text-sm text-red-600">{errors.contact.firstName.message}</p>
                   )}
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Last Name *</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Last Name *</label>
                   <input
                     type="text"
                     {...register('contact.lastName', { required: 'Required' })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                   {errors.contact?.lastName && (
                     <p className="text-sm text-red-600">{errors.contact.lastName.message}</p>
                   )}
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Email *</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Email *</label>
                   <input
                     type="email"
                     {...register('contact.email', { required: 'Required' })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                   {errors.contact?.email && (
                     <p className="text-sm text-red-600">{errors.contact.email.message}</p>
                   )}
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Phone</label>
                   <input
                     type="text"
                     {...register('contact.phone')}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Role</label>
                   <input
                     type="text"
                     {...register('contact.role')}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Company</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Company</label>
                   <input
                     type="text"
                     {...register('contact.companyName')}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -301,28 +301,28 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Title *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Title *</label>
               <input
                 type="text"
                 {...register('title', { required: 'Lead title is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Description</label>
               <textarea
                 rows={3}
                 {...register('description')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="Add context, discovery notes or qualification criteria"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Status</label>
               <select
                 {...register('status')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {LEAD_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -332,46 +332,46 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Probability %</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Probability %</label>
               <input
                 type="number"
                 min={0}
                 max={100}
                 step={1}
                 {...register('probability', { valueAsNumber: true })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Value</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Value</label>
               <input
                 type="number"
                 step="0.01"
                 {...register('value', { valueAsNumber: true })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Expected Close Date</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Expected Close Date</label>
               <input
                 type="date"
                 {...register('expectedCloseDate')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Source</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Source</label>
               <input
                 type="text"
                 {...register('source')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Assigned To</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Assigned To</label>
               <select
                 {...register('assignedToId')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 defaultValue={lead?.assignedToId || ''}
               >
                 <option value="">Unassigned</option>
@@ -383,36 +383,36 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Prospect Company</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Prospect Company</label>
               <input
                 type="text"
                 {...register('prospectCompanyName')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Prospect Website</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Prospect Website</label>
               <input
                 type="text"
                 {...register('prospectWebsite')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Prospect Industry</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Prospect Industry</label>
               <input
                 type="text"
                 {...register('prospectIndustry')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

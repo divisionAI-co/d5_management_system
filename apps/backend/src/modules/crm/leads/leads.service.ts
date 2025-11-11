@@ -6,6 +6,7 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { FilterLeadsDto } from './dto/filter-leads.dto';
 import { UpdateLeadStatusDto } from './dto/update-lead-status.dto';
 import { ConvertLeadDto } from './dto/convert-lead.dto';
+import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 @Injectable()
 export class LeadsService {
@@ -27,6 +28,12 @@ export class LeadsService {
             ? Number(opportunity.value)
             : null,
       }));
+    }
+
+    if (Array.isArray(lead?.activities)) {
+      formatted.activities = lead.activities.map((activity: any) =>
+        mapActivitySummary(activity),
+      );
     }
 
     return formatted;
@@ -231,19 +238,7 @@ export class LeadsService {
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 10,
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            createdAt: true,
-            createdBy: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
+          include: ACTIVITY_SUMMARY_INCLUDE,
         },
       },
     });

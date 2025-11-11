@@ -461,39 +461,64 @@ async function main() {
   // ============================================
   // 9. CREATE SAMPLE ACTIVITIES
   // ============================================
-  console.log('\n📝 Creating sample activities...');
-  
-  await prisma.activity.create({
-    data: {
-      type: 'NOTE',
-      title: 'Initial client meeting',
-      description: 'Discussed project requirements and timeline',
-      customerId: customer1.id,
-      createdById: salesperson.id,
+  console.log('\n📝 Creating sample activity types & activities...');
+
+  const noteActivityType = await prisma.activityType.upsert({
+    where: { key: 'NOTE' },
+    update: {},
+    create: {
+      name: 'Note',
+      key: 'NOTE',
+      description: 'Internal note or meeting summary',
+      isSystem: true,
+    },
+  });
+
+  const callActivityType = await prisma.activityType.upsert({
+    where: { key: 'CALL' },
+    update: {},
+    create: {
+      name: 'Call',
+      key: 'CALL',
+      description: 'Logged phone or video call',
+      isSystem: true,
     },
   });
 
   await prisma.activity.create({
     data: {
-      type: 'CALL',
-      title: 'Follow-up call',
-      description: 'Clarified technical requirements for the project',
-      customerId: customer1.id,
-      createdById: accountManager.id,
+      activityType: { connect: { id: noteActivityType.id } },
+      subject: 'Initial client meeting',
+      body: 'Discussed project requirements and timeline',
+      activityDate: new Date('2025-11-01T09:30:00Z'),
+      customer: { connect: { id: customer1.id } },
+      createdBy: { connect: { id: salesperson.id } },
     },
   });
 
   await prisma.activity.create({
     data: {
-      type: 'NOTE',
-      title: 'Technical screening notes',
-      description: 'Candidate demonstrated strong React and TypeScript skills',
-      candidateId: candidate1.id,
-      createdById: recruiter.id,
+      activityType: { connect: { id: callActivityType.id } },
+      subject: 'Follow-up call',
+      body: 'Clarified technical requirements for the project',
+      activityDate: new Date('2025-11-03T14:00:00Z'),
+      customer: { connect: { id: customer1.id } },
+      createdBy: { connect: { id: accountManager.id } },
     },
   });
 
-  console.log('  ✅ 3 activities created');
+  await prisma.activity.create({
+    data: {
+      activityType: { connect: { id: noteActivityType.id } },
+      subject: 'Technical screening notes',
+      body: 'Candidate demonstrated strong React and TypeScript skills',
+      activityDate: new Date('2025-11-05T10:15:00Z'),
+      candidate: { connect: { id: candidate1.id } },
+      createdBy: { connect: { id: recruiter.id } },
+    },
+  });
+
+  console.log('  ✅ Activity types seeded and 3 activities created');
 
   // ============================================
   // 10. CREATE DEFAULT TEMPLATES

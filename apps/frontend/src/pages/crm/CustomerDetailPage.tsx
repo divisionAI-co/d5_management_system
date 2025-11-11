@@ -2,23 +2,18 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/crm';
-import type {
-  CustomerActivity,
-  CustomerOpportunity,
-} from '@/types/crm';
+import type { CustomerOpportunity } from '@/types/crm';
 import {
   ArrowLeft,
   Building,
-  Calendar,
   DollarSign,
   FileBarChart2,
   Edit3,
   Globe,
   Mail,
   MapPin,
-  MinusCircle,
+  PenSquare,
   Phone,
-  RefreshCw,
   Sparkles,
   Tag,
   Users,
@@ -27,10 +22,11 @@ import { CustomerForm } from '@/components/crm/customers/CustomerForm';
 import { CustomerStatusForm } from '@/components/crm/customers/CustomerStatusForm';
 import { format } from 'date-fns';
 import clsx from 'clsx';
+import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 
 const sentimentClass = {
   HAPPY: 'bg-green-100 text-green-700',
-  NEUTRAL: 'bg-gray-100 text-gray-700',
+  NEUTRAL: 'bg-muted/70 text-muted-foreground',
   UNHAPPY: 'bg-red-100 text-red-700',
 };
 
@@ -49,17 +45,12 @@ export default function CustomerDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showStatusForm, setShowStatusForm] = useState(false);
+  const [showActivitySidebar, setShowActivitySidebar] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const customerQuery = useQuery({
     queryKey: ['customer', id],
     queryFn: () => customersApi.getById(id!),
-    enabled: Boolean(id),
-  });
-
-  const activitiesQuery = useQuery({
-    queryKey: ['customer-activities', id],
-    queryFn: () => customersApi.getActivities(id!, 25),
     enabled: Boolean(id),
   });
 
@@ -78,7 +69,7 @@ export default function CustomerDetailPage() {
 
   if (!id) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
           Invalid customer ID provided.
         </div>
@@ -96,7 +87,7 @@ export default function CustomerDetailPage() {
 
   if (customerQuery.isError || !customer) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
           Unable to load customer. It may have been removed or you do not have access.
         </div>
@@ -116,42 +107,25 @@ export default function CustomerDetailPage() {
     return `${opportunity.type === 'STAFF_AUGMENTATION' ? 'Aug' : 'Sub'} ${opportunity.value.toLocaleString()}`;
   };
 
-  const renderActivityIcon = (activity: CustomerActivity) => {
-    switch (activity.type) {
-      case 'CALL':
-        return <Phone className="h-4 w-4 text-blue-500" />;
-      case 'EMAIL':
-        return <Mail className="h-4 w-4 text-purple-500" />;
-      case 'MEETING':
-        return <Calendar className="h-4 w-4 text-emerald-500" />;
-      case 'TASK_UPDATE':
-        return <Sparkles className="h-4 w-4 text-amber-500" />;
-      case 'STATUS_CHANGE':
-        return <RefreshCw className="h-4 w-4 text-indigo-500" />;
-      default:
-        return <MinusCircle className="h-4 w-4 text-gray-500" />;
-    }
-  };
-
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <button
         onClick={() => navigate('/crm/customers')}
-        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+        className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Customers
       </button>
 
-      <header className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+      <header className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-xl font-semibold text-blue-700">
               {customer.name[0]}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              <h1 className="text-2xl font-bold text-foreground">{customer.name}</h1>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{customer.email}</span>
                 {customer.website && (
                   <>
@@ -175,13 +149,13 @@ export default function CustomerDetailPage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>Customer Type:</span>
-            <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">
+            <span className="rounded-full bg-muted/70 px-2 py-1 font-medium text-muted-foreground">
               {customer.type.replace('_', ' ')}
             </span>
             <span>Last Updated:</span>
-            <span className="font-medium text-gray-700">{lastUpdated}</span>
+            <span className="font-medium text-muted-foreground">{lastUpdated}</span>
           </div>
         </div>
 
@@ -203,15 +177,22 @@ export default function CustomerDetailPage() {
             Sentiment: {customer.sentiment}
           </span>
           <button
+            onClick={() => setShowActivitySidebar(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <PenSquare className="h-4 w-4" />
+            Activities
+          </button>
+          <button
             onClick={() => setShowStatusForm(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <Sparkles className="h-4 w-4" />
             Update Health
           </button>
           <button
             onClick={() => setShowEdit(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <Edit3 className="h-4 w-4" />
             Edit
@@ -232,79 +213,79 @@ export default function CustomerDetailPage() {
       )}
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase text-gray-500">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
             <span>Monthly Value</span>
-            <DollarSign className="h-4 w-4 text-gray-400" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </div>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">
+          <p className="mt-2 text-2xl font-semibold text-foreground">
             {customer.monthlyValue !== null && customer.monthlyValue !== undefined
               ? `${customer.currency ?? 'USD'} ${customer.monthlyValue.toLocaleString()}`
               : '—'}
           </p>
-          <p className="text-xs text-gray-500">Contracted monthly revenue</p>
+          <p className="text-xs text-muted-foreground">Contracted monthly revenue</p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase text-gray-500">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
             <span>Contacts</span>
             <Users className="h-4 w-4 text-green-400" />
           </div>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">
+          <p className="mt-2 text-2xl font-semibold text-foreground">
             {customer._count?.contacts ?? 0}
           </p>
-          <p className="text-xs text-gray-500">Active stakeholder contacts</p>
+          <p className="text-xs text-muted-foreground">Active stakeholder contacts</p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase text-gray-500">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
             <span>Opportunities</span>
             <Building className="h-4 w-4 text-indigo-400" />
           </div>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">
+          <p className="mt-2 text-2xl font-semibold text-foreground">
             {customer._count?.opportunities ?? 0}
           </p>
-          <p className="text-xs text-gray-500">Active commercial engagements</p>
+          <p className="text-xs text-muted-foreground">Active commercial engagements</p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase text-gray-500">
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
             <span>Invoices</span>
             <FileBarChart2 className="h-4 w-4 text-amber-400" />
           </div>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">
+          <p className="mt-2 text-2xl font-semibold text-foreground">
             {customer._count?.invoices ?? 0}
           </p>
-          <p className="text-xs text-gray-500">Generated billing documents</p>
+          <p className="text-xs text-muted-foreground">Generated billing documents</p>
         </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Account Overview</h2>
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Account Overview</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="flex items-start gap-3">
-                <Mail className="mt-1 h-4 w-4 text-gray-400" />
+                <Mail className="mt-1 h-4 w-4 text-muted-foreground" />
                 <div>
-                  <p className="text-xs font-semibold uppercase text-gray-500">Email</p>
-                  <p className="text-sm text-gray-800">{customer.email}</p>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">Email</p>
+                  <p className="text-sm text-foreground">{customer.email}</p>
                 </div>
               </div>
               {customer.phone && (
                 <div className="flex items-start gap-3">
-                  <Phone className="mt-1 h-4 w-4 text-gray-400" />
+                  <Phone className="mt-1 h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs font-semibold uppercase text-gray-500">Phone</p>
-                    <p className="text-sm text-gray-800">{customer.phone}</p>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Phone</p>
+                    <p className="text-sm text-foreground">{customer.phone}</p>
                   </div>
                 </div>
               )}
               {customer.website && (
                 <div className="flex items-start gap-3">
-                  <Globe className="mt-1 h-4 w-4 text-gray-400" />
+                  <Globe className="mt-1 h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs font-semibold uppercase text-gray-500">Website</p>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Website</p>
                     <a
                       className="text-sm text-blue-600 hover:underline"
                       href={customer.website}
@@ -318,10 +299,10 @@ export default function CustomerDetailPage() {
               )}
               {customer.address && (
                 <div className="flex items-start gap-3">
-                  <MapPin className="mt-1 h-4 w-4 text-gray-400" />
+                  <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-xs font-semibold uppercase text-gray-500">Location</p>
-                    <p className="text-sm text-gray-800">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Location</p>
+                    <p className="text-sm text-foreground">
                       {customer.address}
                       {customer.city && `, ${customer.city}`}
                       {customer.country && `, ${customer.country}`}
@@ -333,24 +314,24 @@ export default function CustomerDetailPage() {
             </div>
             {customer.contacts && customer.contacts.length > 0 && (
               <div className="mt-6">
-                <p className="text-xs font-semibold uppercase text-gray-500">Key Contacts</p>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Key Contacts</p>
                 <div className="mt-3 space-y-3">
                   {customer.contacts.map((contact) => (
                     <div
                       key={contact.id}
-                      className="rounded-lg border border-gray-200 p-3 text-sm text-gray-700"
+                      className="rounded-lg border border-border p-3 text-sm text-muted-foreground"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-foreground">
                           {contact.firstName} {contact.lastName}
                         </span>
                         {contact.role && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          <span className="rounded-full bg-muted/70 px-2 py-0.5 text-xs font-medium text-muted-foreground">
                             {contact.role}
                           </span>
                         )}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span>{contact.email}</span>
                         {contact.phone && (
                           <>
@@ -372,7 +353,7 @@ export default function CustomerDetailPage() {
             )}
             {customer.tags && customer.tags.length > 0 && (
               <div className="mt-6">
-                <p className="text-xs font-semibold uppercase text-gray-500">Tags</p>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Tags</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {customer.tags.map((tag) => (
                     <span
@@ -387,15 +368,15 @@ export default function CustomerDetailPage() {
               </div>
             )}
             {customer.notes && (
-              <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+              <div className="mt-6 rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
                 {customer.notes}
               </div>
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Opportunities</h2>
+              <h2 className="text-lg font-semibold text-foreground">Recent Opportunities</h2>
               <Link
                 to="/crm/opportunities"
                 className="text-sm font-medium text-blue-600 hover:underline"
@@ -408,25 +389,25 @@ export default function CustomerDetailPage() {
                 <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600" />
               </div>
             ) : opportunitiesQuery.data && opportunitiesQuery.data.length > 0 ? (
-              <div className="mt-4 overflow-hidden rounded-lg border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
+              <div className="mt-4 overflow-hidden rounded-lg border border-border">
+                <table className="min-w-full divide-y divide-border text-sm">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="px-4 py-2 text-left font-semibold text-gray-500">Title</th>
-                      <th className="px-4 py-2 text-left font-semibold text-gray-500">Stage</th>
-                      <th className="px-4 py-2 text-left font-semibold text-gray-500">Value</th>
-                      <th className="px-4 py-2 text-left font-semibold text-gray-500">Owner</th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Title</th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Stage</th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Value</th>
+                      <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Owner</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
+                  <tbody className="divide-y divide-border bg-card">
                     {opportunitiesQuery.data.slice(0, 5).map((opportunity) => (
                       <tr key={opportunity.id}>
-                        <td className="px-4 py-3 text-gray-800">{opportunity.title}</td>
-                        <td className="px-4 py-3 text-gray-500">{opportunity.stage}</td>
-                        <td className="px-4 py-3 text-gray-500">
+                        <td className="px-4 py-3 text-foreground">{opportunity.title}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{opportunity.stage}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
                           {renderOpportunityValue(opportunity)}
                         </td>
-                        <td className="px-4 py-3 text-gray-500">
+                        <td className="px-4 py-3 text-muted-foreground">
                           {opportunity.assignedTo
                             ? `${opportunity.assignedTo.firstName} ${opportunity.assignedTo.lastName}`
                             : '—'}
@@ -437,7 +418,7 @@ export default function CustomerDetailPage() {
                 </table>
               </div>
             ) : (
-              <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+              <div className="mt-4 rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
                 No opportunities yet.
               </div>
             )}
@@ -445,64 +426,21 @@ export default function CustomerDetailPage() {
         </div>
 
         <aside className="space-y-6">
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Activities</h2>
-              <button
-                onClick={() => activitiesQuery.refetch()}
-                className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:bg-gray-50"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </button>
-            </div>
-            {activitiesQuery.isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600" />
-              </div>
-            ) : activitiesQuery.data && activitiesQuery.data.length > 0 ? (
-              <ul className="mt-4 space-y-4">
-                {activitiesQuery.data.map((activity) => (
-                  <li key={activity.id} className="flex gap-3 rounded-lg border border-gray-200 p-3">
-                    <div className="mt-1">{renderActivityIcon(activity)}</div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-semibold text-gray-900">{activity.title}</span>
-                        <span className="text-xs text-gray-500">
-                          {format(new Date(activity.createdAt), 'MMM dd, yyyy HH:mm')}
-                        </span>
-                      </div>
-                      {activity.description && (
-                        <p className="mt-1 text-sm text-gray-600">{activity.description}</p>
-                      )}
-                      <p className="mt-2 text-xs text-gray-400">
-                        Logged by {activity.createdBy.firstName} {activity.createdBy.lastName}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">
-                No activities recorded yet.
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900">Invoices Snapshot</h2>
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-foreground">Invoices Snapshot</h2>
             {customer.invoices && customer.invoices.length > 0 ? (
-              <ul className="mt-4 space-y-3 text-sm text-gray-600">
+              <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
                 {customer.invoices.map((invoice) => (
-                  <li key={invoice.id} className="rounded-lg border border-gray-200 p-3">
+                  <li key={invoice.id} className="rounded-lg border border-border p-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-gray-900">
+                      <span className="font-semibold text-foreground">
                         {invoice.invoiceNumber}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-muted-foreground">
                         Due {format(new Date(invoice.dueDate), 'MMM dd, yyyy')}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Status: {invoice.status}</span>
                       <span>
                         Total:{' '}
@@ -515,7 +453,7 @@ export default function CustomerDetailPage() {
                 ))}
               </ul>
             ) : (
-              <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">
+              <div className="mt-4 rounded-lg border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
                 No invoices generated yet.
               </div>
             )}
@@ -546,6 +484,14 @@ export default function CustomerDetailPage() {
           }}
         />
       )}
+
+      <ActivitySidebar
+        open={showActivitySidebar}
+        onClose={() => setShowActivitySidebar(false)}
+        entityId={id!}
+        entityType="customer"
+        title="Activities & Notes"
+      />
     </div>
   );
 }

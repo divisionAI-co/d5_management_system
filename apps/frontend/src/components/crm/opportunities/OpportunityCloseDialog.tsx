@@ -65,18 +65,18 @@ export function OpportunityCloseDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="w-full max-w-lg rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Close Opportunity</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-semibold text-foreground">Close Opportunity</h2>
+            <p className="text-sm text-muted-foreground">
               Decide the outcome and capture the closing details for{' '}
-              <span className="font-semibold text-gray-700">{opportunity.title}</span>.
+              <span className="font-semibold text-muted-foreground">{opportunity.title}</span>.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -88,11 +88,11 @@ export function OpportunityCloseDialog({
             name="isWon"
             control={control}
             render={({ field }) => (
-              <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-600">
+              <div className="space-y-3 rounded-lg border border-border bg-muted p-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Outcome
                 </h3>
-                <div className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground">
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="radio"
@@ -116,23 +116,23 @@ export function OpportunityCloseDialog({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Stage<span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 {...register('stage', { required: 'Stage is required when closing.' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder={isWon ? 'Closed Won' : 'Closed Lost'}
               />
               {errors.stage ? <p className="mt-1 text-sm text-rose-600">{errors.stage.message}</p> : null}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Closed Date</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Closed Date</label>
               <input
                 type="date"
                 {...register('closedAt')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -141,7 +141,7 @@ export function OpportunityCloseDialog({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

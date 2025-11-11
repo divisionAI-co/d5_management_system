@@ -1,18 +1,19 @@
 import { apiClient } from './client';
 import type {
   ContactImportSummary,
+  CrmImportType,
   ExecuteImportPayload,
   MapImportPayload,
-  UploadContactsResult,
+  UploadImportResult,
 } from '@/types/imports';
 
 export const importsApi = {
-  uploadContacts: async (file: File) => {
+  upload: async (type: CrmImportType, file: File) => {
     const formData = new FormData();
-    formData.append('type', 'contacts');
+    formData.append('type', type);
     formData.append('file', file);
 
-    const { data } = await apiClient.post<UploadContactsResult>(
+    const { data } = await apiClient.post<UploadImportResult>(
       '/imports/upload',
       formData,
       {
@@ -20,6 +21,18 @@ export const importsApi = {
       },
     );
     return data;
+  },
+
+  uploadContacts: async (file: File) => {
+    return importsApi.upload('contacts', file);
+  },
+
+  uploadLeads: async (file: File) => {
+    return importsApi.upload('leads', file);
+  },
+
+  uploadOpportunities: async (file: File) => {
+    return importsApi.upload('opportunities', file);
   },
 
   saveMapping: async (importId: string, payload: MapImportPayload) => {

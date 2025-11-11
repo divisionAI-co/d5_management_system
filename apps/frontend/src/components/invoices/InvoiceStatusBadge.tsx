@@ -1,7 +1,7 @@
 import type { InvoiceStatus } from '@/types/invoices';
 
 const STATUS_STYLES: Record<InvoiceStatus, string> = {
-  DRAFT: 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-200',
+  DRAFT: 'bg-muted/70 text-muted-foreground ring-1 ring-inset ring-gray-200',
   SENT: 'bg-blue-100 text-blue-700 ring-1 ring-inset ring-blue-200',
   PAID: 'bg-green-100 text-green-700 ring-1 ring-inset ring-green-200',
   OVERDUE: 'bg-red-100 text-red-700 ring-1 ring-inset ring-red-200',

@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   CreateTaskPayload,
   Task,
+  TaskEodLinkResponse,
   TaskFilters,
   TasksKanbanResponse,
   UpdateTaskPayload,
@@ -42,6 +43,13 @@ export const tasksApi = {
   remove: async (id: string) => {
     const { data } = await apiClient.delete<{ deleted: boolean }>(
       `/tasks/${id}`,
+    );
+    return data;
+  },
+
+  addToEod: async (id: string) => {
+    const { data } = await apiClient.post<TaskEodLinkResponse>(
+      `/tasks/${id}/add-to-eod`,
     );
     return data;
   },

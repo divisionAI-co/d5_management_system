@@ -15,7 +15,7 @@ const STATUS_ACCENTS: Record<TaskStatus, string> = {
   IN_PROGRESS: 'border-amber-200 bg-amber-50 text-amber-700',
   IN_REVIEW: 'border-purple-200 bg-purple-50 text-purple-700',
   DONE: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  CANCELLED: 'border-gray-200 bg-gray-50 text-gray-600',
+  CANCELLED: 'border-border bg-muted text-muted-foreground',
 };
 
 interface TaskColumnProps {
@@ -40,22 +40,22 @@ export function TaskColumn({
   disableStatusChange,
 }: TaskColumnProps) {
   return (
-    <div className="flex min-h-[400px] flex-1 flex-col rounded-2xl border border-gray-200 bg-gray-50">
-      <div className="flex items-center justify-between rounded-t-2xl border-b border-gray-200 bg-white px-4 py-3">
+    <div className="flex min-h-[400px] flex-1 flex-col rounded-2xl border border-border bg-muted">
+      <div className="flex items-center justify-between rounded-t-2xl border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-2">
           <span
             className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${STATUS_ACCENTS[status]}`}
           >
             {STATUS_TITLES[status]}
           </span>
-          <span className="text-xs font-medium text-gray-400">
+          <span className="text-xs font-medium text-muted-foreground">
             {tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'}
           </span>
         </div>
         {onCreateTask && (
           <button
             onClick={() => onCreateTask(status)}
-            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1 text-xs font-medium text-gray-500 transition hover:bg-gray-100"
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
           >
             <Plus className="h-3.5 w-3.5" />
             Add
@@ -65,7 +65,7 @@ export function TaskColumn({
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         {tasks.length === 0 && (
-          <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white/80 px-4 py-8 text-center text-sm text-gray-500">
+          <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/80 px-4 py-8 text-center text-sm text-muted-foreground">
             <p>No tasks in this stage yet.</p>
             {onCreateTask && (
               <button

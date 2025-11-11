@@ -157,18 +157,18 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Customers</h1>
+          <p className="text-sm text-muted-foreground">
             Track customer accounts, lifecycle health and opportunities across business models.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => customersQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             title="Refresh data"
           >
             <RefreshCw className="h-4 w-4" />
@@ -184,10 +184,10 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="space-y-4 rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Search
             </label>
             <div className="relative">
@@ -196,14 +196,14 @@ export default function CustomersPage() {
                 value={filters.search ?? ''}
                 onChange={(event) => handleSearchChange(event.target.value)}
                 placeholder="Search by name, email, industry..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Type
             </label>
             <select
@@ -211,7 +211,7 @@ export default function CustomersPage() {
               onChange={(event) =>
                 handleFilterChange('type', (event.target.value || undefined) as CustomerType | undefined)
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {TYPE_FILTERS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -222,7 +222,7 @@ export default function CustomersPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Status
             </label>
             <select
@@ -230,7 +230,7 @@ export default function CustomersPage() {
               onChange={(event) =>
                 handleFilterChange('status', (event.target.value || undefined) as CustomerStatus | undefined)
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {STATUS_FILTERS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -241,7 +241,7 @@ export default function CustomersPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Sentiment
             </label>
             <select
@@ -252,7 +252,7 @@ export default function CustomersPage() {
                   (event.target.value || undefined) as CustomerSentiment | undefined,
                 )
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {SENTIMENT_FILTERS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>

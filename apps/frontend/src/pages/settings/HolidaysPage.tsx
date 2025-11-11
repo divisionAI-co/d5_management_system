@@ -30,10 +30,10 @@ export default function HolidaysPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Company Holidays</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Company Holidays</h1>
+        <p className="text-sm text-muted-foreground">
           Configure the global calendar of national and company-wide holidays.
         </p>
       </div>
@@ -53,9 +53,9 @@ export default function HolidaysPage() {
 
       {deleteHoliday && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">Delete Holiday</h3>
-            <p className="mt-2 text-sm text-gray-600">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-foreground">Delete Holiday</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
               Are you sure you want to delete{' '}
               <span className="font-semibold">{deleteHoliday.name}</span>? This action cannot be
               undone.
@@ -63,7 +63,7 @@ export default function HolidaysPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setDeleteHoliday(null)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+                className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 Cancel
               </button>

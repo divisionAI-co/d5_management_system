@@ -29,6 +29,7 @@ export interface UserSummary {
   isActive: boolean;
   phone?: string | null;
   avatar?: string | null;
+  dateOfBirth?: string | null;
   twoFactorEnabled: boolean;
   lastLoginAt?: string | null;
   createdAt: string;
@@ -87,11 +88,12 @@ export interface UserListFilters {
 
 export interface CreateUserPayload {
   email: string;
-  password: string;
+  password?: string;
   firstName: string;
   lastName: string;
   role: UserRole;
   phone?: string | null;
+  sendInvite?: boolean;
 }
 
 export interface UpdateUserPayload extends Partial<Omit<CreateUserPayload, 'password'>> {
@@ -105,6 +107,17 @@ export interface UpdateUserStatusPayload {
 
 export interface ResetUserPasswordPayload {
   newPassword: string;
+}
+
+export interface UpdateProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  phone?: string | null;
+  avatar?: string | null;
+  dateOfBirth?: string | null;
+  email?: string;
+  currentPassword?: string;
+  newPassword?: string;
 }
 
 

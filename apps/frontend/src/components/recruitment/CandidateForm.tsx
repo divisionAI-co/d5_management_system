@@ -131,19 +131,19 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-foreground">
               {isEdit ? 'Edit Candidate' : 'Add New Candidate'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Capture candidate contact details, experience and recruitment stage.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+            className="rounded-full p-2 text-muted-foreground hover:bg-muted/70 hover:text-muted-foreground transition"
           >
             <X className="h-5 w-5" />
           </button>
@@ -152,13 +152,13 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
         <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-2">
           <section className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 First Name *
               </label>
               <input
                 type="text"
                 {...register('firstName', { required: 'First name is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 placeholder="Jane"
               />
               {errors.firstName && (
@@ -167,13 +167,13 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Last Name *
               </label>
               <input
                 type="text"
                 {...register('lastName', { required: 'Last name is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 placeholder="Doe"
               />
               {errors.lastName && (
@@ -182,13 +182,13 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Email *
               </label>
               <input
                 type="email"
                 {...register('email', { required: 'Email is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 placeholder="jane.doe@example.com"
               />
               {errors.email && (
@@ -198,25 +198,25 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Phone
                 </label>
                 <input
                   type="tel"
                   {...register('phone')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="+355 68 123 4567"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Current Title
                 </label>
                 <input
                   type="text"
                   {...register('currentTitle')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="Senior Full-Stack Engineer"
                 />
               </div>
@@ -224,20 +224,20 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Years of Experience
                 </label>
                 <input
                   type="number"
                   min={0}
                   {...register('yearsOfExperience', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="6"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Rating (1-5)
                 </label>
                 <input
@@ -245,14 +245,14 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                   min={1}
                   max={5}
                   {...register('rating', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="4"
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Skills (comma separated)
               </label>
               <input
@@ -268,19 +268,19 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                       .filter(Boolean),
                   );
                 }}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 placeholder="React, Node.js, GraphQL"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Notes
               </label>
               <textarea
                 rows={4}
                 {...register('notes')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 placeholder="Relevant interview notes, expectations, etc."
               />
             </div>
@@ -289,13 +289,13 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
           <section className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Stage
                 </label>
                 <select
                   value={formStage ?? CANDIDATE_STAGE_ORDER[0]}
                   {...register('stage')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 >
                   {CANDIDATE_STAGE_ORDER.map((stage) => (
                     <option key={stage} value={stage}>
@@ -306,20 +306,20 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Available From
                 </label>
                 <input
                   type="date"
                   {...register('availableFrom')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Expected Salary
                 </label>
                 <input
@@ -327,18 +327,18 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                   min={0}
                   step={100}
                   {...register('expectedSalary', { valueAsNumber: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="60000"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Currency
                 </label>
                 <input
                   type="text"
                   {...register('salaryCurrency')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 uppercase focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="USD"
                   maxLength={3}
                 />
@@ -347,49 +347,49 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
 
             <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   LinkedIn
                 </label>
                 <input
                   type="url"
                   {...register('linkedinUrl')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="https://www.linkedin.com/in/jane-doe"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   GitHub
                 </label>
                 <input
                   type="url"
                   {...register('githubUrl')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="https://github.com/janedoe"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Portfolio
                 </label>
                 <input
                   type="url"
                   {...register('portfolioUrl')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="https://janedoe.dev"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Resume URL
                 </label>
                 <input
                   type="url"
                   {...register('resume')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="https://drive.google.com/.../resume.pdf"
                 />
               </div>
@@ -397,35 +397,35 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   City
                 </label>
                 <input
                   type="text"
                   {...register('city')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="Tirana"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Country
                 </label>
                 <input
                   type="text"
                   {...register('country')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   placeholder="Albania"
                 />
               </div>
             </div>
           </section>
 
-          <div className="flex flex-col gap-3 border-t border-gray-200 py-4 lg:col-span-2 lg:flex-row lg:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border py-4 lg:col-span-2 lg:flex-row lg:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition"
+              className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition"
             >
               Cancel
             </button>

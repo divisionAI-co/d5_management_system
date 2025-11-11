@@ -162,6 +162,15 @@ export class EmailService {
 
   async sendPasswordResetEmail(email: string, resetToken: string): Promise<boolean> {
     const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
+    const expiryHoursRaw = this.configService.get<string>('PASSWORD_RESET_TOKEN_EXPIRY_HOURS');
+    let readableExpiry = '1 hour';
+
+    if (expiryHoursRaw) {
+      const parsed = Number(expiryHoursRaw);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        readableExpiry = parsed === 1 ? '1 hour' : `${parsed} hours`;
+      }
+    }
     
     return this.sendEmail({
       to: email,
@@ -170,8 +179,26 @@ export class EmailService {
         <h1>Password Reset</h1>
         <p>You requested a password reset. Click the link below to reset your password:</p>
         <a href="${resetUrl}">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
+        <p>This link will expire in ${readableExpiry}.</p>
         <p>If you didn't request this, please ignore this email.</p>
+      `,
+    });
+  }
+
+  async sendUserInvitationEmail(email: string, name: string, resetToken: string, expiresAt: Date): Promise<boolean> {
+    const inviteUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
+    const readableExpiry = expiresAt.toLocaleString();
+
+    return this.sendEmail({
+      to: email,
+      subject: 'You have been invited to D5 Management System',
+      html: `
+        <h1>Welcome${name ? `, ${name}` : ''}!</h1>
+        <p>An administrator has created an account for you in the D5 Management System.</p>
+        <p>To finish setting up your account, please create your password using the link below:</p>
+        <p><a href="${inviteUrl}">Set up your password</a></p>
+        <p><strong>Important:</strong> this link will expire on <strong>${readableExpiry}</strong>.</p>
+        <p>If you were not expecting this invitation, you can ignore this email.</p>
       `,
     });
   }

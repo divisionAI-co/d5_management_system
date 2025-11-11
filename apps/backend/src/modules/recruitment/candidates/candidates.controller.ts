@@ -15,6 +15,7 @@ import { FilterCandidatesDto } from './dto/filter-candidates.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { UpdateCandidateStageDto } from './dto/update-candidate-stage.dto';
 import { LinkCandidatePositionDto } from './dto/link-position.dto';
+import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -77,6 +78,20 @@ export class CandidatesController {
     @Body() linkDto: LinkCandidatePositionDto,
   ) {
     return this.candidatesService.linkToPosition(id, linkDto);
+  }
+
+  @Post(':id/convert-to-employee')
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({
+    summary: 'Convert a candidate into an employee profile',
+    description:
+      'Creates an employee record from the candidate details. Optionally links an existing user or creates a new one.',
+  })
+  convertToEmployee(
+    @Param('id') id: string,
+    @Body() convertDto: ConvertCandidateToEmployeeDto,
+  ) {
+    return this.candidatesService.convertToEmployee(id, convertDto);
   }
 
   @Get(':id/positions')

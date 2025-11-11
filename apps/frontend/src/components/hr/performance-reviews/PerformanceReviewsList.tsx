@@ -60,8 +60,8 @@ export function PerformanceReviewsList({
         <div className="flex items-center gap-3">
           <FileText className="h-8 w-8 text-blue-600" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Performance Reviews</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-foreground">Performance Reviews</h1>
+            <p className="text-sm text-muted-foreground">
               {contextLabel
                 ? `Viewing reviews for ${contextLabel}`
                 : 'Track and manage employee reviews'}
@@ -79,14 +79,14 @@ export function PerformanceReviewsList({
         )}
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Search by employee, reviewer, or strengths..."
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-border py-2 pl-10 pr-4 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             type="text"
           />
         </div>
@@ -97,51 +97,51 @@ export function PerformanceReviewsList({
           <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
         </div>
       ) : filtered && filtered.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Employee
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Review Period
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Reviewer
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Overall
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Highlights
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
+            <tbody className="divide-y divide-border bg-card">
               {filtered?.map((review) => (
-                <tr key={review.id} className="transition hover:bg-gray-50">
+                <tr key={review.id} className="transition hover:bg-muted">
                   <td className="whitespace-nowrap px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-foreground">
                       {review.employee?.user.firstName} {review.employee?.user.lastName}
                     </div>
-                    <div className="text-sm text-gray-500">{review.employee?.jobTitle}</div>
+                    <div className="text-sm text-muted-foreground">{review.employee?.jobTitle}</div>
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-muted-foreground">
                     <div>
                       {format(new Date(review.reviewPeriodStart), 'MMM dd, yyyy')} -{' '}
                       {format(new Date(review.reviewPeriodEnd), 'MMM dd, yyyy')}
                     </div>
                     {review.reviewedAt && (
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-muted-foreground">
                         Reviewed on {format(new Date(review.reviewedAt), 'MMM dd, yyyy')}
                       </div>
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">
+                  <td className="whitespace-nowrap px-6 py-4 text-sm text-muted-foreground">
                     {review.reviewerName || '—'}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-center text-sm">
@@ -154,7 +154,7 @@ export function PerformanceReviewsList({
                         : '—'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
+                  <td className="px-6 py-4 text-sm text-muted-foreground">
                     <p className="line-clamp-2">{review.strengths || 'No strengths recorded.'}</p>
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
@@ -198,10 +198,10 @@ export function PerformanceReviewsList({
           </table>
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
-          <FileText className="mx-auto h-12 w-12 text-gray-300" />
-          <h3 className="mt-4 text-lg font-semibold text-gray-800">No reviews yet</h3>
-          <p className="mt-2 text-gray-500">Create your first performance review to get started.</p>
+        <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center">
+          <FileText className="mx-auto h-12 w-12 text-border" />
+          <h3 className="mt-4 text-lg font-semibold text-foreground">No reviews yet</h3>
+          <p className="mt-2 text-muted-foreground">Create your first performance review to get started.</p>
           {onCreateNew && (
             <button
               onClick={onCreateNew}

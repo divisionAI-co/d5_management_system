@@ -14,12 +14,12 @@ interface LeadsTableProps {
 }
 
 const statusColors: Record<string, string> = {
-  NEW: 'bg-blue-100 text-blue-700',
-  CONTACTED: 'bg-indigo-100 text-indigo-700',
-  QUALIFIED: 'bg-emerald-100 text-emerald-700',
-  PROPOSAL: 'bg-amber-100 text-amber-700',
-  WON: 'bg-green-100 text-green-700',
-  LOST: 'bg-red-100 text-red-700',
+  NEW: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200',
+  CONTACTED: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200',
+  QUALIFIED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
+  PROPOSAL: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
+  WON: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-200',
+  LOST: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200',
 };
 
 export function LeadsTable({
@@ -41,9 +41,9 @@ export function LeadsTable({
 
   if (!leads || leads.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
         <div className="flex flex-col items-center gap-3">
-          <ClipboardList className="h-10 w-10 text-gray-400" />
+          <ClipboardList className="h-10 w-10 text-border" />
           <p>No leads found. Try adjusting your filters or create a new lead.</p>
           {onCreate && (
             <button
@@ -60,82 +60,102 @@ export function LeadsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div className="overflow-hidden rounded-lg border border-border bg-card text-foreground shadow-sm">
+      <table className="min-w-full divide-y divide-border">
+        <thead className="bg-muted/70">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Lead</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Contact</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Company</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Probability</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Value</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Assigned</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Updated</th>
-            <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Lead
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Contact
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Company
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Status
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Probability
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Value
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Assigned
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Updated
+            </th>
+            <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Actions
+            </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+        <tbody className="divide-y divide-border bg-card">
           {leads.map((lead) => (
-            <tr key={lead.id} className="transition hover:bg-gray-50">
+            <tr key={lead.id} className="transition hover:bg-muted/70">
               <td className="px-6 py-4 text-sm">
-                <div className="font-semibold text-gray-900">{lead.title}</div>
-                {lead.source && <div className="text-xs text-gray-500">Source: {lead.source}</div>}
+                <div className="font-semibold text-foreground">{lead.title}</div>
+                {lead.source && <div className="text-xs text-muted-foreground">Source: {lead.source}</div>}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
-                <div className="font-medium text-gray-900">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
+                <div className="font-medium text-foreground">
                   {lead.contact.firstName} {lead.contact.lastName}
                 </div>
-                <div className="text-xs text-gray-500">{lead.contact.email}</div>
+                <div className="text-xs text-muted-foreground">{lead.contact.email}</div>
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {lead.contact.companyName || lead.prospectCompanyName || '—'}
               </td>
               <td className="px-6 py-4 text-sm">
                 <span
                   className={clsx(
                     'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold',
-                    statusColors[lead.status] ?? 'bg-gray-100 text-gray-700',
+                    statusColors[lead.status] ?? 'bg-muted/70 text-muted-foreground',
                   )}
                 >
                   {lead.status}
                 </span>
                 {lead.convertedCustomer && (
-                  <div className="mt-1 text-xs text-emerald-600">Converted → {lead.convertedCustomer.name}</div>
+                  <div className="mt-1 text-xs text-emerald-600 dark:text-emerald-300">
+                    Converted → {lead.convertedCustomer.name}
+                  </div>
                 )}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {lead.probability !== null && lead.probability !== undefined ? `${lead.probability}%` : '—'}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {lead.value !== null && lead.value !== undefined ? lead.value.toLocaleString() : '—'}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {lead.assignedTo
                   ? `${lead.assignedTo.firstName} ${lead.assignedTo.lastName}`
                   : 'Unassigned'}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-500">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {format(new Date(lead.updatedAt), 'MMM dd, yyyy')}
               </td>
               <td className="px-6 py-4 text-right text-sm">
                 <div className="flex items-center justify-end gap-2">
                   <button
-                    className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-blue-200 hover:text-blue-600"
+                    className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-300 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-300"
                     title="Edit lead"
                     onClick={() => onEdit(lead)}
                   >
                     <Edit3 className="h-4 w-4" />
                   </button>
                   <button
-                    className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-indigo-200 hover:text-indigo-600"
+                    className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
                     title="Update status"
                     onClick={() => onUpdateStatus(lead)}
                   >
                     <RefreshCcw className="h-4 w-4" />
                   </button>
                   <button
-                    className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-emerald-200 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:border-emerald-400 dark:hover:text-emerald-300"
                     title="Convert lead"
                     onClick={() => onConvert(lead)}
                     disabled={!!lead.convertedCustomerId}
@@ -143,7 +163,7 @@ export function LeadsTable({
                     <Star className="h-4 w-4" />
                   </button>
                   <button
-                    className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                    className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-red-300 hover:text-red-600 dark:hover:border-red-400 dark:hover:text-red-300"
                     title="Delete lead"
                     onClick={() => onDelete(lead)}
                   >

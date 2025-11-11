@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Edit2,
   Mail,
+  PenSquare,
   Phone,
   MapPin,
   Briefcase,
@@ -17,19 +18,20 @@ import {
 import { employeesApi } from '@/lib/api/hr';
 import type { Employee, LeaveRequest, PerformanceReview, EodReport } from '@/types/hr';
 import { EmployeeForm } from '@/components/hr/employees/EmployeeForm';
+import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 
 const employeeStatusStyles: Record<string, string> = {
   ACTIVE: 'bg-green-100 text-green-800',
   ON_LEAVE: 'bg-yellow-100 text-yellow-800',
   TERMINATED: 'bg-red-100 text-red-800',
-  RESIGNED: 'bg-gray-100 text-gray-800',
+  RESIGNED: 'bg-muted/70 text-foreground',
 };
 
 const leaveStatusStyles: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
   APPROVED: 'bg-green-100 text-green-800',
   REJECTED: 'bg-red-100 text-red-800',
-  CANCELLED: 'bg-gray-100 text-gray-800',
+  CANCELLED: 'bg-muted/70 text-foreground',
 };
 
 function formatCurrency(amount: number, currency: string) {
@@ -84,6 +86,7 @@ export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
+  const [showActivitySidebar, setShowActivitySidebar] = useState(false);
 
   const {
     data: employee,
@@ -130,9 +133,9 @@ export default function EmployeeDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-10">
-        <div className="flex h-24 items-center justify-center rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="flex items-center gap-3 text-gray-500">
+      <div className="py-10">
+        <div className="flex h-24 items-center justify-center rounded-lg border border-border bg-card shadow-sm">
+          <div className="flex items-center gap-3 text-muted-foreground">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
             Loading employee profile...
           </div>
@@ -148,7 +151,7 @@ export default function EmployeeDetailPage() {
       'Employee not found';
 
     return (
-      <div className="container mx-auto px-4 py-10">
+      <div className="py-10">
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
           <h2 className="text-lg font-semibold">Unable to load employee</h2>
           <p className="mt-1 text-sm">
@@ -174,12 +177,12 @@ export default function EmployeeDetailPage() {
     `Employee #${displayEmployee.employeeNumber}`;
 
   return (
-    <div className="container mx-auto px-4 py-10 space-y-8">
+    <div className="py-10 space-y-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-start gap-4">
           <Link
             to="/employees"
-            className="text-gray-500 transition hover:text-gray-700"
+            className="text-muted-foreground transition hover:text-muted-foreground"
             aria-label="Back to employees"
           >
             <ArrowLeft className="h-6 w-6" />
@@ -187,13 +190,13 @@ export default function EmployeeDetailPage() {
 
           <div>
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-              <h1 className="text-2xl font-bold text-gray-900">{employeeDisplayName}</h1>
+              <h1 className="text-2xl font-bold text-foreground">{employeeDisplayName}</h1>
               {displayEmployee.status && (
                 <span
                   className={clsx(
                     'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold',
                     employeeStatusStyles[displayEmployee.status] ??
-                      'bg-gray-100 text-gray-800',
+                      'bg-muted/70 text-foreground',
                   )}
                 >
                   {displayEmployee.status.replace('_', ' ')}
@@ -201,13 +204,13 @@ export default function EmployeeDetailPage() {
               )}
             </div>
 
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-muted-foreground">
               {displayEmployee.jobTitle} · {displayEmployee.department || 'Unassigned department'}
             </p>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-sm text-muted-foreground">
               Employee #{displayEmployee.employeeNumber}
               {tenure && (
-                <span className="ml-2 inline-flex items-center gap-1 text-gray-400">
+                <span className="ml-2 inline-flex items-center gap-1 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   Tenure: {tenure}
                 </span>
@@ -216,13 +219,22 @@ export default function EmployeeDetailPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowEdit(true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-        >
-          <Edit2 className="h-4 w-4" />
-          Edit Employee
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowActivitySidebar(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <PenSquare className="h-4 w-4" />
+            Activities
+          </button>
+          <button
+            onClick={() => setShowEdit(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Edit2 className="h-4 w-4" />
+            Edit Employee
+          </button>
+        </div>
       </header>
 
       {statsSummary && (
@@ -236,8 +248,8 @@ export default function EmployeeDetailPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900">Employment Details</h2>
+        <section className="space-y-6 rounded-lg border border-border bg-card p-6 shadow-sm lg:col-span-2">
+          <h2 className="text-lg font-semibold text-foreground">Employment Details</h2>
 
           <div className="grid gap-4 md:grid-cols-2">
             <InfoRow
@@ -270,8 +282,8 @@ export default function EmployeeDetailPage() {
           </div>
         </section>
 
-        <section className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Quick Links</h2>
+        <section className="space-y-4 rounded-lg border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Quick Links</h2>
           <div className="space-y-3">
             <Link
               to="/employees/leave-requests"
@@ -312,9 +324,9 @@ export default function EmployeeDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Leave Requests</h2>
+            <h2 className="text-lg font-semibold text-foreground">Recent Leave Requests</h2>
             <Link
               to="/employees/leave-requests"
               state={{
@@ -330,28 +342,28 @@ export default function EmployeeDetailPage() {
           {recentLeaveRequests.length === 0 ? (
             <EmptyState message="No leave requests recorded yet." />
           ) : (
-            <div className="mt-4 overflow-hidden rounded-md border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
+            <div className="mt-4 overflow-hidden rounded-md border border-border">
+              <table className="min-w-full divide-y divide-border text-sm">
+                <thead className="bg-muted">
                   <tr>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500">Type</th>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500">Dates</th>
-                    <th className="px-4 py-2 text-left font-semibold text-gray-500">Status</th>
+                    <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Type</th>
+                    <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Dates</th>
+                    <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
+                <tbody className="divide-y divide-border bg-card">
                   {recentLeaveRequests.map((request) => (
-                    <tr key={request.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-700">{request.type.replace('_', ' ')}</td>
-                      <td className="px-4 py-3 text-gray-500">
+                    <tr key={request.id} className="hover:bg-muted">
+                      <td className="px-4 py-3 text-muted-foreground">{request.type.replace('_', ' ')}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
                         {formatDisplayDate(request.startDate)} – {formatDisplayDate(request.endDate)}
-                        <span className="ml-2 text-xs text-gray-400">({request.totalDays} days)</span>
+                        <span className="ml-2 text-xs text-muted-foreground">({request.totalDays} days)</span>
                       </td>
                       <td className="px-4 py-3">
                         <span
                           className={clsx(
                             'inline-flex rounded-full px-2.5 py-1 text-xs font-semibold',
-                            leaveStatusStyles[request.status] ?? 'bg-gray-100 text-gray-800',
+                            leaveStatusStyles[request.status] ?? 'bg-muted/70 text-foreground',
                           )}
                         >
                           {request.status}
@@ -365,9 +377,9 @@ export default function EmployeeDetailPage() {
           )}
         </section>
 
-        <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Performance Reviews</h2>
+            <h2 className="text-lg font-semibold text-foreground">Recent Performance Reviews</h2>
             <Link
               to="/employees/performance-reviews"
               state={{
@@ -391,14 +403,14 @@ export default function EmployeeDetailPage() {
                     : null;
 
                 return (
-                  <div key={review.id} className="rounded-lg border border-gray-200 p-4 hover:border-gray-300">
+                  <div key={review.id} className="rounded-lg border border-border p-4 hover:border-border">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
+                        <p className="text-sm font-semibold text-foreground">
                           {formatDisplayDate(review.reviewPeriodStart)} –{' '}
                           {formatDisplayDate(review.reviewPeriodEnd)}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Reviewer: {review.reviewerName || 'Not specified'}
                         </p>
                       </div>
@@ -407,7 +419,7 @@ export default function EmployeeDetailPage() {
                       </span>
                     </div>
                     {review.strengths && (
-                      <p className="mt-2 text-sm text-gray-600 line-clamp-2">{review.strengths}</p>
+                      <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{review.strengths}</p>
                     )}
                   </div>
                 );
@@ -417,15 +429,15 @@ export default function EmployeeDetailPage() {
         </section>
       </div>
 
-      <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Recent EOD Reports</h2>
+          <h2 className="text-lg font-semibold text-foreground">Recent EOD Reports</h2>
           <Link
             to="/employees/eod-reports"
             state={{
               employeeId: displayEmployee.id,
               employeeName: employeeDisplayName,
-                userId: displayEmployee.user?.id,
+              userId: displayEmployee.user?.id,
             }}
             className="text-sm font-medium text-blue-600 hover:underline"
           >
@@ -445,11 +457,11 @@ export default function EmployeeDetailPage() {
               const safeHours = hours !== null && !Number.isNaN(hours) ? hours : null;
 
               return (
-                <div key={report.id} className="rounded-lg border border-gray-200 p-4 hover:border-gray-300">
+                <div key={report.id} className="rounded-lg border border-border p-4 hover:border-border">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{formatDisplayDate(report.date)}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm font-semibold text-foreground">{formatDisplayDate(report.date)}</p>
+                      <p className="text-xs text-muted-foreground">
                         Submitted {format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}
                       </p>
                     </div>
@@ -461,9 +473,9 @@ export default function EmployeeDetailPage() {
                       {report.isLate ? 'Late' : 'On time'}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm text-gray-600 line-clamp-2">{report.summary}</p>
+                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{report.summary}</p>
                   {safeHours !== null && (
-                    <p className="mt-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <p className="mt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Hours worked: {safeHours}
                     </p>
                   )}
@@ -481,15 +493,23 @@ export default function EmployeeDetailPage() {
           onSuccess={handleEditSuccess}
         />
       )}
+
+      <ActivitySidebar
+        open={showActivitySidebar}
+        onClose={() => setShowActivitySidebar(false)}
+        entityId={displayEmployee.id}
+        entityType="employee"
+        title="Employee Activities"
+      />
     </div>
   );
 }
 
 function StatsCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-900">{value}</p>
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }
@@ -506,12 +526,12 @@ function InfoRow({
   secondary?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-      <Icon className="mt-1 h-5 w-5 text-gray-400" />
+    <div className="flex items-start gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+      <Icon className="mt-1 h-5 w-5 text-muted-foreground" />
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
-        <p className="text-sm text-gray-900">{value || '—'}</p>
-        {secondary && <p className="text-xs text-gray-500">{secondary}</p>}
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-sm text-foreground">{value || '—'}</p>
+        {secondary && <p className="text-xs text-muted-foreground">{secondary}</p>}
       </div>
     </div>
   );
@@ -519,7 +539,7 @@ function InfoRow({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+    <div className="mt-6 rounded-lg border border-border bg-muted p-6 text-center text-sm text-muted-foreground">
       {message}
     </div>
   );

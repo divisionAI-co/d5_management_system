@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Calendar, Clock, Edit2, Trash2, User } from 'lucide-react';
+import { Calendar, ClipboardList, Clock, Edit2, PenSquare, Trash2, User } from 'lucide-react';
 import type { Task, TaskPriority, TaskStatus } from '@/types/tasks';
 
 const PRIORITY_STYLES: Record<
@@ -27,6 +27,9 @@ interface TaskCardProps {
   onDelete?: (task: Task) => void;
   statusOptions: TaskStatus[];
   disableStatusChange?: boolean;
+  onAddToEod?: (task: Task) => void;
+  disableAddToEod?: boolean;
+  onOpenActivity?: (task: Task) => void;
 }
 
 export function TaskCard({
@@ -36,6 +39,9 @@ export function TaskCard({
   onDelete,
   statusOptions,
   disableStatusChange,
+  onAddToEod,
+  disableAddToEod,
+  onOpenActivity,
 }: TaskCardProps) {
   const priorityVariant = PRIORITY_STYLES[task.priority];
 
@@ -58,7 +64,7 @@ export function TaskCard({
   }, [task.dueDate, task.status]);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm transition hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -67,26 +73,45 @@ export function TaskCard({
             >
               {priorityVariant.label}
             </span>
-            <span className="text-xs font-medium uppercase tracking-wide text-gray-400">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {STATUS_LABELS[task.status]}
             </span>
           </div>
-          <h3 className="mt-2 text-lg font-semibold text-gray-900">
+          <h3 className="mt-2 text-lg font-semibold text-foreground">
             {task.title}
           </h3>
         </div>
         <div className="flex items-center gap-2">
+          {onOpenActivity && (
+            <button
+              onClick={() => onOpenActivity(task)}
+              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-blue-600"
+              aria-label="View task activities"
+            >
+              <PenSquare className="h-4 w-4" />
+            </button>
+          )}
           <button
             onClick={() => onEdit(task)}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-blue-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-blue-600"
             aria-label="Edit task"
           >
             <Edit2 className="h-4 w-4" />
           </button>
+          {onAddToEod && (
+            <button
+              onClick={() => onAddToEod(task)}
+              disabled={disableAddToEod}
+              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Add task to EOD report"
+            >
+              <ClipboardList className="h-4 w-4" />
+            </button>
+          )}
           {onDelete && (
             <button
               onClick={() => onDelete(task)}
-              className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-red-600"
+              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-red-600"
               aria-label="Delete task"
             >
               <Trash2 className="h-4 w-4" />
@@ -96,12 +121,12 @@ export function TaskCard({
       </div>
 
       {task.description && (
-        <p className="mt-2 text-sm text-gray-600 line-clamp-3">
+        <p className="mt-2 text-sm text-muted-foreground line-clamp-3">
           {task.description}
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         {task.assignedTo && (
           <span className="inline-flex items-center gap-1">
             <User className="h-4 w-4" />
@@ -129,7 +154,7 @@ export function TaskCard({
         {task.actualHours !== undefined &&
           task.actualHours !== null &&
           task.actualHours > 0 && (
-            <span className="inline-flex items-center gap-1 text-gray-600">
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
               Logged {task.actualHours}h
             </span>
           )}
@@ -140,7 +165,7 @@ export function TaskCard({
           {task.tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600"
+              className="inline-flex items-center rounded-full bg-muted/70 px-2 py-1 text-xs font-medium text-muted-foreground"
             >
               #{tag}
             </span>
@@ -149,7 +174,7 @@ export function TaskCard({
       )}
 
       <div className="mt-4">
-        <label className="text-xs font-semibold uppercase text-gray-400">
+        <label className="text-xs font-semibold uppercase text-muted-foreground">
           Update Status
         </label>
         <select
@@ -158,7 +183,7 @@ export function TaskCard({
             onStatusChange(task, event.target.value as TaskStatus)
           }
           disabled={disableStatusChange}
-          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {statusOptions.map((status) => (
             <option key={status} value={status}>

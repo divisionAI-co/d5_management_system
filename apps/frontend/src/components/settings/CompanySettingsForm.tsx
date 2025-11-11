@@ -104,10 +104,10 @@ export function CompanySettingsForm() {
   };
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">Company Policies</h2>
-        <p className="text-sm text-gray-500">
+    <div className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-6 py-4">
+        <h2 className="text-lg font-semibold text-foreground">Company Policies</h2>
+        <p className="text-sm text-muted-foreground">
           Configure remote work limits, EOD submission rules, and review cycles.
         </p>
       </div>
@@ -115,13 +115,13 @@ export function CompanySettingsForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
         <fieldset className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               Remote Work Frequency
             </label>
             <select
               {...register('remoteWorkFrequency')}
               disabled={isLoading || isFetching}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {FREQUENCY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -132,7 +132,7 @@ export function CompanySettingsForm() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               Remote Days Allowed per Period
             </label>
             <input
@@ -140,12 +140,12 @@ export function CompanySettingsForm() {
               min={0}
               {...register('remoteWorkLimit', { valueAsNumber: true, min: 0 })}
               disabled={isLoading || isFetching}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               EOD Grace Days Allowed
             </label>
             <input
@@ -153,12 +153,12 @@ export function CompanySettingsForm() {
               min={0}
               {...register('eodGraceDays', { valueAsNumber: true, min: 0 })}
               disabled={isLoading || isFetching}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               Performance Review Cycle (days)
             </label>
             <input
@@ -169,14 +169,14 @@ export function CompanySettingsForm() {
                 min: 30,
               })}
               disabled={isLoading || isFetching}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         </fieldset>
 
         <fieldset className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               EOD Deadline Hour (0-23)
             </label>
             <input
@@ -189,12 +189,12 @@ export function CompanySettingsForm() {
                 max: 23,
               })}
               disabled={isLoading || isFetching}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
               EOD Deadline Minute (0-59)
             </label>
             <input
@@ -207,17 +207,17 @@ export function CompanySettingsForm() {
                 max: 59,
               })}
               disabled={isLoading || isFetching}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         </fieldset>
 
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-6">
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
           <button
             type="button"
           onClick={handleReset}
           disabled={!isDirty || isSaving}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             Reset
           </button>

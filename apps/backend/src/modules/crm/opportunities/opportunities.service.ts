@@ -14,6 +14,7 @@ import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
 import { CloseOpportunityDto } from './dto/close-opportunity.dto';
+import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -44,6 +45,12 @@ export class OpportunitiesService {
 
     if (opportunity?.openPosition) {
       formatted.openPosition = opportunity.openPosition;
+    }
+
+    if (Array.isArray(opportunity?.activities)) {
+      formatted.activities = opportunity.activities.map((activity: any) =>
+        mapActivitySummary(activity),
+      );
     }
 
     return formatted;
@@ -259,21 +266,7 @@ export class OpportunitiesService {
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 5,
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            description: true,
-            createdAt: true,
-            createdBy: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
+          include: ACTIVITY_SUMMARY_INCLUDE,
         },
       },
     });

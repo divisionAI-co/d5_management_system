@@ -95,6 +95,19 @@ export class EmployeesService {
             role: true,
           },
         },
+        directReports: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+              },
+            },
+          },
+        },
         leaveRequests: {
           orderBy: {
             createdAt: 'desc',
@@ -271,7 +284,9 @@ export class EmployeesService {
         },
       },
       orderBy: {
-        firstName: 'asc',
+        user: {
+          firstName: 'asc',
+        },
       },
     });
   }

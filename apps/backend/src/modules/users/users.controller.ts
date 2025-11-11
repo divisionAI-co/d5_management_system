@@ -22,6 +22,7 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -48,6 +49,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Get current user profile' })
   getMe(@CurrentUser('id') userId: string) {
     return this.usersService.findById(userId);
+  }
+
+  @Patch('me')
+  @ApiOperation({ summary: 'Update current user profile' })
+  updateMe(@CurrentUser('id') userId: string, @Body() dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(userId, dto);
   }
 
   @Get('me/notification-settings')

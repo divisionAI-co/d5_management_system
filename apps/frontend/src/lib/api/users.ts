@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   CreateUserPayload,
   ResetUserPasswordPayload,
+  UpdateProfilePayload,
   UpdateUserPayload,
   UpdateUserStatusPayload,
   UserDetail,
@@ -44,6 +45,16 @@ export const usersApi = {
 
   resetPassword: async (id: string, payload: ResetUserPasswordPayload) => {
     const { data } = await apiClient.patch<UserDetail>(`/users/${id}/reset-password`, payload);
+    return data;
+  },
+
+  getProfile: async () => {
+    const { data } = await apiClient.get<UserDetail>('/users/me');
+    return data;
+  },
+
+  updateProfile: async (payload: UpdateProfilePayload) => {
+    const { data } = await apiClient.patch<UserDetail>('/users/me', payload);
     return data;
   },
 

@@ -7,11 +7,13 @@ import type {
   Candidate,
   CandidateFilters,
   CandidateStage,
+  ConvertCandidateToEmployeeResponse,
   PaginatedResponse,
 } from '@/types/recruitment';
 import { CandidateBoard, CANDIDATE_STAGE_LABELS } from '@/components/recruitment/CandidateBoard';
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
+import { CandidateConvertToEmployeeModal } from '@/components/recruitment/CandidateConvertToEmployeeModal';
 
 interface LocalFilters {
   search?: string;
@@ -32,6 +34,7 @@ export default function CandidatesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | undefined>();
   const [linkCandidate, setLinkCandidate] = useState<Candidate | null>(null);
+  const [convertCandidate, setConvertCandidate] = useState<Candidate | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const sanitizedFilters = useMemo<CandidateFilters>(() => {
@@ -97,6 +100,20 @@ export default function CandidatesPage() {
     setLinkCandidate(candidate);
   };
 
+  const handleConvertCandidate = (candidate: Candidate) => {
+    setConvertCandidate(candidate);
+  };
+
+  const handleConversionSuccess = (result: ConvertCandidateToEmployeeResponse) => {
+    const baseMessage = `${result.candidate.firstName} ${result.candidate.lastName} is now an employee (#${result.employee.employeeNumber}).`;
+    const passwordMessage = result.temporaryPassword
+      ? ` Temporary password: ${result.temporaryPassword}`
+      : '';
+
+    setFeedback(`${baseMessage}${passwordMessage}`);
+    queryClient.invalidateQueries({ queryKey: ['employees'] });
+  };
+
   const handleMoveStage = (candidate: Candidate, stage: CandidateStage) => {
     if (candidate.stage === stage) {
       return;
@@ -140,10 +157,10 @@ export default function CandidatesPage() {
 
   return (
     <div className="py-8 space-y-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4 md:items-end">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Search
             </label>
             <input
@@ -156,12 +173,12 @@ export default function CandidatesPage() {
                 }))
               }
               placeholder="Search by name, email, city or skill..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Stage
             </label>
             <select
@@ -172,7 +189,7 @@ export default function CandidatesPage() {
                   stage: event.target.value as CandidateStage | 'ALL',
                 }))
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             >
               <option value="ALL">All Stages</option>
               {Object.entries(CANDIDATE_STAGE_LABELS).map(([stage, label]) => (
@@ -183,7 +200,7 @@ export default function CandidatesPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-2.5">
+          <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-2.5">
             <input
               id="filter-has-position"
               type="checkbox"
@@ -194,11 +211,11 @@ export default function CandidatesPage() {
                   hasOpenPosition: event.target.checked,
                 }))
               }
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
             />
             <label
               htmlFor="filter-has-position"
-              className="flex-1 text-sm font-medium text-gray-700"
+              className="flex-1 text-sm font-medium text-muted-foreground"
             >
               Linked to open position
             </label>
@@ -228,6 +245,7 @@ export default function CandidatesPage() {
         onLinkPosition={handleLinkPosition}
         onMoveStage={handleMoveStage}
         onCandidateMove={handleCandidateMoveOptimistic}
+        onConvertToEmployee={handleConvertCandidate}
       />
 
       {isFormOpen && (
@@ -252,6 +270,14 @@ export default function CandidatesPage() {
             );
             queryClient.invalidateQueries({ queryKey: ['candidates'] });
           }}
+        />
+      )}
+
+      {convertCandidate && (
+        <CandidateConvertToEmployeeModal
+          candidate={convertCandidate}
+          onClose={() => setConvertCandidate(null)}
+          onSuccess={handleConversionSuccess}
         />
       )}
     </div>

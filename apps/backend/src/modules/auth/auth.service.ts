@@ -9,6 +9,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { EmailService } from '../../common/email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private emailService: EmailService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -148,9 +150,59 @@ export class AuthService {
     }
   }
 
+  private getPasswordResetExpiryHours() {
+    const rawValue = this.configService.get<string>('PASSWORD_RESET_TOKEN_EXPIRY_HOURS');
+
+    if (rawValue === undefined || rawValue === null) {
+      return 1;
+    }
+
+    const parsed = Number(rawValue);
+
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+
+    return 1;
+  }
+
+  async requestPasswordReset(email: string) {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user || !user.isActive) {
+      // Always respond with success message to prevent email enumeration
+      return {
+        message: 'If an account exists for this email, a reset link has been sent.',
+      };
+    }
+
+    const { token } = await this.usersService.generatePasswordResetToken(
+      user.id,
+      this.getPasswordResetExpiryHours(),
+      'RESET',
+    );
+
+    await this.emailService.sendPasswordResetEmail(user.email, token);
+
+    return {
+      message: 'If an account exists for this email, a reset link has been sent.',
+    };
+  }
+
+  async completePasswordReset(token: string, newPassword: string) {
+    const record = await this.usersService.validatePasswordResetToken(token);
+
+    await this.usersService.setUserPassword(record.userId, newPassword);
+    await this.usersService.markPasswordResetTokenUsed(record.id);
+
+    return {
+      message: 'Password has been reset successfully.',
+    };
+  }
+
   // Two-Factor Authentication
   async generateTwoFactorSecret(userId: string) {
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findByIdWithSecret(userId);
     const appName = this.configService.get<string>(
       'TWO_FACTOR_AUTHENTICATION_APP_NAME',
       'D5 Management System',
@@ -177,7 +229,7 @@ export class AuthService {
   }
 
   async enableTwoFactor(userId: string, code: string) {
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findByIdWithSecret(userId);
 
     if (!user.twoFactorSecret) {
       throw new BadRequestException('2FA secret not generated');
@@ -221,7 +273,7 @@ export class AuthService {
   }
 
   async verifyTwoFactorCode(userId: string, code: string): Promise<boolean> {
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findByIdWithSecret(userId);
 
     if (!user.twoFactorSecret) {
       return false;

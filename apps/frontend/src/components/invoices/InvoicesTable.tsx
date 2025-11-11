@@ -31,18 +31,18 @@ export function InvoicesTable({
 }: InvoicesTableProps) {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-12 shadow-sm">
-        <p className="text-sm text-gray-500">Loading invoices...</p>
+      <div className="flex items-center justify-center rounded-lg border border-border bg-card py-12 shadow-sm">
+        <p className="text-sm text-muted-foreground">Loading invoices...</p>
       </div>
     );
   }
 
   if (!invoices.length) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 py-16">
+      <div className="flex items-center justify-center rounded-lg border border-dashed border-border bg-muted py-16">
         <div className="text-center">
-          <p className="text-base font-medium text-gray-700">No invoices found</p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-base font-medium text-muted-foreground">No invoices found</p>
+          <p className="mt-1 text-sm text-muted-foreground">
             Adjust your filters or create a new invoice to get started.
           </p>
         </div>
@@ -51,40 +51,40 @@ export function InvoicesTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+      <table className="min-w-full divide-y divide-border">
+        <thead className="bg-muted">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Invoice
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Customer
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Issue Date
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Due Date
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Amount
             </th>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Status
             </th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200">
+        <tbody className="divide-y divide-border">
           {invoices.map((invoice) => (
-            <tr key={invoice.id} className="hover:bg-gray-50">
+            <tr key={invoice.id} className="hover:bg-muted">
               <td className="whitespace-nowrap px-4 py-3">
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold text-gray-900">{invoice.invoiceNumber}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-semibold text-foreground">{invoice.invoiceNumber}</p>
+                  <p className="text-xs text-muted-foreground">
                     Recurring:{' '}
                     {invoice.isRecurring
                       ? `Yes (day ${invoice.recurringDay ?? '—'})`
@@ -94,19 +94,19 @@ export function InvoicesTable({
               </td>
               <td className="px-4 py-3">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-foreground">
                     {invoice.customer?.name ?? '—'}
                   </p>
-                  <p className="text-xs text-gray-500">{invoice.customer?.email ?? ''}</p>
+                  <p className="text-xs text-muted-foreground">{invoice.customer?.email ?? ''}</p>
                 </div>
               </td>
-              <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                 {formatDate(invoice.issueDate)}
               </td>
-              <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-700">
+              <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                 {formatDate(invoice.dueDate)}
               </td>
-              <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-gray-900">
+              <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-foreground">
                 {formatCurrency(invoice.total, invoice.currency)}
               </td>
               <td className="px-4 py-3">
@@ -128,14 +128,14 @@ export function InvoicesTable({
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => onView(invoice)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                   >
                     <Eye className="h-3.5 w-3.5" />
                     View
                   </button>
                   <button
                     onClick={() => onEdit(invoice)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     Edit
@@ -143,7 +143,7 @@ export function InvoicesTable({
                   <div className="relative">
                     <button
                       onClick={() => onSend(invoice)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                     >
                       <Send className="h-3.5 w-3.5" />
                       Send
@@ -152,7 +152,7 @@ export function InvoicesTable({
                   {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
                     <button
                       onClick={() => onMarkPaid(invoice)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                     >
                       <CheckCircle className="h-3.5 w-3.5" />
                       Mark Paid

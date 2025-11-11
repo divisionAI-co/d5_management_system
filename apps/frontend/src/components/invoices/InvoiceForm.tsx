@@ -226,13 +226,13 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit Invoice' : 'Create Invoice'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit
                 ? 'Update invoice details, line items and billing metadata.'
                 : 'Generate a new invoice for a customer, configure items, taxes and recurrence.'}
@@ -240,7 +240,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -248,18 +248,18 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 px-6 py-6">
-          <section className="rounded-lg border border-gray-200 p-4 shadow-sm">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border p-4 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Billing Details
             </h3>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Customer *
                 </label>
                 <select
                   {...register('customerId', { required: 'Customer is required' })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select customer</option>
                   {customers.map((customer) => (
@@ -269,7 +269,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                   ))}
                 </select>
                 {customersQuery.isLoading && (
-                  <p className="mt-1 text-sm text-gray-500">Loading customers...</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Loading customers...</p>
                 )}
                 {customersQuery.isError && (
                   <p className="mt-1 text-sm text-red-600">
@@ -286,63 +286,63 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Invoice Number
                 </label>
                 <input
                   type="text"
                   {...register('invoiceNumber')}
                   placeholder="Leave blank to auto-generate"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Issue Date *
                 </label>
                 <div className="relative">
                   <input
                     type="date"
                     {...register('issueDate', { required: true })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
-                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Due Date *
                 </label>
                 <div className="relative">
                   <input
                     type="date"
                     {...register('dueDate', { required: 'Due date is required' })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
-                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 </div>
                 {errors.dueDate && (
                   <p className="mt-1 text-sm text-red-600">{errors.dueDate.message}</p>
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Currency *
                 </label>
                 <input
                   type="text"
                   {...register('currency', { required: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 uppercase focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 uppercase focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Status</label>
                 <select
                   {...register('status', { required: true })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 >
                   {INVOICE_STATUSES.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -354,13 +354,13 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
             </div>
           </section>
 
-          <section className="rounded-lg border border-gray-200 p-4 shadow-sm">
+          <section className="rounded-lg border border-border p-4 shadow-sm">
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Line Items
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Add the services or products that make up this invoice.
                 </p>
               </div>
@@ -373,7 +373,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                     unitPrice: '0',
                   })
                 }
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 <Plus className="h-4 w-4" />
                 Add Item
@@ -384,10 +384,10 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
               {fields.map((field, index) => (
                 <div
                   key={field.id}
-                  className="grid gap-3 rounded-lg border border-gray-200 p-3 md:grid-cols-[minmax(0,1fr)_120px_120px_40px]"
+                  className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[minmax(0,1fr)_120px_120px_40px]"
                 >
                   <div className="md:col-span-1">
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Description *
                     </label>
                     <input
@@ -396,7 +396,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                         required: 'Description is required',
                       })}
                       placeholder="Service description"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                     {errors.items?.[index]?.description && (
                       <p className="mt-1 text-xs text-red-600">
@@ -405,7 +405,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                     )}
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Quantity
                     </label>
                     <input
@@ -416,7 +416,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                         validate: (value) =>
                           Number(value) >= 0 || 'Quantity must be greater than or equal to 0',
                       })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                     {errors.items?.[index]?.quantity && (
                       <p className="mt-1 text-xs text-red-600">
@@ -425,7 +425,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                     )}
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Unit Price
                     </label>
                     <input
@@ -436,7 +436,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                         validate: (value) =>
                           Number(value) >= 0 || 'Unit price must be greater than or equal to 0',
                       })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                     />
                     {errors.items?.[index]?.unitPrice && (
                       <p className="mt-1 text-xs text-red-600">
@@ -449,7 +449,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                       <button
                         type="button"
                         onClick={() => remove(index)}
-                        className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-red-600"
+                        className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-red-600"
                         aria-label="Remove item"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -462,7 +462,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Tax Rate (%)</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Tax Rate (%)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -471,14 +471,14 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                     validate: (value) =>
                       Number(value) >= 0 || 'Tax rate must be greater than or equal to 0',
                   })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
                 {errors.taxRate && (
                   <p className="mt-1 text-sm text-red-600">{errors.taxRate.message}</p>
                 )}
               </div>
-              <div className="md:col-span-2 rounded-lg bg-gray-50 p-4">
-                <dl className="grid gap-2 text-sm text-gray-700">
+              <div className="md:col-span-2 rounded-lg bg-muted p-4">
+                <dl className="grid gap-2 text-sm text-muted-foreground">
                   <div className="flex items-center justify-between">
                     <dt>Subtotal</dt>
                     <dd className="font-medium">
@@ -497,7 +497,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                       })}
                     </dd>
                   </div>
-                  <div className="flex items-center justify-between border-t border-gray-200 pt-2 text-base">
+                  <div className="flex items-center justify-between border-t border-border pt-2 text-base">
                     <dt>Total</dt>
                     <dd className="font-semibold">
                       {total.toLocaleString(undefined, {
@@ -512,14 +512,14 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
           </section>
 
 
-          <section className="rounded-lg border border-gray-200 p-4 shadow-sm">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <section className="rounded-lg border border-border p-4 shadow-sm">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Recurrence & Notes
             </h3>
 
             <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="md:col-span-1">
-                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
                   <input
                     type="checkbox"
                     {...isRecurringField}
@@ -530,16 +530,16 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                         setValue('recurringDay', null, { shouldValidate: true });
                       }
                     }}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
                   />
                   Recurring invoice
                 </label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   When enabled, a new draft invoice will be generated each month on the selected day.
                 </p>
               </div>
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-gray-700">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
                   Recurring Day (1-28)
                 </label>
                 <input
@@ -562,7 +562,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                     },
                   })}
                   disabled={!watch('isRecurring')}
-                  className="w-32 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  className="w-32 rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-muted/70"
                 />
                 {errors.recurringDay && (
                   <p className="mt-1 text-sm text-red-600">{errors.recurringDay.message}</p>
@@ -571,21 +571,21 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
             </div>
 
             <div className="mt-4">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Internal Notes</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Internal Notes</label>
               <textarea
                 rows={4}
                 {...register('notes')}
                 placeholder="Add any payment instructions, context or follow-up actions..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </section>
 
-          <div className="flex flex-col gap-3 border-t border-gray-200 pt-6 md:flex-row md:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border pt-6 md:flex-row md:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

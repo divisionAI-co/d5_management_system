@@ -9,6 +9,7 @@ import {
   InvoiceStatus,
   NotificationType,
   Prisma,
+  TemplateType,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
@@ -583,6 +584,112 @@ export class InvoicesService {
     return this.formatInvoice(updated);
   }
 
+  private async getInvoiceTemplate(templateId?: string) {
+    if (templateId) {
+      const template = await this.prisma.template.findFirst({
+        where: {
+          id: templateId,
+          type: TemplateType.INVOICE,
+          isActive: true,
+        },
+      });
+
+      if (!template) {
+        throw new NotFoundException(
+          `Invoice template with ID ${templateId} not found or inactive`,
+        );
+      }
+
+      return template;
+    }
+
+    return this.prisma.template.findFirst({
+      where: {
+        type: TemplateType.INVOICE,
+        isActive: true,
+      },
+      orderBy: [
+        {
+          isDefault: 'desc',
+        },
+        {
+          createdAt: 'asc',
+        },
+      ],
+    });
+  }
+
+  private mergeTemplateHtmlAndCss(html: string, css?: string | null) {
+    if (!css || !css.trim()) {
+      return html;
+    }
+
+    if (html.includes('</head>')) {
+      return html.replace(
+        '</head>',
+        `<style>
+${css}
+</style></head>`,
+      );
+    }
+
+    return `<style>
+${css}
+</style>
+${html}`;
+  }
+
+  private buildInvoiceTemplateData(
+    invoice: any,
+    templateData?: Record<string, any>,
+  ) {
+    const items = Array.isArray(invoice.items) ? invoice.items : [];
+    const normalizedItems = items.map((item: any) => {
+      const quantity = Number(
+        item.quantity ?? item.qty ?? item.amount ?? 0,
+      );
+      const unitPrice = Number(
+        item.unitPrice ?? item.price ?? item.rate ?? 0,
+      );
+      const lineTotal =
+        item.lineTotal !== undefined && item.lineTotal !== null
+          ? Number(item.lineTotal)
+          : quantity * unitPrice;
+
+      return {
+        description: item.description,
+        quantity,
+        unitPrice,
+        price: unitPrice,
+        total: lineTotal,
+        lineTotal,
+        metadata: item.metadata ?? {},
+      };
+    });
+
+    const baseData = {
+      invoiceNumber: invoice.invoiceNumber,
+      issueDate: invoice.issueDate,
+      dueDate: invoice.dueDate,
+      status: invoice.status,
+      subtotal: Number(invoice.subtotal ?? 0),
+      taxRate: Number(invoice.taxRate ?? 0),
+      taxAmount: Number(invoice.taxAmount ?? 0),
+      total: Number(invoice.total ?? 0),
+      currency: invoice.currency ?? 'USD',
+      notes: invoice.notes,
+      items: normalizedItems,
+      customer: invoice.customer ?? {},
+      createdBy: invoice.createdBy ?? {},
+      invoice,
+    };
+
+    return {
+      ...baseData,
+      ...(templateData ?? {}),
+    };
+  }
+
   private buildInvoiceHtml(invoice: any): string {
     const items = Array.isArray(invoice.items) ? invoice.items : [];
     const currency = invoice.currency ?? 'USD';
@@ -691,10 +798,25 @@ export class InvoicesService {
     `;
   }
 
-  async generateInvoicePdf(id: string) {
+  async generateInvoicePdf(
+    id: string,
+    templateId?: string,
+    templateData?: Record<string, any>,
+  ) {
     const invoice = await this.findOne(id);
-    const html = this.buildInvoiceHtml(invoice);
-    return this.pdfService.generatePdfFromHtml(html);
+    const template = await this.getInvoiceTemplate(templateId);
+
+    if (template) {
+      const htmlTemplate = this.mergeTemplateHtmlAndCss(
+        template.htmlContent,
+        template.cssContent,
+      );
+      const data = this.buildInvoiceTemplateData(invoice, templateData);
+      return this.pdfService.generatePdfFromTemplate(htmlTemplate, data);
+    }
+
+    const fallbackHtml = this.buildInvoiceHtml(invoice);
+    return this.pdfService.generatePdfFromHtml(fallbackHtml);
   }
 
   async sendInvoice(id: string, userId: string, sendDto: SendInvoiceDto) {
@@ -736,7 +858,11 @@ export class InvoicesService {
     }
 
     const invoiceData = this.formatInvoice(invoice);
-    const pdfBuffer = await this.generateInvoicePdf(id);
+    const pdfBuffer = await this.generateInvoicePdf(
+      id,
+      sendDto.templateId,
+      sendDto.templateData,
+    );
 
     const subject =
       sendDto.subject ??

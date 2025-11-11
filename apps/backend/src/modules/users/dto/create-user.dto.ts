@@ -1,18 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsEnum, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import { UserRole } from '@prisma/client';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'user@example.com' })
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => value?.trim().toLowerCase())
   email!: string;
 
-  @ApiProperty({ example: 'Password123!', minLength: 8 })
+  @ApiPropertyOptional({ example: 'Password123!', minLength: 8 })
+  @ValidateIf((o) => !o.sendInvite)
   @IsString()
   @MinLength(8)
   @IsNotEmpty()
-  password!: string;
+  password?: string;
 
   @ApiProperty({ example: 'John' })
   @IsString()
@@ -33,5 +45,22 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Send invitation email with password reset link instead of setting a temporary password manually',
+    default: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      return ['true', '1', 'yes', 'on'].includes(value.toLowerCase());
+    }
+    return false;
+  })
+  @IsBoolean()
+  sendInvite?: boolean;
 }
 

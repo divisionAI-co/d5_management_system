@@ -175,13 +175,13 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit Customer' : 'New Customer'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit
                 ? 'Update customer details and account configuration.'
                 : 'Add a new customer to the CRM.'}
@@ -189,7 +189,7 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -199,20 +199,20 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Name *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Name *</label>
               <input
                 type="text"
                 {...register('name', { required: 'Customer name is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Email *</label>
               <input
                 type="email"
                 {...register('email', { required: 'Email is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
             </div>
@@ -220,30 +220,30 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Phone</label>
               <input
                 type="text"
                 {...register('phone')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Website</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Website</label>
               <input
                 type="url"
                 {...register('website')}
                 placeholder="https://"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Type *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Type *</label>
               <select
                 {...register('type', { required: true })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_TYPES.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -253,10 +253,10 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Status *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Status *</label>
               <select
                 {...register('status', { required: true })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_STATUSES.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -266,10 +266,10 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Sentiment *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Sentiment *</label>
               <select
                 {...register('sentiment', { required: true })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_SENTIMENTS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -282,27 +282,27 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Industry</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Industry</label>
               <input
                 type="text"
                 {...register('industry')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Monthly Value</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Monthly Value</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   {...register('monthlyValue')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
                 <input
                   type="text"
                   {...register('currency')}
-                  className="w-24 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-24 rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -310,36 +310,36 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Address</label>
               <input
                 type="text"
                 {...register('address')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">City</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">City</label>
                 <input
                   type="text"
                   {...register('city')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Country</label>
                 <input
                   type="text"
                   {...register('country')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Postal Code</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Postal Code</label>
                 <input
                   type="text"
                   {...register('postalCode')}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -347,39 +347,39 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tags</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Tags</label>
               <input
                 type="text"
                 {...register('tags')}
                 placeholder="enterprise, priority"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Odoo ID</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Odoo ID</label>
               <input
                 type="text"
                 {...register('odooId')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
             <textarea
               rows={4}
               {...register('notes')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               placeholder="Add any context or onboarding notes..."
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

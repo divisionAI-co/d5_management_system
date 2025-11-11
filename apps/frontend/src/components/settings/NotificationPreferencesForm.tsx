@@ -133,12 +133,12 @@ export function NotificationPreferencesForm() {
   const isSaving = mutation.isPending || isSubmitting;
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-gray-900">
+    <div className="rounded-xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-6 py-4">
+        <h2 className="text-lg font-semibold text-foreground">
           Notification Preferences
         </h2>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           Control how you receive updates across the platform.
         </p>
       </div>
@@ -148,31 +148,31 @@ export function NotificationPreferencesForm() {
           {NOTIFICATION_GROUPS.map((setting) => (
             <label
               key={setting.key}
-              className="flex w-full items-start justify-between gap-4 rounded-lg border border-gray-200 px-4 py-3 transition hover:bg-gray-50"
+              className="flex w-full items-start justify-between gap-4 rounded-lg border border-border px-4 py-3 transition hover:bg-muted"
             >
               <div>
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-foreground">
                   {setting.title}
                 </p>
-                <p className="text-xs text-gray-500">{setting.description}</p>
+                <p className="text-xs text-muted-foreground">{setting.description}</p>
               </div>
 
               <input
                 type="checkbox"
                 {...register(setting.key)}
                 disabled={isLoading || isSaving}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </label>
           ))}
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-6">
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
           <button
             type="button"
             onClick={() => reset(mapToFormValues(data))}
             disabled={!isDirty || isSaving}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             Reset
           </button>

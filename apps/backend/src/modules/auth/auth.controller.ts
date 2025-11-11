@@ -8,6 +8,8 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { TwoFactorDto } from './dto/two-factor.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { CompletePasswordResetDto } from './dto/complete-password-reset.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -39,6 +41,20 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto.refreshToken);
+  }
+
+  @Public()
+  @Post('password-reset/request')
+  @ApiOperation({ summary: 'Request a password reset email' })
+  async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto.email);
+  }
+
+  @Public()
+  @Post('password-reset/complete')
+  @ApiOperation({ summary: 'Complete password reset using a one-time token' })
+  async completePasswordReset(@Body() dto: CompletePasswordResetDto) {
+    return this.authService.completePasswordReset(dto.token, dto.password);
   }
 
   @Get('me')

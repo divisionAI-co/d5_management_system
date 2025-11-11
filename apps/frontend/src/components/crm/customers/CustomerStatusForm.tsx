@@ -66,17 +66,17 @@ export function CustomerStatusForm({ customer, onClose, onSuccess }: CustomerSta
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="w-full max-w-lg rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Update Customer Health</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-lg font-semibold text-foreground">Update Customer Health</h2>
+            <p className="text-sm text-muted-foreground">
               Adjust the customer lifecycle status and sentiment.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -85,10 +85,10 @@ export function CustomerStatusForm({ customer, onClose, onSuccess }: CustomerSta
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 px-6 py-6">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Status *</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Status *</label>
             <select
               {...register('status', { required: 'Status is required' })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {CUSTOMER_STATUSES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -102,10 +102,10 @@ export function CustomerStatusForm({ customer, onClose, onSuccess }: CustomerSta
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Sentiment *</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Sentiment *</label>
             <select
               {...register('sentiment', { required: 'Sentiment is required' })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {CUSTOMER_SENTIMENTS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -119,20 +119,20 @@ export function CustomerStatusForm({ customer, onClose, onSuccess }: CustomerSta
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
             <textarea
               rows={4}
               {...register('note')}
               placeholder="Add context for the status change..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+          <div className="flex justify-end gap-3 border-t border-border pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

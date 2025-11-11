@@ -4,6 +4,7 @@ import type {
   ContactFilters,
   ContactSummary,
   ContactsListResponse,
+  ConvertContactToLeadPayload,
   CreateContactPayload,
   UpdateContactPayload,
 } from '@/types/crm';
@@ -33,6 +34,11 @@ export const contactsApi = {
 
   remove: async (id: string) => {
     const { data } = await apiClient.delete<{ deleted: boolean }>(`/crm/contacts/${id}`);
+    return data;
+  },
+
+  convertToLead: async (id: string, payload: ConvertContactToLeadPayload) => {
+    const { data } = await apiClient.post(`/crm/contacts/${id}/convert-to-lead`, payload);
     return data;
   },
 };

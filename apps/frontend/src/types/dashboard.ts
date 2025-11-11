@@ -1,6 +1,5 @@
 import type { UserRole } from '@/types/users';
 import type { TaskPriority, TaskStatus } from '@/types/tasks';
-import type { ActivityType } from '@prisma/client';
 
 export interface DashboardStats {
   missingReports: number;
@@ -34,8 +33,14 @@ export interface DashboardTaskSummary {
 
 export interface DashboardActivityReminder {
   id: string;
-  title: string;
-  type: ActivityType;
+  subject: string;
+  body?: string | null;
+  type: {
+    id: string;
+    key: string;
+    name: string;
+    color: string | null;
+  };
   dueDate: string;
   related: {
     customer?: { id: string; name: string } | null;
@@ -43,6 +48,7 @@ export interface DashboardActivityReminder {
     opportunity?: { id: string; title: string } | null;
     task?: { id: string; title: string } | null;
   };
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface DashboardResponse {

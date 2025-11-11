@@ -81,4 +81,11 @@ export interface UpdateTaskStatusPayload {
   completedAt?: string;
 }
 
+export interface TaskEodLinkResponse {
+  reportId: string;
+  reportDate: string;
+  isNewReport: boolean;
+  message: string;
+}
+
 

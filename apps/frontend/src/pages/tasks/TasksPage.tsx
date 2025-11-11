@@ -2,14 +2,17 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Columns, Kanban, Filter, Plus, RefreshCw, Search } from 'lucide-react';
 import type { DropResult } from '@hello-pangea/dnd';
+import { useNavigate } from 'react-router-dom';
 import { tasksApi } from '@/lib/api/tasks';
 import { usersApi } from '@/lib/api/users';
 import { TaskForm } from '@/components/tasks/TaskForm';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { TaskBoard } from '@/components/tasks/TaskBoard';
 import { TaskTable } from '@/components/tasks/TaskTable';
+import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import type {
   Task,
+  TaskEodLinkResponse,
   TaskFilters,
   TaskPriority,
   TaskStatus,
@@ -42,6 +45,7 @@ interface LocalFilters {
 export default function TasksPage() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [filters, setFilters] = useState<LocalFilters>({
     status: undefined,
@@ -57,6 +61,10 @@ export default function TasksPage() {
   );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isLoadingTaskDetail, setIsLoadingTaskDetail] = useState(false);
+  const [addingTaskId, setAddingTaskId] = useState<string | null>(null);
+  const [eodPrompt, setEodPrompt] = useState<TaskEodLinkResponse | null>(null);
+  const [showActivitySidebar, setShowActivitySidebar] = useState(false);
+  const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
 
   const sanitizedFilters = useMemo(() => {
     const payload: TaskFilters = {};
@@ -103,10 +111,56 @@ export default function TasksPage() {
     },
   });
 
+  const addToEodMutation = useMutation({
+    mutationFn: (taskId: string) => tasksApi.addToEod(taskId),
+  });
+
   const handleOpenCreate = (status?: TaskStatus) => {
     setEditingTask(null);
     setDefaultStatus(status);
     setShowForm(true);
+  };
+
+  const handleOpenActivities = (task: Task) => {
+    setActivityTaskId(task.id);
+    setShowActivitySidebar(true);
+  };
+
+  const handleAddToEod = (task: Task) => {
+    if (!user) {
+      setFeedback('You need to be signed in to add tasks to an EOD report.');
+      return;
+    }
+
+    setAddingTaskId(task.id);
+    addToEodMutation.mutate(task.id, {
+      onSuccess: (result) => {
+        setFeedback(null);
+        setEodPrompt(result);
+      },
+      onError: (error: any) => {
+        const message =
+          error?.response?.data?.message ??
+          (Array.isArray(error?.response?.data) ? error.response.data.join(' ') : null) ??
+          'Unable to add the task to your EOD report.';
+        setFeedback(Array.isArray(message) ? message.join(' ') : String(message));
+        setEodPrompt(null);
+      },
+      onSettled: () => {
+        setAddingTaskId(null);
+      },
+    });
+  };
+
+  const handleViewReport = () => {
+    setEodPrompt(null);
+    if (user?.id) {
+      navigate('/employees/eod-reports', {
+        state: { userId: user.id },
+      });
+    } else {
+      navigate('/employees/eod-reports');
+    }
   };
 
   const handleEditTask = async (task: Task) => {
@@ -219,23 +273,23 @@ export default function TasksPage() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="py-8 space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Task Board</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Task Board</h1>
+          <p className="text-sm text-muted-foreground">
             Track cross-functional work across the lifecycle. Use filters to
             focus on assignments, review progress and keep delivery on track.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-gray-200 bg-white p-1 text-sm font-medium text-gray-500">
+          <div className="flex rounded-lg border border-border bg-card p-1 text-sm font-medium text-muted-foreground">
             <button
               onClick={() => setViewMode('board')}
               className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 transition ${
                 viewMode === 'board'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'hover:bg-gray-100'
+                  : 'hover:bg-muted/70'
               }`}
             >
               <Kanban className="h-4 w-4" /> Board
@@ -245,7 +299,7 @@ export default function TasksPage() {
               className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 transition ${
                 viewMode === 'list'
                   ? 'bg-blue-600 text-white shadow-sm'
-                  : 'hover:bg-gray-100'
+                  : 'hover:bg-muted/70'
               }`}
             >
               <Columns className="h-4 w-4" /> List
@@ -254,7 +308,7 @@ export default function TasksPage() {
 
           <button
             onClick={() => tasksQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <RefreshCw
               className={`h-4 w-4 ${
@@ -274,10 +328,10 @@ export default function TasksPage() {
         </div>
       </div>
 
-      <div className="space-y-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Search
             </label>
             <div className="relative">
@@ -291,14 +345,14 @@ export default function TasksPage() {
                   }))
                 }
                 placeholder="Search by title or description..."
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Status
             </label>
             <select
@@ -311,7 +365,7 @@ export default function TasksPage() {
                     | undefined,
                 }))
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All statuses</option>
               {STATUS_ORDER.map((status) => (
@@ -323,7 +377,7 @@ export default function TasksPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Priority
             </label>
             <select
@@ -336,7 +390,7 @@ export default function TasksPage() {
                     | undefined,
                 }))
               }
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All priorities</option>
               {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
@@ -348,7 +402,7 @@ export default function TasksPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Assignee
             </label>
             <div className="relative">
@@ -360,7 +414,7 @@ export default function TasksPage() {
                     assignedToId: event.target.value || undefined,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All team members</option>
                 {users.map((member: UserSummary) => (
@@ -369,7 +423,7 @@ export default function TasksPage() {
                   </option>
                 ))}
               </select>
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
         </div>
@@ -387,6 +441,28 @@ export default function TasksPage() {
         </div>
       )}
 
+      {eodPrompt && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <span>{eodPrompt.message}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleViewReport}
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-500 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-500/20"
+            >
+              Go to report
+            </button>
+            <button
+              type="button"
+              onClick={() => setEodPrompt(null)}
+              className="text-xs font-semibold uppercase tracking-wide text-emerald-700 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         {tasksQuery.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -399,7 +475,7 @@ export default function TasksPage() {
             {STATUS_ORDER.slice(0, 3).map((status) => (
               <div
                 key={status}
-                className="h-64 animate-pulse rounded-2xl border border-gray-200 bg-white"
+                className="h-64 animate-pulse rounded-2xl border border-border bg-card"
               />
             ))}
           </div>
@@ -414,6 +490,9 @@ export default function TasksPage() {
             disableStatusChange={statusMutation.isPending}
             canDeleteTasks={canDeleteTasks}
             onTaskMove={handleTaskMoveOptimistic}
+            onAddTaskToEod={handleAddToEod}
+            addingTaskId={addingTaskId}
+            onOpenActivity={handleOpenActivities}
           />
         ) : (
           <TaskTable
@@ -424,14 +503,17 @@ export default function TasksPage() {
             onDeleteTask={canDeleteTasks ? handleDeleteTask : undefined}
             disableStatusChange={statusMutation.isPending}
             canDeleteTasks={canDeleteTasks}
+            onAddTaskToEod={handleAddToEod}
+            addingTaskId={addingTaskId}
+            onOpenActivity={handleOpenActivities}
           />
         )}
 
         {!tasksQuery.isLoading &&
           !tasksQuery.isError &&
           (tasksQuery.data?.total ?? 0) === 0 && (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-10 text-center text-sm text-gray-500">
-              <p className="font-medium text-gray-600">
+            <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+              <p className="font-medium text-muted-foreground">
                 No tasks found for the selected filters.
               </p>
               <p className="mt-1">
@@ -473,10 +555,23 @@ export default function TasksPage() {
 
       {isLoadingTaskDetail && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20">
-          <div className="rounded-lg bg-white px-4 py-3 text-sm text-gray-600 shadow-lg">
+          <div className="rounded-lg bg-card px-4 py-3 text-sm text-muted-foreground shadow-lg">
             Loading task details...
           </div>
         </div>
+      )}
+
+      {activityTaskId && (
+        <ActivitySidebar
+          open={showActivitySidebar}
+          onClose={() => {
+            setShowActivitySidebar(false);
+            setActivityTaskId(null);
+          }}
+          entityId={activityTaskId}
+          entityType="task"
+          title="Task Activities"
+        />
       )}
     </div>
   );

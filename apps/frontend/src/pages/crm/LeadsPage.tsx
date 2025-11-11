@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { leadsApi } from '@/lib/api/crm';
-import type { Lead, LeadFilters, LeadStatus, LeadsListResponse } from '@/types/crm';
+import { customersApi, leadsApi } from '@/lib/api/crm';
+import type { CustomerSummary, Lead, LeadFilters, LeadStatus, LeadsListResponse } from '@/types/crm';
 import { LeadsTable } from '@/components/crm/leads/LeadsTable';
 import { LeadForm } from '@/components/crm/leads/LeadForm';
 import { LeadStatusForm } from '@/components/crm/leads/LeadStatusForm';
 import { LeadConvertModal } from '@/components/crm/leads/LeadConvertModal';
-import { Filter, Plus } from 'lucide-react';
+import { ContactImportDialog } from '@/components/crm/contacts/ContactImportDialog';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { Filter, Plus, UploadCloud } from 'lucide-react';
 
 const STATUS_FILTER_OPTIONS: Array<{ label: string; value?: LeadStatus }> = [
   { label: 'All statuses', value: undefined },
@@ -40,11 +42,26 @@ export default function LeadsPage() {
   const [editingLead, setEditingLead] = useState<Lead | undefined>();
   const [statusLead, setStatusLead] = useState<Lead | undefined>();
   const [convertLead, setConvertLead] = useState<Lead | undefined>();
+  const [importOpen, setImportOpen] = useState(false);
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
 
   const leadsQuery = useQuery<LeadsListResponse>({
     queryKey: ['leads', filters],
     queryFn: () => leadsApi.list(filters),
     placeholderData: keepPreviousData,
+  });
+
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'lead-import-options'],
+    queryFn: () =>
+      customersApi.list({
+        page: 1,
+        pageSize: 100,
+        sortBy: 'name',
+        sortOrder: 'asc',
+      }),
+    enabled: isAdmin,
   });
 
   const deleteMutation = useMutation({
@@ -102,6 +119,8 @@ export default function LeadsPage() {
 
   const meta = leadsQuery.data?.meta;
   const leads = leadsQuery.data?.data ?? [];
+  const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
+  const canImport = isAdmin;
 
   const paginationInfo = useMemo(() => {
     if (!meta) return '0 leads';
@@ -111,44 +130,62 @@ export default function LeadsPage() {
   }, [meta]);
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-6">
+    <div className="space-y-6 py-8 text-foreground">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Leads</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Leads</h1>
+          <p className="text-sm text-muted-foreground">
             Track prospects across the lifecycle and convert them to paying customers.
           </p>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          New Lead
-        </button>
+        <div className="flex flex-wrap gap-3">
+          {canImport && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Import Leads
+            </button>
+          )}
+          <button
+            onClick={handleOpenCreate}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            New Lead
+          </button>
+        </div>
       </div>
 
-      <form onSubmit={handleSearchSubmit} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <form
+        onSubmit={handleSearchSubmit}
+        className="rounded-lg border border-border bg-card p-4 shadow-sm"
+      >
         <div className="grid gap-4 md:grid-cols-4">
           <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Search</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+              Search
+            </label>
             <div className="relative">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by title, contact or company"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Status</label>
+            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+              Status
+            </label>
             <select
               value={filters.status ?? ''}
               onChange={(event) => handleStatusChange(event.target.value ? (event.target.value as LeadStatus) : undefined)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
             >
               {STATUS_FILTER_OPTIONS.map((option) => (
                 <option key={option.label} value={option.value ?? ''}>
@@ -159,11 +196,13 @@ export default function LeadsPage() {
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Sort By</label>
+              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                Sort By
+              </label>
               <select
                 value={filters.sortBy ?? 'createdAt'}
                 onChange={(event) => handleSortChange(event.target.value as LeadFilters['sortBy'])}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {SORT_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -173,11 +212,13 @@ export default function LeadsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-gray-500">Direction</label>
+              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                Direction
+              </label>
               <button
                 type="button"
                 onClick={handleSortOrderToggle}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground"
               >
                 {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
               </button>
@@ -197,32 +238,32 @@ export default function LeadsPage() {
               setSearchTerm('');
               setFilters({ page: 1, pageSize: 10, sortBy: 'createdAt', sortOrder: 'desc' });
             }}
-            className="text-sm font-medium text-gray-500 hover:text-gray-700"
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
           >
             Reset
           </button>
         </div>
       </form>
 
-      <div className="flex items-center justify-between text-sm text-gray-500">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{paginationInfo}</span>
         {meta && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => handlePageChange(meta.page - 1)}
               disabled={meta.page === 1}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border px-3 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
             <span>
-              Page <span className="font-semibold text-gray-900">{meta.page}</span> of{' '}
-              <span className="font-semibold text-gray-900">{meta.pageCount || 1}</span>
+              Page <span className="font-semibold text-foreground">{meta.page}</span> of{' '}
+              <span className="font-semibold text-foreground">{meta.pageCount || 1}</span>
             </span>
             <button
               onClick={() => handlePageChange(meta.page + 1)}
               disabled={meta.page >= (meta.pageCount || 1)}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-border px-3 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next
             </button>
@@ -270,6 +311,13 @@ export default function LeadsPage() {
           }}
         />
       )}
+
+      <ContactImportDialog
+        open={importOpen}
+        importType="leads"
+        customers={customers}
+        onClose={() => setImportOpen(false)}
+      />
     </div>
   );
 }

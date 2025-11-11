@@ -93,17 +93,17 @@ export function InvoiceSendDialog({ invoice, onClose, onSent }: InvoiceSendDialo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-3xl rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="w-full max-w-3xl rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Send Invoice</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-lg font-semibold text-foreground">Send Invoice</h2>
+            <p className="text-sm text-muted-foreground">
               Email invoice {invoice.invoiceNumber} to the customer with optional message.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -113,7 +113,7 @@ export function InvoiceSendDialog({ invoice, onClose, onSent }: InvoiceSendDialo
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 To * (comma separated)
               </label>
               <input
@@ -122,27 +122,27 @@ export function InvoiceSendDialog({ invoice, onClose, onSent }: InvoiceSendDialo
                   required: 'At least one recipient email is required',
                 })}
                 placeholder="billing@example.com, ap@example.com"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.to && <p className="mt-1 text-sm text-red-600">{errors.to.message}</p>}
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 CC (optional)
               </label>
               <input
                 type="text"
                 {...register('cc')}
                 placeholder="finance@example.com"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Subject *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Subject *</label>
               <input
                 type="text"
                 {...register('subject', { required: 'Subject is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.subject && (
                 <p className="mt-1 text-sm text-red-600">{errors.subject.message}</p>
@@ -151,19 +151,19 @@ export function InvoiceSendDialog({ invoice, onClose, onSent }: InvoiceSendDialo
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Message</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Message</label>
             <textarea
               rows={6}
               {...register('message')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-gray-200 pt-6 md:flex-row md:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border pt-6 md:flex-row md:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

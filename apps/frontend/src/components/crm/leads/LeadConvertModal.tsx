@@ -63,17 +63,17 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Convert Lead</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-semibold text-foreground">Convert Lead</h2>
+            <p className="text-sm text-muted-foreground">
               Finalize the conversion to a customer and capture contract metadata.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -81,66 +81,66 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
             <p>
-              Converting lead <span className="font-semibold text-gray-900">{lead.title}</span> for contact
-              <span className="font-semibold text-gray-900"> {lead.contact.firstName} {lead.contact.lastName}</span>.
+              Converting lead <span className="font-semibold text-foreground">{lead.title}</span> for contact
+              <span className="font-semibold text-foreground"> {lead.contact.firstName} {lead.contact.lastName}</span>.
             </p>
             {lead.prospectCompanyName && (
               <p className="mt-1">
-                Prospect company: <span className="font-semibold text-gray-900">{lead.prospectCompanyName}</span>
+                Prospect company: <span className="font-semibold text-foreground">{lead.prospectCompanyName}</span>
               </p>
             )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Name *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Name *</label>
               <input
                 type="text"
                 {...register('customerName', { required: 'Customer name is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.customerName && <p className="text-sm text-red-600">{errors.customerName.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Email *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Email *</label>
               <input
                 type="email"
                 {...register('customerEmail', { required: 'Customer email is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.customerEmail && <p className="text-sm text-red-600">{errors.customerEmail.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Phone</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Phone</label>
               <input
                 type="text"
                 {...register('customerPhone')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Website</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Website</label>
               <input
                 type="text"
                 {...register('customerWebsite')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Industry</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Industry</label>
               <input
                 type="text"
                 {...register('customerIndustry')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Type *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Type *</label>
               <select
                 {...register('customerType', { required: 'Customer type is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_TYPES.map((type) => (
                   <option key={type} value={type}>
@@ -150,10 +150,10 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Status</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Status</label>
               <select
                 {...register('customerStatus')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_STATUSES.map((status) => (
                   <option key={status} value={status}>
@@ -163,10 +163,10 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Sentiment</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Sentiment</label>
               <select
                 {...register('customerSentiment')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_SENTIMENTS.map((sentiment) => (
                   <option key={sentiment} value={sentiment}>
@@ -176,38 +176,38 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Monthly Value</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Monthly Value</label>
               <input
                 type="number"
                 step="0.01"
                 {...register('customerMonthlyValue', { valueAsNumber: true })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Currency</label>
               <input
                 type="text"
                 maxLength={10}
                 {...register('customerCurrency')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="USD"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Customer Notes</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Customer Notes</label>
               <textarea
                 rows={3}
                 {...register('customerNotes')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="Add onboarding notes or context"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Lead Status After Conversion</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Lead Status After Conversion</label>
               <select
                 {...register('leadStatus')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {['WON', 'LOST'].map((status) => (
                   <option key={status} value={status}>
@@ -218,11 +218,11 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

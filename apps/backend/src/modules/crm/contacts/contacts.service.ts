@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { LeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { FilterContactsDto } from './dto/filter-contacts.dto';
+import { ConvertContactToLeadDto } from './dto/convert-contact-to-lead.dto';
+import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -41,6 +43,12 @@ export class ContactsService {
         status: lead.status,
         value: lead.value ? Number(lead.value) : null,
       }));
+    }
+
+    if (Array.isArray(formatted.activities)) {
+      formatted.activities = formatted.activities.map((activity: any) =>
+        mapActivitySummary(activity),
+      );
     }
 
     return formatted;
@@ -182,21 +190,7 @@ export class ContactsService {
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 10,
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            description: true,
-            createdAt: true,
-            createdBy: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
+          include: ACTIVITY_SUMMARY_INCLUDE,
         },
       },
     });
@@ -264,5 +258,85 @@ export class ContactsService {
       }
       throw error;
     }
+  }
+
+  async convertToLead(id: string, dto: ConvertContactToLeadDto) {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        companyName: true,
+        customerId: true,
+      },
+    });
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${id} not found`);
+    }
+
+    const lead = await this.prisma.lead.create({
+      data: {
+        contactId: contact.id,
+        title: dto.title,
+        description: dto.description,
+        status: dto.status ?? LeadStatus.NEW,
+        value:
+          dto.value !== undefined && dto.value !== null
+            ? new Prisma.Decimal(dto.value)
+            : undefined,
+        probability: dto.probability,
+        assignedToId: dto.assignedToId,
+        source: dto.source,
+        expectedCloseDate: dto.expectedCloseDate
+          ? new Date(dto.expectedCloseDate)
+          : undefined,
+        prospectCompanyName: dto.prospectCompanyName ?? contact.companyName,
+        prospectIndustry: dto.prospectIndustry,
+        prospectWebsite: dto.prospectWebsite,
+      },
+    });
+
+    const leadWithRelations = await this.prisma.lead.findUnique({
+      where: { id: lead.id },
+      include: {
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            role: true,
+            companyName: true,
+            customerId: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!leadWithRelations) {
+      throw new NotFoundException('Lead not found after creation');
+    }
+
+    return {
+      ...leadWithRelations,
+      value:
+        leadWithRelations.value !== undefined && leadWithRelations.value !== null
+          ? Number(leadWithRelations.value)
+          : null,
+    };
   }
 }

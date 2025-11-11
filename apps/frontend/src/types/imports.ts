@@ -1,3 +1,5 @@
+export type CrmImportType = 'contacts' | 'leads' | 'opportunities';
+
 export interface ImportFieldMetadata {
   key: string;
   label: string;
@@ -5,7 +7,7 @@ export interface ImportFieldMetadata {
   required: boolean;
 }
 
-export interface UploadContactsResult {
+export interface UploadImportResult {
   id: string;
   type: string;
   fileName: string;
@@ -14,6 +16,8 @@ export interface UploadContactsResult {
   totalRows: number;
   availableFields: ImportFieldMetadata[];
 }
+
+export type UploadContactsResult = UploadImportResult;
 
 export interface FieldMappingEntry {
   sourceColumn: string;

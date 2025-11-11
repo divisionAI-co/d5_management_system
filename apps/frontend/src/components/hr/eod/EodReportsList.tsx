@@ -47,8 +47,8 @@ export function EodReportsList({
         <div className="flex items-center gap-3">
           <ClipboardList className="h-8 w-8 text-blue-600" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">EOD Reports</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-foreground">EOD Reports</h1>
+            <p className="text-sm text-muted-foreground">
               {contextLabel
                 ? `Viewing reports for ${contextLabel}`
                 : 'Track daily end-of-day submissions'}
@@ -92,18 +92,18 @@ export function EodReportsList({
             return (
               <div
                 key={report.id}
-                className="space-y-3 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+                className="space-y-3 rounded-lg border border-border bg-card p-6 shadow-sm"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {format(new Date(report.date), 'EEEE, MMM dd, yyyy')}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       Submitted {format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}
                     </p>
                     {!filterUserId && report.user && (
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         {report.user.firstName} {report.user.lastName}
                       </p>
                     )}
@@ -120,7 +120,7 @@ export function EodReportsList({
                       <button
                         type="button"
                         onClick={() => onEdit?.(report)}
-                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50"
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
                       >
                         <Edit3 className="h-3.5 w-3.5" />
                         Edit
@@ -130,15 +130,15 @@ export function EodReportsList({
                 </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
-                <p className="mt-1 text-sm leading-relaxed text-gray-600">{report.summary}</p>
+                <h3 className="text-sm font-semibold text-muted-foreground">Summary</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{report.summary}</p>
               </div>
 
               <div>
-                <h3 className="text-sm font-semibold text-gray-700">Tasks</h3>
-                <div className="mt-2 overflow-hidden rounded-md border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200 text-xs">
-                    <thead className="bg-gray-50 text-gray-500">
+                <h3 className="text-sm font-semibold text-muted-foreground">Tasks</h3>
+                <div className="mt-2 overflow-hidden rounded-md border border-border">
+                  <table className="min-w-full divide-y divide-border text-xs">
+                    <thead className="bg-muted text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 text-left font-semibold">Client / Ticket</th>
                         <th className="px-3 py-2 text-left font-semibold">Type</th>
@@ -148,7 +148,7 @@ export function EodReportsList({
                         <th className="px-3 py-2 text-right font-semibold">Spent (h)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200 bg-white text-gray-600">
+                    <tbody className="divide-y divide-border bg-card text-muted-foreground">
                       {report.tasksWorkedOn.map((task, index) => {
                         if (typeof task === 'string') {
                           return (
@@ -172,8 +172,8 @@ export function EodReportsList({
                         return (
                           <tr key={index}>
                             <td className="px-3 py-2">
-                              <p className="font-medium text-gray-900">{task.clientDetails ?? '—'}</p>
-                              <p className="text-gray-500">{task.ticket ?? '—'}</p>
+                              <p className="font-medium text-foreground">{task.clientDetails ?? '—'}</p>
+                              <p className="text-muted-foreground">{task.ticket ?? '—'}</p>
                             </td>
                             <td className="px-3 py-2">{typeLabel}</td>
                             <td className="px-3 py-2">{lifecycleLabel}</td>
@@ -193,7 +193,7 @@ export function EodReportsList({
               </div>
 
               {safeHours !== null && (
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Hours worked: {safeHours}
                 </p>
               )}
@@ -202,7 +202,7 @@ export function EodReportsList({
           })}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
           {contextLabel
             ? `No EOD reports recorded for ${contextLabel}.`
             : 'No EOD reports submitted yet.'}

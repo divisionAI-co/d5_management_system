@@ -311,7 +311,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
   if (isEdit && opportunityQuery.isLoading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="flex items-center gap-3 rounded-lg bg-white px-6 py-4 text-gray-700 shadow-lg">
+        <div className="flex items-center gap-3 rounded-lg bg-card px-6 py-4 text-muted-foreground shadow-lg">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading opportunity details...
         </div>
@@ -321,13 +321,13 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit Opportunity' : 'New Opportunity'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit
                 ? 'Update opportunity details to keep the pipeline current.'
                 : 'Capture a new opportunity for your pipeline.'}
@@ -335,7 +335,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -345,12 +345,12 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Lead<span className="text-rose-500">*</span>
               </label>
               <select
                 {...register('leadId', { required: 'Select a lead' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select lead</option>
                 {leads.map((lead) => (
@@ -364,12 +364,12 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
               ) : null}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Customer <span className="text-xs font-normal text-gray-400">(optional)</span>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                Customer <span className="text-xs font-normal text-muted-foreground">(optional)</span>
               </label>
               <select
                 {...register('customerId')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Unassigned / Not converted</option>
                 {customers.map((customer) => (
@@ -378,7 +378,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Once the lead converts, the opportunity will automatically inherit the customer.
               </p>
             </div>
@@ -386,33 +386,33 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Title<span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 {...register('title', { required: 'Opportunity title is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="Eg. 3 React Engineers for Fintech client"
               />
               {errors.title ? <p className="mt-1 text-sm text-rose-600">{errors.title.message}</p> : null}
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Description</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Description</label>
               <textarea
                 rows={3}
                 {...register('description')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 placeholder="Add context, scope, stakeholders or next steps."
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Type<span className="text-rose-500">*</span>
               </label>
               <select
                 {...register('type', { required: 'Select an opportunity type' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {CUSTOMER_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -422,14 +422,14 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Stage<span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 list="stage-options"
                 {...register('stage', { required: 'Stage is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               <datalist id="stage-options">
                 {STAGE_OPTIONS.map((stage) => (
@@ -439,7 +439,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
               {errors.stage ? <p className="mt-1 text-sm text-rose-600">{errors.stage.message}</p> : null}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Value (USD)<span className="text-rose-500">*</span>
               </label>
               <input
@@ -451,15 +451,15 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
                   required: 'Projected value is required',
                   min: { value: 0, message: 'Value must be positive' },
                 })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.value ? <p className="mt-1 text-sm text-rose-600">{errors.value.message}</p> : null}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Assigned To</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Assigned To</label>
               <select
                 {...register('assignedToId')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Unassigned</option>
                 {users.map((user) => (
@@ -470,12 +470,12 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Job Description URL</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Job Description URL</label>
               <input
                 type="url"
                 {...register('jobDescriptionUrl')}
                 placeholder="https://"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -521,7 +521,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

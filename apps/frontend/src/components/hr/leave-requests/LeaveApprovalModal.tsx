@@ -42,8 +42,8 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="w-full max-w-lg rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-3">
             {mode === 'approve' ? (
               <CheckCircle className="h-6 w-6 text-green-600" />
@@ -51,10 +51,10 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
               <XCircle className="h-6 w-6 text-red-600" />
             )}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-foreground">
                 {mode === 'approve' ? 'Approve Leave Request' : 'Reject Leave Request'}
               </h2>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 {mode === 'approve'
                   ? 'Confirm approval for this leave request.'
                   : 'Provide a reason for rejecting this leave request.'}
@@ -63,7 +63,7 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -71,35 +71,35 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 px-6 py-6">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-            <p className="font-medium text-gray-800">
+          <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">
               {request.employee?.user.firstName} {request.employee?.user.lastName}
             </p>
             <p className="mt-1">
               {request.type} • {request.totalDays} day(s)
             </p>
-            <p className="mt-1 text-gray-500">{request.reason || 'No reason provided.'}</p>
+            <p className="mt-1 text-muted-foreground">{request.reason || 'No reason provided.'}</p>
           </div>
 
           {mode === 'reject' && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Rejection Reason *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Rejection Reason *</label>
               <textarea
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 rows={4}
                 required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-red-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-red-500"
                 placeholder="Explain the reason for rejection..."
               />
             </div>
           )}
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-5">
+          <div className="flex justify-end gap-3 border-t border-border pt-5">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

@@ -15,18 +15,18 @@ export function PerformanceReviewDetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Review Details</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-xl font-semibold text-foreground">Review Details</h2>
+            <p className="text-sm text-muted-foreground">
               Performance review for {review.employee?.user.firstName}{' '}
               {review.employee?.user.lastName}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -35,44 +35,44 @@ export function PerformanceReviewDetailsModal({
         <div className="space-y-6 px-6 py-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <span className="text-xs uppercase text-gray-500">Employee</span>
-              <p className="text-sm font-medium text-gray-900">
+              <span className="text-xs uppercase text-muted-foreground">Employee</span>
+              <p className="text-sm font-medium text-foreground">
                 {review.employee?.user.firstName} {review.employee?.user.lastName}
               </p>
-              <p className="text-sm text-gray-500">{review.employee?.jobTitle}</p>
+              <p className="text-sm text-muted-foreground">{review.employee?.jobTitle}</p>
             </div>
             <div>
-              <span className="text-xs uppercase text-gray-500">Reviewer</span>
-              <p className="text-sm font-medium text-gray-900">
+              <span className="text-xs uppercase text-muted-foreground">Reviewer</span>
+              <p className="text-sm font-medium text-foreground">
                 {review.reviewerName || 'Not provided'}
               </p>
               {review.reviewedAt && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Reviewed {format(new Date(review.reviewedAt), 'MMM dd, yyyy')}
                 </p>
               )}
             </div>
             <div>
-              <span className="text-xs uppercase text-gray-500">Review Period</span>
-              <p className="text-sm font-medium text-gray-900">
+              <span className="text-xs uppercase text-muted-foreground">Review Period</span>
+              <p className="text-sm font-medium text-foreground">
                 {format(new Date(review.reviewPeriodStart), 'MMM dd, yyyy')} -{' '}
                 {format(new Date(review.reviewPeriodEnd), 'MMM dd, yyyy')}
               </p>
             </div>
             <div>
-              <span className="text-xs uppercase text-gray-500">Overall Rating</span>
-              <p className="text-sm font-medium text-gray-900">
+              <span className="text-xs uppercase text-muted-foreground">Overall Rating</span>
+              <p className="text-sm font-medium text-foreground">
                 {review.overallRating ? review.overallRating.toFixed(1) : '—'}
               </p>
             </div>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Ratings</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground">Ratings</h3>
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
               {Object.entries(ratings || {}).map(([key, value]) => (
-                <div key={key} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <span className="text-xs font-semibold uppercase text-gray-500">
+                <div key={key} className="rounded-lg border border-border bg-muted p-3">
+                  <span className="text-xs font-semibold uppercase text-muted-foreground">
                     {key.replace(/([A-Z])/g, ' $1')}
                   </span>
                   <p className="text-lg font-semibold text-blue-600">{value}</p>
@@ -82,22 +82,22 @@ export function PerformanceReviewDetailsModal({
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Strengths</h3>
-            <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+            <h3 className="text-sm font-semibold text-muted-foreground">Strengths</h3>
+            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
               {review.strengths || 'No strengths documented.'}
             </p>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Areas for Improvement</h3>
-            <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+            <h3 className="text-sm font-semibold text-muted-foreground">Areas for Improvement</h3>
+            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
               {review.improvements || 'No improvement notes provided.'}
             </p>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-gray-700">Goals</h3>
-            <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+            <h3 className="text-sm font-semibold text-muted-foreground">Goals</h3>
+            <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">
               {review.goals || 'No goals set for this cycle.'}
             </p>
           </div>

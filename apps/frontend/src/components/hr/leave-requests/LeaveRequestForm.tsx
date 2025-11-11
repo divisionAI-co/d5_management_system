@@ -115,13 +115,13 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Update Leave Request' : 'New Leave Request'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit
                 ? 'Modify the details of the leave request.'
                 : 'Submit a new leave request.'}
@@ -129,7 +129,7 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -139,11 +139,11 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Start Date *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Start Date *</label>
               <input
                 type="date"
                 {...register('startDate', { required: 'Start date is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.startDate && (
                 <p className="mt-1 text-sm text-red-600">{errors.startDate.message}</p>
@@ -151,11 +151,11 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">End Date *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">End Date *</label>
               <input
                 type="date"
                 {...register('endDate', { required: 'End date is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.endDate && (
                 <p className="mt-1 text-sm text-red-600">{errors.endDate.message}</p>
@@ -163,10 +163,10 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Leave Type *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Leave Type *</label>
               <select
                 {...register('type', { required: 'Leave type is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 {LEAVE_TYPES.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -177,10 +177,10 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Status *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Status *</label>
               <select
                 {...register('status')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 disabled={!isEdit}
               >
                 {LEAVE_STATUS.map((option) => (
@@ -190,7 +190,7 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
                 ))}
               </select>
               {!isEdit && (
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Status will be set to Pending for new requests.
                 </p>
               )}
@@ -198,17 +198,17 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Reason</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Reason</label>
             <textarea
               rows={3}
               {...register('reason')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               placeholder="Brief explanation for the leave request"
             />
           </div>
 
          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Total Days</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Total Days</label>
             <input
               type="number"
               {...register('totalDays', {
@@ -217,15 +217,15 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
                 min: { value: 1, message: 'Total days must be at least 1' },
               })}
               readOnly
-              className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600"
+              className="w-full cursor-not-allowed rounded-lg border border-border bg-muted px-3 py-2 text-muted-foreground"
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

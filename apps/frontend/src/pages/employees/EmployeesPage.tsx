@@ -48,7 +48,7 @@ export default function EmployeesPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="py-8">
       <EmployeesList
         onCreateNew={handleCreateNew}
         onEdit={handleEdit}
@@ -71,11 +71,11 @@ export default function EmployeesPage() {
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">
               Delete Employee
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-muted-foreground mb-6">
               Are you sure you want to delete{' '}
               <span className="font-semibold">
                 {showDeleteConfirm.user?.firstName} {showDeleteConfirm.user?.lastName}
@@ -85,7 +85,7 @@ export default function EmployeesPage() {
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-muted-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 Cancel
               </button>

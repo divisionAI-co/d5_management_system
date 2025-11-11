@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, TaskPriority, TaskStatus } from '@prisma/client';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, TaskPriority, TaskStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -341,6 +341,126 @@ export class TasksService {
     });
 
     return TasksService.formatTask(task);
+  }
+
+  async addTaskToEodReport(taskId: string, userId: string, role: UserRole) {
+    const taskRecord = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: this.taskInclude,
+    });
+
+    if (!taskRecord) {
+      throw new NotFoundException(`Task with ID ${taskId} not found`);
+    }
+
+    const task = TasksService.formatTask(taskRecord);
+
+    const isOwner =
+      task.createdById === userId || task.assignedToId === userId;
+    const isPrivileged =
+      role === UserRole.ADMIN ||
+      role === UserRole.HR ||
+      role === UserRole.ACCOUNT_MANAGER;
+
+    if (!isOwner && !isPrivileged) {
+      throw new ForbiddenException(
+        'You do not have permission to add this task to your EOD report',
+      );
+    }
+
+    const now = new Date();
+    const dateString = now.toISOString().split('T')[0];
+    const reportDate = new Date(`${dateString}T00:00:00.000Z`);
+
+    const eodEntry: Prisma.JsonObject = {
+      clientDetails: task.title,
+      ticket: task.id,
+      typeOfWorkDone: 'IMPLEMENTATION',
+      taskLifecycle: 'NEW',
+      taskStatus: task.status === TaskStatus.DONE ? 'DONE' : 'IN_PROGRESS',
+      timeSpentOnTicket:
+        task.actualHours !== undefined && task.actualHours !== null
+          ? Number(task.actualHours)
+          : 0,
+    };
+
+    if (task.estimatedHours !== undefined && task.estimatedHours !== null) {
+      eodEntry.taskEstimatedTime = Number(task.estimatedHours);
+    }
+
+    const existingReport = await this.prisma.eodReport.findFirst({
+      where: {
+        userId,
+        date: reportDate,
+      },
+      select: {
+        id: true,
+        tasksWorkedOn: true,
+        date: true,
+      },
+    });
+
+    const entryLabel = `Task "${task.title}" added to your ${dateString} EOD report.`;
+
+    if (existingReport) {
+      const tasksWorkedOn: Prisma.JsonArray = Array.isArray(
+        existingReport.tasksWorkedOn,
+      )
+        ? [...(existingReport.tasksWorkedOn as Prisma.JsonArray)]
+        : [];
+
+      const alreadyExists = tasksWorkedOn.some((item) => {
+        if (item && typeof item === 'object' && 'ticket' in item) {
+          try {
+            const parsed = item as Record<string, unknown>;
+            return parsed.ticket === task.id;
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      });
+
+      if (!alreadyExists) {
+        tasksWorkedOn.push(eodEntry);
+
+        await this.prisma.eodReport.update({
+          where: { id: existingReport.id },
+          data: {
+            tasksWorkedOn,
+          },
+        });
+      }
+
+      return {
+        reportId: existingReport.id,
+        reportDate: dateString,
+        isNewReport: false,
+        message: alreadyExists
+          ? `Task "${task.title}" is already part of your EOD report for ${dateString}.`
+          : entryLabel,
+      };
+    }
+
+    const createdReport = await this.prisma.eodReport.create({
+      data: {
+        userId,
+        date: reportDate,
+        summary: `Auto-generated report for ${dateString}. Please update with additional details.`,
+        tasksWorkedOn: [eodEntry],
+      },
+      select: {
+        id: true,
+        date: true,
+      },
+    });
+
+    return {
+      reportId: createdReport.id,
+      reportDate: dateString,
+      isNewReport: true,
+      message: `${entryLabel} A new draft report was created for you.`,
+    };
   }
 
   async remove(id: string) {

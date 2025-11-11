@@ -4,13 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CandidateStage, Prisma } from '@prisma/client';
+import { CandidateStage, EmploymentStatus, Prisma, UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { FilterCandidatesDto } from './dto/filter-candidates.dto';
 import { UpdateCandidateStageDto } from './dto/update-candidate-stage.dto';
 import { LinkCandidatePositionDto } from './dto/link-position.dto';
+import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
+import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -31,7 +35,7 @@ export class CandidatesService {
       return candidate;
     }
 
-    return {
+    const formatted = {
       ...candidate,
       expectedSalary:
         candidate?.expectedSalary !== undefined && candidate?.expectedSalary !== null
@@ -56,6 +60,14 @@ export class CandidatesService {
           : null,
       })),
     };
+
+    if (Array.isArray(candidate?.activities)) {
+      formatted.activities = candidate.activities.map((activity: any) =>
+        mapActivitySummary(activity),
+      );
+    }
+
+    return formatted;
   }
 
   private validateSortField(sortBy?: string) {
@@ -170,6 +182,7 @@ export class CandidatesService {
             },
           },
         },
+        employee: true,
       },
     });
 
@@ -238,6 +251,7 @@ export class CandidatesService {
             },
           },
         },
+        employee: true,
       },
     });
 
@@ -283,6 +297,7 @@ export class CandidatesService {
               },
             },
           },
+          employee: true,
         },
       }),
     ]);
@@ -323,22 +338,9 @@ export class CandidatesService {
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 5,
-          select: {
-            id: true,
-            type: true,
-            title: true,
-            description: true,
-            createdAt: true,
-            createdBy: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
+          include: ACTIVITY_SUMMARY_INCLUDE,
         },
+        employee: true,
       },
     });
 
@@ -405,6 +407,7 @@ export class CandidatesService {
               },
             },
           },
+          employee: true,
         },
       });
 
@@ -454,6 +457,7 @@ export class CandidatesService {
             },
           },
         },
+        employee: true,
       },
     });
 
@@ -541,10 +545,185 @@ export class CandidatesService {
             },
           },
         },
+        employee: true,
       },
     });
 
     return this.formatCandidate(refreshed);
+  }
+
+  private generateSecurePassword() {
+    return randomBytes(12).toString('base64').replace(/[+/=]/g, '').slice(0, 12);
+  }
+
+  async convertToEmployee(
+    candidateId: string,
+    convertDto: ConvertCandidateToEmployeeDto,
+  ) {
+    const candidate = await this.ensureCandidateExists(candidateId);
+
+    if (candidate.employee) {
+      throw new ConflictException('Candidate is already associated with an employee record');
+    }
+
+    let temporaryPassword: string | undefined;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let resolvedUserId = convertDto.userId;
+      let userRecord:
+        | {
+            id: string;
+            email: string;
+            firstName: string;
+            lastName: string;
+            role: UserRole;
+          }
+        | null = null;
+
+      if (resolvedUserId) {
+        const existingUser = await tx.user.findUnique({
+          where: { id: resolvedUserId },
+          include: { employee: true },
+        });
+
+        if (!existingUser) {
+          throw new NotFoundException(`User with ID ${resolvedUserId} not found`);
+        }
+
+        if (existingUser.employee) {
+          throw new ConflictException('The selected user already has an employee record');
+        }
+
+        userRecord = existingUser;
+      } else {
+        const existingUserByEmail = await tx.user.findUnique({
+          where: { email: candidate.email.toLowerCase() },
+          include: { employee: true },
+        });
+
+        if (existingUserByEmail) {
+          if (existingUserByEmail.employee) {
+            throw new ConflictException(
+              'A user with the candidate email already has an employee record. Please select a different user.',
+            );
+          }
+
+          resolvedUserId = existingUserByEmail.id;
+          userRecord = existingUserByEmail;
+        } else {
+          if (convertDto.autoGeneratePassword === false && !convertDto.user?.password) {
+            throw new BadRequestException(
+              'Password is required when autoGeneratePassword is set to false.',
+            );
+          }
+
+          const password =
+            (!convertDto.autoGeneratePassword && convertDto.user?.password) ||
+            this.generateSecurePassword();
+
+          temporaryPassword = password;
+
+          const hashedPassword = await bcrypt.hash(password, 10);
+
+          const newUser = await tx.user.create({
+            data: {
+              email: candidate.email.toLowerCase(),
+              password: hashedPassword,
+              firstName: candidate.firstName,
+              lastName: candidate.lastName,
+              role: convertDto.user?.role ?? UserRole.EMPLOYEE,
+              phone: convertDto.user?.phone ?? candidate.phone ?? undefined,
+            },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          });
+
+          resolvedUserId = newUser.id;
+          userRecord = newUser;
+        }
+      }
+
+      if (!resolvedUserId || !userRecord) {
+        throw new BadRequestException('Unable to resolve user for the new employee');
+      }
+
+      const employee = await tx.employee.create({
+        data: {
+          userId: resolvedUserId,
+          candidateId: candidate.id,
+          employeeNumber: convertDto.employeeNumber,
+          department: convertDto.department,
+          jobTitle: convertDto.jobTitle ?? candidate.currentTitle ?? 'Employee',
+          status: convertDto.status ?? EmploymentStatus.ACTIVE,
+          contractType: convertDto.contractType,
+          hireDate: new Date(convertDto.hireDate),
+          terminationDate: convertDto.terminationDate
+            ? new Date(convertDto.terminationDate)
+            : null,
+          salary: new Prisma.Decimal(convertDto.salary),
+          salaryCurrency: convertDto.salaryCurrency ?? candidate.salaryCurrency ?? 'USD',
+          managerId: convertDto.managerId,
+          emergencyContactName: convertDto.emergencyContactName,
+          emergencyContactPhone: convertDto.emergencyContactPhone,
+          emergencyContactRelation: convertDto.emergencyContactRelation,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+        },
+      });
+
+      const updatedCandidate = await tx.candidate.update({
+        where: { id: candidate.id },
+        data: {
+          stage: CandidateStage.HIRED,
+        },
+        include: {
+          positions: {
+            include: {
+              position: {
+                include: {
+                  opportunity: {
+                    include: {
+                      customer: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          employee: true,
+        },
+      });
+
+      return {
+        employee,
+        candidate: updatedCandidate,
+      };
+    });
+
+    return {
+      employee: result.employee,
+      candidate: this.formatCandidate(result.candidate),
+      temporaryPassword,
+    };
   }
 
   async getPositions(candidateId: string) {

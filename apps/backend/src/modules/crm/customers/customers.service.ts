@@ -14,6 +14,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { FilterCustomersDto } from './dto/filter-customers.dto';
 import { UpdateCustomerStatusDto } from './dto/update-customer-status.dto';
+import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -337,19 +338,10 @@ export class CustomersService {
       where: { customerId: id },
       orderBy: { createdAt: 'desc' },
       take,
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
+      include: ACTIVITY_SUMMARY_INCLUDE,
     });
 
-    return activities;
+    return activities.map((activity) => mapActivitySummary(activity as any));
   }
 
   async getCustomerOpportunities(id: string) {

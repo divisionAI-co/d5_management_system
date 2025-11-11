@@ -29,9 +29,9 @@ export function ContactsTable({
 
   if (!contacts || contacts.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+      <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
         <div className="flex flex-col items-center gap-3">
-          <ClipboardList className="h-10 w-10 text-gray-400" />
+          <ClipboardList className="h-10 w-10 text-muted-foreground" />
           <p>No contacts found. Try adjusting filters or create a new contact.</p>
           {onCreate && (
             <button
@@ -49,28 +49,28 @@ export function ContactsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+    <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <table className="min-w-full divide-y divide-border">
+        <thead className="bg-muted">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Contact</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Company</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Customer</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Leads</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Updated</th>
-            <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contact</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Company</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Customer</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Leads</th>
+            <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Updated</th>
+            <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+        <tbody className="divide-y divide-border bg-card">
           {contacts.map((contact) => (
-            <tr key={contact.id} className="transition hover:bg-gray-50">
-              <td className="px-6 py-4 text-sm text-gray-700">
+            <tr key={contact.id} className="transition hover:bg-muted">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="font-semibold text-gray-900">
+                    <div className="font-semibold text-foreground">
                       {contact.firstName} {contact.lastName}
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <Mail className="h-3.5 w-3.5" />
                         {contact.email}
@@ -92,35 +92,35 @@ export function ContactsTable({
                     <button
                       type="button"
                       onClick={() => onSelect(contact)}
-                      className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50"
+                      className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     >
                       View
                     </button>
                   )}
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {contact.companyName || '—'}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {contact.customer ? (
                   <div>
-                    <div className="font-medium text-gray-900">{contact.customer.name}</div>
+                    <div className="font-medium text-foreground">{contact.customer.name}</div>
                     {contact.customer.email && (
-                      <div className="text-xs text-gray-500">{contact.customer.email}</div>
+                      <div className="text-xs text-muted-foreground">{contact.customer.email}</div>
                     )}
                   </div>
                 ) : (
-                  <span className="text-xs text-gray-400">Unassigned</span>
+                  <span className="text-xs text-muted-foreground">Unassigned</span>
                 )}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
-                <div className="text-sm font-semibold text-gray-900">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
+                <div className="text-sm font-semibold text-foreground">
                   {contact._count?.leads ?? 0}
                 </div>
-                <div className="text-xs text-gray-500">Activities: {contact._count?.activities ?? 0}</div>
+                <div className="text-xs text-muted-foreground">Activities: {contact._count?.activities ?? 0}</div>
               </td>
-              <td className="px-6 py-4 text-sm text-gray-500">
+              <td className="px-6 py-4 text-sm text-muted-foreground">
                 {format(new Date(contact.updatedAt), 'MMM dd, yyyy')}
               </td>
               <td className="px-6 py-4 text-right text-sm">
@@ -128,7 +128,7 @@ export function ContactsTable({
                   <button
                     type="button"
                     onClick={() => onEdit(contact)}
-                    className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-blue-200 hover:text-blue-600"
+                    className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-200 hover:text-blue-600"
                     title="Edit contact"
                   >
                     <Edit3 className="h-4 w-4" />
@@ -136,7 +136,7 @@ export function ContactsTable({
                   <button
                     type="button"
                     onClick={() => onDelete(contact)}
-                    className="rounded-lg border border-gray-200 p-2 text-gray-500 transition hover:border-red-200 hover:text-red-600"
+                    className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-red-200 hover:text-red-600"
                     title="Delete contact"
                   >
                     <Trash2 className="h-4 w-4" />

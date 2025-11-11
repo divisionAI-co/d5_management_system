@@ -31,10 +31,15 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      const refreshToken = useAuthStore.getState().refreshToken;
+
+      if (!refreshToken) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       try {
-        const refreshToken = useAuthStore.getState().refreshToken;
         const response = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken,
         });

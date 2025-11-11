@@ -1,3 +1,6 @@
+import type { ContractType, EmploymentStatus, Employee } from '@/types/hr';
+import type { UserRole } from '@/types/users';
+
 // Recruitment types and DTOs
 
 export enum CandidateStage {
@@ -59,6 +62,7 @@ export interface Candidate {
   updatedAt: string;
   positions?: CandidatePositionLink[];
   activities?: CandidateActivity[];
+  employee?: Employee | null;
 }
 
 export interface CandidateFilters {
@@ -198,6 +202,37 @@ export interface PaginatedMeta {
 export interface PaginatedResponse<T> {
   data: T[];
   meta: PaginatedMeta;
+}
+
+export interface ConvertCandidateUserOptions {
+  password?: string;
+  phone?: string;
+  role?: UserRole;
+}
+
+export interface ConvertCandidateToEmployeePayload {
+  userId?: string;
+  autoGeneratePassword?: boolean;
+  user?: ConvertCandidateUserOptions;
+  employeeNumber: string;
+  department?: string;
+  jobTitle?: string;
+  status?: EmploymentStatus;
+  contractType: ContractType;
+  hireDate: string;
+  terminationDate?: string;
+  salary: number;
+  salaryCurrency?: string;
+  managerId?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+}
+
+export interface ConvertCandidateToEmployeeResponse {
+  employee: Employee;
+  candidate: Candidate;
+  temporaryPassword?: string;
 }
 
 

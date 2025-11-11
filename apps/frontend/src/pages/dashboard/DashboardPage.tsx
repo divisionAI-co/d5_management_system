@@ -70,12 +70,12 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6 p-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="mt-2 text-muted-foreground">
             Welcome back, {user.firstName}! Admin analytics will be available soon.
           </p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-600 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
           Use the navigation above to access CRM, HR, and Operations tools while this overview is
           under construction.
         </div>
@@ -91,15 +91,15 @@ export default function DashboardPage() {
     <div className="space-y-8 p-6">
       <div className="flex flex-col gap-2 md:flex-row md:items-baseline md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Dashboard</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">My Dashboard</h1>
+          <p className="text-muted-foreground">
             Welcome back, {user.firstName}! Track your daily reports, tasks and reminders below.
           </p>
         </div>
         {data.timeframe?.start && data.timeframe?.end && (
-          <p className="text-sm uppercase tracking-wide text-gray-500">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             Monitoring period:{' '}
-            <span className="font-semibold text-gray-700">
+            <span className="font-semibold text-muted-foreground">
               {formatDate(data.timeframe.start)} – {formatDate(data.timeframe.end)}
             </span>
           </p>
@@ -107,42 +107,42 @@ export default function DashboardPage() {
       </div>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-10 w-10 rounded-full bg-red-50 p-2 text-red-500" />
             <div>
-              <p className="text-xs font-semibold uppercase text-gray-500">Missing EOD Reports</p>
-              <p className="text-3xl font-bold text-gray-900">{data.stats.missingReports}</p>
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Missing EOD Reports</p>
+              <p className="text-3xl font-bold text-foreground">{data.stats.missingReports}</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <Clock className="h-10 w-10 rounded-full bg-amber-50 p-2 text-amber-500" />
             <div>
-              <p className="text-xs font-semibold uppercase text-gray-500">Late Submissions</p>
-              <p className="text-3xl font-bold text-gray-900">{data.stats.lateReports}</p>
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Late Submissions</p>
+              <p className="text-3xl font-bold text-foreground">{data.stats.lateReports}</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <ClipboardList className="h-10 w-10 rounded-full bg-blue-50 p-2 text-blue-500" />
             <div>
-              <p className="text-xs font-semibold uppercase text-gray-500">Total Reports Submitted</p>
-              <p className="text-3xl font-bold text-gray-900">{data.stats.totalReports}</p>
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Total Reports Submitted</p>
+              <p className="text-3xl font-bold text-foreground">{data.stats.totalReports}</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-10 w-10 rounded-full bg-emerald-50 p-2 text-emerald-500" />
             <div>
-              <p className="text-xs font-semibold uppercase text-gray-500">On-Time Streak</p>
-              <p className="text-3xl font-bold text-gray-900">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">On-Time Streak</p>
+              <p className="text-3xl font-bold text-foreground">
                 {Math.max(data.stats.totalReports - data.stats.lateReports, 0)}
               </p>
             </div>
@@ -151,19 +151,19 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="space-y-4 rounded-lg border border-border bg-card p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
               <BookOpen className="h-5 w-5 text-blue-500" />
               Recent EOD Reports
             </h2>
-            <span className="text-xs font-semibold uppercase text-gray-400">
+            <span className="text-xs font-semibold uppercase text-muted-foreground">
               Last {data.recentReports.length} entries
             </span>
           </div>
 
           {data.recentReports.length === 0 ? (
-            <p className="rounded-md border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+            <p className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               You have not submitted any EOD reports yet.
             </p>
           ) : (
@@ -171,14 +171,14 @@ export default function DashboardPage() {
               {data.recentReports.map((report) => (
                 <li
                   key={report.id}
-                  className="rounded-md border border-gray-100 bg-gray-50 p-4 transition hover:bg-gray-100"
+                  className="rounded-md border border-border bg-muted p-4 transition hover:bg-muted/70"
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">
+                      <p className="text-sm font-semibold text-foreground">
                         {formatDate(report.date)}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-sm text-gray-600">{report.summary}</p>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{report.summary}</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase">
                       <span
@@ -193,7 +193,7 @@ export default function DashboardPage() {
                       <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-600">
                         {report.hoursWorked !== null ? `${report.hoursWorked} hrs` : '— hrs'}
                       </span>
-                      <span className="rounded-full bg-gray-200 px-2.5 py-1 text-gray-700">
+                      <span className="rounded-full bg-muted/80 px-2.5 py-1 text-muted-foreground">
                         Submitted {formatDateTime(report.submittedAt)}
                       </span>
                     </div>
@@ -205,19 +205,19 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="space-y-3 rounded-lg border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                 <FileText className="h-5 w-5 text-purple-500" />
                 Tasks Due Soon
               </h2>
-              <span className="text-xs uppercase text-gray-400">
+              <span className="text-xs uppercase text-muted-foreground">
                 Next {data.tasksDueSoon.length} tasks
               </span>
             </div>
 
             {data.tasksDueSoon.length === 0 ? (
-              <p className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
+              <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                 You have no assigned tasks due in the next few days.
               </p>
             ) : (
@@ -225,12 +225,12 @@ export default function DashboardPage() {
                 {data.tasksDueSoon.map((task) => (
                   <li
                     key={task.id}
-                    className="rounded-md border border-gray-100 bg-gray-50 p-4 transition hover:bg-gray-100"
+                    className="rounded-md border border-border bg-muted p-4 transition hover:bg-muted/70"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{task.title}</p>
-                        <p className="text-xs uppercase text-gray-500">
+                        <p className="text-sm font-semibold text-foreground">{task.title}</p>
+                        <p className="text-xs uppercase text-muted-foreground">
                           {task.status.replace('_', ' ')}
                         </p>
                       </div>
@@ -255,7 +255,7 @@ export default function DashboardPage() {
                         >
                           {task.isOverdue ? 'Overdue' : 'Due Soon'}
                         </span>
-                        <span className="rounded-full bg-gray-200 px-2.5 py-1 text-gray-700">
+                        <span className="rounded-full bg-muted/80 px-2.5 py-1 text-muted-foreground">
                           {formatDate(task.dueDate)}
                         </span>
                       </div>
@@ -266,19 +266,19 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="space-y-3 rounded-lg border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                 <CalendarClock className="h-5 w-5 text-teal-500" />
                 Upcoming Reminders
               </h2>
-              <span className="text-xs uppercase text-gray-400">
+              <span className="text-xs uppercase text-muted-foreground">
                 {data.activitiesDueSoon.length} scheduled
               </span>
             </div>
 
             {data.activitiesDueSoon.length === 0 ? (
-              <p className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
+              <p className="rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
                 You have no upcoming reminders in the next few days.
               </p>
             ) : (
@@ -286,45 +286,48 @@ export default function DashboardPage() {
                 {data.activitiesDueSoon.map((activity) => (
                   <li
                     key={activity.id}
-                    className="rounded-md border border-gray-100 bg-gray-50 p-4 transition hover:bg-gray-100"
+                    className="rounded-md border border-border bg-muted p-4 transition hover:bg-muted/70"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">
-                          {activity.title || 'Untitled Reminder'}
+                        <p className="text-sm font-semibold text-foreground">
+                          {activity.subject || 'Untitled Reminder'}
                         </p>
-                        <p className="text-xs uppercase text-gray-500">
-                          {activity.type.replace('_', ' ')}
+                        <p className="text-xs uppercase text-muted-foreground">
+                          {activity.type.name}
                         </p>
-                        <div className="mt-1 text-xs text-gray-500">
+                        {activity.body && (
+                          <p className="text-xs text-muted-foreground">{activity.body}</p>
+                        )}
+                        <div className="mt-1 text-xs text-muted-foreground">
                           {activity.related.customer && (
                             <span className="mr-2 inline-flex items-center gap-1">
-                              <span className="font-semibold text-gray-700">Customer:</span>
+                              <span className="font-semibold text-muted-foreground">Customer:</span>
                               {activity.related.customer.name}
                             </span>
                           )}
                           {activity.related.lead && (
                             <span className="mr-2 inline-flex items-center gap-1">
-                              <span className="font-semibold text-gray-700">Lead:</span>
+                              <span className="font-semibold text-muted-foreground">Lead:</span>
                               {activity.related.lead.title}
                             </span>
                           )}
                           {activity.related.opportunity && (
                             <span className="inline-flex items-center gap-1">
-                              <span className="font-semibold text-gray-700">Opportunity:</span>
+                              <span className="font-semibold text-muted-foreground">Opportunity:</span>
                               {activity.related.opportunity.title}
                             </span>
                           )}
                           {activity.related.task && (
                             <span className="inline-flex items-center gap-1">
-                              <span className="font-semibold text-gray-700">Task:</span>
+                              <span className="font-semibold text-muted-foreground">Task:</span>
                               {activity.related.task.title}
                             </span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase">
-                        <span className="rounded-full bg-gray-200 px-2.5 py-1 text-gray-700">
+                        <span className="rounded-full bg-muted/80 px-2.5 py-1 text-muted-foreground">
                           Due {formatDate(activity.dueDate)}
                         </span>
                       </div>

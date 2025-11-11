@@ -33,11 +33,11 @@ export function OpportunitiesTable({
   const rows = opportunities ?? [];
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+    <div className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Pipeline</h2>
-          <p className="text-xs text-gray-500">Monitor opportunity stages, owners, and outcomes.</p>
+          <h2 className="text-lg font-semibold text-foreground">Pipeline</h2>
+          <p className="text-xs text-muted-foreground">Monitor opportunity stages, owners, and outcomes.</p>
         </div>
         <button
           onClick={onCreate}
@@ -48,9 +48,9 @@ export function OpportunitiesTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-600">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted">
+            <tr className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3">Opportunity</th>
               <th className="px-4 py-3">Customer</th>
               <th className="px-4 py-3">Type</th>
@@ -62,11 +62,11 @@ export function OpportunitiesTable({
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 bg-white text-sm">
+          <tbody className="divide-y divide-gray-100 bg-card text-sm">
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
-                  <span className="inline-flex items-center gap-2 text-gray-500">
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                  <span className="inline-flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading opportunities...
                   </span>
@@ -74,7 +74,7 @@ export function OpportunitiesTable({
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                   No opportunities found. Adjust your filters or create a new opportunity to get started.
                 </td>
               </tr>
@@ -92,13 +92,13 @@ export function OpportunitiesTable({
                   : 'bg-blue-50 text-blue-700 border border-blue-200';
 
                 return (
-                  <tr key={opportunity.id} className="text-gray-700">
+                  <tr key={opportunity.id} className="text-muted-foreground">
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">{opportunity.title}</span>
+                        <span className="font-medium text-foreground">{opportunity.title}</span>
                         {opportunity.lead ? (
-                          <span className="text-xs text-gray-500">
-                            From lead: <span className="font-medium text-gray-700">{opportunity.lead.title}</span>
+                          <span className="text-xs text-muted-foreground">
+                            From lead: <span className="font-medium text-muted-foreground">{opportunity.lead.title}</span>
                           </span>
                         ) : null}
                       </div>
@@ -106,41 +106,41 @@ export function OpportunitiesTable({
                     <td className="px-4 py-3">
                       {opportunity.customer ? (
                         <div className="flex flex-col">
-                          <span className="font-medium text-gray-800">{opportunity.customer.name}</span>
-                          <span className="text-xs text-gray-500">{opportunity.customer.email ?? '—'}</span>
+                          <span className="font-medium text-foreground">{opportunity.customer.name}</span>
+                          <span className="text-xs text-muted-foreground">{opportunity.customer.email ?? '—'}</span>
                         </div>
                       ) : (
-                        <span className="text-xs italic text-gray-400">No customer yet</span>
+                        <span className="text-xs italic text-muted-foreground">No customer yet</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      <span className="inline-flex items-center rounded-full bg-muted/70 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {TYPE_LABELS[opportunity.type]}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-800">{opportunity.stage}</span>
+                        <span className="font-medium text-foreground">{opportunity.stage}</span>
                         {opportunity.openPosition ? (
-                          <span className="text-xs text-gray-500">
-                            Position: <span className="font-semibold text-gray-700">{opportunity.openPosition.status}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Position: <span className="font-semibold text-muted-foreground">{opportunity.openPosition.status}</span>
                           </span>
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                    <td className="px-4 py-3 text-right font-semibold text-foreground">
                       {opportunity.value !== null ? VALUE_FORMATTER.format(opportunity.value) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       {opportunity.assignedTo ? (
                         <div className="flex flex-col">
-                          <span className="font-medium text-gray-800">
+                          <span className="font-medium text-foreground">
                             {opportunity.assignedTo.firstName} {opportunity.assignedTo.lastName}
                           </span>
-                          <span className="text-xs text-gray-500">{opportunity.assignedTo.email}</span>
+                          <span className="text-xs text-muted-foreground">{opportunity.assignedTo.email}</span>
                         </div>
                       ) : (
-                        <span className="text-xs italic text-gray-400">Unassigned</span>
+                        <span className="text-xs italic text-muted-foreground">Unassigned</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -158,7 +158,7 @@ export function OpportunitiesTable({
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-col text-xs text-gray-500">
+                      <div className="flex flex-col text-xs text-muted-foreground">
                         <span>
                           Updated {new Date(opportunity.updatedAt).toLocaleDateString()}
                         </span>
@@ -171,7 +171,7 @@ export function OpportunitiesTable({
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => onEdit(opportunity)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
                         >
                           <Edit className="h-3.5 w-3.5" />
                           Edit

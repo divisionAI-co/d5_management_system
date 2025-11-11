@@ -113,13 +113,13 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-foreground">
               {isEdit ? 'Edit Contact' : 'New Contact'}
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               {isEdit
                 ? 'Update contact information and account association.'
                 : 'Capture a new relationship contact for your pipeline.'}
@@ -127,7 +127,7 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -137,73 +137,73 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">First Name *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">First Name *</label>
               <input
                 type="text"
                 {...register('firstName', { required: 'First name is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.firstName && (
                 <p className="text-sm text-red-600">{errors.firstName.message}</p>
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Last Name *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Last Name *</label>
               <input
                 type="text"
                 {...register('lastName', { required: 'Last name is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.lastName && (
                 <p className="text-sm text-red-600">{errors.lastName.message}</p>
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email *</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Email *</label>
               <input
                 type="email"
                 {...register('email', { required: 'Email is required' })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
               {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Phone</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Phone</label>
               <input
                 type="text"
                 {...register('phone')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Role</label>
               <input
                 type="text"
                 {...register('role')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Company</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Company</label>
               <input
                 type="text"
                 {...register('companyName')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">LinkedIn</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">LinkedIn</label>
               <input
                 type="url"
                 {...register('linkedinUrl')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Associated Customer</label>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Associated Customer</label>
               <select
                 {...register('customerId')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 defaultValue={contact?.customerId ?? ''}
               >
                 <option value="">Unassigned</option>
@@ -217,20 +217,20 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
             <textarea
               rows={4}
               {...register('notes')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               placeholder="Add context, relationship history or next actions"
             />
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 pt-6">
+          <div className="flex justify-end gap-3 border-t border-border pt-6">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               Cancel
             </button>

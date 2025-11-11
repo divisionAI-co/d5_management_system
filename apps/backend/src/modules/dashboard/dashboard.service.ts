@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  ActivityType,
   LeaveRequestStatus,
   Prisma,
   TaskStatus,
@@ -16,8 +15,14 @@ interface MissingReportContext {
 
 export interface ActivityReminder {
   id: string;
-  title: string;
-  type: ActivityType;
+  subject: string;
+  body: string | null;
+  type: {
+    id: string;
+    key: string;
+    name: string;
+    color: string | null;
+  };
   dueDate: string;
   related: {
     customer: { id: string; name: string } | null;
@@ -25,6 +30,7 @@ export interface ActivityReminder {
     opportunity: { id: string; title: string } | null;
     task: { id: string; title: string } | null;
   };
+  metadata: Record<string, unknown> | null;
 }
 
 @Injectable()
@@ -32,7 +38,6 @@ export class DashboardService {
   private readonly DAYS_LOOKBACK_FOR_TASKS = 7;
   private readonly DAYS_LOOKBACK_FOR_ACTIVITIES = 7;
   private readonly DAYS_OVERDUE_WINDOW = 7;
-
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyDashboard(userId: string) {
@@ -304,55 +309,118 @@ export class DashboardService {
       take: 50,
       select: {
         id: true,
-        title: true,
-        type: true,
+        subject: true,
+        body: true,
+        activityDate: true,
+        reminderAt: true,
         metadata: true,
         createdAt: true,
-        customer: {
+        updatedAt: true,
+        customerId: true,
+        leadId: true,
+        opportunityId: true,
+        taskId: true,
+        activityType: {
           select: {
             id: true,
+            key: true,
             name: true,
-          },
-        },
-        lead: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        opportunity: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        task: {
-          select: {
-            id: true,
-            title: true,
+            color: true,
           },
         },
       },
     });
 
+    const customerIds = Array.from(
+      new Set(
+        activities
+          .map((activity) => activity.customerId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const leadIds = Array.from(
+      new Set(
+        activities
+          .map((activity) => activity.leadId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const opportunityIds = Array.from(
+      new Set(
+        activities
+          .map((activity) => activity.opportunityId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const taskIds = Array.from(
+      new Set(
+        activities
+          .map((activity) => activity.taskId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const [customers, leads, opportunities, tasks] = await Promise.all([
+      customerIds.length
+        ? this.prisma.customer.findMany({
+            where: { id: { in: customerIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      leadIds.length
+        ? this.prisma.lead.findMany({
+            where: { id: { in: leadIds } },
+            select: { id: true, title: true },
+          })
+        : Promise.resolve([]),
+      opportunityIds.length
+        ? this.prisma.opportunity.findMany({
+            where: { id: { in: opportunityIds } },
+            select: { id: true, title: true },
+          })
+        : Promise.resolve([]),
+      taskIds.length
+        ? this.prisma.task.findMany({
+            where: { id: { in: taskIds } },
+            select: { id: true, title: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
+    const leadMap = new Map(leads.map((lead) => [lead.id, lead.title]));
+    const opportunityMap = new Map(
+      opportunities.map((opportunity) => [opportunity.id, opportunity.title]),
+    );
+    const taskMap = new Map(tasks.map((task) => [task.id, task.title]));
+
     const reminders: ActivityReminder[] = activities
       .map((activity) => {
         const metadata = activity.metadata as Prisma.JsonObject | null;
-        if (!metadata) {
+        const normalizedMetadata = metadata
+          ? (JSON.parse(JSON.stringify(metadata)) as Record<string, unknown>)
+          : null;
+
+        const candidateDueValue =
+          activity.reminderAt?.toISOString() ??
+          activity.activityDate?.toISOString() ??
+          (normalizedMetadata
+            ? this.getFirstStringValue(normalizedMetadata, [
+                'dueDate',
+                'reminderDate',
+                'due_at',
+                'dueOn',
+                'activityDate',
+                'reminderAt',
+              ])
+            : null);
+
+        if (!candidateDueValue) {
           return null;
         }
 
-        const dueValue =
-          metadata['dueDate'] ??
-          metadata['reminderDate'] ??
-          metadata['due_at'] ??
-          metadata['dueOn'];
+        const dueDate = new Date(candidateDueValue);
 
-        if (!dueValue || typeof dueValue !== 'string') {
-          return null;
-        }
-
-        const dueDate = new Date(dueValue);
         if (Number.isNaN(dueDate.getTime())) {
           return null;
         }
@@ -363,25 +431,58 @@ export class DashboardService {
           return null;
         }
 
+        if (!activity.activityType) {
+          return null;
+        }
+
         const reminder: ActivityReminder = {
           id: activity.id,
-          title: activity.title,
-          type: activity.type,
+          subject: activity.subject ?? 'Untitled activity',
+          body:
+            activity.body ??
+            (normalizedMetadata && typeof normalizedMetadata['body'] === 'string'
+              ? (normalizedMetadata['body'] as string)
+              : normalizedMetadata && typeof normalizedMetadata['notes'] === 'string'
+              ? (normalizedMetadata['notes'] as string)
+              : null),
+          type: {
+            id: activity.activityType.id,
+            key: activity.activityType.key,
+            name: activity.activityType.name,
+            color: activity.activityType.color,
+          },
           dueDate: dueDate.toISOString(),
           related: {
-            customer: activity.customer
-              ? { id: activity.customer.id, name: activity.customer.name }
-              : null,
-            lead: activity.lead
-              ? { id: activity.lead.id, title: activity.lead.title }
-              : null,
-            opportunity: activity.opportunity
-              ? { id: activity.opportunity.id, title: activity.opportunity.title }
-              : null,
-            task: activity.task
-              ? { id: activity.task.id, title: activity.task.title }
-              : null,
+            customer:
+              activity.customerId && customerMap.has(activity.customerId)
+                ? {
+                    id: activity.customerId,
+                    name: customerMap.get(activity.customerId)!,
+                  }
+                : null,
+            lead:
+              activity.leadId && leadMap.has(activity.leadId)
+                ? {
+                    id: activity.leadId,
+                    title: leadMap.get(activity.leadId)!,
+                  }
+                : null,
+            opportunity:
+              activity.opportunityId && opportunityMap.has(activity.opportunityId)
+                ? {
+                    id: activity.opportunityId,
+                    title: opportunityMap.get(activity.opportunityId)!,
+                  }
+                : null,
+            task:
+              activity.taskId && taskMap.has(activity.taskId)
+                ? {
+                    id: activity.taskId,
+                    title: taskMap.get(activity.taskId)!,
+                  }
+                : null,
           },
+          metadata: normalizedMetadata,
         };
 
         return reminder;
@@ -412,6 +513,19 @@ export class DashboardService {
 
   private toDateKey(date: Date): string {
     return this.toDateOnly(date).toISOString().slice(0, 10);
+  }
+
+  private getFirstStringValue(
+    metadata: Record<string, unknown>,
+    keys: string[],
+  ): string | null {
+    for (const key of keys) {
+      const value = metadata[key];
+      if (typeof value === 'string' && value.trim().length) {
+        return value;
+      }
+    }
+    return null;
   }
 }
 
