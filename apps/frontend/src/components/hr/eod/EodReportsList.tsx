@@ -1,0 +1,215 @@
+import { useQuery } from '@tanstack/react-query';
+import { eodReportsApi } from '@/lib/api/hr';
+import type { EodReport } from '@/types/hr';
+import { addDays, endOfDay, format } from 'date-fns';
+import { ClipboardList, Edit3, Plus } from 'lucide-react';
+import { AxiosError } from 'axios';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { UserRole } from '@prisma/client';
+
+interface EodReportsListProps {
+  onCreateNew?: () => void;
+  onEdit?: (report: EodReport) => void;
+  filterUserId?: string;
+  contextLabel?: string;
+}
+
+export function EodReportsList({
+  onCreateNew,
+  onEdit,
+  filterUserId,
+  contextLabel,
+}: EodReportsListProps) {
+  const { user } = useAuthStore();
+  const isPrivileged =
+    user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
+
+  const { data: reports, isLoading } = useQuery({
+    queryKey: ['eod-reports', filterUserId],
+    queryFn: async () => {
+      if (filterUserId) {
+        return eodReportsApi.getAll({ userId: filterUserId });
+      }
+      try {
+        return await eodReportsApi.getAll();
+      } catch (error) {
+        if (error instanceof AxiosError && error.response?.status === 403) {
+          return eodReportsApi.getMine();
+        }
+        throw error;
+      }
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <ClipboardList className="h-8 w-8 text-blue-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">EOD Reports</h1>
+            <p className="text-sm text-gray-500">
+              {contextLabel
+                ? `Viewing reports for ${contextLabel}`
+                : 'Track daily end-of-day submissions'}
+            </p>
+          </div>
+        </div>
+        {onCreateNew && (
+          <button
+            onClick={onCreateNew}
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
+          >
+            <Plus className="h-5 w-5" />
+            New Report
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
+        </div>
+      ) : reports && reports.length > 0 ? (
+        <div className="space-y-4">
+          {reports.map((report: EodReport) => {
+            const now = new Date();
+            const reportDate = new Date(report.date);
+            const editDeadline = endOfDay(addDays(reportDate, 1));
+            const canEdit =
+              !!onEdit &&
+              !!user?.id &&
+              (isPrivileged ||
+                (user.id === report.userId &&
+                  now.getTime() <= editDeadline.getTime()));
+
+            const hours =
+              report.hoursWorked !== undefined && report.hoursWorked !== null
+                ? Number(report.hoursWorked)
+                : null;
+            const safeHours = hours !== null && !Number.isNaN(hours) ? hours : null;
+
+            return (
+              <div
+                key={report.id}
+                className="space-y-3 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {format(new Date(report.date), 'EEEE, MMM dd, yyyy')}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Submitted {format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm')}
+                    </p>
+                    {!filterUserId && report.user && (
+                      <p className="text-xs text-gray-400">
+                        {report.user.firstName} {report.user.lastName}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                        report.isLate ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {report.isLate ? 'Late' : 'On time'}
+                    </span>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit?.(report)}
+                        className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600 transition hover:bg-gray-50"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        Edit
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
+                <p className="mt-1 text-sm leading-relaxed text-gray-600">{report.summary}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Tasks</h3>
+                <div className="mt-2 overflow-hidden rounded-md border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead className="bg-gray-50 text-gray-500">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">Client / Ticket</th>
+                        <th className="px-3 py-2 text-left font-semibold">Type</th>
+                        <th className="px-3 py-2 text-left font-semibold">Lifecycle</th>
+                        <th className="px-3 py-2 text-left font-semibold">Status</th>
+                        <th className="px-3 py-2 text-right font-semibold">Est. (h)</th>
+                        <th className="px-3 py-2 text-right font-semibold">Spent (h)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white text-gray-600">
+                      {report.tasksWorkedOn.map((task, index) => {
+                        if (typeof task === 'string') {
+                          return (
+                            <tr key={index}>
+                              <td className="px-3 py-2" colSpan={6}>
+                                {task}
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        const estimated =
+                          task.taskEstimatedTime !== undefined && task.taskEstimatedTime !== null
+                            ? Number(task.taskEstimatedTime)
+                            : null;
+                        const spent = task.timeSpentOnTicket !== undefined ? Number(task.timeSpentOnTicket) : null;
+                        const typeLabel = task.typeOfWorkDone ? task.typeOfWorkDone.replace('_', ' ') : '—';
+                        const lifecycleLabel = task.taskLifecycle ?? '—';
+                        const statusLabel = task.taskStatus ? task.taskStatus.replace('_', ' ') : '—';
+
+                        return (
+                          <tr key={index}>
+                            <td className="px-3 py-2">
+                              <p className="font-medium text-gray-900">{task.clientDetails ?? '—'}</p>
+                              <p className="text-gray-500">{task.ticket ?? '—'}</p>
+                            </td>
+                            <td className="px-3 py-2">{typeLabel}</td>
+                            <td className="px-3 py-2">{lifecycleLabel}</td>
+                            <td className="px-3 py-2">{statusLabel}</td>
+                            <td className="px-3 py-2 text-right">
+                              {estimated !== null && !Number.isNaN(estimated) ? estimated : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {spent !== null && !Number.isNaN(spent) ? spent : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {safeHours !== null && (
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Hours worked: {safeHours}
+                </p>
+              )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-500">
+          {contextLabel
+            ? `No EOD reports recorded for ${contextLabel}.`
+            : 'No EOD reports submitted yet.'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+

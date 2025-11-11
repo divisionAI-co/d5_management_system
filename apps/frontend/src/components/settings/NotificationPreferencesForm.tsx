@@ -1,0 +1,203 @@
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { settingsApi } from '@/lib/api/settings';
+import type {
+  NotificationSettings,
+  UpdateNotificationSettingsPayload,
+} from '@/types/settings';
+
+type NotificationFormValues = {
+  emailEnabled: boolean;
+  inAppEnabled: boolean;
+  taskAssigned: boolean;
+  taskDueSoon: boolean;
+  leaveApproved: boolean;
+  performanceReview: boolean;
+  newCandidate: boolean;
+  newOpportunity: boolean;
+};
+
+const DEFAULT_VALUES: NotificationFormValues = {
+  emailEnabled: true,
+  inAppEnabled: true,
+  taskAssigned: true,
+  taskDueSoon: true,
+  leaveApproved: true,
+  performanceReview: true,
+  newCandidate: true,
+  newOpportunity: true,
+};
+
+const mapToFormValues = (
+  source?: NotificationSettings,
+): NotificationFormValues => {
+  if (!source) {
+    return DEFAULT_VALUES;
+  }
+
+  return {
+    emailEnabled: source.emailEnabled,
+    inAppEnabled: source.inAppEnabled,
+    taskAssigned: source.taskAssigned,
+    taskDueSoon: source.taskDueSoon,
+    leaveApproved: source.leaveApproved,
+    performanceReview: source.performanceReview,
+    newCandidate: source.newCandidate,
+    newOpportunity: source.newOpportunity,
+  };
+};
+
+const NOTIFICATION_GROUPS: Array<{
+  key: keyof NotificationFormValues;
+  title: string;
+  description: string;
+}> = [
+  {
+    key: 'emailEnabled',
+    title: 'Email notifications',
+    description: 'Receive updates via email for critical events.',
+  },
+  {
+    key: 'inAppEnabled',
+    title: 'In-app notifications',
+    description: 'Show alerts inside the application notification center.',
+  },
+  {
+    key: 'taskAssigned',
+    title: 'Task assignments',
+    description: 'Notify when new tasks are assigned to you.',
+  },
+  {
+    key: 'taskDueSoon',
+    title: 'Task due reminders',
+    description: 'Send reminders one day before task deadlines.',
+  },
+  {
+    key: 'leaveApproved',
+    title: 'Leave requests',
+    description: 'Inform about approvals or rejections of leave requests.',
+  },
+  {
+    key: 'performanceReview',
+    title: 'Performance reviews',
+    description: 'Alert when a performance review is created or assigned.',
+  },
+  {
+    key: 'newCandidate',
+    title: 'New candidate added',
+    description: 'Notify recruiters when new candidates enter the pipeline.',
+  },
+  {
+    key: 'newOpportunity',
+    title: 'New opportunity created',
+    description: 'Notify sales and account managers of new opportunities.',
+  },
+];
+
+export function NotificationPreferencesForm() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: settingsApi.getNotificationSettings,
+  });
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { isDirty, isSubmitting },
+  } = useForm<NotificationFormValues>({
+    defaultValues: DEFAULT_VALUES,
+  });
+
+  useEffect(() => {
+    reset(mapToFormValues(data));
+  }, [data, reset]);
+
+  const mutation = useMutation({
+    mutationFn: (payload: UpdateNotificationSettingsPayload) =>
+      settingsApi.updateNotificationSettings(payload),
+    onSuccess: (updated: NotificationSettings) => {
+      queryClient.setQueryData(['notification-settings'], updated);
+    },
+  });
+
+  const onSubmit = (values: NotificationFormValues) => {
+    const payload: UpdateNotificationSettingsPayload = { ...values };
+    mutation.mutate(payload);
+  };
+
+  const isSaving = mutation.isPending || isSubmitting;
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-200 px-6 py-4">
+        <h2 className="text-lg font-semibold text-gray-900">
+          Notification Preferences
+        </h2>
+        <p className="text-sm text-gray-500">
+          Control how you receive updates across the platform.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
+        <div className="space-y-4">
+          {NOTIFICATION_GROUPS.map((setting) => (
+            <label
+              key={setting.key}
+              className="flex w-full items-start justify-between gap-4 rounded-lg border border-gray-200 px-4 py-3 transition hover:bg-gray-50"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {setting.title}
+                </p>
+                <p className="text-xs text-gray-500">{setting.description}</p>
+              </div>
+
+              <input
+                type="checkbox"
+                {...register(setting.key)}
+                disabled={isLoading || isSaving}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-6">
+          <button
+            type="button"
+            onClick={() => reset(mapToFormValues(data))}
+            disabled={!isDirty || isSaving}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Reset
+          </button>
+          <button
+            type="submit"
+            disabled={!isDirty || isSaving}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+
+        {mutation.isSuccess && (
+          <p className="text-sm text-green-600">
+            Preferences updated successfully.
+          </p>
+        )}
+        {mutation.isError && (
+          <p className="text-sm text-red-600">
+            Something went wrong. Please try again.
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+

@@ -1,0 +1,268 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../../common/prisma/prisma.service';
+import { CreateContactDto } from './dto/create-contact.dto';
+import { UpdateContactDto } from './dto/update-contact.dto';
+import { FilterContactsDto } from './dto/filter-contacts.dto';
+
+export interface PaginatedResult<T> {
+  data: T[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    pageCount: number;
+  };
+}
+
+@Injectable()
+export class ContactsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private formatContact(contact: any) {
+    if (!contact) {
+      return contact;
+    }
+
+    const formatted = { ...contact };
+    if (formatted.customer) {
+      formatted.customer = {
+        id: formatted.customer.id,
+        name: formatted.customer.name,
+        email: formatted.customer.email,
+        phone: formatted.customer.phone,
+      };
+    }
+
+    if (Array.isArray(formatted.leads)) {
+      formatted.leads = formatted.leads.map((lead: any) => ({
+        id: lead.id,
+        title: lead.title,
+        status: lead.status,
+        value: lead.value ? Number(lead.value) : null,
+      }));
+    }
+
+    return formatted;
+  }
+
+  private buildWhere(filters: FilterContactsDto): Prisma.ContactWhereInput {
+    const where: Prisma.ContactWhereInput = {};
+
+    if (filters.search) {
+      const search = filters.search.trim();
+      where.OR = [
+        { firstName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { lastName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { email: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { phone: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { companyName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+      ];
+    }
+
+    if (filters.customerId) {
+      where.customerId = filters.customerId;
+    }
+
+    if (filters.unassigned) {
+      where.customerId = null;
+    }
+
+    return where;
+  }
+
+  async create(createContactDto: CreateContactDto) {
+    try {
+      const contact = await this.prisma.contact.create({
+        data: {
+          firstName: createContactDto.firstName,
+          lastName: createContactDto.lastName,
+          email: createContactDto.email,
+          phone: createContactDto.phone,
+          role: createContactDto.role,
+          companyName: createContactDto.companyName,
+          linkedinUrl: createContactDto.linkedinUrl,
+          notes: createContactDto.notes,
+          customerId: createContactDto.customerId,
+        },
+        include: {
+          customer: true,
+          leads: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              value: true,
+            },
+          },
+        },
+      });
+
+      return this.formatContact(contact);
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('A contact with this email already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async findAll(filters: FilterContactsDto): Promise<PaginatedResult<any>> {
+    const { page = 1, pageSize = 25, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
+    const skip = (page - 1) * pageSize;
+
+    const where = this.buildWhere(filters);
+
+    const orderBy: Prisma.ContactOrderByWithRelationInput = {
+      [sortBy]: sortOrder,
+    };
+
+    const [total, contacts] = await this.prisma.$transaction([
+      this.prisma.contact.count({ where }),
+      this.prisma.contact.findMany({
+        where,
+        orderBy,
+        skip,
+        take: pageSize,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          _count: {
+            select: {
+              leads: true,
+              activities: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      data: contacts.map((contact) => this.formatContact(contact)),
+      meta: {
+        page,
+        pageSize,
+        total,
+        pageCount: Math.ceil(total / pageSize),
+      },
+    };
+  }
+
+  async findOne(id: string) {
+    const contact = await this.prisma.contact.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        leads: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            value: true,
+            probability: true,
+            createdAt: true,
+          },
+        },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            description: true,
+            createdAt: true,
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!contact) {
+      throw new NotFoundException(`Contact ${id} not found`);
+    }
+
+    return this.formatContact(contact);
+  }
+
+  async update(id: string, updateContactDto: UpdateContactDto) {
+    try {
+      const contact = await this.prisma.contact.update({
+        where: { id },
+        data: {
+          firstName: updateContactDto.firstName,
+          lastName: updateContactDto.lastName,
+          email: updateContactDto.email,
+          phone: updateContactDto.phone,
+          role: updateContactDto.role,
+          companyName: updateContactDto.companyName,
+          linkedinUrl: updateContactDto.linkedinUrl,
+          notes: updateContactDto.notes,
+          customerId: updateContactDto.customerId,
+        },
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+          leads: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              value: true,
+            },
+          },
+        },
+      });
+
+      return this.formatContact(contact);
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('A contact with this email already exists.');
+      }
+      throw error;
+    }
+  }
+
+  async remove(id: string) {
+    try {
+      await this.prisma.contact.delete({ where: { id } });
+      return { deleted: true };
+    } catch (error: any) {
+      if (error?.code === 'P2025') {
+        throw new NotFoundException(`Contact ${id} not found`);
+      }
+      throw error;
+    }
+  }
+}

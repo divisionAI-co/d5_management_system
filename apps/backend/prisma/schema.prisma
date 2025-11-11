@@ -1,0 +1,1102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT & AUTHENTICATION
+// ============================================
+
+enum UserRole {
+  ADMIN
+  SALESPERSON
+  ACCOUNT_MANAGER
+  RECRUITER
+  HR
+  EMPLOYEE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole
+  isActive  Boolean  @default(true)
+  
+  // Two-Factor Authentication
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean @default(false)
+  
+  // Profile
+  phone             String?
+  avatar            String?
+  dateOfBirth       DateTime?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
+  
+  // Relations
+  employee              Employee?
+  assignedLeads         Lead[]
+  assignedOpportunities Opportunity[]
+  assignedTasks         Task[] @relation("AssignedTasks")
+  createdTasks          Task[] @relation("CreatedTasks")
+  activities            Activity[]
+  notifications         Notification[]
+  notificationSettings  NotificationSettings?
+  eodReports            EodReport[]
+  leaveRequests         LeaveRequest[]
+  remoteWorkLogs        RemoteWorkLog[]
+  createdInvoices       Invoice[] @relation("InvoiceCreator")
+  sentCampaigns         EmailCampaign[]
+  
+  @@map("users")
+}
+
+model NotificationSettings {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  emailEnabled     Boolean @default(true)
+  inAppEnabled     Boolean @default(true)
+  taskAssigned     Boolean @default(true)
+  taskDueSoon      Boolean @default(true)
+  leaveApproved    Boolean @default(true)
+  performanceReview Boolean @default(true)
+  newCandidate     Boolean @default(true)
+  newOpportunity   Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("notification_settings")
+}
+
+// ============================================
+// CRM MODULE
+// ============================================
+
+enum CustomerType {
+  STAFF_AUGMENTATION
+  SOFTWARE_SUBSCRIPTION
+  BOTH
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  WON
+  LOST
+}
+
+enum CustomerStatus {
+  ONBOARDING
+  ACTIVE
+  AT_RISK
+  PAUSED
+  CHURNED
+}
+
+enum CustomerSentiment {
+  HAPPY
+  NEUTRAL
+  UNHAPPY
+}
+
+model Customer {
+  id          String       @id @default(uuid())
+  name        String
+  email       String       @unique
+  phone       String?
+  website     String?
+  industry    String?
+  type        CustomerType
+  
+  // Account Management
+  status      CustomerStatus   @default(ONBOARDING)
+  sentiment   CustomerSentiment @default(NEUTRAL)
+  
+  // Address
+  address     String?
+  city        String?
+  country     String?
+  postalCode  String?
+  
+  // Financial
+  monthlyValue Decimal? @db.Decimal(10, 2)
+  currency     String?  @default("USD")
+  
+  // Metadata
+  notes       String?
+  tags        String[]
+  
+  // Odoo Migration
+  odooId      String?  @unique
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  opportunities Opportunity[]
+  invoices     Invoice[]
+  activities   Activity[]
+  meetings     Meeting[]
+  reports      CustomerReport[]
+  contacts     Contact[]
+  convertedLeads Lead[] @relation("CustomerConvertedLeads")
+  
+  @@map("customers")
+}
+
+model Contact {
+  id           String    @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String    @unique
+  phone        String?
+  role         String?
+  companyName  String?
+  linkedinUrl  String?
+  notes        String?   @db.Text
+
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  leads        Lead[]
+  activities   Activity[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([customerId])
+  @@map("contacts")
+}
+
+model Lead {
+  id          String     @id @default(uuid())
+  contactId   String
+  contact     Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  status      LeadStatus @default(NEW)
+  value       Decimal?   @db.Decimal(10, 2)
+  probability Int?       // 0-100
+  
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  source      String? // e.g., "Website", "Referral", "Cold Call"
+  
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+  lostReason        String?
+
+  convertedCustomerId String?
+  convertedCustomer   Customer? @relation("CustomerConvertedLeads", fields: [convertedCustomerId], references: [id], onDelete: SetNull)
+
+  prospectCompanyName String?
+  prospectWebsite     String?
+  prospectIndustry    String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  opportunities Opportunity[]
+  activities    Activity[]
+  
+  @@index([contactId])
+  @@index([convertedCustomerId])
+  @@index([status])
+  @@index([assignedToId])
+  @@map("leads")
+}
+
+model Opportunity {
+  id         String       @id @default(uuid())
+  leadId     String
+  lead       Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  customerId String?
+  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  
+  title      String
+  description String?
+  type       CustomerType
+  value      Decimal      @db.Decimal(10, 2)
+  
+  assignedToId String?
+  assignedTo   User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  // Staff Augmentation specific
+  jobDescriptionUrl String?
+  
+  stage         String  @default("Negotiation") // Customizable
+  isClosed      Boolean @default(false)
+  isWon         Boolean @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  closedAt      DateTime?
+  
+  // Relations
+  openPosition OpenPosition?
+  activities   Activity[]
+  
+  @@index([customerId])
+  @@index([type])
+  @@index([assignedToId])
+  @@map("opportunities")
+}
+
+// ============================================
+// EMAIL CAMPAIGNS
+// ============================================
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PAUSED
+}
+
+model EmailCampaign {
+  id          String         @id @default(uuid())
+  name        String
+  subject     String
+  htmlContent String         @db.Text
+  textContent String?        @db.Text
+  
+  status      CampaignStatus @default(DRAFT)
+  
+  // Targeting
+  targetSegment String? // JSON string with filter criteria
+  recipientCount Int    @default(0)
+  
+  // Scheduling
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  
+  // Analytics
+  sentCount    Int @default(0)
+  openedCount  Int @default(0)
+  clickedCount Int @default(0)
+  
+  createdById  String
+  createdBy    User   @relation(fields: [createdById], references: [id])
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  logs EmailCampaignLog[]
+  
+  @@map("email_campaigns")
+}
+
+model EmailCampaignLog {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  recipientEmail String
+  recipientName  String?
+  
+  sent       Boolean   @default(false)
+  sentAt     DateTime?
+  opened     Boolean   @default(false)
+  openedAt   DateTime?
+  clicked    Boolean   @default(false)
+  clickedAt  DateTime?
+  
+  error      String?
+  
+  createdAt  DateTime  @default(now())
+  
+  @@index([campaignId])
+  @@index([recipientEmail])
+  @@map("email_campaign_logs")
+}
+
+model EmailSequence {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+  
+  // Trigger
+  triggerOn   String // e.g., "lead_status_new", "opportunity_created"
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  steps EmailSequenceStep[]
+  
+  @@map("email_sequences")
+}
+
+model EmailSequenceStep {
+  id         String  @id @default(uuid())
+  sequenceId String
+  sequence   EmailSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  
+  order      Int
+  delayDays  Int     @default(0)
+  delayHours Int     @default(0)
+  
+  subject    String
+  htmlContent String @db.Text
+  textContent String? @db.Text
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@unique([sequenceId, order])
+  @@map("email_sequence_steps")
+}
+
+// ============================================
+// BILLING & INVOICING
+// ============================================
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model Invoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String        @unique
+  
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  
+  // Amounts
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxRate        Decimal       @default(0) @db.Decimal(5, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(10, 2)
+  total          Decimal       @db.Decimal(10, 2)
+  currency       String        @default("USD")
+  
+  // Dates
+  issueDate      DateTime      @default(now())
+  dueDate        DateTime
+  paidDate       DateTime?
+  
+  status         InvoiceStatus @default(DRAFT)
+  
+  // Recurring
+  isRecurring    Boolean       @default(false)
+  recurringDay   Int?          // Day of month (1-28)
+  
+  // Content
+  items          Json          // Array of invoice items
+  notes          String?       @db.Text
+  
+  // PDF
+  pdfUrl         String?
+  
+  // Reminders
+  remindersSent  Int           @default(0)
+  lastReminderAt DateTime?
+  
+  createdById    String
+  createdBy      User          @relation("InvoiceCreator", fields: [createdById], references: [id])
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  
+  @@index([customerId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+// ============================================
+// RECRUITMENT MODULE
+// ============================================
+
+enum CandidateStage {
+  VALIDATION
+  CULTURAL_INTERVIEW
+  TECHNICAL_INTERVIEW
+  CUSTOMER_INTERVIEW
+  CONTRACT_SIGNING
+  HIRED
+  REJECTED
+}
+
+model Candidate {
+  id          String         @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String         @unique
+  phone       String?
+  
+  // Professional Info
+  currentTitle String?
+  yearsOfExperience Int?
+  skills      String[]
+  resume      String? // URL to resume file
+  linkedinUrl String?
+  githubUrl   String?
+  portfolioUrl String?
+  
+  // Recruitment
+  stage       CandidateStage @default(VALIDATION)
+  rating      Int?           // 1-5
+  notes       String?        @db.Text
+  
+  // Location
+  city        String?
+  country     String?
+  
+  // Availability
+  availableFrom DateTime?
+  expectedSalary Decimal?    @db.Decimal(10, 2)
+  salaryCurrency String?     @default("USD")
+  
+  // Odoo Migration
+  odooId      String?        @unique
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  // Relations
+  positions   CandidatePosition[]
+  activities  Activity[]
+  employee    Employee?
+  
+  @@index([stage])
+  @@index([email])
+  @@map("candidates")
+}
+
+model OpenPosition {
+  id             String      @id @default(uuid())
+  opportunityId  String      @unique
+  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  title          String
+  description    String      @db.Text
+  requirements   String?     @db.Text
+  
+  status         String      @default("Open") // Open, Filled, Cancelled
+  
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  filledAt       DateTime?
+  
+  // Relations
+  candidates     CandidatePosition[]
+  
+  @@index([status])
+  @@map("open_positions")
+}
+
+model CandidatePosition {
+  id          String       @id @default(uuid())
+  candidateId String
+  candidate   Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  positionId  String
+  position    OpenPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  
+  appliedAt   DateTime     @default(now())
+  status      String       @default("Under Review")
+  notes       String?
+  
+  @@unique([candidateId, positionId])
+  @@index([candidateId])
+  @@index([positionId])
+  @@map("candidate_positions")
+}
+
+// ============================================
+// HR & EMPLOYEE MANAGEMENT
+// ============================================
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+  RESIGNED
+}
+
+enum ContractType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+model Employee {
+  id              String           @id @default(uuid())
+  userId          String           @unique
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  candidateId     String?          @unique
+  candidate       Candidate?       @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  
+  // Employment Details
+  employeeNumber  String           @unique
+  department      String?
+  jobTitle        String
+  status          EmploymentStatus @default(ACTIVE)
+  contractType    ContractType
+  
+  // Dates
+  hireDate        DateTime
+  terminationDate DateTime?
+  
+  // Compensation
+  salary          Decimal          @db.Decimal(10, 2)
+  salaryCurrency  String           @default("USD")
+  
+  // Manager
+  managerId       String?
+  manager         Employee?        @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports   Employee[]       @relation("EmployeeManager")
+  
+  // Emergency Contact
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  emergencyContactRelation String?
+  
+  // Documents
+  documents       Json? // Array of document objects with name, url, type
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  // Relations
+  performanceReviews PerformanceReview[]
+  leaveRequests      LeaveRequest[]
+  remoteWorkLogs     RemoteWorkLog[]
+  activities         Activity[]
+  
+  @@map("employees")
+}
+
+model PerformanceReview {
+  id          String   @id @default(uuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  reviewPeriodStart DateTime
+  reviewPeriodEnd   DateTime
+  
+  // Ratings (1-5 scale or custom)
+  ratings     Json // Flexible structure for various rating criteria
+  
+  strengths   String?  @db.Text
+  improvements String? @db.Text
+  goals       String?  @db.Text
+  
+  overallRating Decimal? @db.Decimal(3, 2)
+  
+  reviewedAt  DateTime?
+  reviewerName String?
+  
+  // PDF Export
+  pdfUrl      String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([employeeId])
+  @@map("performance_reviews")
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  PERSONAL
+  UNPAID
+  MATERNITY
+  PATERNITY
+  BEREAVEMENT
+}
+
+model LeaveRequest {
+  id          String             @id @default(uuid())
+  userId      String
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  employeeId  String
+  employee    Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  type        LeaveType
+  startDate   DateTime
+  endDate     DateTime
+  totalDays   Int
+  
+  reason      String?            @db.Text
+  status      LeaveRequestStatus @default(PENDING)
+  
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectionReason String?
+  
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  
+  @@index([employeeId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+model RemoteWorkLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date       DateTime @db.Date
+  reason     String?
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([employeeId, date])
+  @@index([employeeId])
+  @@map("remote_work_logs")
+}
+
+model NationalHoliday {
+  id          String   @id @default(uuid())
+  name        String
+  date        DateTime @db.Date
+  country     String   @default("AL") // Albania
+  isRecurring Boolean  @default(false) // For holidays like New Year's Day
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([date, country])
+  @@map("national_holidays")
+}
+
+model CompanySettings {
+  id                    String   @id @default(uuid())
+  
+  // Remote Work Policy
+  remoteWorkFrequency   String   @default("WEEKLY") // WEEKLY, MONTHLY, etc.
+  remoteWorkLimit       Int      @default(1) // Number of times per period
+  
+  // EOD Settings
+  eodGraceDays          Int      @default(2)
+  eodReportDeadlineHour Int      @default(23)
+  eodReportDeadlineMin  Int      @default(59)
+  
+  // Performance Review
+  reviewCycleDays       Int      @default(180) // 6 months
+  
+  updatedAt             DateTime @updatedAt
+  
+  @@map("company_settings")
+}
+
+// ============================================
+// EOD REPORTS
+// ============================================
+
+model EodReport {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  date       DateTime @db.Date
+  
+  // Content
+  summary    String   @db.Text
+  tasksWorkedOn Json  // Array of task IDs or descriptions
+  hoursWorked Decimal? @db.Decimal(4, 2)
+  
+  // Submission tracking
+  submittedAt DateTime @default(now())
+  isLate      Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+  @@map("eod_reports")
+}
+
+// ============================================
+// TASK MANAGEMENT
+// ============================================
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  title       String
+  description String?      @db.Text
+  
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  
+  // Assignment
+  assignedToId String?
+  assignedTo   User?       @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  createdById  String
+  createdBy    User        @relation("CreatedTasks", fields: [createdById], references: [id])
+  
+  // Dates
+  dueDate     DateTime?
+  startDate   DateTime?
+  completedAt DateTime?
+  
+  // Customer/Project relation
+  customerId  String?
+  
+  // Metadata
+  tags        String[]
+  estimatedHours Decimal? @db.Decimal(5, 2)
+  actualHours    Decimal? @db.Decimal(5, 2)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  activities  Activity[]
+  
+  @@index([assignedToId])
+  @@index([status])
+  @@index([customerId])
+  @@map("tasks")
+}
+
+// ============================================
+// UNIVERSAL ACTIVITY MODULE
+// ============================================
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  TASK_UPDATE
+  STATUS_CHANGE
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  type        ActivityType
+  title       String
+  description String?      @db.Text
+  
+  // Relations (polymorphic-style)
+  customerId    String?
+  customer      Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  leadId        String?
+  lead          Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  
+  candidateId   String?
+  candidate     Candidate?   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  employeeId    String?
+  employee      Employee?    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  contactId     String?
+  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  taskId        String?
+  task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  // Creator
+  createdById   String
+  createdBy     User         @relation(fields: [createdById], references: [id])
+  
+  // Metadata
+  metadata      Json?        // For additional flexible data
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@index([customerId])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([candidateId])
+  @@index([employeeId])
+  @@index([contactId])
+  @@index([taskId])
+  @@index([createdById])
+  @@map("activities")
+}
+
+// ============================================
+// CUSTOMER ENGAGEMENT
+// ============================================
+
+model Meeting {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  meetingUrl  String?  // For virtual meetings
+  
+  // Calendar Integration
+  googleEventId String?
+  microsoftEventId String?
+  
+  attendees   Json     // Array of attendee objects
+  
+  notes       String?  @db.Text
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([customerId])
+  @@index([startTime])
+  @@map("meetings")
+}
+
+model CustomerReport {
+  id          String   @id @default(uuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  title       String
+  periodStart DateTime
+  periodEnd   DateTime
+  
+  // Content
+  content     Json     // Structured report data
+  htmlContent String?  @db.Text
+  
+  // PDF
+  pdfUrl      String?
+  
+  // Collaboration
+  contributors Json?   // Array of user IDs who contributed
+  
+  status      String   @default("Draft") // Draft, Sent
+  sentAt      DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([customerId])
+  @@map("customer_reports")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_DUE_SOON
+  LEAVE_REQUEST
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  PERFORMANCE_REVIEW
+  NEW_CANDIDATE
+  NEW_OPPORTUNITY
+  INVOICE_OVERDUE
+  MEETING_REMINDER
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  
+  // Link to related entity
+  entityType String?         // "task", "leave_request", "candidate", etc.
+  entityId   String?
+  
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  
+  // Email notification
+  emailSent Boolean          @default(false)
+  emailSentAt DateTime?
+  
+  createdAt DateTime         @default(now())
+  
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+// ============================================
+// TEMPLATES
+// ============================================
+
+enum TemplateType {
+  INVOICE
+  CUSTOMER_REPORT
+  PERFORMANCE_REVIEW
+  EMAIL
+}
+
+model Template {
+  id          String       @id @default(uuid())
+  name        String
+  type        TemplateType
+  
+  htmlContent String       @db.Text
+  cssContent  String?      @db.Text
+  
+  // Variables that can be used in template
+  variables   Json         // Array of available variables
+  
+  isDefault   Boolean      @default(false)
+  isActive    Boolean      @default(true)
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  @@map("templates")
+}
+
+// ============================================
+// FILE UPLOADS & IMPORTS
+// ============================================
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model DataImport {
+  id          String       @id @default(uuid())
+  type        String       // "customers", "candidates", "activities"
+  fileName    String
+  fileUrl     String
+  
+  status      ImportStatus @default(PENDING)
+  
+  // Mapping
+  fieldMapping Json?       // Column to field mapping
+  
+  // Results
+  totalRecords    Int      @default(0)
+  successCount    Int      @default(0)
+  failureCount    Int      @default(0)
+  errors          Json?    // Array of error messages
+  
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  createdAt   DateTime     @default(now())
+  
+  @@map("data_imports")
+}
+
+// ============================================
+// INTEGRATIONS
+// ============================================
+
+model Integration {
+  id          String   @id @default(uuid())
+  name        String   @unique // "google_drive", "google_calendar", "microsoft"
+  
+  isActive    Boolean  @default(false)
+  
+  // OAuth tokens (encrypted)
+  accessToken  String? @db.Text
+  refreshToken String? @db.Text
+  expiresAt    DateTime?
+  
+  // Configuration
+  config      Json?    // Provider-specific configuration
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("integrations")
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  
+  userId    String?
+  userEmail String?
+  
+  action    String   // "CREATE", "UPDATE", "DELETE"
+  entity    String   // "customer", "employee", etc.
+  entityId  String
+  
+  changes   Json?    // Before/after values
+  
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+

@@ -1,0 +1,35 @@
+{
+  "name": "d5-management-system",
+  "version": "1.0.0",
+  "description": "Integrated Business Management Platform - CRM, HR, Recruitment, and Project Management",
+  "private": true,
+  "workspaces": [
+    "apps/backend",
+    "apps/frontend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "build:frontend": "npm run build --workspace=apps/frontend",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "@types/d3-array": "^3.2.2",
+    "@types/linkify-it": "^5.0.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/mdurl": "^2.0.0",
+    "concurrently": "^8.2.2",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
