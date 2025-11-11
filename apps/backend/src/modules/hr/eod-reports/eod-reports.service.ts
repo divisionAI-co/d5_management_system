@@ -71,7 +71,7 @@ export class EodReportsService {
     }
 
     let isLate = false;
-    let submittedAt: Date | null = null;
+    let submittedAt: Date | undefined;
 
     if (submit) {
       isLate = await this.computeIsLate(rest.date);
@@ -220,7 +220,7 @@ export class EodReportsService {
       const currentTasks =
         nextTasks ??
         (Array.isArray(report.tasksWorkedOn)
-          ? (report.tasksWorkedOn as EodReportTaskDto[])
+          ? (report.tasksWorkedOn as unknown as EodReportTaskDto[])
           : []);
 
       if (!currentTasks.length) {

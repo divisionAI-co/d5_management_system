@@ -481,6 +481,7 @@ export class TasksService {
             tasksWorkedOn: true,
             date: true,
             updatedAt: true,
+            submittedAt: true,
           },
         });
 
