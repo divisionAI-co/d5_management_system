@@ -96,7 +96,7 @@ export class DashboardService {
         id: report.id,
         date: report.date.toISOString(),
         isLate: report.isLate,
-        submittedAt: report.submittedAt.toISOString(),
+        submittedAt: report.submittedAt ? report.submittedAt.toISOString() : null,
         summary: report.summary,
         hoursWorked:
           report.hoursWorked !== undefined && report.hoursWorked !== null
