@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import apiClient from '@/lib/api/client';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type LocationState = {
   email?: string;
@@ -66,7 +67,12 @@ export default function TwoFactorPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted px-4 py-12">
+    <>
+      {error && (
+        <FeedbackToast message={error} onDismiss={() => setError('')} tone="error" />
+      )}
+
+      <div className="flex min-h-screen items-center justify-center bg-muted px-4 py-12">
       <div className="w-full max-w-md space-y-6 rounded-xl border border-border bg-card p-8 shadow-sm">
         <div className="space-y-2 text-center">
           <h2 className="text-2xl font-semibold text-foreground">Two-Factor Authentication</h2>
@@ -77,11 +83,6 @@ export default function TwoFactorPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-500">
-              {error}
-            </div>
-          )}
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
@@ -122,5 +123,6 @@ export default function TwoFactorPage() {
         </form>
       </div>
     </div>
+    </>
   );
 }

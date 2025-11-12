@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { FeedbackToast } from '@/components/ui/feedback-toast';
+
 import { settingsApi } from '@/lib/api/settings';
 import type {
   CompanySettings,
@@ -256,14 +258,18 @@ export function CompanySettingsForm() {
         </div>
 
         {mutation.isSuccess && (
-          <p className="text-sm text-green-600">
-            Settings updated successfully.
-          </p>
+          <FeedbackToast
+            message="Settings updated successfully."
+            onDismiss={() => mutation.reset()}
+            tone="success"
+          />
         )}
         {mutation.isError && (
-          <p className="text-sm text-red-600">
-            Unable to save changes. Please try again.
-          </p>
+          <FeedbackToast
+            message="Unable to save changes. Please try again."
+            onDismiss={() => mutation.reset()}
+            tone="error"
+          />
         )}
       </form>
     </div>

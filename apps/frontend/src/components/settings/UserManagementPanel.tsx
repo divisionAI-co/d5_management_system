@@ -13,6 +13,7 @@ import type {
   UsersListResponse,
   UserSummary,
 } from '@/types/users';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const DEFAULT_FORM: CreateUserPayload = {
   firstName: '',
@@ -322,21 +323,19 @@ export function UserManagementPanel() {
       </div>
 
       {feedback && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}
-          <button
-            className="ml-2 text-xs font-semibold uppercase text-emerald-800 hover:underline"
-            onClick={() => setFeedback(null)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
       )}
 
       <div className="space-y-6 rounded-lg border border-border bg-card p-6 shadow-sm">
@@ -534,12 +533,6 @@ export function UserManagementPanel() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-
-            {errorMessage && (
-              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {errorMessage}
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">

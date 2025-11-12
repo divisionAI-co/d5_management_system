@@ -205,7 +205,7 @@ export class AuthService {
     const user = await this.usersService.findByIdWithSecret(userId);
     const appName = this.configService.get<string>(
       'TWO_FACTOR_AUTHENTICATION_APP_NAME',
-      'D5 Management System',
+      'division5',
     );
 
     const secret = speakeasy.generateSecret({

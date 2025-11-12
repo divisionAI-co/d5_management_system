@@ -48,7 +48,7 @@ export const useAuthStore = create<AuthStore>()(
         })),
     }),
     {
-      name: 'd5-auth-storage',
+      name: 'division5-auth-storage',
     }
   )
 );

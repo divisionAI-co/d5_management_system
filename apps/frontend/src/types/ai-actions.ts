@@ -10,6 +10,15 @@ export type AiEntityType =
 export type AiCollectionKey = 'EOD_REPORTS' | 'OPPORTUNITIES' | 'LEADS' | 'TASKS' | 'ACTIVITIES';
 export type AiCollectionFormat = 'TABLE' | 'BULLET_LIST' | 'PLAIN_TEXT';
 
+export interface AiCollectionFilterDefinition {
+  key: string;
+  label: string;
+  type: 'date' | 'text' | 'select' | 'boolean' | 'number';
+  description?: string;
+  options?: Array<{ value: string; label: string }>;
+  multi?: boolean;
+}
+
 export interface AiActionField {
   id: string;
   fieldKey: string;
@@ -37,6 +46,7 @@ export interface AiCollectionDefinition {
   defaultLimit: number;
   defaultFormat: AiCollectionFormat;
   supportedFormats: AiCollectionFormat[];
+  filters?: AiCollectionFilterDefinition[];
 }
 
 export interface AiActionCollectionSummary {

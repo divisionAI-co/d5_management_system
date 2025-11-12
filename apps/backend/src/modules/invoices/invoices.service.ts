@@ -866,7 +866,7 @@ ${html}`;
 
     const subject =
       sendDto.subject ??
-      `Invoice ${invoice.invoiceNumber} from D5 Management`;
+      `Invoice ${invoice.invoiceNumber} from division5`;
 
     const message =
       sendDto.message ??

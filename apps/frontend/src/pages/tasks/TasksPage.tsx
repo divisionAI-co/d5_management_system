@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Columns, Kanban, Filter, Plus, RefreshCw, Search } from 'lucide-react';
 import type { DropResult } from '@hello-pangea/dnd';
@@ -19,6 +19,7 @@ import type {
   TasksKanbanResponse,
 } from '@/types/tasks';
 import type { UsersListResponse, UserSummary } from '@/types/users';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const STATUS_ORDER: TaskStatus[] = [
   'TODO',
@@ -60,6 +61,7 @@ export default function TasksPage() {
     undefined,
   );
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [isLoadingTaskDetail, setIsLoadingTaskDetail] = useState(false);
   const [addingTaskId, setAddingTaskId] = useState<string | null>(null);
   const [eodPrompt, setEodPrompt] = useState<TaskEodLinkResponse | null>(null);
@@ -87,6 +89,14 @@ export default function TasksPage() {
     queryKey: ['tasks', sanitizedFilters],
     queryFn: () => tasksApi.list(sanitizedFilters),
   });
+
+  useEffect(() => {
+    if (tasksQuery.isError) {
+      setTaskError('Unable to load tasks right now. Please try refreshing the view.');
+    } else if (tasksQuery.isSuccess) {
+      setTaskError(null);
+    }
+  }, [tasksQuery.isError, tasksQuery.isSuccess]);
 
   const usersQuery = useQuery<UsersListResponse>({
     queryKey: ['users', 'options'],
@@ -430,15 +440,19 @@ export default function TasksPage() {
       </div>
 
       {feedback && (
-        <div className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-          <span>{feedback}</span>
-          <button
-            className="text-xs font-semibold uppercase tracking-wide text-blue-800"
-            onClick={() => setFeedback(null)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="info"
+        />
+      )}
+
+      {taskError && (
+        <FeedbackToast
+          message={taskError}
+          onDismiss={() => setTaskError(null)}
+          tone="error"
+        />
       )}
 
       {eodPrompt && (
@@ -464,12 +478,6 @@ export default function TasksPage() {
       )}
 
       <div className="space-y-4">
-        {tasksQuery.isError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            Unable to load tasks right now. Please try refreshing the view.
-          </div>
-        )}
-
         {tasksQuery.isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {STATUS_ORDER.slice(0, 3).map((status) => (

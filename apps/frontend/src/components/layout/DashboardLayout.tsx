@@ -48,6 +48,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'EOD Reports', href: '/employees/eod-reports', roles: ROLE_PERMISSIONS.EOD_REPORTS },
       { name: 'Leave Requests', href: '/employees/leave-requests', roles: ROLE_PERMISSIONS.LEAVE_REQUESTS },
       { name: 'Performance Reviews', href: '/employees/performance-reviews', roles: ROLE_PERMISSIONS.PERFORMANCE_REVIEWS },
+      { name: 'Remote Work', href: '/employees/remote-work', roles: ROLE_PERMISSIONS.REMOTE_WORK },
     ],
   },
   {
@@ -150,7 +151,7 @@ export default function DashboardLayout() {
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <span className="text-xl font-bold text-blue-600">D5</span>
+                <span className="text-xl font-bold text-blue-600">division5</span>
               </div>
               <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                 {navigationGroups.map((group) => {

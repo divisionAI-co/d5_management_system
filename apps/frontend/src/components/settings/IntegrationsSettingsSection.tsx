@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { settingsApi } from '@/lib/api/settings';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   IntegrationSettings,
   UpdateIntegrationPayload,
@@ -113,9 +114,11 @@ export function IntegrationsSettingsSection() {
         ))}
 
         {mutation.isError && (
-          <p className="text-sm text-red-600">
-            Could not update integration. Please try again.
-          </p>
+          <FeedbackToast
+            message="Could not update integration. Please try again."
+            onDismiss={() => mutation.reset()}
+            tone="error"
+          />
         )}
       </div>
     </div>

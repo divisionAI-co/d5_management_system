@@ -31,7 +31,7 @@ export class ContactFieldMappingEntry {
   sourceColumn!: string;
 
   @ApiProperty({
-    description: 'Target field in the D5 contact model',
+    description: 'Target field in the division5 contact model',
     enum: ContactImportField,
     example: ContactImportField.EMAIL,
   })

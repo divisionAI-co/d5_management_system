@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { differenceInCalendarDays, parseISO, isValid } from 'date-fns';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveRequestsApi } from '@/lib/api/hr';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   LeaveRequest,
   CreateLeaveRequestDto,
@@ -40,6 +41,7 @@ const LEAVE_STATUS: Array<{ label: string; value: LeaveRequestStatus }> = [
 export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: LeaveRequestFormProps) {
   const queryClient = useQueryClient();
   const isEdit = !!request;
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -87,6 +89,14 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
       queryClient.invalidateQueries({ queryKey: ['leave-balance'] });
       onSuccess();
       onClose();
+      setErrorMessage(null);
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ??
+        error?.message ??
+        'Unable to submit leave request right now.';
+      setErrorMessage(Array.isArray(message) ? message.join(' ') : String(message));
     },
   });
 
@@ -97,6 +107,14 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
       queryClient.invalidateQueries({ queryKey: ['leave-request', request!.id] });
       onSuccess();
       onClose();
+      setErrorMessage(null);
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ??
+        error?.message ??
+        'Unable to update leave request right now.';
+      setErrorMessage(Array.isArray(message) ? message.join(' ') : String(message));
     },
   });
 
@@ -115,7 +133,14 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card-elevated shadow-xl">
+        {errorMessage && (
+          <FeedbackToast
+            message={errorMessage}
+            onDismiss={() => setErrorMessage(null)}
+            tone="error"
+          />
+        )}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
             <h2 className="text-xl font-semibold text-foreground">

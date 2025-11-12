@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AiCollectionFormat, AiCollectionKey, AiEntityType, Prisma } from '@prisma/client';
+import { validate as uuidValidate } from 'uuid';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import {
@@ -271,7 +272,12 @@ export class AiActionsService {
   }
 
   async attach(actionId: string, dto: AttachAiActionDto, userId: string) {
-    const action = await this.prisma.aiAction.findUnique({ where: { id: actionId } });
+    const normalizedActionId = actionId.trim();
+    if (!uuidValidate(normalizedActionId)) {
+      throw new BadRequestException('Invalid Gemini action identifier.');
+    }
+
+    const action = await this.prisma.aiAction.findUnique({ where: { id: normalizedActionId } });
     if (!action) {
       throw new NotFoundException('Gemini action not found');
     }
@@ -281,16 +287,46 @@ export class AiActionsService {
 
     await this.entityFieldResolver.ensureEntityExists(action.entityType, dto.entityId);
 
-    const attachment = await this.prisma.aiActionAttachment.create({
-      data: {
-        actionId,
-        entityType: action.entityType,
-        entityId: dto.entityId,
-        attachedById: userId,
+    const existingAttachment = await this.prisma.aiActionAttachment.findUnique({
+      where: {
+        actionId_entityType_entityId: {
+          actionId: normalizedActionId,
+          entityType: action.entityType,
+          entityId: dto.entityId,
+        },
       },
     });
 
-    return attachment;
+    if (existingAttachment) {
+      return existingAttachment;
+    }
+
+    try {
+      const attachment = await this.prisma.aiActionAttachment.create({
+        data: {
+          actionId: normalizedActionId,
+          entityType: action.entityType,
+          entityId: dto.entityId,
+          attachedById: userId,
+        },
+      });
+
+      return attachment;
+    } catch (error: unknown) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return (await this.prisma.aiActionAttachment.findUnique({
+          where: {
+            actionId_entityType_entityId: {
+              actionId: normalizedActionId,
+              entityType: action.entityType,
+              entityId: dto.entityId,
+            },
+          },
+        }))!;
+      }
+
+      throw error;
+    }
   }
 
   async detach(attachmentId: string, userId: string) {

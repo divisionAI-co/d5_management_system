@@ -4,6 +4,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type UseMutationResult,
 } from '@tanstack/react-query';
 import {
   CheckCircle,
@@ -14,6 +15,7 @@ import {
   PinOff,
   PlusCircle,
   Repeat,
+  Sparkles,
   XCircle,
 } from 'lucide-react';
 
@@ -21,6 +23,7 @@ import { activitiesApi } from '@/lib/api/activities';
 import type { Activity } from '@/types/activities';
 import { cn } from '@/lib/utils';
 import { GeminiActionsSection } from './GeminiActionsSection';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type EntityType =
   | 'customer'
@@ -30,6 +33,8 @@ type EntityType =
   | 'employee'
   | 'contact'
   | 'task';
+
+const AI_ACTIVITY_KEY = 'AI_ACTION';
 
 function buildFilter(entityType: EntityType, entityId: string) {
   return {
@@ -41,6 +46,180 @@ function buildFilter(entityType: EntityType, entityId: string) {
     contactId: entityType === 'contact' ? entityId : undefined,
     taskId: entityType === 'task' ? entityId : undefined,
   };
+}
+
+interface ActivityItemProps {
+  activity: Activity;
+  getTypeStyles: (activity: Activity) => { backgroundColor: string; color: string; borderColor: string };
+  completionMutation: UseMutationResult<
+    unknown,
+    unknown,
+    { id: string; isCompleted: boolean },
+    unknown
+  >;
+  pinMutation: UseMutationResult<unknown, unknown, { id: string; isPinned: boolean }, unknown>;
+}
+
+function ActivityItem({
+  activity,
+  getTypeStyles,
+  completionMutation,
+  pinMutation,
+}: ActivityItemProps) {
+  const isAiActivity = useMemo(() => {
+    const typeKey = activity.activityType?.key?.toUpperCase();
+    const typeName = activity.activityType?.name?.toUpperCase();
+    const typeLabel = activity.typeLabel?.toUpperCase();
+    const metadata = (activity.metadata ?? undefined) as Record<string, unknown> | undefined;
+    const hasAiMetadata =
+      Boolean(metadata?.aiActionExecutionId) ||
+      Boolean(metadata?.aiActionId) ||
+      Boolean(metadata?.geminiExecutionId);
+
+    return (
+      typeKey === AI_ACTIVITY_KEY ||
+      typeName === 'AI ACTION' ||
+      typeLabel === 'AI ACTION' ||
+      hasAiMetadata === true
+    );
+  }, [activity]);
+
+  const [isExpanded, setIsExpanded] = useState(() => !isAiActivity);
+
+  useEffect(() => {
+    setIsExpanded(isAiActivity ? false : true);
+  }, [isAiActivity]);
+
+  const handleToggle = () => {
+    setIsExpanded((prev) => !prev);
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
+              )}
+              style={getTypeStyles(activity)}
+            >
+              {activity.typeLabel ?? activity.activityType?.name ?? activity.type}
+            </span>
+            {activity.isPinned && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                <Pin className="h-3.5 w-3.5" />
+                Pinned
+              </span>
+            )}
+            {activity.isCompleted && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Completed
+              </span>
+            )}
+          </div>
+
+          {isAiActivity && (
+            <button
+              type="button"
+              onClick={handleToggle}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-expanded={isExpanded}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {isExpanded ? 'Hide AI output' : 'View AI output'}
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-base font-semibold text-foreground">{activity.subject}</h3>
+          {isAiActivity && !isExpanded && (
+            <span className="text-xs text-muted-foreground">
+              {new Date(activity.createdAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+
+        {(!isAiActivity || isExpanded) ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                Logged by {activity.createdBy.firstName} {activity.createdBy.lastName} ·{' '}
+                {new Date(activity.createdAt).toLocaleString()}
+              </span>
+              {activity.activityDate && (
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Occurs {new Date(activity.activityDate).toLocaleString()}
+                </span>
+              )}
+              {activity.reminderAt && (
+                <span className="inline-flex items-center gap-1">
+                  <MessageSquare className="h-3 w-3" />
+                  Reminder {new Date(activity.reminderAt).toLocaleString()}
+                </span>
+              )}
+            </div>
+
+            {activity.body && (
+              <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                {activity.body}
+              </pre>
+            )}
+          </>
+        ) : null}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            completionMutation.mutate({ id: activity.id, isCompleted: !activity.isCompleted })
+          }
+          className={cn(
+            'inline-flex items-center gap-1 rounded-lg border px-3 py-1 text-xs font-semibold transition',
+            activity.isCompleted
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+          disabled={completionMutation.isPending}
+        >
+          {activity.isCompleted ? (
+            <>
+              <XCircle className="h-3.5 w-3.5" />
+              Reopen
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-3.5 w-3.5" />
+              Complete
+            </>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => pinMutation.mutate({ id: activity.id, isPinned: !activity.isPinned })}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          disabled={pinMutation.isPending}
+        >
+          {activity.isPinned ? (
+            <>
+              <PinOff className="h-3.5 w-3.5" />
+              Unpin
+            </>
+          ) : (
+            <>
+              <Pin className="h-3.5 w-3.5" />
+              Pin
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 interface ActivityPanelProps {
@@ -73,6 +252,9 @@ export function ActivityPanel({
   const queryClient = useQueryClient();
   const [composerState, setComposerState] = useState<ActivityComposerState>(DEFAULT_COMPOSER);
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [showComposer, setShowComposer] = useState(false);
+  const [showGeminiSection, setShowGeminiSection] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   const activityTypesQuery = useQuery({
     queryKey: ['activity-types', { includeInactive: false }],
@@ -104,11 +286,14 @@ export function ActivityPanel({
         activityTypeId: prev.activityTypeId,
       }));
       setComposerError(null);
+      setActivityError(null);
+      setShowComposer(false);
     },
     onError: (error: any) => {
       const message =
         error?.response?.data?.message ?? 'Unable to create activity. Please try again.';
       setComposerError(Array.isArray(message) ? message.join(' ') : String(message));
+      setActivityError(Array.isArray(message) ? message.join(' ') : String(message));
     },
   });
 
@@ -117,6 +302,12 @@ export function ActivityPanel({
       activitiesApi.togglePin(id, isPinned),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      setActivityError(null);
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ?? 'Unable to update pin state. Please try again.';
+      setActivityError(Array.isArray(message) ? message.join(' ') : String(message));
     },
   });
 
@@ -125,6 +316,12 @@ export function ActivityPanel({
       activitiesApi.toggleComplete(id, isCompleted),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      setActivityError(null);
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ?? 'Unable to update activity status. Please try again.';
+      setActivityError(Array.isArray(message) ? message.join(' ') : String(message));
     },
   });
 
@@ -190,6 +387,14 @@ export function ActivityPanel({
 
   return (
     <div className="space-y-6">
+      {activityError && (
+        <FeedbackToast
+          message={activityError}
+          onDismiss={() => setActivityError(null)}
+          tone="error"
+        />
+      )}
+
       <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -198,17 +403,43 @@ export function ActivityPanel({
               Log quick notes, next steps, or reminders to keep teammates informed.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => activitiesQuery.refetch()}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <Repeat className="h-4 w-4" />
-            Refresh
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowComposer((prev) => !prev)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-expanded={showComposer}
+              aria-controls="activity-composer"
+            >
+              {showComposer ? (
+                <>
+                  <XCircle className="h-4 w-4" />
+                  Hide activity form
+                </>
+              ) : (
+                <>
+                  <PlusCircle className="h-4 w-4" />
+                  Log activity
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => activitiesQuery.refetch()}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Repeat className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-lg border border-border bg-background/40 p-4">
+        {showComposer && (
+          <form
+            id="activity-composer"
+            onSubmit={handleSubmit}
+            className="mt-6 space-y-4 rounded-lg border border-border bg-background/40 p-4"
+          >
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
@@ -306,41 +537,79 @@ export function ActivityPanel({
           )}
 
           <div className="flex justify-end gap-3">
-            <button
-              type="reset"
-              onClick={() => {
-                setComposerState((prev) => ({
-                  ...DEFAULT_COMPOSER,
-                  activityTypeId: prev.activityTypeId,
-                }));
-                setComposerError(null);
-              }}
-              className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              Clear
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {createMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <PlusCircle className="h-4 w-4" />
-                  Log Activity
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+              <button
+                type="button"
+                onClick={() => {
+                  setComposerState((prev) => ({
+                    ...DEFAULT_COMPOSER,
+                    activityTypeId: prev.activityTypeId,
+                  }));
+                  setComposerError(null);
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                Clear
+              </button>
+              <button
+                type="submit"
+                disabled={createMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="h-4 w-4" />
+                    Log Activity
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
-      <GeminiActionsSection entityId={entityId} entityType={entityType} />
+      {showGeminiSection ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setShowGeminiSection(false)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <XCircle className="h-4 w-4" />
+              Hide Gemini actions
+            </button>
+          </div>
+          <GeminiActionsSection
+            entityId={entityId}
+            entityType={entityType}
+            onDismiss={() => setShowGeminiSection(false)}
+          />
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Gemini actions</h3>
+              <p className="text-xs text-muted-foreground">
+                Attach saved prompts or run ad-hoc Gemini requests to capture AI-generated summaries and next steps.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGeminiSection(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <Sparkles className="h-4 w-4" />
+              Show Gemini actions
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         {activities.length === 0 && !activitiesQuery.isFetching ? (
@@ -349,106 +618,13 @@ export function ActivityPanel({
           </div>
         ) : (
           activities.map((activity) => (
-            <div key={activity.id} className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
-                      )}
-                      style={getTypeStyles(activity)}
-                    >
-                      {activity.typeLabel ?? activity.activityType?.name ?? activity.type}
-                    </span>
-                    {activity.isPinned && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                        <Pin className="h-3.5 w-3.5" />
-                        Pinned
-                      </span>
-                    )}
-                    {activity.isCompleted && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        Completed
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="mt-2 text-base font-semibold text-foreground">
-                    {activity.subject}
-                  </h3>
-                  {activity.body && (
-                    <p className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
-                      {activity.body}
-                    </p>
-                  )}
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    <span>
-                      Logged by {activity.createdBy.firstName} {activity.createdBy.lastName} ·{' '}
-                      {new Date(activity.createdAt).toLocaleString()}
-                    </span>
-                    {activity.activityDate && (
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Occurs {new Date(activity.activityDate).toLocaleString()}
-                      </span>
-                    )}
-                    {activity.reminderAt && (
-                      <span className="inline-flex items-center gap-1">
-                        <MessageSquare className="h-3 w-3" />
-                        Reminder {new Date(activity.reminderAt).toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      completionMutation.mutate({ id: activity.id, isCompleted: !activity.isCompleted })
-                    }
-                    className={cn(
-                      'inline-flex items-center gap-1 rounded-lg border px-3 py-1 text-xs font-semibold transition',
-                      activity.isCompleted
-                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                        : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-                    )}
-                    disabled={completionMutation.isPending}
-                  >
-                    {activity.isCompleted ? (
-                      <>
-                        <XCircle className="h-3.5 w-3.5" />
-                        Reopen
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        Complete
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => pinMutation.mutate({ id: activity.id, isPinned: !activity.isPinned })}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                    disabled={pinMutation.isPending}
-                  >
-                    {activity.isPinned ? (
-                      <>
-                        <PinOff className="h-3.5 w-3.5" />
-                        Unpin
-                      </>
-                    ) : (
-                      <>
-                        <Pin className="h-3.5 w-3.5" />
-                        Pin
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <ActivityItem
+              key={activity.id}
+              activity={activity}
+              getTypeStyles={getTypeStyles}
+              completionMutation={completionMutation}
+              pinMutation={pinMutation}
+            />
           ))
         )}
 

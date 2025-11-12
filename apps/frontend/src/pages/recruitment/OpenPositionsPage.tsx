@@ -16,6 +16,7 @@ import {
 } from '@/components/recruitment/CandidateBoard';
 import { OpenPositionsTable } from '@/components/recruitment/OpenPositionsTable';
 import { CreatePositionModal } from '@/components/recruitment/CreatePositionModal';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const STATUS_OPTIONS: Array<{ value: PositionStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All statuses' },
@@ -222,15 +223,11 @@ export default function OpenPositionsPage() {
       </div>
 
       {feedback && (
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          <span>{feedback}</span>
-          <button
-            onClick={() => setFeedback(null)}
-            className="text-xs font-semibold uppercase tracking-wide"
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       <OpenPositionsTable

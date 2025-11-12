@@ -26,6 +26,7 @@ import type {
   InvoiceStatus,
 } from '@/types/invoices';
 import type { CustomerSummary } from '@/types/crm';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type SortOption = {
   label: string;
@@ -493,9 +494,11 @@ export default function InvoicesPage() {
       </div>
 
       {feedback && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          {feedback}
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       <InvoicesTable

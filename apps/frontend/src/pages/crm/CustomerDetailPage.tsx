@@ -23,6 +23,7 @@ import { CustomerStatusForm } from '@/components/crm/customers/CustomerStatusFor
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const sentimentClass = {
   HAPPY: 'bg-green-100 text-green-700',
@@ -201,15 +202,11 @@ export default function CustomerDetailPage() {
       </header>
 
       {feedback && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}{' '}
-          <button
-            className="text-xs font-semibold uppercase tracking-wide text-emerald-800"
-            onClick={() => setFeedback(null)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

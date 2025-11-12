@@ -13,6 +13,7 @@ import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { CandidateDrivePreview } from '@/components/recruitment/CandidateDrivePreview';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -178,15 +179,11 @@ export default function CandidateDetailPage() {
       </div>
 
       {feedback && (
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          <span>{feedback}</span>
-          <button
-            onClick={() => setFeedback(null)}
-            className="text-xs font-semibold uppercase tracking-wide"
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">

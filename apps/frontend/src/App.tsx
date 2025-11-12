@@ -36,6 +36,7 @@ import EmployeeDetailPage from '@/pages/employees/EmployeeDetailPage';
 import EodReportsPage from '@/pages/employees/EodReportsPage';
 import LeaveRequestsPage from '@/pages/employees/LeaveRequestsPage';
 import PerformanceReviewsPage from '@/pages/employees/PerformanceReviewsPage';
+import RemoteWorkPage from '@/pages/employees/RemoteWorkPage';
 import HolidaysPage from '@/pages/settings/HolidaysPage';
 
 // Tasks
@@ -120,6 +121,7 @@ function App() {
             <Route path="eod-reports" element={<EodReportsPage />} />
             <Route path="leave-requests" element={<LeaveRequestsPage />} />
             <Route path="performance-reviews" element={<PerformanceReviewsPage />} />
+            <Route path="remote-work" element={<RemoteWorkPage />} />
           </Route>
 
           {/* Tasks */}

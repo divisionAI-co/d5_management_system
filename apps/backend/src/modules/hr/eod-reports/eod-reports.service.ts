@@ -122,6 +122,8 @@ export class EodReportsService {
       throw new BadRequestException('tasksWorkedOn must contain at least 1 entry');
     }
 
+    this.ensureNotFutureDate(rest.date);
+
     let isLate = false;
     let submittedAt: Date | undefined;
 
@@ -315,6 +317,21 @@ export class EodReportsService {
     return this.prisma.eodReport.delete({
       where: { id },
     });
+  }
+
+  private ensureNotFutureDate(dateString: string) {
+    const parsed = new Date(dateString);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid report date provided.');
+    }
+
+    const reportDateUTC = Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+    const now = new Date();
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+    if (reportDateUTC > todayUTC) {
+      throw new BadRequestException('EOD reports cannot be submitted for future dates.');
+    }
   }
 }
 

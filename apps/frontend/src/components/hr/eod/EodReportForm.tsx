@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { eodReportsApi } from '@/lib/api/hr';
 import type { CreateEodReportDto, EodReport, EodReportTask, UpdateEodReportDto } from '@/types/hr';
 import { X } from 'lucide-react';
 import { format } from 'date-fns';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface EodReportFormProps {
   report?: EodReport;
@@ -44,6 +45,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
   const queryClient = useQueryClient();
   const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const isEdit = !!report;
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const initialValues = useMemo<FormValues>(() => {
     if (!report) {
@@ -122,6 +124,13 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       payload: CreateEodReportDto;
       submit: boolean;
     }) => eodReportsApi.create({ ...payload, submit }),
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ??
+        (error instanceof Error ? error.message : null) ??
+        'Unable to save the EOD report right now.';
+      setMutationError(typeof message === 'string' ? message : 'Unable to save the EOD report right now.');
+    },
   });
 
   const updateMutation = useMutation({
@@ -137,9 +146,17 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       }
       return eodReportsApi.update(report.id, { ...payload, submit });
     },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ??
+        (error instanceof Error ? error.message : null) ??
+        'Unable to update the EOD report right now.';
+      setMutationError(typeof message === 'string' ? message : 'Unable to update the EOD report right now.');
+    },
   });
 
   const onSubmit = (data: FormValues, submit: boolean) => {
+    setMutationError(null);
     if (!data.tasks.length) {
       setError('tasks', {
         type: 'manual',
@@ -167,15 +184,16 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       updateMutation.mutate(
         { payload, submit },
         {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['eod-reports'] });
-          const targetUserId = employeeId ?? report.userId;
-          if (targetUserId) {
-            queryClient.invalidateQueries({ queryKey: ['eod-reports', targetUserId] });
-          }
-          onSuccess();
-          onClose();
-        },
+          onSuccess: () => {
+            setMutationError(null);
+            queryClient.invalidateQueries({ queryKey: ['eod-reports'] });
+            const targetUserId = employeeId ?? report.userId;
+            if (targetUserId) {
+              queryClient.invalidateQueries({ queryKey: ['eod-reports', targetUserId] });
+            }
+            onSuccess();
+            onClose();
+          },
         },
       );
 
@@ -194,6 +212,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       { payload, submit },
       {
         onSuccess: () => {
+          setMutationError(null);
           queryClient.invalidateQueries({ queryKey: ['eod-reports'] });
           if (employeeId) {
             queryClient.invalidateQueries({ queryKey: ['eod-reports', employeeId] });
@@ -212,7 +231,16 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
   const handleSubmitFinal = handleSubmit((data) => onSubmit(data, true));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <>
+      {mutationError && (
+        <FeedbackToast
+          message={mutationError}
+          onDismiss={() => setMutationError(null)}
+          tone="error"
+        />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -448,6 +476,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
         </form>
       </div>
     </div>
+    </>
   );
 }
 

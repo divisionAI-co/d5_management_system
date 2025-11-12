@@ -20,6 +20,7 @@ import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm'
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
 import { OpportunitiesBoard } from '@/components/crm/opportunities/OpportunitiesBoard';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const TYPE_FILTERS: Array<{ label: string; value?: CustomerType }> = [
   { label: 'All types', value: undefined },
@@ -622,15 +623,11 @@ export default function OpportunitiesPage() {
       ) : null}
 
       {feedback ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}
-          <button
-            className="ml-3 text-xs font-semibold uppercase tracking-wide text-emerald-800"
-            onClick={() => setFeedback(null)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       ) : null}
 
       {viewMode === 'table' ? (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { templatesApi } from '@/lib/api/templates';
 import type { TemplateModel } from '@/types/templates';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface TemplatePreviewDialogProps {
   template: TemplateModel;
@@ -83,7 +84,12 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
   }, [template.id]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
+    <>
+      {error && (
+        <FeedbackToast message={error} onDismiss={() => setError(null)} tone="error" />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
       <div className="relative flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -122,11 +128,6 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               {isLoading ? 'Rendering...' : 'Render Preview'}
             </button>
-            {error && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
-                {error}
-              </div>
-            )}
           </div>
 
           <div className="flex-1 overflow-hidden bg-muted/70">
@@ -139,6 +140,7 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
         </div>
       </div>
     </div>
+    </>
   );
 }
 

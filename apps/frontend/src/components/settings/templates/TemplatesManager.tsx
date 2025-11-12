@@ -8,6 +8,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import type { CreateTemplatePayload, TemplateFilters, TemplateModel, TemplateType } from '@/types/templates';
 import { TemplateFormModal } from './TemplateFormModal';
 import { TemplatePreviewModal } from './TemplatePreviewModal';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const TEMPLATE_TYPE_LABEL: Record<TemplateType, string> = {
   EMAIL: 'Email',
@@ -161,15 +162,19 @@ export function TemplatesManager() {
       </div>
 
       {feedbackMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedbackMessage}
-        </div>
+        <FeedbackToast
+          message={feedbackMessage}
+          onDismiss={() => setFeedbackMessage(null)}
+          tone="success"
+        />
       )}
 
       {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
       )}
 
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-sm md:flex-row md:items-end md:justify-between">

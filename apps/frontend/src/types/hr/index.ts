@@ -218,6 +218,34 @@ export interface LeaveBalance {
   leaveRequests: LeaveRequest[];
 }
 
+export interface RemoteWorkLog {
+  id: string;
+  userId: string;
+  employeeId: string;
+  date: string;
+  reason?: string | null;
+  createdAt: string;
+  employee?: Employee & { user: User };
+  user?: User;
+}
+
+export interface RemoteWorkWindowState {
+  isOpen: boolean;
+  startDate?: string | null;
+  endDate?: string | null;
+  limit: number;
+}
+
+export interface SetRemotePreferencesPayload {
+  dates: string[];
+  reason?: string;
+}
+
+export interface OpenRemoteWindowPayload {
+  startDate: string;
+  endDate?: string;
+}
+
 export interface CreateEodReportDto {
   employeeId?: string;
   date: string;

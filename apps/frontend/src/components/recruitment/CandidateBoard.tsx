@@ -356,7 +356,6 @@ function CandidateCard({
                   event.stopPropagation();
                   onView(candidate);
                 }}
-                onClick={() => onView(candidate)}
                 className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
               >
                 View
@@ -369,7 +368,6 @@ function CandidateCard({
                   event.stopPropagation();
                   onEdit(candidate);
                 }}
-                onClick={() => onEdit(candidate)}
                 className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
               >
                 Edit
@@ -385,7 +383,6 @@ function CandidateCard({
                   event.stopPropagation();
                   onLinkPosition(candidate);
                 }}
-                onClick={() => onLinkPosition(candidate)}
                 className="w-full rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100"
               >
                 Link to Position
@@ -399,7 +396,6 @@ function CandidateCard({
                   event.stopPropagation();
                   onConvertToEmployee(candidate);
                 }}
-                onClick={() => onConvertToEmployee(candidate)}
                 className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={Boolean(candidate.employee)}
               >
@@ -435,10 +431,8 @@ function CandidateCard({
   );
 }
 
-export {
-  STAGE_ORDER as CANDIDATE_STAGE_ORDER,
-  STAGE_LABELS as CANDIDATE_STAGE_LABELS,
-  STAGE_COLORS as CANDIDATE_STAGE_COLORS,
-};
+export const CANDIDATE_STAGE_ORDER = STAGE_ORDER;
+export const CANDIDATE_STAGE_LABELS = STAGE_LABELS;
+export const CANDIDATE_STAGE_COLORS = STAGE_COLORS;
 
 

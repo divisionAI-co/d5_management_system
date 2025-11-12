@@ -15,6 +15,7 @@ import { CustomerForm } from '@/components/crm/customers/CustomerForm';
 import { CustomersTable } from '@/components/crm/customers/CustomersTable';
 import { CustomerStatusForm } from '@/components/crm/customers/CustomerStatusForm';
 import { Filter, Plus, RefreshCw } from 'lucide-react';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type SortField = 'name' | 'createdAt' | 'updatedAt' | 'monthlyValue';
 
@@ -273,15 +274,11 @@ export default function CustomersPage() {
       </div>
 
       {feedback && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}
-          <button
-            className="ml-3 text-xs font-semibold uppercase tracking-wide text-emerald-800"
-            onClick={() => setFeedback(null)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       <CustomersTable

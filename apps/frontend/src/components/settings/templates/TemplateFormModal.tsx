@@ -4,6 +4,7 @@ import { X, Plus, Trash2, Loader2 } from 'lucide-react';
 import type { CreateTemplatePayload, TemplateModel, TemplateType, TemplateVariable } from '@/types/templates';
 import type { TemplateBlock } from '@/types/templates';
 import { TemplateBlockEditor } from './TemplateBlockEditor';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import {
   createRawHtmlBlock,
   extractBlocksFromHtml,
@@ -39,8 +40,8 @@ type TemplateFormModalProps = {
 
 const DEFAULT_HTML = `<main style="font-family: Arial, sans-serif; line-height: 1.5;">
   <h1 style="color: #1f2937;">Hi {{firstName}},</h1>
-  <p>Thanks for choosing D5 Management System. This is your email template body.</p>
-  <p style="margin-top: 24px;">— The D5 Team</p>
+  <p>Thanks for choosing division5. This is your email template body.</p>
+  <p style="margin-top: 24px;">— The division5 Team</p>
 </main>`;
 
 const TEMPLATE_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; description: string }> = [
@@ -277,7 +278,16 @@ export function TemplateFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <>
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -568,12 +578,6 @@ export function TemplateFormModal({
             </div>
           </div>
 
-          {errorMessage && (
-            <div className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
           <div className="mt-8 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
@@ -593,7 +597,8 @@ export function TemplateFormModal({
           </div>
         </form>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

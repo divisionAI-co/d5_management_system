@@ -23,6 +23,7 @@ import type {
   AiFieldDefinition,
 } from '@/types/ai-actions';
 import { cn } from '@/lib/utils';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type ActivityEntityType =
   | 'customer'
@@ -40,6 +41,7 @@ function toAiEntityType(entityType: ActivityEntityType): AiEntityType {
 interface GeminiActionsSectionProps {
   entityId: string;
   entityType: ActivityEntityType;
+  onDismiss?: () => void;
 }
 
 interface AttachModalProps {
@@ -72,7 +74,7 @@ function AttachActionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl">
+      <div className="w-full max-w-2xl rounded-xl border border-border bg-card-elevated shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-500" />
@@ -188,8 +190,13 @@ function AdhocPromptModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="grid w-full max-w-3xl grid-rows-[auto_1fr_auto] rounded-xl border border-border bg-card shadow-xl">
+    <>
+      {error && (
+        <FeedbackToast message={error} onDismiss={() => setError(null)} tone="error" />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="grid w-full max-w-3xl grid-rows-[auto_1fr_auto] rounded-xl border border-border bg-card-elevated shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
             <PenSquare className="h-5 w-5 text-blue-500" />
@@ -280,11 +287,6 @@ function AdhocPromptModal({
             Gemini requests may take a few seconds. Results appear in the activity timeline automatically.
           </div>
           <div className="flex items-center gap-3">
-            {error && (
-              <span className="text-xs font-medium text-red-500" role="alert">
-                {error}
-              </span>
-            )}
             <button
               type="button"
               onClick={handleSubmit}
@@ -298,6 +300,7 @@ function AdhocPromptModal({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -310,9 +313,9 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
       : execution.rawOutput ?? JSON.stringify(execution.output ?? {}, null, 2);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="grid w-full max-w-3xl grid-rows-[auto_1fr_auto] rounded-xl border border-border bg-card shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6">
+      <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card-elevated shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-500" />
             <h3 className="text-lg font-semibold text-foreground">Gemini Output</h3>
@@ -320,12 +323,12 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="space-y-4 overflow-y-auto px-5 py-4 text-sm text-foreground">
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5 text-sm text-foreground">
           {execution.status === 'FAILED' ? (
             <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
@@ -339,13 +342,13 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
               <p className="font-semibold text-muted-foreground">
                 Generated {new Date(execution.createdAt).toLocaleString()}
               </p>
-              <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
+              <pre className="max-h-[60vh] whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
                 {outputText || 'Gemini returned an empty response.'}
               </pre>
             </>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-border px-5 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
           <button
             type="button"
             onClick={() => {
@@ -368,7 +371,7 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
   );
 }
 
-export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSectionProps) {
+export function GeminiActionsSection({ entityId, entityType, onDismiss }: GeminiActionsSectionProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const aiEntityType = useMemo(() => toAiEntityType(entityType), [entityType]);
@@ -377,6 +380,7 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
   const [showAdhocModal, setShowAdhocModal] = useState(false);
   const [selectedExecution, setSelectedExecution] = useState<AiActionExecution | null>(null);
   const [defaultAdhocPrompt, setDefaultAdhocPrompt] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   const attachmentsQuery = useQuery({
     queryKey: ['ai-actions', 'attachments', aiEntityType, entityId],
@@ -403,6 +407,7 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
   const attachMutation = useMutation({
     mutationFn: (actionId: string) => aiActionsApi.attach(actionId, entityId),
     onSuccess: () => {
+      setError(null);
       toast({
         title: 'Action attached',
         description: 'The Gemini action is now accessible from this record.',
@@ -411,6 +416,7 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       queryClient.invalidateQueries({ queryKey: ['ai-actions', 'attachments', aiEntityType, entityId] });
     },
     onError: () => {
+      setError('Could not attach action. Please try again in a moment.');
       toast({
         title: 'Could not attach action',
         description: 'Please try again in a moment.',
@@ -422,11 +428,20 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
   const detachMutation = useMutation({
     mutationFn: (attachmentId: string) => aiActionsApi.detach(attachmentId),
     onSuccess: () => {
+      setError(null);
       toast({
         title: 'Action detached',
         description: 'The Gemini action is no longer linked to this record.',
       });
       queryClient.invalidateQueries({ queryKey: ['ai-actions', 'attachments', aiEntityType, entityId] });
+    },
+    onError: () => {
+      setError('Could not detach action. Please try again in a moment.');
+      toast({
+        title: 'Could not detach action',
+        description: 'Please try again in a moment.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -439,6 +454,7 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       payload: { fieldKeys?: string[]; promptOverride?: string; extraInstructions?: string };
     }) => aiActionsApi.executeSaved(actionId, { entityId, ...payload }),
     onSuccess: (execution) => {
+      setError(null);
       toast({
         title: 'Gemini request started',
         description: 'The response will appear in the activity timeline shortly.',
@@ -448,10 +464,12 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
       queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
     },
-    onError: (error: any) => {
+    onError: (err: any) => {
+      const message = err?.response?.data?.message ?? 'Gemini request failed.';
+      setError(message);
       toast({
         title: 'Could not run action',
-        description: error?.response?.data?.message ?? 'Gemini request failed.',
+        description: message,
         variant: 'destructive',
       });
     },
@@ -478,6 +496,7 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
         extraInstructions,
       }),
     onSuccess: (execution) => {
+      setError(null);
       toast({
         title: 'Gemini request started',
         description: 'The response will appear in the activity timeline shortly.',
@@ -487,10 +506,12 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
       queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
     },
-    onError: (error: any) => {
+    onError: (err: any) => {
+      const message = err?.response?.data?.message ?? 'Gemini request failed.';
+      setError(message);
       toast({
         title: 'Could not run prompt',
-        description: error?.response?.data?.message ?? 'Gemini request failed.',
+        description: message,
         variant: 'destructive',
       });
     },
@@ -505,7 +526,16 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
   }, [attachments, availableActionsQuery.data]);
 
   return (
-    <div className="max-h-[32rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-sm">
+    <>
+      {error && (
+        <FeedbackToast
+          message={error}
+          onDismiss={() => setError(null)}
+          tone="error"
+        />
+      )}
+
+      <div className="max-h-[32rem] space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Gemini actions</h2>
@@ -617,57 +647,6 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
             </div>
           )}
         </div>
-
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground">Recent executions</h3>
-          {executionsQuery.isLoading ? (
-            <div className="flex items-center justify-center rounded-lg border border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading execution history…
-            </div>
-          ) : executions.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-              No Gemini runs logged yet. Execute an action to see results here.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {executions.map((execution) => (
-                <button
-                  key={execution.id}
-                  type="button"
-                  onClick={() => setSelectedExecution(execution)}
-                  className="w-full rounded-lg border border-border bg-background px-4 py-3 text-left text-sm transition hover:border-blue-500"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {execution.action?.name ?? 'Ad-hoc prompt'}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {new Date(execution.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase',
-                        execution.status === 'SUCCESS'
-                          ? 'bg-emerald-100 text-emerald-600'
-                          : execution.status === 'FAILED'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-amber-100 text-amber-600',
-                      )}
-                    >
-                      {execution.status.toLowerCase()}
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
-                    {execution.prompt}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {showAttachModal && (
@@ -700,7 +679,8 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       )}
 
       <ExecutionResultModal execution={selectedExecution} onClose={() => setSelectedExecution(null)} />
-    </div>
+      </div>
+    </>
   );
 }
 

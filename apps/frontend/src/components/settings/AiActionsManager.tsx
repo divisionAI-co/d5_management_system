@@ -22,12 +22,14 @@ import type {
   AiActionUpdatePayload,
   AiCollectionDefinition,
   AiCollectionFieldDefinition,
+  AiCollectionFilterDefinition,
   AiCollectionFormat,
   AiCollectionKey,
   AiEntityType,
   AiFieldDefinition,
 } from '@/types/ai-actions';
 import { cn } from '@/lib/utils';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type FormMode = 'create' | 'edit';
 
@@ -152,26 +154,10 @@ export function AiActionsManager() {
   useEffect(() => {
     if (!showForm || !availableFieldsQuery.data) return;
 
-    // Ensure selected fields still exist for the current entity type.
     setFormState((prev) => {
       const validSelections = prev.selectedFields.filter((field) =>
         availableFieldsQuery.data?.some((definition) => definition.key === field.key),
       );
-
-      // Auto-select initial fields if nothing selected.
-      if (validSelections.length === 0) {
-        const defaults = availableFieldsQuery.data.slice(0, 3).map((field) => ({
-          key: field.key,
-          label: field.label,
-          description: field.description,
-        }));
-        return {
-          ...prev,
-          selectedFields: defaults,
-        };
-      }
-
-      // Preserve existing order.
       return {
         ...prev,
         selectedFields: validSelections.map((field) => ({
@@ -241,7 +227,6 @@ export function AiActionsManager() {
 
   const availableFields = (availableFieldsQuery.data ?? []) as AiFieldDefinition[];
   const selectedFieldKeys = new Set(formState.selectedFields.map((field) => field.key));
-  const remainingFields = availableFields.filter((field) => !selectedFieldKeys.has(field.key));
   const availableCollections = (collectionDefinitionsQuery.data ?? []) as AiCollectionDefinition[];
 
   const handleCollectionSave = (collection: AiActionCollectionSummary) => {
@@ -293,25 +278,39 @@ export function AiActionsManager() {
     setCollectionModal({ mode, index });
   };
 
-  const addField = (field: AiFieldDefinition) => {
-    setFormState((prev) => ({
-      ...prev,
-      selectedFields: [
-        ...prev.selectedFields,
-        {
-          key: field.key,
-          label: field.label,
-          description: field.description,
-        },
-      ],
-    }));
-  };
-
   const removeField = (fieldKey: string) => {
     setFormState((prev) => ({
       ...prev,
       selectedFields: prev.selectedFields.filter((field) => field.key !== fieldKey),
     }));
+  };
+
+  const addField = (field: AiFieldDefinition) => {
+    setFormState((prev) => {
+      const alreadySelected = prev.selectedFields.some((selected) => selected.key === field.key);
+      if (alreadySelected) {
+        return prev;
+      }
+      return {
+        ...prev,
+        selectedFields: [
+          ...prev.selectedFields,
+          {
+            key: field.key,
+            label: field.label,
+            description: field.description,
+          },
+        ],
+      };
+    });
+  };
+
+  const toggleField = (field: AiFieldDefinition) => {
+    if (selectedFieldKeys.has(field.key)) {
+      removeField(field.key);
+    } else {
+      addField(field);
+    }
   };
 
   const moveField = (index: number, direction: 'up' | 'down') => {
@@ -441,16 +440,19 @@ export function AiActionsManager() {
       </div>
 
       {feedback && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}{' '}
-          <button className="text-xs font-semibold uppercase" onClick={() => setFeedback(null)}>
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <FeedbackToast
+          message={error}
+          onDismiss={() => setError(null)}
+          tone="error"
+        />
       )}
 
       <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
@@ -535,7 +537,7 @@ export function AiActionsManager() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-4xl rounded-xl border border-border bg-card shadow-2xl">
+          <div className="w-full max-w-4xl rounded-xl border border-border bg-card-elevated shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-blue-500" />
@@ -701,28 +703,39 @@ export function AiActionsManager() {
                         <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                         Loading fields…
                       </div>
-                    ) : remainingFields.length === 0 ? (
+                    ) : availableFields.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        All fields are already selected for this action.
+                        Select an entity to load available fields.
                       </p>
                     ) : (
-                      remainingFields.map((field) => (
-                        <button
-                        key={field.key}
-                          type="button"
-                          onClick={() => addField(field)}
-                          className="flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2 text-left text-sm transition hover:border-blue-500 hover:text-blue-600"
-                        >
-                          <span>
-                            {field.label}{' '}
-                            <span className="text-xs font-semibold text-muted-foreground">({field.key})</span>
-                            {field.description && (
-                              <span className="block text-xs text-muted-foreground">{field.description}</span>
+                      availableFields.map((field) => {
+                        const isSelected = selectedFieldKeys.has(field.key);
+                        return (
+                          <label
+                            key={field.key}
+                            className={cn(
+                              'flex cursor-pointer items-start gap-3 rounded-lg border border-transparent px-2 py-1.5 transition hover:bg-muted/60',
+                              isSelected && 'border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-200',
                             )}
-                          </span>
-                          <Sparkles className="h-4 w-4 text-blue-500" />
-                        </button>
-                      ))
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={isSelected}
+                              onChange={() => toggleField(field)}
+                            />
+                            <span>
+                              <span className="block text-[13px] font-semibold">
+                                {field.label}{' '}
+                                <span className="text-xs font-normal text-muted-foreground">({field.key})</span>
+                              </span>
+                              {field.description && (
+                                <span className="text-xs text-muted-foreground">{field.description}</span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -791,6 +804,18 @@ export function AiActionsManager() {
                                   Fields:{' '}
                                   {collection.fields.map((field) => field.fieldLabel).join(', ') || 'None selected'}
                                 </span>
+                                {collection.metadata &&
+                                  typeof collection.metadata === 'object' &&
+                                  !Array.isArray(collection.metadata) &&
+                                  collection.metadata.filters &&
+                                  typeof collection.metadata.filters === 'object' &&
+                                  !Array.isArray(collection.metadata.filters) && (
+                                    <span className="rounded-full bg-muted px-2 py-0.5">
+                                      Filters:{' '}
+                                      {Object.keys(collection.metadata.filters as Record<string, unknown>).join(', ') ||
+                                        'None'}
+                                    </span>
+                                  )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1">
@@ -852,14 +877,6 @@ export function AiActionsManager() {
                   </div>
                 </div>
               </div>
-
-              {error && (
-                <div className="md:col-span-2">
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {error}
-                  </div>
-                </div>
-              )}
 
               <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-border pt-4">
                 <button
@@ -932,6 +949,17 @@ function CollectionEditorModal({
     ? definitions.find((definition) => definition.collectionKey === initialValue?.collectionKey) ?? definitions[0]
     : undefined;
 
+  const initialFilters = useMemo<Record<string, unknown>>(() => {
+    if (!initialValue?.metadata || typeof initialValue.metadata !== 'object' || Array.isArray(initialValue.metadata)) {
+      return {};
+    }
+    const rawFilters = (initialValue.metadata as Record<string, unknown>).filters;
+    if (!rawFilters || typeof rawFilters !== 'object' || Array.isArray(rawFilters)) {
+      return {};
+    }
+    return { ...(rawFilters as Record<string, unknown>) };
+  }, [initialValue]);
+
   const [selectedKey, setSelectedKey] = useState<AiCollectionKey | undefined>(defaultDefinition?.collectionKey);
   const [format, setFormat] = useState<AiCollectionFormat>(
     initialValue?.format ?? defaultDefinition?.defaultFormat ?? 'TABLE',
@@ -940,6 +968,7 @@ function CollectionEditorModal({
   const [selectedFieldKeys, setSelectedFieldKeys] = useState<string[]>(
     initialValue?.fields.map((field) => field.fieldKey) ?? [],
   );
+  const [filterValues, setFilterValues] = useState<Record<string, unknown>>(initialFilters);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const fieldsQuery = useQuery({
@@ -955,6 +984,14 @@ function CollectionEditorModal({
       setLimit(defaultDefinition.defaultLimit);
     }
   }, [defaultDefinition, selectedKey]);
+
+  useEffect(() => {
+    if (initialValue && initialValue.collectionKey === selectedKey) {
+      setFilterValues(initialFilters);
+    } else if (!initialValue || initialValue.collectionKey !== selectedKey) {
+      setFilterValues({});
+    }
+  }, [initialFilters, initialValue, selectedKey]);
 
   useEffect(() => {
     if (fieldsQuery.data && fieldsQuery.data.length > 0 && selectedFieldKeys.length === 0) {
@@ -974,6 +1011,162 @@ function CollectionEditorModal({
     );
   };
 
+  const updateFilterValue = (key: string, value: unknown) => {
+    setFilterValues((prev) => {
+      const next = { ...prev };
+
+      const shouldRemove =
+        value === undefined ||
+        value === null ||
+        (typeof value === 'string' && value.trim().length === 0) ||
+        (Array.isArray(value) && value.length === 0);
+
+      if (shouldRemove) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+
+      return next;
+    });
+  };
+
+  const renderFilterControl = (filter: AiCollectionFilterDefinition) => {
+    const currentValue = filterValues[filter.key];
+
+    switch (filter.type) {
+      case 'boolean': {
+        const checked = typeof currentValue === 'boolean' ? currentValue : false;
+        return (
+          <label
+            key={filter.key}
+            className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm"
+          >
+            <span className="flex flex-col">
+              <span className="font-medium text-foreground">{filter.label}</span>
+              {filter.description && <span className="text-xs text-muted-foreground">{filter.description}</span>}
+            </span>
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(event) => updateFilterValue(filter.key, event.target.checked ? true : undefined)}
+              className="h-4 w-4"
+            />
+          </label>
+        );
+      }
+      case 'select': {
+        const options = filter.options ?? [];
+        const isMulti = Boolean(filter.multi);
+        const selectedValues = Array.isArray(currentValue)
+          ? currentValue.map(String)
+          : typeof currentValue === 'string'
+            ? [currentValue]
+            : [];
+
+        if (options.length === 0) {
+          return (
+            <div key={filter.key} className="space-y-1">
+              <label className="block text-xs font-semibold uppercase text-muted-foreground">
+                {filter.label}
+              </label>
+              <input
+                type="text"
+                value={selectedValues.join(', ')}
+                onChange={(event) =>
+                  updateFilterValue(
+                    filter.key,
+                    event.target.value ? event.target.value.split(',').map((value) => value.trim()) : undefined,
+                  )
+                }
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter comma-separated values"
+              />
+              {filter.description && <p className="text-xs text-muted-foreground">{filter.description}</p>}
+            </div>
+          );
+        }
+
+        return (
+          <div key={filter.key} className="space-y-1">
+            <label className="block text-xs font-semibold uppercase text-muted-foreground">{filter.label}</label>
+            <select
+              value={isMulti ? selectedValues : selectedValues[0] ?? ''}
+              multiple={isMulti}
+              onChange={(event) => {
+                if (isMulti) {
+                  const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+                  updateFilterValue(filter.key, values.length > 0 ? values : undefined);
+                } else {
+                  const value = event.target.value;
+                  updateFilterValue(filter.key, value ? value : undefined);
+                }
+              }}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            >
+              {!isMulti && <option value="">Any</option>}
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {filter.description && <p className="text-xs text-muted-foreground">{filter.description}</p>}
+          </div>
+        );
+      }
+      case 'number': {
+        const value = typeof currentValue === 'number' ? currentValue : currentValue ?? '';
+        return (
+          <div key={filter.key} className="space-y-1">
+            <label className="block text-xs font-semibold uppercase text-muted-foreground">{filter.label}</label>
+            <input
+              type="number"
+              value={value}
+              onChange={(event) => {
+                const raw = event.target.value;
+                updateFilterValue(filter.key, raw === '' ? undefined : Number(raw));
+              }}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              placeholder={filter.description}
+            />
+            {filter.description && <p className="text-xs text-muted-foreground">{filter.description}</p>}
+          </div>
+        );
+      }
+      case 'text': {
+        return (
+          <div key={filter.key} className="space-y-1">
+            <label className="block text-xs font-semibold uppercase text-muted-foreground">{filter.label}</label>
+            <input
+              type="text"
+              value={typeof currentValue === 'string' ? currentValue : ''}
+              onChange={(event) => updateFilterValue(filter.key, event.target.value || undefined)}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              placeholder={filter.description}
+            />
+            {filter.description && <p className="text-xs text-muted-foreground">{filter.description}</p>}
+          </div>
+        );
+      }
+      case 'date':
+      default: {
+        return (
+          <div key={filter.key} className="space-y-1">
+            <label className="block text-xs font-semibold uppercase text-muted-foreground">{filter.label}</label>
+            <input
+              type="date"
+              value={typeof currentValue === 'string' ? currentValue : ''}
+              onChange={(event) => updateFilterValue(filter.key, event.target.value || undefined)}
+              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            />
+            {filter.description && <p className="text-xs text-muted-foreground">{filter.description}</p>}
+          </div>
+        );
+      }
+    }
+  };
+
   const handleSave = () => {
     setValidationError(null);
     if (!selectedKey || !currentDefinition) {
@@ -984,6 +1177,48 @@ function CollectionEditorModal({
       setValidationError('Select at least one field to send to Gemini.');
       return;
     }
+
+    const sanitizedFilters = (() => {
+      if (!currentDefinition?.filters || currentDefinition.filters.length === 0) {
+        return undefined;
+      }
+
+      const result: Record<string, unknown> = {};
+      currentDefinition.filters.forEach((filter) => {
+        const raw = filterValues[filter.key];
+        switch (filter.type) {
+          case 'boolean':
+            if (raw === true) {
+              result[filter.key] = true;
+            }
+            break;
+          case 'number':
+            if (typeof raw === 'number' && Number.isFinite(raw)) {
+              result[filter.key] = raw;
+            }
+            break;
+          case 'select':
+            if (filter.multi) {
+              const values = Array.isArray(raw) ? raw.map((value) => String(value)).filter(Boolean) : [];
+              if (values.length > 0) {
+                result[filter.key] = values;
+              }
+            } else if (typeof raw === 'string' && raw.trim().length > 0) {
+              result[filter.key] = raw.trim();
+            }
+            break;
+          case 'text':
+          case 'date':
+          default:
+            if (typeof raw === 'string' && raw.trim().length > 0) {
+              result[filter.key] = raw.trim();
+            }
+            break;
+        }
+      });
+
+      return Object.keys(result).length > 0 ? result : undefined;
+    })();
 
     const selectedFields = selectedFieldKeys.map((fieldKey, index) => {
       const definitionField = availableFields.find((field) => field.key === fieldKey);
@@ -997,6 +1232,21 @@ function CollectionEditorModal({
       };
     });
 
+    const existingMetadata =
+      initialValue?.metadata && typeof initialValue.metadata === 'object' && !Array.isArray(initialValue.metadata)
+        ? { ...(initialValue.metadata as Record<string, unknown>) }
+        : {};
+
+    if ('filters' in existingMetadata) {
+      delete existingMetadata.filters;
+    }
+
+    if (sanitizedFilters) {
+      existingMetadata.filters = sanitizedFilters;
+    }
+
+    const metadata = Object.keys(existingMetadata).length > 0 ? existingMetadata : null;
+
     onSubmit({
       id: initialValue?.id,
       collectionKey: selectedKey,
@@ -1005,7 +1255,7 @@ function CollectionEditorModal({
       format,
       limit,
       order: initialValue?.order ?? 0,
-      metadata: initialValue?.metadata ?? null,
+      metadata,
       fields: selectedFields,
     });
   };
@@ -1021,7 +1271,7 @@ function CollectionEditorModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-3xl rounded-xl border border-border bg-card shadow-2xl">
+      <div className="w-full max-w-3xl rounded-xl border border-border bg-card-elevated shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-500" />
@@ -1055,6 +1305,7 @@ function CollectionEditorModal({
                     setLimit(definition.defaultLimit);
                   }
                   setSelectedFieldKeys([]);
+                  setFilterValues({});
                 }}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
@@ -1119,6 +1370,15 @@ function CollectionEditorModal({
                 prompt.
               </div>
             </div>
+
+            {currentDefinition?.filters && currentDefinition.filters.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold uppercase text-muted-foreground">Filters</label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {currentDefinition.filters.map((filter) => renderFilterControl(filter))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">

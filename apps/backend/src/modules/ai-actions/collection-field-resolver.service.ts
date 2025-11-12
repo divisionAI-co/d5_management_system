@@ -15,6 +15,15 @@ interface CollectionFieldSelector<T> {
   select: (row: T) => unknown;
 }
 
+interface CollectionFilterDefinition {
+  key: string;
+  label: string;
+  type: 'date' | 'text' | 'select' | 'boolean' | 'number';
+  description?: string;
+  options?: Array<{ value: string; label: string }>;
+  multi?: boolean;
+}
+
 export interface CollectionDefinition<T> {
   key: AiCollectionKey;
   label: string;
@@ -22,7 +31,8 @@ export interface CollectionDefinition<T> {
   defaultLimit: number;
   defaultFormat: AiCollectionFormat;
   fields: CollectionFieldSelector<T>[];
-  resolve: (params: { entityId: string; limit: number }) => Promise<T[]>;
+  filters?: CollectionFilterDefinition[];
+  resolve: (params: { entityId: string; limit: number; filters?: Record<string, unknown> | undefined }) => Promise<T[]>;
   format?: AiCollectionFormat[];
 }
 
@@ -33,6 +43,7 @@ export interface CollectionSummary {
   defaultLimit: number;
   defaultFormat: AiCollectionFormat;
   supportedFormats: AiCollectionFormat[];
+  filters?: CollectionFilterDefinition[];
 }
 
 export interface CollectionFieldMetadata {
@@ -115,12 +126,140 @@ type EodReportPayload = Prisma.EodReportGetPayload<{
     hoursWorked: true;
     isLate: true;
     submittedAt: true;
+    tasksWorkedOn: true;
   };
 }>;
 
 @Injectable()
 export class CollectionFieldResolver {
   constructor(private readonly prisma: PrismaService) {}
+
+  private formatEodTasks(tasks: Prisma.JsonValue | null | undefined): string | null {
+    if (!tasks) {
+      return null;
+    }
+
+    if (typeof tasks === 'string') {
+      return tasks.trim();
+    }
+
+    let entries: unknown[] = [];
+    if (Array.isArray(tasks)) {
+      entries = tasks;
+    } else {
+      entries = [tasks];
+    }
+
+    const lines = entries
+      .map((entry) => {
+        if (typeof entry === 'string') {
+          return entry.trim();
+        }
+
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>;
+          const clientDetails = this.safeString(record.clientDetails);
+          const ticket = this.safeString(record.ticket);
+          const workType = this.safeString(record.typeOfWorkDone);
+          const lifecycle = this.safeString(record.taskLifecycle);
+          const status = this.safeString(record.taskStatus);
+          const estimated = this.toNumber(record.taskEstimatedTime);
+          const spent = this.toNumber(record.timeSpentOnTicket);
+
+          const parts: string[] = [];
+          if (clientDetails) {
+            parts.push(clientDetails);
+          }
+          if (ticket) {
+            parts.push(`#${ticket}`);
+          }
+          if (workType) {
+            parts.push(workType.replace(/_/g, ' '));
+          }
+          if (lifecycle) {
+            parts.push(`Lifecycle: ${lifecycle.replace(/_/g, ' ')}`);
+          }
+          if (status) {
+            parts.push(`Status: ${status.replace(/_/g, ' ')}`);
+          }
+          if (estimated !== null) {
+            parts.push(`Est: ${estimated}h`);
+          }
+          if (spent !== null) {
+            parts.push(`Spent: ${spent}h`);
+          }
+
+          if (parts.length === 0) {
+            return null;
+          }
+          return parts.join(' • ');
+        }
+
+        return null;
+      })
+      .filter((line): line is string => !!line && line.trim().length > 0);
+
+    if (lines.length === 0) {
+      return null;
+    }
+
+    return lines.map((line, index) => `${index + 1}. ${line}`).join('\n');
+  }
+
+  private safeString(value: unknown): string | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (typeof value === 'string') {
+      return value.trim();
+    }
+    return String(value);
+  }
+
+  private toNumber(value: unknown): number | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Number(numeric.toFixed(2)) : null;
+  }
+
+  private parseDate(value: unknown): Date | undefined {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return undefined;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+  }
+
+  private parseBoolean(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) {
+        return true;
+      }
+      if (['false', '0', 'no', 'n', 'off'].includes(normalized)) {
+        return false;
+      }
+    }
+    return undefined;
+  }
+
+  private parseStringArray(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.map((entry) => String(entry)).filter((entry) => entry.trim().length > 0);
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+    }
+    return [];
+  }
 
   private readonly definitions: Partial<Record<AiEntityType, CollectionMap<any>>> = {
     EMPLOYEE: {
@@ -130,6 +269,26 @@ export class CollectionFieldResolver {
         description: 'Recent end-of-day reports submitted by this employee.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Start date',
+            type: 'date',
+            description: 'Include reports on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'End date',
+            type: 'date',
+            description: 'Include reports on or before this date',
+          },
+          {
+            key: 'lateOnly',
+            label: 'Late submissions only',
+            type: 'boolean',
+            description: 'Show only reports submitted after the deadline',
+          },
+        ],
         fields: [
           { key: 'date', label: 'Date', description: 'Report date', select: (report: EodReportPayload) => report.date },
           {
@@ -137,6 +296,12 @@ export class CollectionFieldResolver {
             label: 'Summary',
             description: 'Daily summary of accomplishments',
             select: (report: EodReportPayload) => report.summary,
+          },
+          {
+            key: 'tasksWorkedOn',
+            label: 'Tasks',
+            description: 'Tasks worked on during the day',
+            select: (report: EodReportPayload) => this.formatEodTasks(report.tasksWorkedOn),
           },
           {
             key: 'hoursWorked',
@@ -157,7 +322,11 @@ export class CollectionFieldResolver {
             select: (report: EodReportPayload) => report.submittedAt,
           },
         ],
-        resolve: async ({ entityId, limit }) => {
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const lateOnly = this.parseBoolean(filters?.lateOnly);
+
           const employee = await this.prisma.employee.findUnique({
             where: { id: entityId },
             select: { userId: true },
@@ -167,8 +336,23 @@ export class CollectionFieldResolver {
             return [];
           }
 
+          const where: Prisma.EodReportWhereInput = {
+            userId: employee.userId,
+          };
+
+          if (startDate || endDate) {
+            where.date = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          if (lateOnly === true) {
+            where.isLate = true;
+          }
+
           return this.prisma.eodReport.findMany({
-            where: { userId: employee.userId },
+            where,
             orderBy: { date: 'desc' },
             take: limit,
             select: {
@@ -178,6 +362,7 @@ export class CollectionFieldResolver {
               hoursWorked: true,
               isLate: true,
               submittedAt: true,
+              tasksWorkedOn: true,
             },
           });
         },
@@ -188,6 +373,20 @@ export class CollectionFieldResolver {
         description: 'Current tasks assigned to this employee.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Due on/after',
+            type: 'date',
+            description: 'Include tasks due on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Due on/before',
+            type: 'date',
+            description: 'Include tasks due on or before this date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (task: TaskPayload) => task.title },
           { key: 'status', label: 'Status', select: (task: TaskPayload) => task.status },
@@ -195,7 +394,10 @@ export class CollectionFieldResolver {
           { key: 'dueDate', label: 'Due Date', select: (task: TaskPayload) => task.dueDate },
           { key: 'createdAt', label: 'Created', select: (task: TaskPayload) => task.createdAt },
         ],
-        resolve: async ({ entityId, limit }) => {
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
           const employee = await this.prisma.employee.findUnique({
             where: { id: entityId },
             select: { userId: true },
@@ -203,8 +405,20 @@ export class CollectionFieldResolver {
           if (!employee?.userId) {
             return [];
           }
+
+          const where: Prisma.TaskWhereInput = {
+            assignedToId: employee.userId,
+          };
+
+          if (startDate || endDate) {
+            where.dueDate = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
           return this.prisma.task.findMany({
-            where: { assignedToId: employee.userId },
+            where,
             orderBy: { dueDate: 'asc' },
             take: limit,
             select: {
@@ -224,6 +438,20 @@ export class CollectionFieldResolver {
         description: 'Most recent activities related to this employee.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+            description: 'Include activities logged on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+            description: 'Include activities logged on or before this date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (activity: ActivityPayload) => activity.subject },
           {
@@ -234,9 +462,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (activity: ActivityPayload) => activity.createdAt },
           { key: 'body', label: 'Details', select: (activity: ActivityPayload) => activity.body },
         ],
-        resolve: async ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { employeeId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            employeeId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -246,7 +488,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
     },
     CUSTOMER: {
@@ -256,6 +499,20 @@ export class CollectionFieldResolver {
         description: 'Opportunities linked to this customer.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Updated on/after',
+            type: 'date',
+            description: 'Include opportunities updated on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Updated on/before',
+            type: 'date',
+            description: 'Include opportunities updated on or before this date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (row: OpportunityPayload) => row.title },
           { key: 'stage', label: 'Stage', select: (row: OpportunityPayload) => row.stage },
@@ -267,9 +524,23 @@ export class CollectionFieldResolver {
           },
           { key: 'updatedAt', label: 'Updated', select: (row: OpportunityPayload) => row.updatedAt },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.opportunity.findMany({
-            where: { customerId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.OpportunityWhereInput = {
+            customerId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.updatedAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.opportunity.findMany({
+            where,
             orderBy: { updatedAt: 'desc' },
             take: limit,
             select: {
@@ -280,7 +551,8 @@ export class CollectionFieldResolver {
               value: true,
               updatedAt: true,
             },
-          }),
+          });
+        },
       },
       [AiCollectionKey.LEADS]: {
         key: AiCollectionKey.LEADS,
@@ -288,6 +560,20 @@ export class CollectionFieldResolver {
         description: 'Leads converted into this customer.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+            description: 'Include leads created on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+            description: 'Include leads created on or before this date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (row: LeadPayload) => row.title },
           { key: 'status', label: 'Status', select: (row: LeadPayload) => row.status },
@@ -299,9 +585,23 @@ export class CollectionFieldResolver {
           { key: 'source', label: 'Source', select: (row: LeadPayload) => row.source },
           { key: 'createdAt', label: 'Created', select: (row: LeadPayload) => row.createdAt },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.lead.findMany({
-            where: { convertedCustomerId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.LeadWhereInput = {
+            convertedCustomerId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.lead.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -312,7 +612,8 @@ export class CollectionFieldResolver {
               source: true,
               createdAt: true,
             },
-          }),
+          });
+        },
       },
       [AiCollectionKey.ACTIVITIES]: {
         key: AiCollectionKey.ACTIVITIES,
@@ -320,6 +621,20 @@ export class CollectionFieldResolver {
         description: 'Latest activities involving this customer.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+            description: 'Include activities logged on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+            description: 'Include activities logged on or before this date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (row: ActivityPayload) => row.subject },
           {
@@ -330,9 +645,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (row: ActivityPayload) => row.createdAt },
           { key: 'body', label: 'Details', select: (row: ActivityPayload) => row.body },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { customerId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            customerId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -342,7 +671,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
       [AiCollectionKey.TASKS]: {
         key: AiCollectionKey.TASKS,
@@ -350,15 +680,41 @@ export class CollectionFieldResolver {
         description: 'Tasks associated with this customer.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Due on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Due on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (row: TaskPayload) => row.title },
           { key: 'status', label: 'Status', select: (row: TaskPayload) => row.status },
           { key: 'priority', label: 'Priority', select: (row: TaskPayload) => row.priority },
           { key: 'dueDate', label: 'Due Date', select: (row: TaskPayload) => row.dueDate },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.task.findMany({
-            where: { customerId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.TaskWhereInput = {
+            customerId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.dueDate = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.task.findMany({
+            where,
             orderBy: { dueDate: 'asc' },
             take: limit,
             select: {
@@ -369,7 +725,8 @@ export class CollectionFieldResolver {
               dueDate: true,
               createdAt: true,
             },
-          }),
+          });
+        },
       },
     },
     LEAD: {
@@ -379,6 +736,18 @@ export class CollectionFieldResolver {
         description: 'Opportunities created from this lead.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Updated on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Updated on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (row: OpportunityPayload) => row.title },
           { key: 'stage', label: 'Stage', select: (row: OpportunityPayload) => row.stage },
@@ -389,9 +758,23 @@ export class CollectionFieldResolver {
           },
           { key: 'updatedAt', label: 'Updated', select: (row: OpportunityPayload) => row.updatedAt },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.opportunity.findMany({
-            where: { leadId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.OpportunityWhereInput = {
+            leadId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.updatedAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.opportunity.findMany({
+            where,
             orderBy: { updatedAt: 'desc' },
             take: limit,
             select: {
@@ -402,7 +785,8 @@ export class CollectionFieldResolver {
               value: true,
               updatedAt: true,
             },
-          }),
+          });
+        },
       },
       [AiCollectionKey.ACTIVITIES]: {
         key: AiCollectionKey.ACTIVITIES,
@@ -410,6 +794,18 @@ export class CollectionFieldResolver {
         description: 'Latest activities for this lead.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (row: ActivityPayload) => row.subject },
           {
@@ -420,9 +816,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (row: ActivityPayload) => row.createdAt },
           { key: 'body', label: 'Details', select: (row: ActivityPayload) => row.body },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { leadId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            leadId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -432,7 +842,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
     },
     OPPORTUNITY: {
@@ -475,6 +886,18 @@ export class CollectionFieldResolver {
         description: 'Latest activities for this opportunity.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (row: ActivityPayload) => row.subject },
           {
@@ -485,9 +908,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (row: ActivityPayload) => row.createdAt },
           { key: 'body', label: 'Details', select: (row: ActivityPayload) => row.body },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { opportunityId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            opportunityId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -497,7 +934,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
     },
     CANDIDATE: {
@@ -507,6 +945,18 @@ export class CollectionFieldResolver {
         description: 'Opportunities linked via candidate positions.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Updated on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Updated on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (row: OpportunityPayload) => row.title },
           { key: 'stage', label: 'Stage', select: (row: OpportunityPayload) => row.stage },
@@ -517,7 +967,10 @@ export class CollectionFieldResolver {
             select: (row: OpportunityPayload) => row.value ? row.value.toNumber?.() ?? row.value : null,
           },
         ],
-        resolve: async ({ entityId, limit }) => {
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
           const positions: CandidateOpportunityPayload[] = await this.prisma.candidatePosition.findMany({
             where: { candidateId: entityId },
             take: limit,
@@ -539,9 +992,30 @@ export class CollectionFieldResolver {
             },
           });
 
-          return positions
+          const opportunities = positions
             .map((position) => position.position?.opportunity)
             .filter((opportunity): opportunity is OpportunityPayload => Boolean(opportunity));
+
+          if (!startDate && !endDate) {
+            return opportunities;
+          }
+
+          return opportunities.filter((opportunity) => {
+            if (!opportunity?.updatedAt) {
+              return false;
+            }
+            const updatedAt = new Date(opportunity.updatedAt);
+            if (Number.isNaN(updatedAt.getTime())) {
+              return false;
+            }
+            if (startDate && updatedAt < startDate) {
+              return false;
+            }
+            if (endDate && updatedAt > endDate) {
+              return false;
+            }
+            return true;
+          });
         },
       },
       [AiCollectionKey.ACTIVITIES]: {
@@ -550,6 +1024,18 @@ export class CollectionFieldResolver {
         description: 'Latest activities logged for this candidate.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (row: ActivityPayload) => row.subject },
           {
@@ -560,9 +1046,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (row: ActivityPayload) => row.createdAt },
           { key: 'body', label: 'Details', select: (row: ActivityPayload) => row.body },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { candidateId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            candidateId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -572,7 +1072,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
     },
     CONTACT: {
@@ -582,14 +1083,40 @@ export class CollectionFieldResolver {
         description: 'Leads associated with this contact.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'title', label: 'Title', select: (row: LeadPayload) => row.title },
           { key: 'status', label: 'Status', select: (row: LeadPayload) => row.status },
           { key: 'createdAt', label: 'Created', select: (row: LeadPayload) => row.createdAt },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.lead.findMany({
-            where: { contactId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.LeadWhereInput = {
+            contactId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.lead.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -600,7 +1127,8 @@ export class CollectionFieldResolver {
               source: true,
               createdAt: true,
             },
-          }),
+          });
+        },
       },
       [AiCollectionKey.ACTIVITIES]: {
         key: AiCollectionKey.ACTIVITIES,
@@ -608,6 +1136,18 @@ export class CollectionFieldResolver {
         description: 'Latest activities for this contact.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (row: ActivityPayload) => row.subject },
           {
@@ -618,9 +1158,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (row: ActivityPayload) => row.createdAt },
           { key: 'body', label: 'Details', select: (row: ActivityPayload) => row.body },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { contactId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            contactId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -630,7 +1184,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
     },
     TASK: {
@@ -640,6 +1195,18 @@ export class CollectionFieldResolver {
         description: 'Latest activities related to this task.',
         defaultLimit: 5,
         defaultFormat: AiCollectionFormat.BULLET_LIST,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+        ],
         fields: [
           { key: 'subject', label: 'Subject', select: (row: ActivityPayload) => row.subject },
           {
@@ -650,9 +1217,23 @@ export class CollectionFieldResolver {
           { key: 'createdAt', label: 'Created', select: (row: ActivityPayload) => row.createdAt },
           { key: 'body', label: 'Details', select: (row: ActivityPayload) => row.body },
         ],
-        resolve: ({ entityId, limit }) =>
-          this.prisma.activity.findMany({
-            where: { taskId: entityId },
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+
+          const where: Prisma.ActivityWhereInput = {
+            taskId: entityId,
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.activity.findMany({
+            where,
             orderBy: { createdAt: 'desc' },
             take: limit,
             select: {
@@ -662,7 +1243,8 @@ export class CollectionFieldResolver {
               body: true,
               activityType: { select: { name: true } },
             },
-          }),
+          });
+        },
       },
     },
   };
@@ -685,6 +1267,7 @@ export class CollectionFieldResolver {
           definition.defaultFormat,
           ...Object.values(AiCollectionFormat).filter((format) => format !== definition.defaultFormat),
         ],
+        filters: definition.filters ?? [],
       }));
   }
 
@@ -738,6 +1321,7 @@ export class CollectionFieldResolver {
     collectionKey: AiCollectionKey;
     limit?: number;
     fieldKeys: string[];
+    filters?: Record<string, unknown>;
   }): Promise<Array<Record<string, unknown>>> {
     const definition = this.getCollectionDefinition(params.entityType, params.collectionKey);
     if (!definition) {
@@ -747,6 +1331,7 @@ export class CollectionFieldResolver {
     const rows = await definition.resolve({
       entityId: params.entityId,
       limit: params.limit ?? definition.defaultLimit,
+      filters: params.filters,
     });
 
     const fieldSelectors = definition.fields.filter((field) => params.fieldKeys.includes(field.key));

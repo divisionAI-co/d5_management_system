@@ -40,7 +40,7 @@ export const useThemeStore = create<ThemeStore>()(
       },
     }),
     {
-      name: 'd5-theme-storage',
+      name: 'division5-theme-storage',
       onRehydrateStorage: () => (state) => {
         const restoredTheme = state?.theme ?? 'dark';
         applyThemeToDocument(restoredTheme);

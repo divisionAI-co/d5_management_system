@@ -31,6 +31,7 @@ export const ROLE_PERMISSIONS = {
   HOLIDAYS_SETTINGS: ['ADMIN', 'HR'],
   DOCUMENTS: ['ADMIN', 'HR'],
   AI_ACTIONS: ['ADMIN'],
+  REMOTE_WORK: ALL_ROLES,
 } satisfies Record<string, UserRole[]>;
 
 

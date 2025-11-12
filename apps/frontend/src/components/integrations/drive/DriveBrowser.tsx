@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Folder, FileText, ArrowLeft, RefreshCcw, Upload, Download, Edit, Trash2, Search, ListTree, Link as LinkIcon, Check } from 'lucide-react';
 
 import { googleDriveApi } from '@/lib/api/google-drive';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type { DriveFile } from '@/types/integrations';
 
 type Breadcrumb = {
@@ -40,6 +41,7 @@ export function DriveBrowser() {
   const [activeSearch, setActiveSearch] = useState('');
   const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [recursiveSearch, setRecursiveSearch] = useState(false);
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null);
 
@@ -55,6 +57,14 @@ export function DriveBrowser() {
         recursive: recursiveSearch || undefined,
       }),
   });
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      setListError('Unable to load Google Drive files right now. Please try again later.');
+    } else if (listQuery.isSuccess) {
+      setListError(null);
+    }
+  }, [listQuery.isError, listQuery.isSuccess]);
 
   const uploadMutation = useMutation({
     mutationFn: ({ file, parent }: { file: File; parent?: string }) =>
@@ -238,12 +248,29 @@ export function DriveBrowser() {
     downloadingFileId !== null;
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-border px-6 py-4 md:flex-row md:items-center md:justify-between">
+    <>
+      {actionError && (
+        <FeedbackToast
+          message={actionError}
+          onDismiss={() => setActionError(null)}
+          tone="error"
+        />
+      )}
+
+      {listError && (
+        <FeedbackToast
+          message={listError}
+          onDismiss={() => setListError(null)}
+          tone="error"
+        />
+      )}
+
+      <div className="rounded-xl border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-border px-6 py-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Google Drive</h2>
           <p className="text-sm text-muted-foreground">
-            Browse and manage files stored in your shared Google Drive without leaving D5.
+            Browse and manage files stored in your shared Google Drive without leaving division5.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -273,19 +300,7 @@ export function DriveBrowser() {
         </div>
       </div>
 
-      <div className="space-y-4 px-6 py-6">
-        {actionError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {actionError}
-            <button
-              type="button"
-              className="ml-2 text-xs font-semibold uppercase hover:underline"
-              onClick={() => setActionError(null)}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        <div className="space-y-4 px-6 py-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -473,13 +488,9 @@ export function DriveBrowser() {
           </p>
         )}
 
-        {listQuery.isError && (
-          <p className="text-sm text-red-600">
-            Unable to load Google Drive files right now. Please try again later.
-          </p>
-        )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

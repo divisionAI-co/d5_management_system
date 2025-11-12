@@ -714,24 +714,27 @@ model NationalHoliday {
 }
 
 model CompanySettings {
-  id                    String   @id @default(uuid())
+  id                       String   @id @default(uuid())
   
   // Remote Work Policy
-  remoteWorkFrequency   String   @default("WEEKLY") // WEEKLY, MONTHLY, etc.
-  remoteWorkLimit       Int      @default(1) // Number of times per period
+  remoteWorkFrequency      String   @default("WEEKLY") // WEEKLY, MONTHLY, etc.
+  remoteWorkLimit          Int      @default(3) // Number of times per period
+  remoteWorkWindowOpen     Boolean  @default(false)
+  remoteWorkWindowStart    DateTime?
+  remoteWorkWindowEnd      DateTime?
   
   // EOD Settings
-  eodGraceDays          Int      @default(2)
-  eodReportDeadlineHour Int      @default(23)
-  eodReportDeadlineMin  Int      @default(59)
+  eodGraceDays             Int      @default(2)
+  eodReportDeadlineHour    Int      @default(23)
+  eodReportDeadlineMin     Int      @default(59)
   
   // Performance Review
-  reviewCycleDays       Int      @default(180) // 6 months
+  reviewCycleDays          Int      @default(180) // 6 months
 
   // Leave Policy
-  annualLeaveAllowanceDays Int @default(20)
+  annualLeaveAllowanceDays Int      @default(20)
   
-  updatedAt             DateTime @updatedAt
+  updatedAt                DateTime @updatedAt
   
   @@map("company_settings")
 }

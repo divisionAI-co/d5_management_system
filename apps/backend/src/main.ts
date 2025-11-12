@@ -47,7 +47,7 @@ async function bootstrap() {
 
   // Swagger API Documentation
   const config = new DocumentBuilder()
-    .setTitle('D5 Management System API')
+    .setTitle('division5 API')
     .setDescription('Integrated Business Management Platform - REST API Documentation')
     .setVersion('1.0')
     .addBearerAuth()
@@ -83,7 +83,7 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`
-    🚀 D5 Management System API is running!
+    🚀 division5 API is running!
     📝 API: http://localhost:${port}/${apiPrefix}
     📚 Docs: http://localhost:${port}/${apiPrefix}/docs
     🌍 Environment: ${configService.get<string>('NODE_ENV', 'development')}

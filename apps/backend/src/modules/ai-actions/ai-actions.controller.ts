@@ -68,6 +68,12 @@ export class AiActionsController {
     return this.aiActionsService.listCollectionFields(entityType, collectionKey);
   }
 
+  @Get('attachments')
+  @ApiOperation({ summary: 'List Gemini action attachments for an entity' })
+  listAttachments(@Query() query: ListAiActionAttachmentsDto) {
+    return this.aiActionsService.listAttachments(query);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get Gemini action details' })
   get(@Param('id') id: string) {
@@ -89,6 +95,12 @@ export class AiActionsController {
     return this.aiActionsService.update(id, dto);
   }
 
+  @Delete('attachments/:attachmentId')
+  @ApiOperation({ summary: 'Detach a Gemini action from an entity instance' })
+  detach(@Param('attachmentId') attachmentId: string, @CurrentUser('id') userId: string) {
+    return this.aiActionsService.detach(attachmentId, userId);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a Gemini action' })
   remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
@@ -103,18 +115,6 @@ export class AiActionsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.aiActionsService.attach(actionId, dto, userId);
-  }
-
-  @Delete('attachments/:attachmentId')
-  @ApiOperation({ summary: 'Detach a Gemini action from an entity instance' })
-  detach(@Param('attachmentId') attachmentId: string, @CurrentUser('id') userId: string) {
-    return this.aiActionsService.detach(attachmentId, userId);
-  }
-
-  @Get('attachments')
-  @ApiOperation({ summary: 'List Gemini action attachments for an entity' })
-  listAttachments(@Query() query: ListAiActionAttachmentsDto) {
-    return this.aiActionsService.listAttachments(query);
   }
 
   @Post(':id/execute')

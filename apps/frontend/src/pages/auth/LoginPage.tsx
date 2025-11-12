@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import apiClient from '@/lib/api/client';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -34,22 +35,22 @@ export default function LoginPage() {
   };
 
   return (
+    <>
+      {error && (
+        <FeedbackToast message={error} onDismiss={() => setError('')} tone="error" />
+      )}
+
     <div className="min-h-screen flex items-center justify-center bg-muted py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-foreground">
-            D5 Management System
+            division5
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
             Sign in to your account
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">
@@ -97,12 +98,13 @@ export default function LoginPage() {
 
           <div className="text-center text-sm text-muted-foreground">
             <p>Test Accounts:</p>
-            <p>admin@d5.com / admin123</p>
-            <p>sales@d5.com / sales123</p>
+            <p>admin@division5.com / admin123</p>
+            <p>sales@division5.com / sales123</p>
           </div>
         </form>
       </div>
     </div>
+    </>
   );
 }
 

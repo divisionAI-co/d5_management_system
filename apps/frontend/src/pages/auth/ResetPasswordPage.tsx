@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, Navigate, useSearchParams, useNavigate } from 'react-router-dom';
 import apiClient from '@/lib/api/client';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -67,7 +68,20 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted py-12 px-4 sm:px-6 lg:px-8">
+    <>
+      {error && (
+        <FeedbackToast message={error} onDismiss={() => setError(null)} tone="error" />
+      )}
+
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+
+      <div className="min-h-screen flex items-center justify-center bg-muted py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="bg-background shadow rounded-lg px-6 py-8">
           <h2 className="text-center text-3xl font-bold text-foreground">Reset Your Password</h2>
@@ -76,18 +90,6 @@ export default function ResetPasswordPage() {
           </p>
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="rounded-md bg-green-50 p-4">
-                <p className="text-sm text-green-800">{successMessage}</p>
-              </div>
-            )}
-
             <div className="space-y-4">
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-foreground">
@@ -144,6 +146,7 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

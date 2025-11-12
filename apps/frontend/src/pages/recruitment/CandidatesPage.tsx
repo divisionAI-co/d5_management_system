@@ -17,6 +17,7 @@ import { CandidateConvertToEmployeeModal } from '@/components/recruitment/Candid
 import { CandidateImportDialog } from '@/components/recruitment/CandidateImportDialog';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@prisma/client';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface LocalFilters {
   search?: string;
@@ -231,15 +232,11 @@ export default function CandidatesPage() {
       </div>
 
       {feedback && (
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          <span>{feedback}</span>
-          <button
-            onClick={() => setFeedback(null)}
-            className="text-xs font-semibold uppercase tracking-wide"
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       <CandidateBoard

@@ -1,7 +1,7 @@
 {
   "name": "@d5/backend",
   "version": "1.0.0",
-  "description": "D5 Management System - NestJS Backend API",
+  "description": "division5 - NestJS Backend API",
   "private": true,
   "scripts": {
     "dev": "nest start --watch",

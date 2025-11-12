@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { settingsApi } from '@/lib/api/settings';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   NotificationSettings,
   UpdateNotificationSettingsPayload,
@@ -186,14 +187,18 @@ export function NotificationPreferencesForm() {
         </div>
 
         {mutation.isSuccess && (
-          <p className="text-sm text-green-600">
-            Preferences updated successfully.
-          </p>
+          <FeedbackToast
+            message="Preferences updated successfully."
+            onDismiss={() => mutation.reset()}
+            tone="success"
+          />
         )}
         {mutation.isError && (
-          <p className="text-sm text-red-600">
-            Something went wrong. Please try again.
-          </p>
+          <FeedbackToast
+            message="Something went wrong. Please try again."
+            onDismiss={() => mutation.reset()}
+            tone="error"
+          />
         )}
       </form>
     </div>

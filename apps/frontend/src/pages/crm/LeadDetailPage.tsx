@@ -26,6 +26,7 @@ import { LeadForm } from '@/components/crm/leads/LeadForm';
 import { LeadStatusForm } from '@/components/crm/leads/LeadStatusForm';
 import { LeadConvertModal } from '@/components/crm/leads/LeadConvertModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const STATUS_COLORS: Record<string, string> = {
   NEW: 'bg-blue-100 text-blue-700',
@@ -207,15 +208,11 @@ export default function LeadDetailPage() {
       </header>
 
       {feedback ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}
-          <button
-            className="ml-3 text-xs font-semibold uppercase tracking-wide text-emerald-800"
-            onClick={() => setFeedback(null)}
-          >
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       ) : null}
 
       <section className="grid gap-6 lg:grid-cols-3">

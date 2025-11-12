@@ -18,6 +18,8 @@ import { RemoteWorkService } from './remote-work.service';
 import { CreateRemoteWorkLogDto } from './dto/create-remote-work-log.dto';
 import { UpdateRemoteWorkPolicyDto } from './dto/update-remote-work-policy.dto';
 import { EmployeesService } from '../employees/employees.service';
+import { OpenRemoteWindowDto } from './dto/open-remote-window.dto';
+import { SetRemotePreferencesDto } from './dto/set-remote-preferences.dto';
 
 @ApiTags('HR - Remote Work')
 @ApiBearerAuth()
@@ -78,10 +80,16 @@ export class RemoteWorkController {
 
   @Get('logs/my')
   @ApiOperation({ summary: 'Get remote work logs for current user' })
-  async findMine(@Request() req: any) {
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  async findMine(
+    @Request() req: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
     const user = req.user;
     await this.employeesService.findByUserId(user.id);
-    return this.remoteWorkService.findForUser(user.id);
+    return this.remoteWorkService.findForUser(user.id, { startDate, endDate });
   }
 
   @Get('policy')
@@ -95,6 +103,37 @@ export class RemoteWorkController {
   @ApiOperation({ summary: 'Update the remote work policy' })
   updatePolicy(@Body() updateDto: UpdateRemoteWorkPolicyDto) {
     return this.remoteWorkService.updatePolicy(updateDto);
+  }
+
+  @Get('window')
+  @ApiOperation({ summary: 'Get the current remote work window state' })
+  getWindowState() {
+    return this.remoteWorkService.getWindowState();
+  }
+
+  @Patch('window/open')
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Open a remote work submission window' })
+  openWindow(@Body() openDto: OpenRemoteWindowDto) {
+    return this.remoteWorkService.openWindow(openDto);
+  }
+
+  @Patch('window/close')
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Close the remote work submission window' })
+  closeWindow() {
+    return this.remoteWorkService.closeWindow();
+  }
+
+  @Post('preferences')
+  @ApiOperation({ summary: 'Set remote work preferences for the active window' })
+  async setPreferences(
+    @Request() req: any,
+    @Body() preferencesDto: SetRemotePreferencesDto,
+  ) {
+    const user = req.user;
+    const employee = await this.employeesService.findByUserId(user.id);
+    return this.remoteWorkService.setPreferences(user.id, employee.id, preferencesDto);
   }
 }
 

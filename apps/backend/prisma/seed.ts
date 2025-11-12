@@ -13,10 +13,10 @@ async function main() {
   
   const adminPassword = await bcrypt.hash('admin123', 10);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@d5.com' },
+    where: { email: 'admin@division5.com' },
     update: {},
     create: {
-      email: 'admin@d5.com',
+      email: 'admin@division5.com',
       password: adminPassword,
       firstName: 'Admin',
       lastName: 'User',
@@ -29,10 +29,10 @@ async function main() {
 
   const salesPassword = await bcrypt.hash('sales123', 10);
   const salesperson = await prisma.user.upsert({
-    where: { email: 'sales@d5.com' },
+    where: { email: 'sales@division5.com' },
     update: {},
     create: {
-      email: 'sales@d5.com',
+      email: 'sales@division5.com',
       password: salesPassword,
       firstName: 'John',
       lastName: 'Sales',
@@ -45,10 +45,10 @@ async function main() {
 
   const recruiterPassword = await bcrypt.hash('recruiter123', 10);
   const recruiter = await prisma.user.upsert({
-    where: { email: 'recruiter@d5.com' },
+    where: { email: 'recruiter@division5.com' },
     update: {},
     create: {
-      email: 'recruiter@d5.com',
+      email: 'recruiter@division5.com',
       password: recruiterPassword,
       firstName: 'Jane',
       lastName: 'Recruiter',
@@ -61,10 +61,10 @@ async function main() {
 
   const hrPassword = await bcrypt.hash('hr123', 10);
   const hr = await prisma.user.upsert({
-    where: { email: 'hr@d5.com' },
+    where: { email: 'hr@division5.com' },
     update: {},
     create: {
-      email: 'hr@d5.com',
+      email: 'hr@division5.com',
       password: hrPassword,
       firstName: 'Sarah',
       lastName: 'HR',
@@ -77,10 +77,10 @@ async function main() {
 
   const amPassword = await bcrypt.hash('manager123', 10);
   const accountManager = await prisma.user.upsert({
-    where: { email: 'manager@d5.com' },
+    where: { email: 'manager@division5.com' },
     update: {},
     create: {
-      email: 'manager@d5.com',
+      email: 'manager@division5.com',
       password: amPassword,
       firstName: 'Mike',
       lastName: 'Manager',
@@ -93,10 +93,10 @@ async function main() {
 
   const employeePassword = await bcrypt.hash('employee123', 10);
   const employee = await prisma.user.upsert({
-    where: { email: 'employee@d5.com' },
+    where: { email: 'employee@division5.com' },
     update: {},
     create: {
-      email: 'employee@d5.com',
+      email: 'employee@division5.com',
       password: employeePassword,
       firstName: 'Bob',
       lastName: 'Developer',
@@ -693,12 +693,12 @@ async function main() {
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
   console.log('👤 Test Users Created:');
-  console.log('  • Admin:           admin@d5.com           / admin123');
-  console.log('  • Salesperson:     sales@d5.com           / sales123');
-  console.log('  • Account Manager: manager@d5.com         / manager123');
-  console.log('  • Recruiter:       recruiter@d5.com       / recruiter123');
-  console.log('  • HR:              hr@d5.com              / hr123');
-  console.log('  • Employee:        employee@d5.com        / employee123');
+  console.log('  • Admin:           admin@division5.com           / admin123');
+  console.log('  • Salesperson:     sales@division5.com           / sales123');
+  console.log('  • Account Manager: manager@division5.com         / manager123');
+  console.log('  • Recruiter:       recruiter@division5.com       / recruiter123');
+  console.log('  • HR:              hr@division5.com              / hr123');
+  console.log('  • Employee:        employee@division5.com        / employee123');
   console.log('');
   console.log('🏢 Sample Data Created:');
   console.log('  • 3 Customers');

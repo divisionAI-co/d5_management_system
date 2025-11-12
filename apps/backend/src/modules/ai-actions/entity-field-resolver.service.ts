@@ -55,7 +55,114 @@ type OpportunitySnapshot = {
   } | null;
 };
 
-type EntitySnapshot = CandidateSnapshot | OpportunitySnapshot;
+type EmployeeSnapshot = {
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+  department: string | null;
+  jobTitle: string | null;
+  status: string;
+  contractType: string;
+  hireDate: Date | null;
+  terminationDate: Date | null;
+  salary: string | null;
+  salaryCurrency: string | null;
+  managerName: string | null;
+  managerEmail: string | null;
+  managerTitle: string | null;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
+  emergencyContactRelation: string | null;
+};
+
+type CustomerSnapshot = {
+  name: string;
+  email: string;
+  phone?: string | null;
+  website?: string | null;
+  industry?: string | null;
+  type: string;
+  status: string;
+  sentiment: string;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
+  monthlyValue?: Prisma.Decimal | null;
+  currency?: string | null;
+  notes?: string | null;
+  tags: string[];
+};
+
+type ContactSnapshot = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  role?: string | null;
+  companyName?: string | null;
+  linkedinUrl?: string | null;
+  notes?: string | null;
+  customer?: {
+    id: string;
+    name: string;
+  } | null;
+};
+
+type LeadSnapshot = {
+  title: string;
+  description?: string | null;
+  status: string;
+  value?: Prisma.Decimal | null;
+  probability?: number | null;
+  source?: string | null;
+  expectedCloseDate?: Date | null;
+  actualCloseDate?: Date | null;
+  lostReason?: string | null;
+  prospectCompanyName?: string | null;
+  prospectWebsite?: string | null;
+  prospectIndustry?: string | null;
+  assignedTo?: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  } | null;
+  contact: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    phone: string | null;
+  };
+};
+
+type TaskSnapshot = {
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  dueDate?: Date | null;
+  startDate?: Date | null;
+  completedAt?: Date | null;
+  tags: string[];
+  estimatedHours?: Prisma.Decimal | null;
+  actualHours?: Prisma.Decimal | null;
+  assignedTo?: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  } | null;
+  customerId?: string | null;
+};
+
+type EntitySnapshot =
+  | CandidateSnapshot
+  | OpportunitySnapshot
+  | EmployeeSnapshot
+  | CustomerSnapshot
+  | ContactSnapshot
+  | LeadSnapshot
+  | TaskSnapshot;
 
 @Injectable()
 export class EntityFieldResolver {
@@ -127,6 +234,411 @@ export class EntityFieldResolver {
       label: 'Recruitment notes',
       description: 'Internal notes captured by recruiters',
       select: (candidate) => candidate.notes,
+    },
+  ];
+
+  private readonly employeeFields: FieldSelector<EmployeeSnapshot>[] = [
+    {
+      key: 'fullName',
+      label: 'Full name',
+      description: 'Employee full name',
+      select: (employee) => {
+        const fullName = `${employee.firstName ?? ''} ${employee.lastName ?? ''}`.trim();
+        return fullName || employee.email;
+      },
+    },
+    {
+      key: 'email',
+      label: 'Work email',
+      select: (employee) => employee.email,
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      select: (employee) => employee.phone,
+    },
+    {
+      key: 'department',
+      label: 'Department',
+      select: (employee) => employee.department,
+    },
+    {
+      key: 'jobTitle',
+      label: 'Job title',
+      select: (employee) => employee.jobTitle,
+    },
+    {
+      key: 'status',
+      label: 'Employment status',
+      select: (employee) => employee.status,
+    },
+    {
+      key: 'contractType',
+      label: 'Contract type',
+      select: (employee) => employee.contractType,
+    },
+    {
+      key: 'hireDate',
+      label: 'Hire date',
+      description: 'ISO date string representing the hire date',
+      select: (employee) => (employee.hireDate ? employee.hireDate.toISOString().split('T')[0] : null),
+    },
+    {
+      key: 'tenureMonths',
+      label: 'Tenure (months)',
+      description: 'Approximate number of months employed',
+      select: (employee) => {
+        if (!employee.hireDate) {
+          return null;
+        }
+        const endDate = employee.terminationDate ?? new Date();
+        const diffMs = endDate.getTime() - employee.hireDate.getTime();
+        const months = diffMs / (1000 * 60 * 60 * 24 * 30.4375);
+        return Math.max(0, Math.round(months));
+      },
+    },
+    {
+      key: 'managerName',
+      label: 'Manager name',
+      select: (employee) => employee.managerName,
+    },
+    {
+      key: 'managerEmail',
+      label: 'Manager email',
+      select: (employee) => employee.managerEmail,
+    },
+    {
+      key: 'managerTitle',
+      label: 'Manager job title',
+      select: (employee) => employee.managerTitle,
+    },
+    {
+      key: 'salaryDisplay',
+      label: 'Salary (display)',
+      description: 'Formatted salary including currency',
+      select: (employee) => {
+        if (!employee.salary) {
+          return null;
+        }
+        const currency = employee.salaryCurrency ?? 'USD';
+        return `${currency} ${employee.salary}`;
+      },
+    },
+    {
+      key: 'salaryAmount',
+      label: 'Salary amount',
+      description: 'Raw salary value without currency formatting',
+      select: (employee) => employee.salary,
+    },
+    {
+      key: 'salaryCurrency',
+      label: 'Salary currency',
+      select: (employee) => employee.salaryCurrency,
+    },
+    {
+      key: 'emergencyContactName',
+      label: 'Emergency contact name',
+      select: (employee) => employee.emergencyContactName,
+    },
+    {
+      key: 'emergencyContactPhone',
+      label: 'Emergency contact phone',
+      select: (employee) => employee.emergencyContactPhone,
+    },
+    {
+      key: 'emergencyContactRelation',
+      label: 'Emergency contact relation',
+      select: (employee) => employee.emergencyContactRelation,
+    },
+  ];
+
+  private readonly customerFields: FieldSelector<CustomerSnapshot>[] = [
+    {
+      key: 'name',
+      label: 'Customer name',
+      select: (customer) => customer.name,
+    },
+    {
+      key: 'email',
+      label: 'Customer email',
+      select: (customer) => customer.email,
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      select: (customer) => customer.phone,
+    },
+    {
+      key: 'website',
+      label: 'Website',
+      select: (customer) => customer.website,
+    },
+    {
+      key: 'industry',
+      label: 'Industry',
+      select: (customer) => customer.industry,
+    },
+    {
+      key: 'type',
+      label: 'Customer type',
+      select: (customer) => customer.type,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      select: (customer) => customer.status,
+    },
+    {
+      key: 'sentiment',
+      label: 'Sentiment',
+      select: (customer) => customer.sentiment,
+    },
+    {
+      key: 'address',
+      label: 'Address',
+      select: (customer) => customer.address,
+    },
+    {
+      key: 'city',
+      label: 'City',
+      select: (customer) => customer.city,
+    },
+    {
+      key: 'country',
+      label: 'Country',
+      select: (customer) => customer.country,
+    },
+    {
+      key: 'postalCode',
+      label: 'Postal code',
+      select: (customer) => customer.postalCode,
+    },
+    {
+      key: 'monthlyValue',
+      label: 'Monthly value',
+      description: 'Recurring revenue value as string',
+      select: (customer) => (customer.monthlyValue ? customer.monthlyValue.toString() : null),
+    },
+    {
+      key: 'currency',
+      label: 'Currency',
+      select: (customer) => customer.currency,
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      select: (customer) => customer.notes,
+    },
+    {
+      key: 'tags',
+      label: 'Tags',
+      description: 'Comma separated customer tags',
+      select: (customer) => (customer.tags.length ? customer.tags.join(', ') : null),
+    },
+  ];
+
+  private readonly contactFields: FieldSelector<ContactSnapshot>[] = [
+    {
+      key: 'fullName',
+      label: 'Full name',
+      select: (contact) => `${contact.firstName} ${contact.lastName}`.trim(),
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      select: (contact) => contact.email,
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      select: (contact) => contact.phone,
+    },
+    {
+      key: 'role',
+      label: 'Role',
+      select: (contact) => contact.role,
+    },
+    {
+      key: 'companyName',
+      label: 'Company name',
+      select: (contact) => contact.companyName,
+    },
+    {
+      key: 'linkedinUrl',
+      label: 'LinkedIn URL',
+      select: (contact) => contact.linkedinUrl,
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      select: (contact) => contact.notes,
+    },
+    {
+      key: 'customerName',
+      label: 'Associated customer',
+      select: (contact) => contact.customer?.name ?? null,
+    },
+  ];
+
+  private readonly leadFields: FieldSelector<LeadSnapshot>[] = [
+    {
+      key: 'title',
+      label: 'Lead title',
+      select: (lead) => lead.title,
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      select: (lead) => lead.description,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      select: (lead) => lead.status,
+    },
+    {
+      key: 'value',
+      label: 'Value',
+      select: (lead) => (lead.value ? lead.value.toString() : null),
+    },
+    {
+      key: 'probability',
+      label: 'Close probability',
+      select: (lead) => (lead.probability ?? null),
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      select: (lead) => lead.source,
+    },
+    {
+      key: 'expectedCloseDate',
+      label: 'Expected close date',
+      select: (lead) => (lead.expectedCloseDate ? lead.expectedCloseDate.toISOString().split('T')[0] : null),
+    },
+    {
+      key: 'actualCloseDate',
+      label: 'Actual close date',
+      select: (lead) => (lead.actualCloseDate ? lead.actualCloseDate.toISOString().split('T')[0] : null),
+    },
+    {
+      key: 'lostReason',
+      label: 'Lost reason',
+      select: (lead) => lead.lostReason,
+    },
+    {
+      key: 'prospectCompanyName',
+      label: 'Prospect company',
+      select: (lead) => lead.prospectCompanyName,
+    },
+    {
+      key: 'prospectWebsite',
+      label: 'Prospect website',
+      select: (lead) => lead.prospectWebsite,
+    },
+    {
+      key: 'prospectIndustry',
+      label: 'Prospect industry',
+      select: (lead) => lead.prospectIndustry,
+    },
+    {
+      key: 'assignedTo',
+      label: 'Assigned to',
+      select: (lead) => {
+        if (!lead.assignedTo) {
+          return null;
+        }
+        const fullName = `${lead.assignedTo.firstName ?? ''} ${lead.assignedTo.lastName ?? ''}`.trim();
+        return fullName || lead.assignedTo.email;
+      },
+    },
+    {
+      key: 'contactName',
+      label: 'Primary contact name',
+      select: (lead) => {
+        const contact = lead.contact;
+        const fullName = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim();
+        return fullName || contact.email || null;
+      },
+    },
+    {
+      key: 'contactEmail',
+      label: 'Primary contact email',
+      select: (lead) => lead.contact.email,
+    },
+    {
+      key: 'contactPhone',
+      label: 'Primary contact phone',
+      select: (lead) => lead.contact.phone,
+    },
+  ];
+
+  private readonly taskFields: FieldSelector<TaskSnapshot>[] = [
+    {
+      key: 'title',
+      label: 'Task title',
+      select: (task) => task.title,
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      select: (task) => task.description,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      select: (task) => task.status,
+    },
+    {
+      key: 'priority',
+      label: 'Priority',
+      select: (task) => task.priority,
+    },
+    {
+      key: 'dueDate',
+      label: 'Due date',
+      select: (task) => (task.dueDate ? task.dueDate.toISOString() : null),
+    },
+    {
+      key: 'startDate',
+      label: 'Start date',
+      select: (task) => (task.startDate ? task.startDate.toISOString() : null),
+    },
+    {
+      key: 'completedAt',
+      label: 'Completed at',
+      select: (task) => (task.completedAt ? task.completedAt.toISOString() : null),
+    },
+    {
+      key: 'tags',
+      label: 'Tags',
+      select: (task) => (task.tags.length ? task.tags.join(', ') : null),
+    },
+    {
+      key: 'estimatedHours',
+      label: 'Estimated hours',
+      select: (task) => (task.estimatedHours ? task.estimatedHours.toString() : null),
+    },
+    {
+      key: 'actualHours',
+      label: 'Actual hours',
+      select: (task) => (task.actualHours ? task.actualHours.toString() : null),
+    },
+    {
+      key: 'assignedTo',
+      label: 'Assigned to',
+      select: (task) => {
+        if (!task.assignedTo) {
+          return null;
+        }
+        const fullName = `${task.assignedTo.firstName ?? ''} ${task.assignedTo.lastName ?? ''}`.trim();
+        return fullName || task.assignedTo.email;
+      },
+    },
+    {
+      key: 'customerId',
+      label: 'Customer ID',
+      select: (task) => task.customerId ?? null,
     },
   ];
 
@@ -237,6 +749,41 @@ export class EntityFieldResolver {
         }
         return;
       }
+      case AiEntityType.EMPLOYEE: {
+        const entity = await this.findEmployee(entityId);
+        if (!entity) {
+          throw new NotFoundException(`EMPLOYEE with ID ${entityId} was not found`);
+        }
+        return;
+      }
+      case AiEntityType.CUSTOMER: {
+        const entity = await this.findCustomer(entityId);
+        if (!entity) {
+          throw new NotFoundException(`CUSTOMER with ID ${entityId} was not found`);
+        }
+        return;
+      }
+      case AiEntityType.CONTACT: {
+        const entity = await this.findContact(entityId);
+        if (!entity) {
+          throw new NotFoundException(`CONTACT with ID ${entityId} was not found`);
+        }
+        return;
+      }
+      case AiEntityType.LEAD: {
+        const entity = await this.findLead(entityId);
+        if (!entity) {
+          throw new NotFoundException(`LEAD with ID ${entityId} was not found`);
+        }
+        return;
+      }
+      case AiEntityType.TASK: {
+        const entity = await this.findTask(entityId);
+        if (!entity) {
+          throw new NotFoundException(`TASK with ID ${entityId} was not found`);
+        }
+        return;
+      }
       default:
         throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
     }
@@ -258,6 +805,41 @@ export class EntityFieldResolver {
         }
         return this.mapFieldValues(fieldKeys, entity, this.opportunityFields);
       }
+      case AiEntityType.EMPLOYEE: {
+        const entity = await this.findEmployee(entityId);
+        if (!entity) {
+          throw new NotFoundException(`EMPLOYEE with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.employeeFields);
+      }
+      case AiEntityType.CUSTOMER: {
+        const entity = await this.findCustomer(entityId);
+        if (!entity) {
+          throw new NotFoundException(`CUSTOMER with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.customerFields);
+      }
+      case AiEntityType.CONTACT: {
+        const entity = await this.findContact(entityId);
+        if (!entity) {
+          throw new NotFoundException(`CONTACT with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.contactFields);
+      }
+      case AiEntityType.LEAD: {
+        const entity = await this.findLead(entityId);
+        if (!entity) {
+          throw new NotFoundException(`LEAD with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.leadFields);
+      }
+      case AiEntityType.TASK: {
+        const entity = await this.findTask(entityId);
+        if (!entity) {
+          throw new NotFoundException(`TASK with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.taskFields);
+      }
       default:
         throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
     }
@@ -269,6 +851,16 @@ export class EntityFieldResolver {
         return this.candidateFields as FieldSelector<EntitySnapshot>[];
       case AiEntityType.OPPORTUNITY:
         return this.opportunityFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.EMPLOYEE:
+        return this.employeeFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.CUSTOMER:
+        return this.customerFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.CONTACT:
+        return this.contactFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.LEAD:
+        return this.leadFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.TASK:
+        return this.taskFields as FieldSelector<EntitySnapshot>[];
       default:
         return [];
     }
@@ -329,6 +921,205 @@ export class EntityFieldResolver {
     if (!record) {
       return null;
     }
+    return record;
+  }
+
+  private async findEmployee(entityId: string): Promise<EmployeeSnapshot | null> {
+    const record = await this.prisma.employee.findUnique({
+      where: { id: entityId },
+      select: {
+        department: true,
+        jobTitle: true,
+        status: true,
+        contractType: true,
+        hireDate: true,
+        terminationDate: true,
+        salary: true,
+        salaryCurrency: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        emergencyContactRelation: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        manager: {
+          select: {
+            jobTitle: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    const managerFirstName = record.manager?.user?.firstName ?? '';
+    const managerLastName = record.manager?.user?.lastName ?? '';
+    const managerFullName = `${managerFirstName} ${managerLastName}`.trim() || null;
+
+    return {
+      firstName: record.user?.firstName ?? null,
+      lastName: record.user?.lastName ?? null,
+      email: record.user?.email ?? null,
+      phone: record.user?.phone ?? null,
+      department: record.department ?? null,
+      jobTitle: record.jobTitle ?? null,
+      status: record.status,
+      contractType: record.contractType,
+      hireDate: record.hireDate ?? null,
+      terminationDate: record.terminationDate ?? null,
+      salary: record.salary ? record.salary.toString() : null,
+      salaryCurrency: record.salaryCurrency ?? null,
+      managerName: managerFullName,
+      managerEmail: record.manager?.user?.email ?? null,
+      managerTitle: record.manager?.jobTitle ?? null,
+      emergencyContactName: record.emergencyContactName ?? null,
+      emergencyContactPhone: record.emergencyContactPhone ?? null,
+      emergencyContactRelation: record.emergencyContactRelation ?? null,
+    };
+  }
+
+  private async findCustomer(entityId: string): Promise<CustomerSnapshot | null> {
+    const record = await this.prisma.customer.findUnique({
+      where: { id: entityId },
+      select: {
+        name: true,
+        email: true,
+        phone: true,
+        website: true,
+        industry: true,
+        type: true,
+        status: true,
+        sentiment: true,
+        address: true,
+        city: true,
+        country: true,
+        postalCode: true,
+        monthlyValue: true,
+        currency: true,
+        notes: true,
+        tags: true,
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return record;
+  }
+
+  private async findContact(entityId: string): Promise<ContactSnapshot | null> {
+    const record = await this.prisma.contact.findUnique({
+      where: { id: entityId },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        role: true,
+        companyName: true,
+        linkedinUrl: true,
+        notes: true,
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return record;
+  }
+
+  private async findLead(entityId: string): Promise<LeadSnapshot | null> {
+    const record = await this.prisma.lead.findUnique({
+      where: { id: entityId },
+      select: {
+        title: true,
+        description: true,
+        status: true,
+        value: true,
+        probability: true,
+        source: true,
+        expectedCloseDate: true,
+        actualCloseDate: true,
+        lostReason: true,
+        prospectCompanyName: true,
+        prospectWebsite: true,
+        prospectIndustry: true,
+        assignedTo: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        contact: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return record;
+  }
+
+  private async findTask(entityId: string): Promise<TaskSnapshot | null> {
+    const record = await this.prisma.task.findUnique({
+      where: { id: entityId },
+      select: {
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        startDate: true,
+        completedAt: true,
+        tags: true,
+        estimatedHours: true,
+        actualHours: true,
+        customerId: true,
+        assignedTo: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
     return record;
   }
 

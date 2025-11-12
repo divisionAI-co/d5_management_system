@@ -11,19 +11,57 @@ import {
   RemoteWorkFrequency,
   UpdateRemoteWorkPolicyDto,
 } from './dto/update-remote-work-policy.dto';
+import { OpenRemoteWindowDto } from './dto/open-remote-window.dto';
+import { SetRemotePreferencesDto } from './dto/set-remote-preferences.dto';
+
+type CompanySettingsWithWindow = CompanySettings & {
+  remoteWorkWindowOpen?: boolean | null;
+  remoteWorkWindowStart?: Date | null;
+  remoteWorkWindowEnd?: Date | null;
+};
+
+type ExtendedCompanySettings = CompanySettings & {
+  remoteWorkWindowOpen: boolean;
+  remoteWorkWindowStart: Date | null;
+  remoteWorkWindowEnd: Date | null;
+};
 
 @Injectable()
 export class RemoteWorkService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async ensureCompanySettings(): Promise<CompanySettings> {
-    let settings = await this.prisma.companySettings.findFirst();
-    if (!settings) {
-      settings = await this.prisma.companySettings.create({
-        data: {},
+  private readonly MAX_REMOTE_DAYS_PER_WINDOW = 3;
+  private readonly defaultWindowState = {
+    remoteWorkWindowOpen: false,
+    remoteWorkWindowStart: null as Date | null,
+    remoteWorkWindowEnd: null as Date | null,
+  };
+
+  private withWindowDefaults(settings?: CompanySettingsWithWindow | null): ExtendedCompanySettings {
+    const base = (settings ?? {}) as CompanySettingsWithWindow;
+    return {
+      ...base,
+      remoteWorkWindowOpen:
+        base.remoteWorkWindowOpen ?? this.defaultWindowState.remoteWorkWindowOpen,
+      remoteWorkWindowStart:
+        base.remoteWorkWindowStart ?? this.defaultWindowState.remoteWorkWindowStart,
+      remoteWorkWindowEnd:
+        base.remoteWorkWindowEnd ?? this.defaultWindowState.remoteWorkWindowEnd,
+    } as ExtendedCompanySettings;
+  }
+
+  private async ensureCompanySettings(): Promise<ExtendedCompanySettings> {
+    let settingsRecord = await this.prisma.companySettings.findFirst();
+    if (!settingsRecord) {
+      settingsRecord = await this.prisma.companySettings.create({
+        data: {
+          remoteWorkWindowOpen: this.defaultWindowState.remoteWorkWindowOpen,
+          remoteWorkWindowStart: this.defaultWindowState.remoteWorkWindowStart,
+          remoteWorkWindowEnd: this.defaultWindowState.remoteWorkWindowEnd,
+        } as Prisma.CompanySettingsCreateInput,
       });
     }
-    return settings;
+    return this.withWindowDefaults(settingsRecord as CompanySettingsWithWindow);
   }
 
   private normalizeDate(date: Date): Date {
@@ -65,9 +103,49 @@ export class RemoteWorkService {
     return { start, end };
   }
 
-  private async validateRemoteWorkLimit(employeeId: string, date: Date) {
-    const settings = await this.ensureCompanySettings();
-    const { start, end } = this.getPeriodBounds(date, settings.remoteWorkFrequency);
+  private async ensureActiveWindow(
+    checkDate?: Date,
+    settings?: ExtendedCompanySettings,
+  ): Promise<{ settings: ExtendedCompanySettings; start: Date; end: Date; limit: number }> {
+    const resolvedSettings = settings ?? (await this.ensureCompanySettings());
+
+    if (
+      !resolvedSettings.remoteWorkWindowOpen ||
+      !resolvedSettings.remoteWorkWindowStart ||
+      !resolvedSettings.remoteWorkWindowEnd
+    ) {
+      throw new BadRequestException('Remote work submissions are currently closed.');
+    }
+
+    const start = this.normalizeDate(resolvedSettings.remoteWorkWindowStart);
+    const end = this.normalizeDate(resolvedSettings.remoteWorkWindowEnd);
+
+    if (checkDate) {
+      const normalized = this.normalizeDate(checkDate);
+      if (normalized < start || normalized > end) {
+        throw new BadRequestException(
+          'Selected date is outside the active remote work window.',
+        );
+      }
+    }
+
+    const limit = Math.min(
+      resolvedSettings.remoteWorkLimit ?? this.MAX_REMOTE_DAYS_PER_WINDOW,
+      this.MAX_REMOTE_DAYS_PER_WINDOW,
+    );
+
+    return { settings: resolvedSettings, start, end, limit };
+  }
+
+  private async validateRemoteWorkLimit(
+    employeeId: string,
+    date: Date,
+    settings?: ExtendedCompanySettings,
+  ) {
+    const { start, end, limit, settings: resolvedSettings } = await this.ensureActiveWindow(
+      date,
+      settings,
+    );
 
     const logsCount = await this.prisma.remoteWorkLog.count({
       where: {
@@ -79,10 +157,9 @@ export class RemoteWorkService {
       },
     });
 
-    const limit = settings.remoteWorkLimit ?? 1;
     if (logsCount >= limit) {
       throw new BadRequestException(
-        `Remote work limit of ${limit} day(s) reached for the current ${settings.remoteWorkFrequency.toLowerCase()} period`,
+        `Remote work limit of ${limit} day(s) reached for the current ${resolvedSettings.remoteWorkFrequency.toLowerCase()} period`,
       );
     }
   }
@@ -111,7 +188,8 @@ export class RemoteWorkService {
     }
 
     const targetDate = this.normalizeDate(new Date(createDto.date));
-    await this.validateRemoteWorkLimit(employeeId, targetDate);
+    const settings = await this.ensureCompanySettings();
+    await this.validateRemoteWorkLimit(employeeId, targetDate, settings);
 
     try {
       return await this.prisma.remoteWorkLog.create({
@@ -214,8 +292,18 @@ export class RemoteWorkService {
     });
   }
 
-  async findForUser(userId: string) {
-    return this.findAll({ userId });
+  async findForUser(
+    userId: string,
+    filters?: {
+      startDate?: string;
+      endDate?: string;
+    },
+  ) {
+    return this.findAll({
+      userId,
+      startDate: filters?.startDate,
+      endDate: filters?.endDate,
+    });
   }
 
   async getPolicy() {
@@ -224,6 +312,11 @@ export class RemoteWorkService {
       frequency: settings.remoteWorkFrequency,
       limit: settings.remoteWorkLimit,
       updatedAt: settings.updatedAt,
+      window: {
+        isOpen: settings.remoteWorkWindowOpen ?? false,
+        startDate: settings.remoteWorkWindowStart ?? undefined,
+        endDate: settings.remoteWorkWindowEnd ?? undefined,
+      },
     };
   }
 
@@ -244,11 +337,179 @@ export class RemoteWorkService {
       data,
     });
 
+    const applied = this.withWindowDefaults(updated as CompanySettingsWithWindow);
+
     return {
-      frequency: updated.remoteWorkFrequency,
-      limit: updated.remoteWorkLimit,
-      updatedAt: updated.updatedAt,
+      frequency: applied.remoteWorkFrequency,
+      limit: applied.remoteWorkLimit,
+      updatedAt: applied.updatedAt,
     };
+  }
+
+  async openWindow(openDto: OpenRemoteWindowDto) {
+    const start = this.normalizeDate(new Date(openDto.startDate));
+    if (Number.isNaN(start.getTime())) {
+      throw new BadRequestException('Invalid start date provided.');
+    }
+
+    let end: Date;
+    if (openDto.endDate) {
+      end = this.normalizeDate(new Date(openDto.endDate));
+      if (Number.isNaN(end.getTime())) {
+        throw new BadRequestException('Invalid end date provided.');
+      }
+    } else {
+      end = new Date(start);
+      end.setDate(start.getDate() + 6);
+    }
+
+    if (end < start) {
+      throw new BadRequestException('Window end date must be on or after the start date.');
+    }
+
+    const spanDays = Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    if (spanDays > 7) {
+      throw new BadRequestException('Remote work window cannot exceed 7 days.');
+    }
+
+    const settings = await this.ensureCompanySettings();
+
+    const updated = await this.prisma.companySettings.update({
+      where: { id: settings.id },
+      data: {
+        remoteWorkWindowOpen: true,
+        remoteWorkWindowStart: start,
+        remoteWorkWindowEnd: end,
+      } as any,
+    });
+
+    const applied = this.withWindowDefaults(updated as CompanySettingsWithWindow);
+
+    return {
+      isOpen: applied.remoteWorkWindowOpen,
+      startDate: applied.remoteWorkWindowStart ?? undefined,
+      endDate: applied.remoteWorkWindowEnd ?? undefined,
+      limit: Math.min(
+        applied.remoteWorkLimit ?? this.MAX_REMOTE_DAYS_PER_WINDOW,
+        this.MAX_REMOTE_DAYS_PER_WINDOW,
+      ),
+    };
+  }
+
+  async closeWindow() {
+    const settings = await this.ensureCompanySettings();
+
+    const updated = await this.prisma.companySettings.update({
+      where: { id: settings.id },
+      data: {
+        remoteWorkWindowOpen: false,
+      } as any,
+    });
+
+    const applied = this.withWindowDefaults(updated as CompanySettingsWithWindow);
+
+    return {
+      isOpen: applied.remoteWorkWindowOpen,
+      startDate: applied.remoteWorkWindowStart ?? undefined,
+      endDate: applied.remoteWorkWindowEnd ?? undefined,
+      limit: Math.min(
+        applied.remoteWorkLimit ?? this.MAX_REMOTE_DAYS_PER_WINDOW,
+        this.MAX_REMOTE_DAYS_PER_WINDOW,
+      ),
+    };
+  }
+
+  async getWindowState() {
+    const settings = await this.ensureCompanySettings();
+    return {
+      isOpen: settings.remoteWorkWindowOpen ?? false,
+      startDate: settings.remoteWorkWindowStart ?? undefined,
+      endDate: settings.remoteWorkWindowEnd ?? undefined,
+      limit: this.MAX_REMOTE_DAYS_PER_WINDOW,
+    };
+  }
+
+  async setPreferences(
+    userId: string,
+    employeeId: string,
+    preferencesDto: SetRemotePreferencesDto,
+  ) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+    }
+
+    if (employee.userId !== userId) {
+      throw new ForbiddenException('You can only manage your own remote work preferences.');
+    }
+
+    const settings = await this.ensureCompanySettings();
+    const { start, end, limit } = await this.ensureActiveWindow(undefined, settings);
+
+    const uniqueDates = Array.from(new Set(preferencesDto.dates ?? []));
+
+    if (uniqueDates.length > limit) {
+      throw new BadRequestException(
+        `You can only select up to ${limit} remote day(s) during the current window.`,
+      );
+    }
+
+    const normalizedDates = uniqueDates.map((date) => {
+      const parsed = this.normalizeDate(new Date(date));
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException(`Invalid date provided: ${date}`);
+      }
+      if (parsed < start || parsed > end) {
+        throw new BadRequestException(
+          `Date ${date} is outside the active remote work window (${start.toISOString().slice(0, 10)} - ${end
+            .toISOString()
+            .slice(0, 10)}).`,
+        );
+      }
+      return parsed;
+    });
+
+    const reason = preferencesDto.reason?.trim() || undefined;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.remoteWorkLog.deleteMany({
+        where: {
+          employeeId,
+          date: {
+            gte: start,
+            lte: end,
+          },
+        },
+      });
+
+      if (normalizedDates.length === 0) {
+        return;
+      }
+
+      for (const date of normalizedDates) {
+        await tx.remoteWorkLog.create({
+          data: {
+            userId,
+            employeeId,
+            date,
+            reason,
+          },
+        });
+      }
+    });
+
+    return this.findAll({
+      employeeId,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    });
   }
 }
 

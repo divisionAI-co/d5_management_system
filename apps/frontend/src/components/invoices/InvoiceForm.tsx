@@ -1,9 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Plus, Trash2, CalendarIcon } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
 import { customersApi } from '@/lib/api/crm';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   CreateInvoicePayload,
   InvoiceDetail,
@@ -60,6 +61,7 @@ const getDefaultDueDate = () => {
 export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(invoice);
+  const [customerError, setCustomerError] = useState<string | null>(null);
 
   const customersQuery = useQuery({
     queryKey: ['customers', 'for-invoices'],
@@ -71,6 +73,14 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
         sortOrder: 'asc',
       }),
   });
+
+  useEffect(() => {
+    if (customersQuery.isError) {
+      setCustomerError('Unable to load customers. Please refresh and try again.');
+    } else if (customersQuery.isSuccess) {
+      setCustomerError(null);
+    }
+  }, [customersQuery.isError, customersQuery.isSuccess]);
 
   const defaultValues = useMemo<FormValues>(() => {
     if (!invoice) {
@@ -225,7 +235,16 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
   const isRecurringField = register('isRecurring');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <>
+      {customerError && (
+        <FeedbackToast
+          message={customerError}
+          onDismiss={() => setCustomerError(null)}
+          tone="error"
+        />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-xl bg-card shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -271,11 +290,7 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                 {customersQuery.isLoading && (
                   <p className="mt-1 text-sm text-muted-foreground">Loading customers...</p>
                 )}
-                {customersQuery.isError && (
-                  <p className="mt-1 text-sm text-red-600">
-                    Unable to load customers. Please refresh and try again.
-                  </p>
-                )}
+                
                 {!customersQuery.isLoading && !customersQuery.isError && customers.length === 0 && (
                   <p className="mt-1 text-sm text-amber-600">
                     No customers found. Create a customer before generating invoices.
@@ -599,7 +614,8 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
           </div>
         </form>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

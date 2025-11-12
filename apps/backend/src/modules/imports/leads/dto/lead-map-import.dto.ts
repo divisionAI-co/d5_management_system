@@ -37,7 +37,7 @@ export class LeadFieldMappingEntry {
   sourceColumn!: string;
 
   @ApiProperty({
-    description: 'Target field in the D5 lead model',
+    description: 'Target field in the division5 lead model',
     enum: LeadImportField,
     example: LeadImportField.TITLE,
   })

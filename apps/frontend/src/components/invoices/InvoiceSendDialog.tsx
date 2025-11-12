@@ -42,7 +42,7 @@ export function InvoiceSendDialog({ invoice, onClose, onSent }: InvoiceSendDialo
     () => ({
       to: invoice.customer?.email ?? '',
       cc: '',
-      subject: `Invoice ${invoice.invoiceNumber} from D5 Management`,
+      subject: `Invoice ${invoice.invoiceNumber} from division5`,
       message: defaultMessage(invoice),
     }),
     [invoice],

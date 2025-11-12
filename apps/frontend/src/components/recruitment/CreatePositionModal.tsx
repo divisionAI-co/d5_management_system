@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { leadsApi } from '@/lib/api/crm/leads';
 import { opportunitiesApi } from '@/lib/api/crm/opportunities';
 import type { CreateOpportunityPayload, Lead } from '@/types/crm';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface CreatePositionModalProps {
   onClose: () => void;
@@ -253,9 +254,11 @@ export function CreatePositionModal({ onClose, onCreated }: CreatePositionModalP
           </div>
 
           {mutation.isError && (
-            <div className="lg:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-              Unable to create the position right now. Please verify the lead details and try again.
-            </div>
+            <FeedbackToast
+              message="Unable to create the position right now. Please verify the lead details and try again."
+              onDismiss={() => mutation.reset()}
+              tone="error"
+            />
           )}
         </form>
       </div>

@@ -4,6 +4,7 @@ import { Palette, Pencil, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
 
 import { activitiesApi } from '@/lib/api/activities';
 import type { ActivityType, ActivityTypePayload } from '@/types/activities';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type FormMode = 'create' | 'edit';
 
@@ -185,18 +186,19 @@ export default function ActivityTypesPage() {
       </div>
 
       {feedback && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {feedback}{' '}
-          <button className="text-xs font-semibold uppercase" onClick={() => setFeedback(null)}>
-            Dismiss
-          </button>
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="success"
+        />
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
+        <FeedbackToast
+          message={error}
+          onDismiss={() => setError(null)}
+          tone="error"
+        />
       )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -326,12 +328,6 @@ export default function ActivityTypesPage() {
                 ✕
               </button>
             </div>
-
-            {error && (
-              <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

@@ -87,7 +87,7 @@ export const getDefaultTemplateBlocks = (): TemplateBlock[] => [
   {
     id: createBlockId(),
     type: 'heading',
-    text: 'Welcome to the D5 Management System',
+    text: 'Welcome to division5',
     level: 'h1',
     align: 'left',
   },

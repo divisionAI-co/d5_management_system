@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import * as sgMail from '@sendgrid/mail';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { PeerCertificate, TlsOptions } from 'tls';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export interface EmailOptions {
   to: string | string[];
@@ -44,6 +48,91 @@ export class EmailService {
     return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
   }
 
+  private getStringEnv(key: string): string | undefined {
+    const value = this.configService.get<string | undefined>(key);
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+
+    return value;
+  }
+
+  private isProduction(): boolean {
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    return nodeEnv?.toLowerCase() === 'production';
+  }
+
+  private normalizeCertificate(certificate: string): string | Buffer {
+    const trimmed = certificate.trim();
+
+    if (trimmed.startsWith('-----BEGIN')) {
+      return trimmed;
+    }
+
+    try {
+      return Buffer.from(trimmed, 'base64');
+    } catch (error) {
+      this.logger.warn(
+        `Failed to decode SMTP_CA_CERT as base64: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return trimmed;
+    }
+  }
+
+  private buildSmtpTlsOptions(): TlsOptions {
+    const defaultAllowSelfSigned = this.isProduction() ? false : true;
+    const allowSelfSigned = this.getBooleanEnv('SMTP_ALLOW_SELF_SIGNED', defaultAllowSelfSigned);
+    const defaultRejectUnauthorized = this.isProduction() ? true : !allowSelfSigned;
+    const rejectUnauthorized = this.getBooleanEnv('SMTP_REJECT_UNAUTHORIZED', defaultRejectUnauthorized);
+    const caCert = this.getStringEnv('SMTP_CA_CERT');
+    const caPath = this.getStringEnv('SMTP_CA_CERT_PATH');
+    const servername = this.getStringEnv('SMTP_TLS_SERVERNAME');
+
+    const tlsOptions: TlsOptions & {
+      checkServerIdentity?: (servername: string, cert: PeerCertificate) => Error | undefined;
+      servername?: string;
+    } = {
+      rejectUnauthorized,
+    };
+
+    if (allowSelfSigned) {
+      tlsOptions.rejectUnauthorized = false;
+      tlsOptions.checkServerIdentity = () => undefined;
+    }
+
+    const caCertificates: Array<string | Buffer> = [];
+
+    if (caCert) {
+      caCertificates.push(this.normalizeCertificate(caCert));
+    }
+
+    if (caPath) {
+      try {
+        const resolvedPath = resolve(process.cwd(), caPath);
+        caCertificates.push(readFileSync(resolvedPath));
+      } catch (error) {
+        this.logger.warn(
+          `Failed to read SMTP_CA_CERT_PATH (${caPath}): ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    if (caCertificates.length > 0) {
+      tlsOptions.ca = caCertificates;
+    }
+
+    if (servername) {
+      tlsOptions.servername = servername;
+    }
+
+    const ciphers = this.getStringEnv('SMTP_TLS_CIPHERS');
+    if (ciphers) {
+      tlsOptions.ciphers = ciphers;
+    }
+
+    return tlsOptions;
+  }
+
   private getNumberEnv(key: string, defaultValue?: number): number | undefined {
     const value = this.configService.get<string | number | undefined>(key);
 
@@ -79,10 +168,9 @@ export class EmailService {
             user: this.configService.get<string>('SMTP_USER'),
             pass: this.configService.get<string>('SMTP_PASSWORD'),
           },
-          tls: {
-            rejectUnauthorized: this.getBooleanEnv('SMTP_REJECT_UNAUTHORIZED', true),
-          },
-        });
+          requireTLS: this.getBooleanEnv('SMTP_REQUIRE_TLS', false),
+          tls: this.buildSmtpTlsOptions(),
+        } as SMTPTransport.Options);
         this.logger.log('SMTP email provider initialized');
         break;
     }
@@ -183,7 +271,7 @@ export class EmailService {
   async sendWelcomeEmail(email: string, name: string): Promise<boolean> {
     return this.sendEmail({
       to: email,
-      subject: 'Welcome to D5 Management System',
+      subject: 'Welcome to division5',
       html: `
         <h1>Welcome ${name}!</h1>
         <p>Your account has been created successfully.</p>
@@ -223,10 +311,10 @@ export class EmailService {
 
     return this.sendEmail({
       to: email,
-      subject: 'You have been invited to D5 Management System',
+      subject: 'You have been invited to division5',
       html: `
         <h1>Welcome${name ? `, ${name}` : ''}!</h1>
-        <p>An administrator has created an account for you in the D5 Management System.</p>
+        <p>An administrator has created an account for you in division5.</p>
         <p>To finish setting up your account, please create your password using the link below:</p>
         <p><a href="${inviteUrl}">Set up your password</a></p>
         <p><strong>Important:</strong> this link will expire on <strong>${readableExpiry}</strong>.</p>

@@ -365,6 +365,7 @@ export class AiActionExecutor {
         collectionKey: collection.collectionKey,
         limit: collection.limit ?? definition.defaultLimit,
         fieldKeys,
+        filters: this.extractCollectionFilters(collection.metadata),
       });
 
       const formatted = this.formatCollection({
@@ -391,6 +392,21 @@ export class AiActionExecutor {
     }
 
     return { contexts, debugContext };
+  }
+
+  private extractCollectionFilters(metadata: Prisma.JsonValue | null | undefined): Record<string, unknown> | undefined {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return undefined;
+    }
+
+    const record = metadata as Record<string, unknown>;
+    const filters = record.filters;
+
+    if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
+      return undefined;
+    }
+
+    return filters as Record<string, unknown>;
   }
 
   private formatCollection(params: {

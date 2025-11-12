@@ -15,6 +15,7 @@ import { InvoiceForm } from '@/components/invoices/InvoiceForm';
 import { InvoiceSendDialog } from '@/components/invoices/InvoiceSendDialog';
 import { InvoiceMarkPaidDialog } from '@/components/invoices/InvoiceMarkPaidDialog';
 import type { InvoiceDetail } from '@/types/invoices';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const formatCurrency = (amount: number, currency: string) =>
   amount.toLocaleString(undefined, {
@@ -186,9 +187,11 @@ export default function InvoiceDetailPage() {
       </div>
 
       {feedback && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-          {feedback}
-        </div>
+        <FeedbackToast
+          message={feedback}
+          onDismiss={() => setFeedback(null)}
+          tone="info"
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { UploadCloud, ArrowLeft, Loader2 } from 'lucide-react';
 
@@ -8,6 +8,7 @@ import type {
   UploadBaseResult,
   ExecutePayloadBase,
 } from '@/types/imports';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type ImportStep = 'upload' | 'map' | 'execute' | 'result';
 
@@ -76,6 +77,7 @@ export function ImportDialog<
   const [summary, setSummary] = useState<TSummary | null>(null);
   const [updateExisting, setUpdateExisting] = useState(true);
   const [options, setOptions] = useState<TOptions>(() => initialOptions());
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const resetState = () => {
     setStep('upload');
@@ -140,6 +142,38 @@ export function ImportDialog<
       }
     },
   });
+
+  useEffect(() => {
+    if (uploadMutation.isError || mappingMutation.isError || executeMutation.isError) {
+      const rawError =
+        (uploadMutation.error as any) ??
+        (mappingMutation.error as any) ??
+        (executeMutation.error as any);
+
+      const resolvedMessage =
+        rawError?.response?.data?.message ??
+        (rawError instanceof Error ? rawError.message : null) ??
+        'An unexpected error occurred. Please try again.';
+
+      setMutationError(resolvedMessage);
+    } else {
+      setMutationError(null);
+    }
+  }, [
+    uploadMutation.isError,
+    mappingMutation.isError,
+    executeMutation.isError,
+    uploadMutation.error,
+    mappingMutation.error,
+    executeMutation.error,
+  ]);
+
+  const clearMutationError = () => {
+    setMutationError(null);
+    uploadMutation.reset();
+    mappingMutation.reset();
+    executeMutation.reset();
+  };
 
   const availableColumns = useMemo(
     () => pending?.upload.columns ?? [],
@@ -546,7 +580,16 @@ export function ImportDialog<
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4">
+    <>
+      {mutationError && (
+        <FeedbackToast
+          message={mutationError}
+          onDismiss={clearMutationError}
+          tone="error"
+        />
+      )}
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 p-4">
       <div className="relative flex w-full max-w-5xl flex-col rounded-2xl bg-card shadow-xl max-h-[90vh] overflow-hidden">
         <div className="flex-shrink-0 space-y-4 border-b border-border bg-card/80 p-6">
           <div>
@@ -589,24 +632,9 @@ export function ImportDialog<
           {step === 'map' && renderMappingStep()}
           {step === 'execute' && renderExecuteStep()}
           {step === 'result' && renderResultStep()}
-
-          {(uploadMutation.isError ||
-            mappingMutation.isError ||
-            executeMutation.isError) && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {(uploadMutation.error ||
-                mappingMutation.error ||
-                executeMutation.error) instanceof Error
-                ? (
-                    (uploadMutation.error ||
-                      mappingMutation.error ||
-                      executeMutation.error) as Error
-                  ).message
-                : 'An unexpected error occurred. Please try again.'}
-            </div>
-          )}
         </div>
       </div>
     </div>
+    </>
   );
 }
