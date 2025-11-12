@@ -220,6 +220,14 @@ export class InvoicesService {
               id: true,
               name: true,
               email: true,
+              phone: true,
+              address: true,
+              city: true,
+              country: true,
+              postalCode: true,
+              taxId: true,
+              registrationId: true,
+              currency: true,
             },
           },
           createdBy: {
@@ -356,6 +364,12 @@ export class InvoicesService {
             name: true,
             email: true,
             phone: true,
+            address: true,
+            city: true,
+            country: true,
+            postalCode: true,
+            taxId: true,
+            registrationId: true,
             currency: true,
           },
         },
@@ -667,6 +681,18 @@ ${html}`;
       };
     });
 
+    const customerInfo = invoice.customer
+      ? {
+          ...invoice.customer,
+          address: invoice.customer.address ?? '',
+          city: invoice.customer.city ?? '',
+          country: invoice.customer.country ?? '',
+          postalCode: invoice.customer.postalCode ?? '',
+          taxId: invoice.customer.taxId ?? '',
+          registrationId: invoice.customer.registrationId ?? '',
+        }
+      : {};
+
     const baseData = {
       invoiceNumber: invoice.invoiceNumber,
       issueDate: invoice.issueDate,
@@ -679,7 +705,7 @@ ${html}`;
       currency: invoice.currency ?? 'USD',
       notes: invoice.notes,
       items: normalizedItems,
-      customer: invoice.customer ?? {},
+      customer: customerInfo,
       createdBy: invoice.createdBy ?? {},
       invoice,
     };
@@ -828,6 +854,13 @@ ${html}`;
             id: true,
             name: true,
             email: true,
+            phone: true,
+            address: true,
+            city: true,
+            country: true,
+            postalCode: true,
+            taxId: true,
+            registrationId: true,
           },
         },
         createdBy: {
@@ -1095,6 +1128,13 @@ ${html}`;
             id: true,
             name: true,
             email: true,
+            phone: true,
+            address: true,
+            city: true,
+            country: true,
+            postalCode: true,
+            taxId: true,
+            registrationId: true,
             currency: true,
           },
         },

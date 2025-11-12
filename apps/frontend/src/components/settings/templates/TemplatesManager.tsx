@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Loader2, Plus, RefreshCcw, Search, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Copy, FileText, Loader2, Plus, RefreshCcw, Search, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { templatesApi } from '@/lib/api/templates';
@@ -81,6 +81,18 @@ export function TemplatesManager() {
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message ?? 'Unable to update template at this time.';
+      setErrorMessage(message);
+    },
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.duplicate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setFeedbackMessage('Template duplicated successfully.');
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message ?? 'Unable to duplicate template at this time.';
       setErrorMessage(message);
     },
   });
@@ -302,6 +314,16 @@ export function TemplatesManager() {
                           className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                         >
                           Preview
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => duplicateMutation.mutate(template.id)}
+                          disabled={duplicateMutation.isPending}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70 disabled:cursor-not-allowed disabled:opacity-60"
+                          title="Duplicate template"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Duplicate
                         </button>
                         <button
                           type="button"

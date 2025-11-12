@@ -128,7 +128,7 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
 
     if (state.status === 'success' && state.html) {
       return (
-        <div className="h-full overflow-y-auto rounded-lg border border-border bg-card">
+        <div className="h-full min-h-0 overflow-y-auto rounded-lg border border-border bg-card p-4">
           <div
             className="preview-content"
             dangerouslySetInnerHTML={{ __html: state.html }}
@@ -143,7 +143,7 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <div>
             <h2 className="text-xl font-semibold text-foreground">{template.name} Preview</h2>
             <p className="text-sm text-muted-foreground">
@@ -159,8 +159,8 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
           </button>
         </div>
 
-        <div className="grid flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="flex flex-col gap-4 border-b border-border bg-muted p-5 md:border-r md:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto border-b border-border bg-muted p-5 md:border-r md:border-b-0">
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase text-muted-foreground">Sample Data (JSON)</label>
               <textarea
@@ -203,7 +203,9 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
             </div>
           </aside>
 
-          <section className="flex flex-1 flex-col bg-muted/70 p-5">{renderPreview()}</section>
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/70 p-5">
+            {renderPreview()}
+          </section>
         </div>
       </div>
     </div>

@@ -17,6 +17,8 @@ import {
   Sparkles,
   Tag,
   Users,
+  BadgePercent,
+  CreditCard,
 } from 'lucide-react';
 import { CustomerForm } from '@/components/crm/customers/CustomerForm';
 import { CustomerStatusForm } from '@/components/crm/customers/CustomerStatusForm';
@@ -305,6 +307,24 @@ export default function CustomerDetailPage() {
                       {customer.country && `, ${customer.country}`}
                       {customer.postalCode && ` ${customer.postalCode}`}
                     </p>
+                  </div>
+                </div>
+              )}
+              {customer.taxId && (
+                <div className="flex items-start gap-3">
+                  <BadgePercent className="mt-1 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Tax ID</p>
+                    <p className="text-sm text-foreground">{customer.taxId}</p>
+                  </div>
+                </div>
+              )}
+              {customer.registrationId && (
+                <div className="flex items-start gap-3">
+                  <CreditCard className="mt-1 h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">Registration ID</p>
+                    <p className="text-sm text-foreground">{customer.registrationId}</p>
                   </div>
                 </div>
               )}

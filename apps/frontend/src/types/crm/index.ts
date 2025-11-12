@@ -28,6 +28,8 @@ export interface CustomerBase {
   city?: string | null;
   country?: string | null;
   postalCode?: string | null;
+  taxId?: string | null;
+  registrationId?: string | null;
   monthlyValue?: number | null;
   currency?: string | null;
   notes?: string | null;
@@ -155,6 +157,8 @@ export interface CreateCustomerPayload {
   city?: string;
   country?: string;
   postalCode?: string;
+  taxId?: string;
+  registrationId?: string;
   monthlyValue?: number;
   currency?: string;
   notes?: string;

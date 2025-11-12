@@ -38,6 +38,11 @@ export const templatesApi = {
     );
     return data;
   },
+
+  duplicate: async (id: string) => {
+    const { data } = await apiClient.post<TemplateModel>(`/templates/${id}/duplicate`);
+    return data;
+  },
 };
 
 

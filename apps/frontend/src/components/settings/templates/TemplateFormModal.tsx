@@ -67,6 +67,86 @@ const TEMPLATE_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; descrip
   },
 ];
 
+const INPUT_BASE_CLASS =
+  'w-full rounded-lg border border-border bg-muted/20 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
+
+const INPUT_DENSE_CLASS =
+  'w-full rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
+
+const TEXTAREA_MONO_CLASS =
+  'w-full rounded-lg border border-border bg-muted/20 px-3 py-2 font-mono text-xs leading-5 text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
+
+const TOGGLE_BUTTON_BASE =
+  'rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+
+const DATA_CONTEXT_HELP: Record<
+  TemplateType,
+  {
+    heading: string;
+    description: string;
+    groups?: Array<{ title: string; items: string[] }>;
+    note?: string;
+  }
+> = {
+  EMAIL: {
+    heading: 'Email data context',
+    description:
+      'Email templates receive whatever payload is supplied when the message is sent. Use the Variables list below to declare the merge fields you expect, such as {{firstName}}.',
+    note: 'System emails often pass recipient details (firstName, email) and CTA links. Check the sending module for exact fields.',
+  },
+  INVOICE: {
+    heading: 'Invoice data context',
+    description:
+      'Invoices include the merged fields produced by buildInvoiceTemplateData. You can reference them directly or via the nested invoice object.',
+    groups: [
+      {
+        title: 'Invoice',
+        items: [
+          '{{invoiceNumber}}',
+          '{{issueDate}}',
+          '{{dueDate}}',
+          '{{status}}',
+          '{{subtotal}}',
+          '{{taxRate}}',
+          '{{taxAmount}}',
+          '{{total}}',
+          '{{currency}}',
+          '{{notes}}',
+        ],
+      },
+      {
+        title: 'Customer',
+        items: ['{{customer.name}}', '{{customer.email}}', '{{invoice.customer.name}}', '{{invoice.customer.email}}'],
+      },
+      {
+        title: 'Creator',
+        items: ['{{createdBy.firstName}}', '{{createdBy.lastName}}', '{{createdBy.email}}'],
+      },
+      {
+        title: 'Line items (loop over {{#each items}} ... {{/each}})',
+        items: [
+          '{{description}}',
+          '{{quantity}}',
+          '{{unitPrice}}',
+          '{{lineTotal}}',
+          '{{metadata.someField}}',
+        ],
+      },
+    ],
+    note: 'The entire invoice record is also available as {{invoice}} for advanced Handlebars logic.',
+  },
+  CUSTOMER_REPORT: {
+    heading: 'Customer report context',
+    description:
+      'Customer reports are generated per module and pass summary metrics (totals, charts, timelines). Inspect the report generator to see the exact structure, then mirror it here with variables.',
+  },
+  PERFORMANCE_REVIEW: {
+    heading: 'Performance review context',
+    description:
+      'Performance review exports include the review details (employee, period, overall rating, strengths, improvements). Match those keys with variables or reference nested objects like {{review.employee.firstName}}.',
+  },
+};
+
 const generateId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID();
@@ -288,7 +368,7 @@ export function TemplateFormModal({
       )}
 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+      <div className="flex max-h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-card-elevated shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
             <h2 className="text-xl font-semibold text-foreground">{dialogTitle}</h2>
@@ -318,21 +398,21 @@ export function TemplateFormModal({
                     setFormValues((prev) => ({ ...prev, name: event.target.value }))
                   }
                   placeholder="Invoice Payment Reminder"
-                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={INPUT_BASE_CLASS}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Template Type</label>
-                <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
                   {TEMPLATE_TYPE_OPTIONS.map((option) => (
                     <label
                       key={option.value}
                       className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${
                         formValues.type === option.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-transparent hover:border-border'
+                          ? 'border-blue-500 bg-blue-500/20 shadow-sm'
+                          : 'border-transparent bg-muted/10 hover:border-border'
                       }`}
                     >
                       <input
@@ -341,7 +421,7 @@ export function TemplateFormModal({
                         value={option.value}
                         checked={formValues.type === option.value}
                         onChange={() => setFormValues((prev) => ({ ...prev, type: option.value }))}
-                        className="mt-1 h-4 w-4 border-border text-blue-600 focus:ring-blue-500"
+                        className="mt-1 h-4 w-4 border-border text-blue-500 focus:ring-blue-500"
                       />
                       <div>
                         <p className="text-sm font-semibold text-foreground">{option.label}</p>
@@ -360,7 +440,7 @@ export function TemplateFormModal({
                     setFormValues((prev) => ({ ...prev, cssContent: event.target.value }))
                   }
                   rows={8}
-                  className="w-full rounded-lg border border-border px-3 py-2 font-mono text-xs focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={TEXTAREA_MONO_CLASS}
                   placeholder={`body {\n  background: #ffffff;\n  color: #111827;\n}`}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -374,7 +454,7 @@ export function TemplateFormModal({
                     <button
                       type="button"
                       onClick={() => setVariables((prev) => [...prev, newVariable()])}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     >
                       <Plus className="h-4 w-4" />
                       Add Variable
@@ -382,10 +462,10 @@ export function TemplateFormModal({
                   </div>
 
                   <div className="space-y-3">
-                  {variables.map((variable, index) => (
+                    {variables.map((variable, index) => (
                     <div
                       key={variable.id}
-                      className="rounded-lg border border-border bg-muted/80 p-3"
+                      className="rounded-lg border border-border bg-muted/20 p-3"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase text-muted-foreground">
@@ -413,7 +493,7 @@ export function TemplateFormModal({
                               handleVariableChange(variable.id, 'key', event.target.value)
                             }
                             placeholder="firstName"
-                            className="mt-1 w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={INPUT_DENSE_CLASS}
                           />
                           <p className="mt-1 text-[11px] text-muted-foreground">
                             Refer to this variable as {'{{'} {variable.key || 'key'} {'}}'} in the HTML.
@@ -429,7 +509,7 @@ export function TemplateFormModal({
                               handleVariableChange(variable.id, 'description', event.target.value)
                             }
                             placeholder="Recipient first name"
-                            className="mt-1 w-full rounded-lg border border-border px-3 py-1.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={INPUT_DENSE_CLASS}
                           />
                         </div>
 
@@ -444,7 +524,7 @@ export function TemplateFormModal({
                             }
                             rows={3}
                             placeholder='"Taylor" or {"amount": 299}'
-                            className="mt-1 w-full rounded-lg border border-border px-3 py-1.5 font-mono text-xs focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={TEXTAREA_MONO_CLASS}
                           />
                         </div>
                       </div>
@@ -453,7 +533,7 @@ export function TemplateFormModal({
                 </div>
               </div>
 
-              <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+              <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-4">
                 <label className="text-sm font-medium text-muted-foreground">Visibility</label>
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <label className="flex items-center gap-2">
@@ -489,7 +569,7 @@ export function TemplateFormModal({
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium text-muted-foreground">Template Content</label>
-                  <div className="inline-flex items-center rounded-lg border border-border bg-muted/60 p-1">
+                  <div className="inline-flex items-center rounded-lg border border-border bg-muted/20 p-1">
                     <button
                       type="button"
                       onClick={() => setEditingMode('visual')}
@@ -516,7 +596,7 @@ export function TemplateFormModal({
                 </div>
 
                 {editingMode === 'visual' ? (
-                  <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+                  <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
                     <p className="text-xs text-muted-foreground">
                       Assemble your email using pre-built content blocks. Switching back to the raw HTML editor is always possible.
                     </p>
@@ -575,6 +655,38 @@ export function TemplateFormModal({
                   </div>
                 )}
               </div>
+            </div>
+            <div className="space-y-4 rounded-lg border border-border bg-muted/15 p-4">
+              {DATA_CONTEXT_HELP[formValues.type] && (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      {DATA_CONTEXT_HELP[formValues.type].heading}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {DATA_CONTEXT_HELP[formValues.type].description}
+                    </p>
+                  </div>
+                  {DATA_CONTEXT_HELP[formValues.type].groups?.map((group) => (
+                    <div key={group.title} className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground">{group.title}</p>
+                      <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                        {group.items.map((item) => (
+                          <li
+                            key={item}
+                            className="rounded border border-border bg-muted/20 px-2 py-1 font-mono text-[11px]"
+                          >
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  {DATA_CONTEXT_HELP[formValues.type].note && (
+                    <p className="text-xs text-muted-foreground">{DATA_CONTEXT_HELP[formValues.type].note}</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

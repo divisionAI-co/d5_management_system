@@ -67,6 +67,7 @@ model User {
   aiActions             AiAction[] @relation("AiActionsCreatedBy")
   aiActionAttachments   AiActionAttachment[] @relation("AiActionAttachmentsByUser")
   aiActionExecutions    AiActionExecution[] @relation("AiActionExecutionsTriggeredBy")
+  sessions              UserSession[]
   
   @@map("users")
 }
@@ -142,6 +143,8 @@ model Customer {
   city        String?
   country     String?
   postalCode  String?
+  taxId       String?
+  registrationId String?
   
   // Financial
   monthlyValue Decimal? @db.Decimal(10, 2)
@@ -1296,6 +1299,25 @@ model UserCalendarIntegration {
 
   @@unique([userId, provider])
   @@map("user_calendar_integrations")
+}
+
+model UserSession {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  tokenHash  String   @db.Text @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  userAgent  String?  @map("user_agent")
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
 }
 
 // ============================================

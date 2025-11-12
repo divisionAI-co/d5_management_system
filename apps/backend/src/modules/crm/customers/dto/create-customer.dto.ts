@@ -74,6 +74,16 @@ export class CreateCustomerDto {
   @IsOptional()
   postalCode?: string;
 
+  @ApiPropertyOptional({ description: 'Tax identification number' })
+  @IsString()
+  @IsOptional()
+  taxId?: string;
+
+  @ApiPropertyOptional({ description: 'Company registration identifier' })
+  @IsString()
+  @IsOptional()
+  registrationId?: string;
+
   @ApiPropertyOptional({ description: 'Monthly contract value', example: 2500 })
   @IsNumber()
   @Min(0)

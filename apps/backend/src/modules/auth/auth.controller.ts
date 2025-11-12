@@ -1,5 +1,7 @@
 import { Controller, Post, Body, UseGuards, Get, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ThrottlerGuard } from '@nestjs/throttler';
+import { UserRole } from '@prisma/client';
 
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -10,6 +12,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { CompletePasswordResetDto } from './dto/complete-password-reset.dto';
+import { Roles } from './decorators/roles.decorator';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -17,6 +20,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @UseGuards(ThrottlerGuard)
   @Post('login')
   @ApiOperation({ summary: 'User login' })
   @ApiResponse({ status: 200, description: 'Login successful' })
@@ -25,9 +29,10 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Register new user (Admin only in production)' })
+  @ApiBearerAuth()
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create a new user (admin only)' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Email already exists' })
   async register(@Body() registerDto: RegisterDto) {
@@ -35,6 +40,7 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
@@ -44,6 +50,7 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
   @Post('password-reset/request')
   @ApiOperation({ summary: 'Request a password reset email' })
   async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
@@ -51,6 +58,7 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
   @Post('password-reset/complete')
   @ApiOperation({ summary: 'Complete password reset using a one-time token' })
   async completePasswordReset(@Body() dto: CompletePasswordResetDto) {

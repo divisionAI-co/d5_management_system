@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
+import * as crypto from 'crypto';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { UsersService } from '../users/users.service';
@@ -13,6 +14,8 @@ import { EmailService } from '../../common/email/email.service';
 
 @Injectable()
 export class AuthService {
+  private static readonly DEFAULT_REFRESH_EXPIRY = '30d';
+
   constructor(
     private prisma: PrismaService,
     private usersService: UsersService,
@@ -111,20 +114,54 @@ export class AuthService {
     };
   }
 
-  async generateTokens(user: any) {
+  async generateTokens(
+    user: any,
+    options?: {
+      sessionMetadata?: {
+        userAgent?: string;
+        ipAddress?: string;
+      };
+    },
+  ) {
+    const sessionId = crypto.randomUUID();
+
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      sid: sessionId,
     };
 
+    const refreshExpiryConfig = this.configService.get<string>(
+      'JWT_REFRESH_EXPIRES_IN',
+      AuthService.DEFAULT_REFRESH_EXPIRY,
+    );
+
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload),
+      this.jwtService.signAsync({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+      }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '30d'),
+        expiresIn: refreshExpiryConfig,
       }),
     ]);
+
+    const tokenHash = this.hashToken(refreshToken);
+    const expiresAt = this.calculateRefreshExpiryDate(refreshExpiryConfig);
+
+    await this.prisma.userSession.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        userAgent: options?.sessionMetadata?.userAgent,
+        ipAddress: options?.sessionMetadata?.ipAddress,
+      },
+    });
 
     return {
       accessToken,
@@ -138,16 +175,81 @@ export class AuthService {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
+      if (!payload?.sid) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      const session = await this.prisma.userSession.findUnique({
+        where: { id: payload.sid },
+      });
+
+      if (!session) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      if (session.revokedAt || session.expiresAt < new Date()) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      const presentedHash = this.hashToken(refreshToken);
+
+      if (presentedHash !== session.tokenHash) {
+        await this.prisma.userSession.update({
+          where: { id: session.id },
+          data: {
+            revokedAt: new Date(),
+            lastUsedAt: new Date(),
+          },
+        });
+
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
       const user = await this.usersService.findById(payload.sub);
       
       if (!user || !user.isActive) {
         throw new UnauthorizedException('Invalid token');
       }
 
-      return this.generateTokens(user);
+      await this.prisma.userSession.update({
+        where: { id: session.id },
+        data: {
+          revokedAt: new Date(),
+          lastUsedAt: new Date(),
+        },
+      });
+
+      return this.generateTokens(user, {
+        sessionMetadata: {
+          userAgent: session.userAgent ?? undefined,
+          ipAddress: session.ipAddress ?? undefined,
+        },
+      });
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  private hashToken(token: string) {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private calculateRefreshExpiryDate(configValue: string) {
+    const match = /^(\d+)([smhd])$/.exec(configValue ?? '');
+
+    const amount = match ? Number(match[1]) : 30;
+    const unit = match ? match[2] : 'd';
+
+    const multiplier =
+      unit === 's'
+        ? 1000
+        : unit === 'm'
+          ? 60_000
+          : unit === 'h'
+            ? 3_600_000
+            : 86_400_000;
+
+    return new Date(Date.now() + amount * multiplier);
   }
 
   private getPasswordResetExpiryHours() {

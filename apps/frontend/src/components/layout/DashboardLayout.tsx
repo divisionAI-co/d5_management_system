@@ -4,6 +4,7 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/types/users';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { ROLE_PERMISSIONS } from '@/constants/permissions';
+import { NotificationsPanel } from './NotificationsPanel';
 
 type NavItem = {
   name: string;
@@ -223,7 +224,8 @@ export default function DashboardLayout() {
                 })}
               </div>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center gap-3">
+              <NotificationsPanel />
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"

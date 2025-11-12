@@ -60,15 +60,21 @@ export class EodReportsService {
   }
 
   private async hasApprovedLeave(userId: string, date: Date) {
+    const dateOnly = this.toDateOnly(date);
+    const startOfDay = new Date(dateOnly);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(dateOnly);
+    endOfDay.setHours(23, 59, 59, 999);
+
     const leave = await this.prisma.leaveRequest.findFirst({
       where: {
         userId,
         status: LeaveRequestStatus.APPROVED,
         startDate: {
-          lte: date,
+          lte: endOfDay,
         },
         endDate: {
-          gte: date,
+          gte: startOfDay,
         },
       },
       select: { id: true },
@@ -124,15 +130,19 @@ export class EodReportsService {
 
     this.ensureNotFutureDate(rest.date);
 
+    // Validate that the report date is a working day (not weekend or vacation)
+    const reportDate = new Date(rest.date);
+    const isWorkingDay = await this.isWorkingDay(userId, reportDate);
+    if (!isWorkingDay) {
+      throw new BadRequestException(
+        'EOD reports cannot be created for weekends, holidays, or days when you are on approved leave.',
+      );
+    }
+
     let isLate = false;
     let submittedAt: Date | undefined;
 
     if (submit) {
-      const reportDate = new Date(rest.date);
-      const isWorkingDay = await this.isWorkingDay(userId, reportDate);
-      if (!isWorkingDay) {
-        throw new BadRequestException('EOD reports are not required on approved leave or holidays.');
-      }
       isLate = await this.computeIsLate(rest.date);
       submittedAt = new Date();
     }

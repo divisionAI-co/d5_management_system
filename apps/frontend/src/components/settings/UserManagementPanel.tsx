@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldAlert, ShieldCheck, UserPlus, RefreshCcw, Trash2, X, Wand2 } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, UserPlus, RefreshCcw, Trash2, X, Wand2, Loader2 } from 'lucide-react';
 
 import { usersApi } from '@/lib/api/users';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -180,6 +180,8 @@ export function UserManagementPanel() {
     setFormPassword('');
     setFormSendInvite(false);
   };
+  const isSaving = formMode === 'create' ? createMutation.isPending : updateMutation.isPending;
+
 
   const generateStrongPassword = () => {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*()';
@@ -684,9 +686,17 @@ export function UserManagementPanel() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
+                  disabled={isSaving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {formMode === 'create' ? 'Invite User' : 'Save Changes'}
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {formMode === 'create' ? 'Sending invite…' : 'Saving…'}
+                    </>
+                  ) : (
+                    formMode === 'create' ? 'Invite User' : 'Save Changes'
+                  )}
                 </button>
               </div>
             </form>

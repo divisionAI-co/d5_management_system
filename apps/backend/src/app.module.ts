@@ -33,7 +33,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 
 // Universal
 import { ActivitiesModule } from './modules/activities/activities.module';
-// import { NotificationsModule } from './modules/notifications/notifications.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 // import { MeetingsModule } from './modules/meetings/meetings.module';
 // import { ReportsModule } from './modules/reports/reports.module';
 import { TemplatesModule } from './modules/templates/templates.module';
@@ -98,7 +98,7 @@ import { PdfModule } from './common/pdf/pdf.module';
 
     // Universal
     ActivitiesModule,
-    // NotificationsModule,
+    NotificationsModule,
     // MeetingsModule,
     // ReportsModule,
     TemplatesModule,

@@ -45,6 +45,8 @@ type FormValues = {
   city?: string;
   country?: string;
   postalCode?: string;
+  taxId?: string;
+  registrationId?: string;
   monthlyValue?: string;
   currency?: string;
   notes?: string;
@@ -72,6 +74,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         sentiment: 'NEUTRAL',
         currency: 'USD',
         tags: '',
+        taxId: '',
+        registrationId: '',
       };
     }
 
@@ -88,6 +92,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
       city: customer.city ?? '',
       country: customer.country ?? '',
       postalCode: customer.postalCode ?? '',
+      taxId: customer.taxId ?? '',
+      registrationId: customer.registrationId ?? '',
       monthlyValue:
         customer.monthlyValue !== undefined && customer.monthlyValue !== null
           ? String(customer.monthlyValue)
@@ -146,6 +152,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
       city: values.city || undefined,
       country: values.country || undefined,
       postalCode: values.postalCode || undefined,
+      taxId: values.taxId || undefined,
+      registrationId: values.registrationId || undefined,
       monthlyValue,
       currency: values.currency || undefined,
       notes: values.notes || undefined,
@@ -342,6 +350,27 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
                   className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Tax ID</label>
+              <input
+                type="text"
+                {...register('taxId')}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. VAT123456"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Registration ID</label>
+              <input
+                type="text"
+                {...register('registrationId')}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                placeholder="Company registration number"
+              />
             </div>
           </div>
 

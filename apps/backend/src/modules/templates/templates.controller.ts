@@ -60,6 +60,13 @@ export class TemplatesController {
   preview(@Param('id') id: string, @Body() previewTemplateDto: PreviewTemplateDto) {
     return this.templatesService.preview(id, previewTemplateDto);
   }
+
+  @Post(':id/duplicate')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Duplicate a template' })
+  duplicate(@Param('id') id: string) {
+    return this.templatesService.duplicate(id);
+  }
 }
 
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { UserRole } from '@/types/users';
 
 interface User {
@@ -49,6 +49,7 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'division5-auth-storage',
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );

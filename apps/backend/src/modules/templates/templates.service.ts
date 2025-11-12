@@ -73,6 +73,22 @@ export class TemplatesService {
     });
   }
 
+  async duplicate(id: string) {
+    const source = await this.findOne(id);
+
+    return this.prisma.template.create({
+      data: {
+        name: `${source.name} (Copy)`,
+        type: source.type,
+        htmlContent: source.htmlContent,
+        cssContent: source.cssContent,
+        variables: source.variables as Prisma.InputJsonValue,
+        isDefault: false, // Duplicates should never be default
+        isActive: source.isActive,
+      },
+    });
+  }
+
   async update(id: string, dto: UpdateTemplateDto) {
     const existing = await this.findOne(id);
     const nextType = dto.type ?? existing.type;
