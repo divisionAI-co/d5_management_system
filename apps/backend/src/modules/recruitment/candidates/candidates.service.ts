@@ -61,6 +61,11 @@ export class CandidatesService {
       })),
     };
 
+    formatted.driveFolderId = candidate.driveFolderId ?? null;
+    formatted.driveFolderUrl = candidate.driveFolderId
+      ? `https://drive.google.com/drive/folders/${candidate.driveFolderId}`
+      : null;
+
     if (Array.isArray(candidate?.activities)) {
       formatted.activities = candidate.activities.map((activity: any) =>
         mapActivitySummary(activity),
@@ -68,6 +73,50 @@ export class CandidatesService {
     }
 
     return formatted;
+  }
+
+  private extractDriveFolderId(input?: string | null): string | undefined {
+    if (!input) {
+      return undefined;
+    }
+
+    const trimmed = input.trim();
+
+    if (!trimmed) {
+      return undefined;
+    }
+
+    const idPattern = /[-\w]{10,}/;
+
+    // If it does not look like a URL, assume it's already an ID.
+    if (!trimmed.includes('/')) {
+      const maybeId = trimmed.match(idPattern)?.[0];
+      return maybeId ?? undefined;
+    }
+
+    try {
+      const url = new URL(trimmed);
+
+      const folderMatch = url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      if (folderMatch?.[1]) {
+        return folderMatch[1];
+      }
+
+      const fileMatch = url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileMatch?.[1]) {
+        return fileMatch[1];
+      }
+
+      const idFromQuery = url.searchParams.get('id');
+      if (idFromQuery) {
+        return idFromQuery;
+      }
+    } catch {
+      // Not a valid URL; fall back to regex below.
+    }
+
+    const fallbackMatch = trimmed.match(idPattern);
+    return fallbackMatch?.[0];
   }
 
   private validateSortField(sortBy?: string) {
@@ -204,6 +253,19 @@ export class CandidatesService {
       );
     }
 
+    const driveFolderId = this.extractDriveFolderId(
+      createDto.driveFolderId ?? createDto.driveFolderUrl,
+    );
+
+    if (
+      (createDto.driveFolderId ?? createDto.driveFolderUrl) &&
+      !driveFolderId
+    ) {
+      throw new BadRequestException(
+        'Unable to extract Google Drive folder ID from the provided value.',
+      );
+    }
+
     const candidate = await this.prisma.candidate.create({
       data: {
         firstName: createDto.firstName,
@@ -231,6 +293,7 @@ export class CandidatesService {
             ? new Prisma.Decimal(createDto.expectedSalary)
             : undefined,
         salaryCurrency: createDto.salaryCurrency,
+        driveFolderId,
       },
       include: {
         positions: {
@@ -354,6 +417,28 @@ export class CandidatesService {
   async update(id: string, updateDto: UpdateCandidateDto) {
     await this.ensureCandidateExists(id);
 
+    let driveFolderIdUpdate: string | null | undefined = undefined;
+    if (
+      updateDto.driveFolderId !== undefined ||
+      updateDto.driveFolderUrl !== undefined
+    ) {
+      const resolved = this.extractDriveFolderId(
+        updateDto.driveFolderId ?? updateDto.driveFolderUrl,
+      );
+
+      if (
+        (updateDto.driveFolderId ?? updateDto.driveFolderUrl) &&
+        !resolved
+      ) {
+        throw new BadRequestException(
+          'Unable to extract Google Drive folder ID from the provided value.',
+        );
+      }
+
+      driveFolderIdUpdate =
+        resolved !== undefined ? resolved : null;
+    }
+
     try {
       const candidate = await this.prisma.candidate.update({
         where: { id },
@@ -387,6 +472,7 @@ export class CandidatesService {
                 : new Prisma.Decimal(updateDto.expectedSalary)
               : undefined,
           salaryCurrency: updateDto.salaryCurrency,
+          driveFolderId: driveFolderIdUpdate,
         },
         include: {
           positions: {

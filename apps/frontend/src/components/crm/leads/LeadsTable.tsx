@@ -11,6 +11,7 @@ interface LeadsTableProps {
   onUpdateStatus: (lead: Lead) => void;
   onConvert: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
+  onView?: (lead: Lead) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -30,6 +31,7 @@ export function LeadsTable({
   onUpdateStatus,
   onConvert,
   onDelete,
+  onView,
 }: LeadsTableProps) {
   if (isLoading) {
     return (
@@ -95,7 +97,11 @@ export function LeadsTable({
         </thead>
         <tbody className="divide-y divide-border bg-card">
           {leads.map((lead) => (
-            <tr key={lead.id} className="transition hover:bg-muted/70">
+            <tr
+              key={lead.id}
+              className={`transition ${onView ? 'cursor-pointer hover:bg-muted/70' : 'hover:bg-muted/70'}`}
+              onClick={() => onView?.(lead)}
+            >
               <td className="px-6 py-4 text-sm">
                 <div className="font-semibold text-foreground">{lead.title}</div>
                 {lead.source && <div className="text-xs text-muted-foreground">Source: {lead.source}</div>}
@@ -141,31 +147,43 @@ export function LeadsTable({
               <td className="px-6 py-4 text-right text-sm">
                 <div className="flex items-center justify-end gap-2">
                   <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(lead);
+                    }}
                     className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-300 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-300"
                     title="Edit lead"
-                    onClick={() => onEdit(lead)}
                   >
                     <Edit3 className="h-4 w-4" />
                   </button>
                   <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onUpdateStatus(lead);
+                    }}
                     className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-400 dark:hover:text-indigo-300"
                     title="Update status"
-                    onClick={() => onUpdateStatus(lead)}
                   >
                     <RefreshCcw className="h-4 w-4" />
                   </button>
                   <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onConvert(lead);
+                    }}
                     className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-emerald-300 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:border-emerald-400 dark:hover:text-emerald-300"
                     title="Convert lead"
-                    onClick={() => onConvert(lead)}
                     disabled={!!lead.convertedCustomerId}
                   >
                     <Star className="h-4 w-4" />
                   </button>
                   <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(lead);
+                    }}
                     className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-red-300 hover:text-red-600 dark:hover:border-red-400 dark:hover:text-red-300"
                     title="Delete lead"
-                    onClick={() => onDelete(lead)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

@@ -124,6 +124,8 @@ export default function ContactsPage() {
     }));
   };
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const handlePageChange = (page: number) => {
     if (page < 1) return;
     setFilters((prev) => ({ ...prev, page }));
@@ -205,11 +207,10 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      <form onSubmit={handleFilterApply} className="rounded-lg border border-border bg-card p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Search</label>
-            <div className="relative">
+      <form onSubmit={handleFilterApply} className="rounded-lg border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
               <input
                 type="text"
                 value={searchTerm}
@@ -219,72 +220,83 @@ export default function ContactsPage() {
               />
               <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Customer</label>
-            <select
-              value={selectedCustomer ?? ''}
-              onChange={(event) => setSelectedCustomer(event.target.value || undefined)}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            <button
+              type="button"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
-              <option value="">All customers</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-            <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={showUnassigned}
-                onChange={(event) => setShowUnassigned(event.target.checked)}
-              />
-              Show only unassigned contacts
-            </label>
+              Advanced filters
+            </button>
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Sort By</label>
-              <select
-                value={filters.sortBy ?? 'createdAt'}
-                onChange={(event) => handleSortChange(event.target.value as NonNullable<ContactFilters['sortBy']>)}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+        </div>
+        {showFilters && (
+          <div className="space-y-4 px-4 py-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Customer</label>
+                <select
+                  value={selectedCustomer ?? ''}
+                  onChange={(event) => setSelectedCustomer(event.target.value || undefined)}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All customers</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={showUnassigned}
+                    onChange={(event) => setShowUnassigned(event.target.checked)}
+                  />
+                  Show only unassigned contacts
+                </label>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Sort By</label>
+                <select
+                  value={filters.sortBy ?? 'createdAt'}
+                  onChange={(event) => handleSortChange(event.target.value as NonNullable<ContactFilters['sortBy']>)}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Direction</label>
+                <button
+                  type="button"
+                  onClick={handleSortDirection}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">Direction</label>
+            <div className="flex items-center gap-3 border-t border-border pt-3">
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+              >
+                Apply Filters
+              </button>
               <button
                 type="button"
-                onClick={handleSortDirection}
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                onClick={handleReset}
+                className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
               >
-                {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                Reset
               </button>
             </div>
           </div>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            Apply Filters
-          </button>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            Reset
-          </button>
-        </div>
+        )}
       </form>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">

@@ -1,15 +1,13 @@
 import {
-  Body,
   Controller,
-  Delete,
   Get,
-  Param,
-  Patch,
   Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
   Query,
   UseGuards,
-  Request,
-  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { EmployeesService } from './employees.service';
@@ -39,18 +37,42 @@ export class EmployeesController {
   @ApiOperation({ summary: 'Get all employees' })
   @ApiQuery({ name: 'status', required: false, type: String })
   @ApiQuery({ name: 'department', required: false, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number })
   findAll(
     @Query('status') status?: string,
     @Query('department') department?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     const filters: any = {};
-    
+
     if (status) {
       filters.status = status;
     }
-    
+
     if (department) {
       filters.department = department;
+    }
+
+    if (search) {
+      filters.search = search;
+    }
+
+    if (page) {
+      const parsed = Number.parseInt(page, 10);
+      if (!Number.isNaN(parsed)) {
+        filters.page = parsed;
+      }
+    }
+
+    if (pageSize) {
+      const parsed = Number.parseInt(pageSize, 10);
+      if (!Number.isNaN(parsed)) {
+        filters.pageSize = parsed;
+      }
     }
 
     return this.employeesService.findAll(filters);
@@ -81,21 +103,6 @@ export class EmployeesController {
   @ApiOperation({ summary: 'Get employee by user ID' })
   findByUserId(@Param('userId') userId: string) {
     return this.employeesService.findByUserId(userId);
-  }
-
-  @Get('me/direct-reports')
-  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER)
-  @ApiOperation({ summary: 'Get direct reports for the current user' })
-  async getMyDirectReports(@Request() req: any) {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      throw new ForbiddenException('Unable to resolve current user.');
-    }
-
-    const manager = await this.employeesService.findByUserId(userId);
-
-    return this.employeesService.findDirectReports(manager.id);
   }
 
   @Patch(':id')

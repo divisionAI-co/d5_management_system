@@ -16,6 +16,7 @@ type CompanySettingsFormValues = {
   eodReportDeadlineHour: number;
   eodReportDeadlineMin: number;
   reviewCycleDays: number;
+  annualLeaveAllowanceDays: number;
 };
 
 const DEFAULT_VALUES: CompanySettingsFormValues = {
@@ -25,6 +26,7 @@ const DEFAULT_VALUES: CompanySettingsFormValues = {
   eodReportDeadlineHour: 23,
   eodReportDeadlineMin: 59,
   reviewCycleDays: 180,
+  annualLeaveAllowanceDays: 20,
 };
 
 const FREQUENCY_OPTIONS: Array<{
@@ -61,6 +63,7 @@ export function CompanySettingsForm() {
         eodReportDeadlineHour: data.eodReportDeadlineHour,
         eodReportDeadlineMin: data.eodReportDeadlineMin,
         reviewCycleDays: data.reviewCycleDays,
+        annualLeaveAllowanceDays: data.annualLeaveAllowanceDays,
       };
       reset(initialValues);
     }
@@ -82,6 +85,7 @@ export function CompanySettingsForm() {
       eodReportDeadlineHour: values.eodReportDeadlineHour,
       eodReportDeadlineMin: values.eodReportDeadlineMin,
       reviewCycleDays: values.reviewCycleDays,
+      annualLeaveAllowanceDays: values.annualLeaveAllowanceDays,
     };
 
     mutation.mutate(payload);
@@ -97,6 +101,7 @@ export function CompanySettingsForm() {
         eodReportDeadlineHour: data.eodReportDeadlineHour,
         eodReportDeadlineMin: data.eodReportDeadlineMin,
         reviewCycleDays: data.reviewCycleDays,
+        annualLeaveAllowanceDays: data.annualLeaveAllowanceDays,
       });
       return;
     }
@@ -209,6 +214,25 @@ export function CompanySettingsForm() {
               disabled={isLoading || isFetching}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
+              Annual PTO Allowance (days)
+            </label>
+            <input
+              type="number"
+              min={0}
+              {...register('annualLeaveAllowanceDays', {
+                valueAsNumber: true,
+                min: 0,
+              })}
+              disabled={isLoading || isFetching}
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Determines how many paid days off each employee can use per calendar year.
+            </p>
           </div>
         </fieldset>
 

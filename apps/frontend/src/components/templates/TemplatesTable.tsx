@@ -67,7 +67,19 @@ export function TemplatesTable({
             const updatedOn = new Date(template.updatedAt).toLocaleString();
 
             return (
-              <tr key={template.id}>
+              <tr
+                key={template.id}
+                className="cursor-pointer hover:bg-muted focus-within:bg-muted"
+                role="button"
+                tabIndex={0}
+                onClick={() => onPreview(template)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onPreview(template);
+                  }
+                }}
+              >
                 <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-foreground">
                   <div className="space-y-1">
                     <div>{template.name}</div>
@@ -109,7 +121,10 @@ export function TemplatesTable({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => onPreview(template)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onPreview(template);
+                      }}
                       className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     >
                       <Eye className="h-4 w-4" />
@@ -117,7 +132,10 @@ export function TemplatesTable({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onEdit(template)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit(template);
+                      }}
                       className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition hover:bg-blue-700"
                     >
                       <Pencil className="h-4 w-4" />

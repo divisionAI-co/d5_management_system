@@ -60,9 +60,13 @@ model User {
   leaveRequests         LeaveRequest[]
   remoteWorkLogs        RemoteWorkLog[]
   createdInvoices       Invoice[] @relation("InvoiceCreator")
+  calendarIntegrations  UserCalendarIntegration[]
   sentCampaigns         EmailCampaign[]
   passwordResetTokens   PasswordResetToken[]
   createdActivityTypes  ActivityType[] @relation("ActivityTypeCreatedBy")
+  aiActions             AiAction[] @relation("AiActionsCreatedBy")
+  aiActionAttachments   AiActionAttachment[] @relation("AiActionAttachmentsByUser")
+  aiActionExecutions    AiActionExecution[] @relation("AiActionExecutionsTriggeredBy")
   
   @@map("users")
 }
@@ -464,6 +468,7 @@ model Candidate {
   linkedinUrl String?
   githubUrl   String?
   portfolioUrl String?
+  driveFolderId String? // Google Drive folder containing interviews/CV
   
   // Recruitment
   stage       CandidateStage @default(VALIDATION)
@@ -722,6 +727,9 @@ model CompanySettings {
   
   // Performance Review
   reviewCycleDays       Int      @default(180) // 6 months
+
+  // Leave Policy
+  annualLeaveAllowanceDays Int @default(20)
   
   updatedAt             DateTime @updatedAt
   
@@ -867,6 +875,7 @@ model Activity {
   
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+  aiExecutions  AiActionExecution[] @relation("ActivityExecutions")
   
   @@index([activityTypeId])
   @@index([customerId])
@@ -909,6 +918,148 @@ model ActivityType {
   @@index([isActive])
   @@index([order])
   @@map("activity_types")
+}
+
+// ============================================
+// AI ACTIONS & GEMINI INTEGRATION
+// ============================================
+
+enum AiEntityType {
+  CUSTOMER
+  LEAD
+  OPPORTUNITY
+  CANDIDATE
+  EMPLOYEE
+  CONTACT
+  TASK
+}
+
+enum AiActionExecutionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum AiCollectionKey {
+  EOD_REPORTS
+  OPPORTUNITIES
+  LEADS
+  TASKS
+  ACTIVITIES
+}
+
+enum AiCollectionFormat {
+  TABLE
+  BULLET_LIST
+  PLAIN_TEXT
+}
+
+model AiAction {
+  id              String     @id @default(uuid())
+  name            String
+  description     String?
+  promptTemplate  String     @db.Text
+  entityType      AiEntityType
+  model           String?    // Optional override, defaults in service
+  isSystem        Boolean    @default(false)
+  isActive        Boolean    @default(true)
+  createdById     String?
+  createdBy       User?      @relation("AiActionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  fields          AiActionField[]
+  collections     AiActionCollection[]
+  attachments     AiActionAttachment[]
+  executions      AiActionExecution[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("ai_actions")
+  @@index([entityType])
+  @@index([isActive])
+}
+
+model AiActionField {
+  id         String    @id @default(uuid())
+  actionId   String
+  action     AiAction  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  fieldKey   String
+  fieldLabel String
+  metadata   Json?
+  order      Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@unique([actionId, fieldKey])
+  @@map("ai_action_fields")
+}
+
+model AiActionCollection {
+  id            String             @id @default(uuid())
+  actionId      String
+  action        AiAction           @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  collectionKey AiCollectionKey
+  format        AiCollectionFormat @default(TABLE)
+  limit         Int?
+  order         Int                @default(0)
+  metadata      Json?
+  createdAt     DateTime           @default(now())
+  fields        AiActionCollectionField[]
+
+  @@index([actionId])
+  @@map("ai_action_collections")
+}
+
+model AiActionCollectionField {
+  id           String              @id @default(uuid())
+  collectionId String
+  collection   AiActionCollection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  fieldKey     String
+  fieldLabel   String
+  metadata     Json?
+  order        Int                 @default(0)
+
+  @@unique([collectionId, fieldKey])
+  @@map("ai_action_collection_fields")
+}
+
+model AiActionAttachment {
+  id            String     @id @default(uuid())
+  actionId      String
+  action        AiAction   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  entityType    AiEntityType
+  entityId      String
+  attachedById  String?
+  attachedBy    User?      @relation("AiActionAttachmentsByUser", fields: [attachedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+  executions    AiActionExecution[]
+
+  @@unique([actionId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@map("ai_action_attachments")
+}
+
+model AiActionExecution {
+  id             String                    @id @default(uuid())
+  actionId       String?
+  action         AiAction?                 @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  attachmentId   String?
+  attachment     AiActionAttachment?       @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  entityType     AiEntityType
+  entityId       String
+  prompt         String                    @db.Text
+  inputs         Json?
+  output         Json?
+  rawOutput      String?                   @db.Text
+  status         AiActionExecutionStatus   @default(PENDING)
+  errorMessage   String?
+  triggeredById  String?
+  triggeredBy    User?                     @relation("AiActionExecutionsTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  activityId     String?
+  activity       Activity?                 @relation("ActivityExecutions", fields: [activityId], references: [id], onDelete: SetNull)
+  createdAt      DateTime                  @default(now())
+  completedAt    DateTime?
+
+  @@index([entityType, entityId])
+  @@index([status])
+  @@map("ai_action_executions")
 }
 
 // ============================================
@@ -1121,6 +1272,27 @@ model Integration {
   updatedAt   DateTime @updatedAt
   
   @@map("integrations")
+}
+
+model UserCalendarIntegration {
+  id                String   @id @default(uuid())
+  userId            String   @map("user_id")
+  provider          String
+  accessToken       String?  @db.Text @map("access_token")
+  refreshToken      String?  @db.Text @map("refresh_token")
+  expiresAt         DateTime? @map("expires_at")
+  scope             String?
+  externalAccountId String?  @map("external_account_id")
+  externalEmail     String?  @map("external_email")
+  syncToken         String?  @db.Text @map("sync_token")
+  lastSyncedAt      DateTime? @map("last_synced_at")
+  connectedAt       DateTime @default(now()) @map("connected_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("user_calendar_integrations")
 }
 
 // ============================================

@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { EmployeesList } from '@/components/hr/employees/EmployeesList';
 import { EmployeeForm } from '@/components/hr/employees/EmployeeForm';
+import { EmployeeImportDialog } from '@/components/hr/employees/EmployeeImportDialog';
 import { employeesApi } from '@/lib/api/hr';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import type { Employee } from '@/types/hr';
 
 export default function EmployeesPage() {
@@ -12,6 +14,9 @@ export default function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<Employee | null>(null);
   const queryClient = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
+  const { user } = useAuthStore();
+  const canImport = user?.role === 'ADMIN' || user?.role === 'HR';
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => employeesApi.delete(id),
@@ -54,6 +59,8 @@ export default function EmployeesPage() {
         onEdit={handleEdit}
         onView={handleView}
         onDelete={handleDelete}
+        onImport={canImport ? () => setImportOpen(true) : undefined}
+        canImport={canImport}
       />
 
       {showForm && (
@@ -99,6 +106,13 @@ export default function EmployeesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {canImport && importOpen && (
+        <EmployeeImportDialog
+          open={importOpen}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

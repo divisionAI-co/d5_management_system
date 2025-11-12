@@ -6,6 +6,7 @@ import { PerformanceReviewsList } from '@/components/hr/performance-reviews/Perf
 import { PerformanceReviewForm } from '@/components/hr/performance-reviews/PerformanceReviewForm';
 import { PerformanceReviewDetailsModal } from '@/components/hr/performance-reviews/PerformanceReviewDetailsModal';
 import type { PerformanceReview } from '@/types/hr';
+import { useAuthStore } from '@/lib/stores/auth-store';
 
 export default function PerformanceReviewsPage() {
   const location = useLocation();
@@ -19,6 +20,8 @@ export default function PerformanceReviewsPage() {
   const [deleteReview, setDeleteReview] = useState<PerformanceReview | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const canManage = user?.role === 'ADMIN' || user?.role === 'HR';
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => performanceReviewsApi.delete(id),
@@ -32,11 +35,17 @@ export default function PerformanceReviewsPage() {
   });
 
   const handleCreate = () => {
+    if (!canManage) {
+      return;
+    }
     setSelectedReview(undefined);
     setShowForm(true);
   };
 
   const handleEdit = (review: PerformanceReview) => {
+    if (!canManage) {
+      return;
+    }
     setSelectedReview(review);
     setShowForm(true);
   };
@@ -68,29 +77,29 @@ export default function PerformanceReviewsPage() {
   };
 
   return (
-    <div className="py-8">
+    <div className="container mx-auto px-4 py-8">
       {employeeIdFilter && (
         <div className="mb-4">
           <button
             onClick={() => navigate(`/employees/${employeeIdFilter}`)}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             Back to {employeeName || 'Employee'}
           </button>
         </div>
       )}
       <PerformanceReviewsList
-        onCreateNew={handleCreate}
-        onEdit={handleEdit}
+        onCreateNew={canManage ? handleCreate : undefined}
+        onEdit={canManage ? handleEdit : undefined}
         onView={handleView}
-        onDelete={setDeleteReview}
+        onDelete={canManage ? setDeleteReview : undefined}
         onDownloadPdf={handleDownload}
         downloadingId={downloadingId}
         contextLabel={employeeName}
         filterEmployeeId={employeeIdFilter}
       />
 
-      {showForm && (
+      {showForm && canManage && (
         <PerformanceReviewForm
           review={selectedReview}
           employeeId={employeeIdFilter}
@@ -113,11 +122,11 @@ export default function PerformanceReviewsPage() {
         <PerformanceReviewDetailsModal review={detailReview} onClose={() => setDetailReview(null)} />
       )}
 
-      {deleteReview && (
+      {deleteReview && canManage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-foreground">Delete Performance Review</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">Delete Performance Review</h3>
+            <p className="mt-2 text-sm text-gray-600">
               Are you sure you want to delete the review for{' '}
               <span className="font-semibold">
                 {deleteReview.employee?.user.firstName} {deleteReview.employee?.user.lastName}
@@ -127,7 +136,7 @@ export default function PerformanceReviewsPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setDeleteReview(null)}
-                className="rounded-lg border border-border px-4 py-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
               >
                 Cancel
               </button>

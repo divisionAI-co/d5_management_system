@@ -50,6 +50,8 @@ export interface Candidate {
   linkedinUrl?: string | null;
   githubUrl?: string | null;
   portfolioUrl?: string | null;
+  driveFolderId?: string | null;
+  driveFolderUrl?: string | null;
   stage: CandidateStage;
   rating?: number | null;
   notes?: string | null;
@@ -89,6 +91,8 @@ export interface CreateCandidateDto {
   linkedinUrl?: string;
   githubUrl?: string;
   portfolioUrl?: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
   stage?: CandidateStage;
   rating?: number;
   notes?: string;

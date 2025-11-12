@@ -2,8 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { eodReportsApi } from '@/lib/api/hr';
 import type { EodReport } from '@/types/hr';
 import { addDays, endOfDay, format } from 'date-fns';
-import { ClipboardList, Edit3, Plus } from 'lucide-react';
-import { AxiosError } from 'axios';
+import { ClipboardList, Edit3, Plus, UploadCloud } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@prisma/client';
 
@@ -12,6 +11,8 @@ interface EodReportsListProps {
   onEdit?: (report: EodReport) => void;
   filterUserId?: string;
   contextLabel?: string;
+  onImport?: () => void;
+  canImport?: boolean;
 }
 
 export function EodReportsList({
@@ -19,25 +20,25 @@ export function EodReportsList({
   onEdit,
   filterUserId,
   contextLabel,
+  onImport,
+  canImport,
 }: EodReportsListProps) {
   const { user } = useAuthStore();
   const isPrivileged =
     user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
 
   const { data: reports, isLoading } = useQuery({
-    queryKey: ['eod-reports', filterUserId],
+    queryKey: ['eod-reports', filterUserId, isPrivileged, user?.id],
     queryFn: async () => {
-      if (filterUserId) {
-        return eodReportsApi.getAll({ userId: filterUserId });
-      }
-      try {
-        return await eodReportsApi.getAll();
-      } catch (error) {
-        if (error instanceof AxiosError && error.response?.status === 403) {
-          return eodReportsApi.getMine();
+      if (isPrivileged) {
+        if (filterUserId) {
+          return eodReportsApi.getAll({ userId: filterUserId });
         }
-        throw error;
+        return eodReportsApi.getAll();
       }
+
+      // Non-privileged users can only view their own submissions.
+      return eodReportsApi.getMine();
     },
   });
 
@@ -55,15 +56,26 @@ export function EodReportsList({
             </p>
           </div>
         </div>
-        {onCreateNew && (
-          <button
-            onClick={onCreateNew}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
-          >
-            <Plus className="h-5 w-5" />
-            New Report
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {canImport && onImport && (
+            <button
+              onClick={onImport}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Import Reports
+            </button>
+          )}
+          {onCreateNew && (
+            <button
+              onClick={onCreateNew}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700"
+            >
+              <Plus className="h-5 w-5" />
+              New Report
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -76,12 +88,12 @@ export function EodReportsList({
             const now = new Date();
             const reportDate = new Date(report.date);
             const editDeadline = endOfDay(addDays(reportDate, 1));
+            const isOwner = !!user?.id && user.id === report.userId;
+            const isDraft = !report.submittedAt;
+            const withinWindow = now.getTime() <= editDeadline.getTime();
             const canEdit =
               !!onEdit &&
-              !!user?.id &&
-              (isPrivileged ||
-                (user.id === report.userId &&
-                  now.getTime() <= editDeadline.getTime()));
+              (isPrivileged || (isOwner && (isDraft || withinWindow)));
 
             const hours =
               report.hoursWorked !== undefined && report.hoursWorked !== null

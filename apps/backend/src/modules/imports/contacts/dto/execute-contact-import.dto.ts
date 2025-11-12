@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
-export class ExecuteImportDto {
+export class ExecuteContactImportDto {
   @ApiPropertyOptional({
     description: 'If true, existing contacts matched by email will be updated',
     default: true,
@@ -12,7 +12,7 @@ export class ExecuteImportDto {
 
   @ApiPropertyOptional({
     description:
-      'Fallback customer ID to associate when mappings do not supply a customer',
+      'Fallback customer ID to associate with imported contacts when mapping does not supply a customer',
   })
   @IsOptional()
   @IsString()

@@ -8,6 +8,7 @@ export interface CompanySettings {
   eodReportDeadlineHour: number;
   eodReportDeadlineMin: number;
   reviewCycleDays: number;
+  annualLeaveAllowanceDays: number;
   updatedAt: string;
 }
 
@@ -20,6 +21,7 @@ export type UpdateCompanySettingsPayload = Partial<
     | 'eodReportDeadlineHour'
     | 'eodReportDeadlineMin'
     | 'reviewCycleDays'
+    | 'annualLeaveAllowanceDays'
   >
 >;
 

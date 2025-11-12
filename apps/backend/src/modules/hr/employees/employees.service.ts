@@ -1,7 +1,16 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Prisma, EmploymentStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
+
+interface EmployeeFilters {
+  status?: string;
+  department?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
 
 @Injectable()
 export class EmployeesService {
@@ -46,19 +55,48 @@ export class EmployeesService {
     });
   }
 
-  async findAll(filters?: { status?: string; department?: string }) {
-    const where: any = {};
+  async findAll(filters: EmployeeFilters = {}) {
+    const { status, department, search } = filters;
+    const page = Math.max(filters.page ?? 1, 1);
+    const rawPageSize = filters.pageSize ?? 10;
+    const pageSize = Math.min(Math.max(rawPageSize, 1), 100);
 
-    if (filters?.status) {
-      where.status = filters.status;
+    const where: Prisma.EmployeeWhereInput = {};
+
+    if (status && Object.values(EmploymentStatus).includes(status as EmploymentStatus)) {
+      where.status = status as EmploymentStatus;
     }
 
-    if (filters?.department) {
-      where.department = filters.department;
+    if (department) {
+      where.department = department;
     }
 
-    return this.prisma.employee.findMany({
+    if (search && search.trim().length > 0) {
+      const term = search.trim();
+      where.OR = [
+        { employeeNumber: { contains: term, mode: Prisma.QueryMode.insensitive } },
+        { jobTitle: { contains: term, mode: Prisma.QueryMode.insensitive } },
+        {
+          user: {
+            OR: [
+              { firstName: { contains: term, mode: Prisma.QueryMode.insensitive } },
+              { lastName: { contains: term, mode: Prisma.QueryMode.insensitive } },
+              { email: { contains: term, mode: Prisma.QueryMode.insensitive } },
+            ],
+          },
+        },
+      ];
+    }
+
+    const total = await this.prisma.employee.count({ where });
+    const pageCount = pageSize > 0 ? Math.ceil(total / pageSize) : 0;
+    const currentPage = pageCount > 0 ? Math.min(page, pageCount) : 1;
+    const skip = pageCount > 0 ? (currentPage - 1) * pageSize : 0;
+
+    const items = await this.prisma.employee.findMany({
       where,
+      skip,
+      take: pageSize,
       include: {
         user: {
           select: {
@@ -80,6 +118,16 @@ export class EmployeesService {
         hireDate: 'desc',
       },
     });
+
+    return {
+      data: items,
+      meta: {
+        page: currentPage,
+        pageSize,
+        total,
+        pageCount,
+      },
+    };
   }
 
   async findOne(id: string) {
@@ -93,19 +141,6 @@ export class EmployeesService {
             firstName: true,
             lastName: true,
             role: true,
-          },
-        },
-        directReports: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
           },
         },
         leaveRequests: {
@@ -152,19 +187,6 @@ export class EmployeesService {
             role: true,
           },
         },
-        directReports: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -173,56 +195,6 @@ export class EmployeesService {
     }
 
     return employee;
-  }
-
-  async findByUserIdNullable(userId: string) {
-    return this.prisma.employee.findUnique({
-      where: { userId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-        directReports: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  async getManagedEmployeeIds(managerId: string) {
-    const reports = await this.prisma.employee.findMany({
-      where: { managerId },
-      select: { id: true },
-    });
-
-    return reports.map((report) => report.id);
-  }
-
-  async isManagerOf(managerId: string, targetEmployeeId: string) {
-    const count = await this.prisma.employee.count({
-      where: {
-        id: targetEmployeeId,
-        managerId,
-      },
-    });
-
-    return count > 0;
   }
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto) {
@@ -260,34 +232,6 @@ export class EmployeesService {
 
     return this.prisma.employee.delete({
       where: { id },
-    });
-  }
-
-  async findDirectReports(managerId: string) {
-    return this.prisma.employee.findMany({
-      where: { managerId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-        _count: {
-          select: {
-            leaveRequests: true,
-            performanceReviews: true,
-          },
-        },
-      },
-      orderBy: {
-        user: {
-          firstName: 'asc',
-        },
-      },
     });
   }
 

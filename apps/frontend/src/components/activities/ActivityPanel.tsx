@@ -20,6 +20,7 @@ import {
 import { activitiesApi } from '@/lib/api/activities';
 import type { Activity } from '@/types/activities';
 import { cn } from '@/lib/utils';
+import { GeminiActionsSection } from './GeminiActionsSection';
 
 type EntityType =
   | 'customer'
@@ -338,6 +339,8 @@ export function ActivityPanel({
           </div>
         </form>
       </div>
+
+      <GeminiActionsSection entityId={entityId} entityType={entityType} />
 
       <div className="space-y-4">
         {activities.length === 0 && !activitiesQuery.isFetching ? (

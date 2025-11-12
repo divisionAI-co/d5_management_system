@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { customersApi, leadsApi } from '@/lib/api/crm';
 import type { CustomerSummary, Lead, LeadFilters, LeadStatus, LeadsListResponse } from '@/types/crm';
@@ -6,7 +7,7 @@ import { LeadsTable } from '@/components/crm/leads/LeadsTable';
 import { LeadForm } from '@/components/crm/leads/LeadForm';
 import { LeadStatusForm } from '@/components/crm/leads/LeadStatusForm';
 import { LeadConvertModal } from '@/components/crm/leads/LeadConvertModal';
-import { ContactImportDialog } from '@/components/crm/contacts/ContactImportDialog';
+import { LeadsImportDialog } from '@/components/crm/leads/LeadsImportDialog';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Filter, Plus, UploadCloud } from 'lucide-react';
 
@@ -29,6 +30,7 @@ const SORT_OPTIONS: Array<{ label: string; value: LeadFilters['sortBy'] }> = [
 
 export default function LeadsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [filters, setFilters] = useState<LeadFilters>({
     page: 1,
@@ -45,6 +47,7 @@ export default function LeadsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
+  const [showFilters, setShowFilters] = useState(false);
 
   const leadsQuery = useQuery<LeadsListResponse>({
     queryKey: ['leads', filters],
@@ -117,6 +120,10 @@ export default function LeadsPage() {
     }
   };
 
+  const handleView = (lead: Lead) => {
+    navigate(`/crm/leads/${lead.id}`);
+  };
+
   const meta = leadsQuery.data?.meta;
   const leads = leadsQuery.data?.data ?? [];
   const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
@@ -158,16 +165,10 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <form
-        onSubmit={handleSearchSubmit}
-        className="rounded-lg border border-border bg-card p-4 shadow-sm"
-      >
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Search
-            </label>
-            <div className="relative">
+      <form onSubmit={handleSearchSubmit} className="rounded-lg border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
               <input
                 type="text"
                 value={searchTerm}
@@ -177,72 +178,83 @@ export default function LeadsPage() {
               />
               <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Status
-            </label>
-            <select
-              value={filters.status ?? ''}
-              onChange={(event) => handleStatusChange(event.target.value ? (event.target.value as LeadStatus) : undefined)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            <button
+              type="button"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
-              {STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option.label} value={option.value ?? ''}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              Advanced filters
+            </button>
           </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-                Sort By
-              </label>
-              <select
-                value={filters.sortBy ?? 'createdAt'}
-                onChange={(event) => handleSortChange(event.target.value as LeadFilters['sortBy'])}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              >
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+        </div>
+        {showFilters && (
+          <div className="space-y-4 px-4 py-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Status
+                </label>
+                <select
+                  value={filters.status ?? ''}
+                  onChange={(event) => handleStatusChange(event.target.value ? (event.target.value as LeadStatus) : undefined)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {STATUS_FILTER_OPTIONS.map((option) => (
+                    <option key={option.label} value={option.value ?? ''}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Sort By
+                </label>
+                <select
+                  value={filters.sortBy ?? 'createdAt'}
+                  onChange={(event) => handleSortChange(event.target.value as LeadFilters['sortBy'])}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Direction
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSortOrderToggle}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground"
+                >
+                  {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-                Direction
-              </label>
+            <div className="flex items-center gap-3 border-t border-border pt-3">
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+              >
+                Apply Filters
+              </button>
               <button
                 type="button"
-                onClick={handleSortOrderToggle}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground hover:text-foreground"
+                onClick={() => {
+                  setSearchTerm('');
+                  setFilters({ page: 1, pageSize: 10, sortBy: 'createdAt', sortOrder: 'desc' });
+                }}
+                className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
               >
-                {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                Reset
               </button>
             </div>
           </div>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            Apply Filters
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSearchTerm('');
-              setFilters({ page: 1, pageSize: 10, sortBy: 'createdAt', sortOrder: 'desc' });
-            }}
-            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
-          >
-            Reset
-          </button>
-        </div>
+        )}
       </form>
 
       <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -279,6 +291,7 @@ export default function LeadsPage() {
         onUpdateStatus={handleStatusUpdate}
         onConvert={handleConvert}
         onDelete={handleDelete}
+        onView={handleView}
       />
 
       {formOpen && (
@@ -312,9 +325,8 @@ export default function LeadsPage() {
         />
       )}
 
-      <ContactImportDialog
+      <LeadsImportDialog
         open={importOpen}
-        importType="leads"
         customers={customers}
         onClose={() => setImportOpen(false)}
       />

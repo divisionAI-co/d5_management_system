@@ -1,5 +1,3 @@
-export type CrmImportType = 'contacts' | 'leads' | 'opportunities';
-
 export interface ImportFieldMetadata {
   key: string;
   label: string;
@@ -7,7 +5,7 @@ export interface ImportFieldMetadata {
   required: boolean;
 }
 
-export interface UploadImportResult {
+export interface UploadBaseResult {
   id: string;
   type: string;
   fileName: string;
@@ -17,24 +15,7 @@ export interface UploadImportResult {
   availableFields: ImportFieldMetadata[];
 }
 
-export type UploadContactsResult = UploadImportResult;
-
-export interface FieldMappingEntry {
-  sourceColumn: string;
-  targetField: string;
-}
-
-export interface MapImportPayload {
-  mappings: FieldMappingEntry[];
-  ignoredColumns?: string[];
-}
-
-export interface ExecuteImportPayload {
-  updateExisting?: boolean;
-  defaultCustomerId?: string;
-}
-
-export interface ContactImportSummary {
+export interface ImportSummaryBase {
   importId: string;
   totalRows: number;
   processedRows: number;
@@ -43,6 +24,81 @@ export interface ContactImportSummary {
   skippedCount: number;
   failedCount: number;
   errors: Array<{ row: number; message: string }>;
+}
+
+export interface MapPayloadBase {
+  mappings: Array<{
+    sourceColumn: string;
+    targetField: string;
+  }>;
+  ignoredColumns?: string[];
+}
+
+export interface ExecutePayloadBase {
+  updateExisting?: boolean;
+}
+
+export type UploadContactsResult = UploadBaseResult;
+export type ContactImportSummary = ImportSummaryBase;
+export interface ContactMapPayload extends MapPayloadBase {}
+export interface ExecuteContactImportPayload extends ExecutePayloadBase {
+  defaultCustomerId?: string;
+}
+
+export type UploadLeadsResult = UploadBaseResult;
+export type LeadsImportSummary = ImportSummaryBase;
+export interface LeadMapPayload extends MapPayloadBase {}
+export interface ExecuteLeadImportPayload extends ExecutePayloadBase {
+  defaultOwnerEmail?: string;
+  defaultStatus?: string;
+}
+
+export type UploadOpportunitiesResult = UploadBaseResult;
+export type OpportunitiesImportSummary = ImportSummaryBase;
+export interface OpportunityMapPayload extends MapPayloadBase {}
+export interface ExecuteOpportunityImportPayload extends ExecutePayloadBase {
+  defaultOwnerEmail?: string;
+  defaultCustomerId?: string;
+  defaultStage?: string;
+}
+
+export type UploadEmployeesResult = UploadBaseResult;
+export type EmployeeImportSummary = ImportSummaryBase;
+export interface EmployeeMapPayload extends MapPayloadBase {}
+export interface ExecuteEmployeeImportPayload extends ExecutePayloadBase {
+  defaultRole?: string;
+  defaultStatus?: string;
+  defaultContractType?: string;
+  defaultManagerEmail?: string;
+  defaultSalaryCurrency?: string;
+  defaultPassword?: string;
+}
+
+export type UploadEodResult = UploadBaseResult;
+export type EodImportSummary = ImportSummaryBase;
+export interface EodMapPayload extends MapPayloadBase {}
+export interface ExecuteEodImportPayload extends ExecutePayloadBase {
+  markMissingAsSubmitted?: boolean;
+  defaultIsLate?: boolean;
+}
+
+export type UploadInvoicesResult = UploadBaseResult;
+export type InvoicesImportSummary = ImportSummaryBase;
+export interface InvoiceMapPayload extends MapPayloadBase {}
+export interface ExecuteInvoiceImportPayload extends ExecutePayloadBase {
+  defaultStatus?: string;
+  defaultCurrency?: string;
+  defaultCustomerEmail?: string;
+  defaultCustomerName?: string;
+  defaultCreatedByEmail?: string;
+}
+
+export type UploadCandidatesResult = UploadBaseResult;
+export type CandidatesImportSummary = ImportSummaryBase;
+export interface CandidateMapPayload extends MapPayloadBase {}
+export interface ExecuteCandidateImportPayload extends ExecutePayloadBase {
+  defaultStage?: string;
+  defaultSalaryCurrency?: string;
 }
 
 

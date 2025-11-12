@@ -40,6 +40,9 @@ import { TemplatesModule } from './modules/templates/templates.module';
 
 // Integrations & Imports
 import { ImportsModule } from './modules/imports/imports.module';
+import { GoogleDriveModule } from './modules/integrations/google-drive/google-drive.module';
+import { GoogleCalendarModule } from './modules/integrations/google-calendar/google-calendar.module';
+import { AiActionsModule } from './modules/ai-actions/ai-actions.module';
 // import { IntegrationsModule } from './modules/integrations/integrations.module';
 
 // Services
@@ -102,6 +105,9 @@ import { PdfModule } from './common/pdf/pdf.module';
 
     // Integrations
     ImportsModule,
+    GoogleDriveModule,
+    GoogleCalendarModule,
+    AiActionsModule,
     // IntegrationsModule,
 
     // Services

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { MoveRight, Plus, UserRound } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronDown, MoveRight, Plus, UploadCloud, UserRound } from 'lucide-react';
 import {
   DragDropContext,
   Droppable,
@@ -54,6 +54,7 @@ interface CandidateBoardProps {
   onLinkPosition?: (candidate: Candidate) => void;
   onCandidateMove?: (result: DropResult, candidate: Candidate) => void;
   onConvertToEmployee?: (candidate: Candidate) => void;
+  onImportCandidates?: () => void;
 }
 
 export function CandidateBoard({
@@ -67,6 +68,7 @@ export function CandidateBoard({
   onLinkPosition,
   onCandidateMove,
   onConvertToEmployee,
+  onImportCandidates,
 }: CandidateBoardProps) {
   const grouped = useMemo(() => {
     const map = new Map<CandidateStage, Candidate[]>();
@@ -121,6 +123,17 @@ export function CandidateBoard({
             >
               <MoveRight className={`h-4 w-4 ${isLoading ? 'animate-pulse' : ''}`} />
               Refresh
+            </button>
+          )}
+          {onImportCandidates && (
+            <button
+              onClick={onImportCandidates}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition disabled:opacity-60"
+              disabled={isLoading}
+              type="button"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Import Candidates
             </button>
           )}
           {onCreateCandidate && (
@@ -230,128 +243,194 @@ function CandidateCard({
   onConvertToEmployee,
 }: CandidateCardProps) {
   const nextStages = STAGE_ORDER.filter((stage) => stage !== candidate.stage);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const previewSkills = (candidate.skills ?? []).slice(0, 2);
+  const remainingSkills = Math.max((candidate.skills?.length ?? 0) - previewSkills.length, 0);
+
+  const toggleExpanded = () => {
+    setIsExpanded((prev) => !prev);
+  };
+
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      toggleExpanded();
+    }
+  };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">
+    <div
+      className="space-y-3"
+      role="button"
+      tabIndex={0}
+      onClick={toggleExpanded}
+      onKeyDown={handleCardKeyDown}
+    >
+      <div className="flex items-start justify-between">
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-semibold text-foreground">
             {candidate.firstName} {candidate.lastName}
           </h3>
-          <p className="text-sm text-muted-foreground">{candidate.currentTitle || 'Title pending'}</p>
+          <p className="truncate text-sm text-muted-foreground">
+            {candidate.currentTitle || 'Title pending'}
+          </p>
         </div>
-        <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-          {candidate.yearsOfExperience !== undefined && candidate.yearsOfExperience !== null && (
-            <span>{candidate.yearsOfExperience} yrs exp</span>
-          )}
-          {candidate.rating && (
-            <span className="rounded bg-yellow-100 px-2 py-0.5 text-yellow-700">
-              ★ {candidate.rating}/5
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleExpanded();
+          }}
+          className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted"
+          aria-label={isExpanded ? 'Collapse candidate details' : 'Expand candidate details'}
+        >
+          <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {!isExpanded && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-2">
+            <UserRound className="h-3.5 w-3.5" />
+            <a href={`mailto:${candidate.email}`} className="hover:underline">
+              {candidate.email}
+            </a>
+          </span>
+          {previewSkills.map((skill) => (
+            <span
+              key={skill}
+              className="rounded-full bg-muted/70 px-2 py-0.5 font-medium uppercase tracking-wide"
+            >
+              {skill}
+            </span>
+          ))}
+          {remainingSkills > 0 && (
+            <span className="rounded-full bg-muted/70 px-2 py-0.5 font-medium text-muted-foreground">
+              +{remainingSkills} more
             </span>
           )}
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-wrap gap-2">
-        {(candidate.skills ?? []).slice(0, 4).map((skill) => (
-          <span
-            key={skill}
-            className="rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground"
-          >
-            {skill}
-          </span>
-        ))}
-        {(candidate.skills?.length ?? 0) > 4 && (
-          <span className="rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground">
-            +{(candidate.skills?.length ?? 0) - 4} more
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-2 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <UserRound className="h-4 w-4 text-muted-foreground" />
-          <a href={`mailto:${candidate.email}`} className="truncate hover:underline">
-            {candidate.email}
-          </a>
-        </div>
-        {candidate.phone && (
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">📞</span>
-            <span>{candidate.phone}</span>
-          </div>
-        )}
-        {candidate.expectedSalary !== undefined && candidate.expectedSalary !== null && (
-          <div className="text-xs text-muted-foreground">
-            Expected Salary:{' '}
-            <span className="font-medium text-muted-foreground">
-              {candidate.salaryCurrency ?? 'USD'}{' '}
-              {candidate.expectedSalary.toLocaleString()}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {onView && (
-          <button
-            onClick={() => onView(candidate)}
-            className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
-          >
-            View
-          </button>
-        )}
-        {onEdit && (
-          <button
-            onClick={() => onEdit(candidate)}
-            className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
-          >
-            Edit
-          </button>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {onLinkPosition && (
-          <button
-            onClick={() => onLinkPosition(candidate)}
-            className="w-full rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100"
-          >
-            Link to Position
-          </button>
-        )}
-
-        {onConvertToEmployee && (
-          <button
-            onClick={() => onConvertToEmployee(candidate)}
-            className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={Boolean(candidate.employee)}
-          >
-            {candidate.employee ? 'Already an Employee' : 'Convert to Employee'}
-          </button>
-        )}
-
-        {onMoveStage && (
-          <select
-            onChange={(event) => {
-              const nextStage = event.target.value as CandidateStage;
-              if (nextStage) {
-                onMoveStage(candidate, nextStage);
-                event.currentTarget.selectedIndex = 0;
-              }
-            }}
-            defaultValue=""
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          >
-            <option value="">Move to stage...</option>
-            {nextStages.map((stage) => (
-              <option key={stage} value={stage}>
-                {STAGE_LABELS[stage]}
-              </option>
+      {isExpanded && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {(candidate.skills ?? []).map((skill) => (
+              <span
+                key={skill}
+                className="rounded-full bg-muted/70 px-3 py-1 text-xs font-medium text-muted-foreground"
+              >
+                {skill}
+              </span>
             ))}
-          </select>
-        )}
-      </div>
+          </div>
+
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <UserRound className="h-4 w-4 text-muted-foreground" />
+              <a href={`mailto:${candidate.email}`} className="truncate hover:underline">
+                {candidate.email}
+              </a>
+            </div>
+            {candidate.phone && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">📞</span>
+                <span>{candidate.phone}</span>
+              </div>
+            )}
+            {candidate.expectedSalary !== undefined && candidate.expectedSalary !== null && (
+              <div className="text-xs text-muted-foreground">
+                Expected Salary:{' '}
+                <span className="font-medium text-muted-foreground">
+                  {candidate.salaryCurrency ?? 'USD'} {candidate.expectedSalary.toLocaleString()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {onView && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onView(candidate);
+                }}
+                onClick={() => onView(candidate)}
+                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
+              >
+                View
+              </button>
+            )}
+            {onEdit && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit(candidate);
+                }}
+                onClick={() => onEdit(candidate)}
+                className="flex-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {onLinkPosition && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onLinkPosition(candidate);
+                }}
+                onClick={() => onLinkPosition(candidate)}
+                className="w-full rounded-lg bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-100"
+              >
+                Link to Position
+              </button>
+            )}
+
+            {onConvertToEmployee && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onConvertToEmployee(candidate);
+                }}
+                onClick={() => onConvertToEmployee(candidate)}
+                className="w-full rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={Boolean(candidate.employee)}
+              >
+                {candidate.employee ? 'Already an Employee' : 'Convert to Employee'}
+              </button>
+            )}
+
+            {onMoveStage && (
+              <select
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  const nextStage = event.target.value as CandidateStage;
+                  if (nextStage) {
+                    onMoveStage(candidate, nextStage);
+                    event.currentTarget.selectedIndex = 0;
+                  }
+                }}
+                defaultValue=""
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">Move to stage...</option>
+                {nextStages.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {STAGE_LABELS[stage]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

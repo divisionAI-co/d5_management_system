@@ -7,6 +7,7 @@ import {
   RefreshCw,
   CalendarIcon,
   ArrowUpRight,
+  UploadCloud,
 } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
 import { customersApi } from '@/lib/api/crm';
@@ -14,6 +15,9 @@ import { InvoicesTable } from '@/components/invoices/InvoicesTable';
 import { InvoiceForm } from '@/components/invoices/InvoiceForm';
 import { InvoiceSendDialog } from '@/components/invoices/InvoiceSendDialog';
 import { InvoiceMarkPaidDialog } from '@/components/invoices/InvoiceMarkPaidDialog';
+import { InvoiceImportDialog } from '@/components/invoices/InvoiceImportDialog';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { UserRole } from '@prisma/client';
 import type {
   InvoiceDetail,
   InvoiceFilters,
@@ -65,6 +69,8 @@ export default function InvoicesPage() {
 
   const [sendInvoiceId, setSendInvoiceId] = useState<string | null>(null);
   const [markInvoiceId, setMarkInvoiceId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const sanitizedFilters = useMemo(() => {
     const payload: InvoiceFilters = {
@@ -230,6 +236,8 @@ export default function InvoicesPage() {
   const invoices = invoicesQuery.data?.data ?? [];
   const pagination = invoicesQuery.data?.meta;
   const customers: CustomerSummary[] = customersQuery.data?.data ?? [];
+  const { user } = useAuthStore();
+  const canImport = user?.role === UserRole.ADMIN || user?.role === UserRole.ACCOUNT_MANAGER;
 
   return (
     <div className="py-8 space-y-6">
@@ -241,6 +249,15 @@ export default function InvoicesPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canImport && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Import Invoices
+            </button>
+          )}
           <button
             onClick={() => invoicesQuery.refetch()}
             className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
@@ -258,17 +275,9 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase text-muted-foreground">
-          <Filter className="h-4 w-4" />
-          Filters
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Search
-            </label>
+      <div className="rounded-lg border border-border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <div className="relative flex-1">
             <input
               type="text"
               value={filters.search ?? ''}
@@ -276,176 +285,211 @@ export default function InvoicesPage() {
               placeholder="Invoice number, customer name, email..."
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
+            <Filter className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
           </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Status
-            </label>
-            <select
-              value={filters.status ?? ''}
-              onChange={(event) =>
-                handleStatusChange(
-                  event.target.value ? (event.target.value as InvoiceStatus) : undefined,
-                )
-              }
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {STATUS_FILTERS.map((option) => (
-                <option key={option.label} value={option.value ?? ''}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Customer
-            </label>
-            <select
-              value={filters.customerId ?? ''}
-              onChange={(event) => handleCustomerFilter(event.target.value || undefined)}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All customers</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Recurring Only
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={Boolean(filters.isRecurring)}
-                onChange={(event) => handleToggle('isRecurring', event.target.checked)}
-                className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-muted-foreground">Show recurring invoices</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Overdue Only
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={Boolean(filters.overdue)}
-                onChange={(event) => handleToggle('overdue', event.target.checked)}
-                className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-muted-foreground">Require follow-up</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Issue Date From
-            </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={filters.issueDateFrom ?? ''}
-                onChange={(event) => handleDateFilter('issueDateFrom', event.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Issue Date To
-            </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={filters.issueDateTo ?? ''}
-                onChange={(event) => handleDateFilter('issueDateTo', event.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Due Date From
-            </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={filters.dueDateFrom ?? ''}
-                onChange={(event) => handleDateFilter('dueDateFrom', event.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Due Date To
-            </label>
-            <div className="relative">
-              <input
-                type="date"
-                value={filters.dueDateTo ?? ''}
-                onChange={(event) => handleDateFilter('dueDateTo', event.target.value)}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              />
-              <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold uppercase text-muted-foreground">Sort</label>
-            <select
-              value={filters.sortBy}
-              onChange={(event) => handleSortFieldChange(event.target.value as InvoiceSortField)}
-              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleSortOrderToggle}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-            >
-              <ArrowUpRight
-                className={`h-3.5 w-3.5 transition-transform ${
-                  filters.sortOrder === 'asc' ? 'rotate-180' : ''
-                }`}
-              />
-              {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-            </button>
-          </div>
-
-          <div className="flex-1" />
-
           <button
             type="button"
-            onClick={handleResetFilters}
+            onClick={() => setShowFilters((prev) => !prev)}
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
-            Reset Filters
+            Advanced filters
           </button>
         </div>
+        {showFilters && (
+          <div className="space-y-4 px-4 py-4">
+            <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-6">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Status
+                </label>
+                <select
+                  value={filters.status ?? ''}
+                  onChange={(event) =>
+                    handleStatusChange(event.target.value ? (event.target.value as InvoiceStatus) : undefined)
+                  }
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {STATUS_FILTERS.map((option) => (
+                    <option key={option.label} value={option.value ?? ''}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Customer
+                </label>
+                <select
+                  value={filters.customerId ?? ''}
+                  onChange={(event) => handleCustomerFilter(event.target.value || undefined)}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All customers</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Recurring Only
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(filters.isRecurring)}
+                    onChange={(event) => handleToggle('isRecurring', event.target.checked)}
+                    className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-muted-foreground">Show recurring invoices</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Overdue Only
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(filters.overdue)}
+                    onChange={(event) => handleToggle('overdue', event.target.checked)}
+                    className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-muted-foreground">Require follow-up</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Issue Date From
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={filters.issueDateFrom ?? ''}
+                    onChange={(event) => handleDateFilter('issueDateFrom', event.target.value)}
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  />
+                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Issue Date To
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={filters.issueDateTo ?? ''}
+                    onChange={(event) => handleDateFilter('issueDateTo', event.target.value)}
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  />
+                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Due Date From
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={filters.dueDateFrom ?? ''}
+                    onChange={(event) => handleDateFilter('dueDateFrom', event.target.value)}
+                    className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                  />
+                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Due Date To
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={filters.dueDateTo ?? ''}
+                    onChange={(event) => handleDateFilter('dueDateTo', event.target.value)}
+                    className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                  />
+                  <CalendarIcon className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Sort By
+                </label>
+                <select
+                  value={filters.sortBy ?? 'issueDate'}
+                  onChange={(event) => handleSortFieldChange(event.target.value as InvoiceSortField)}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Sort Direction
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSortOrderToggle}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                </button>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Results per Page
+                </label>
+                <select
+                  value={filters.pageSize ?? DEFAULT_FILTERS.pageSize}
+                  onChange={(event) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      pageSize: Number(event.target.value),
+                      page: 1,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {[10, 20, 50].map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 border-t border-border pt-3">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {feedback && (
@@ -549,6 +593,10 @@ export default function InvoicesPage() {
             setMarkInvoiceId(null);
           }}
         />
+      )}
+
+      {canImport && importOpen && (
+        <InvoiceImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       )}
     </div>
   );

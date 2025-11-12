@@ -8,6 +8,52 @@ import { ApproveLeaveDto } from './dto/approve-leave.dto';
 export class LeaveRequestsService {
   constructor(private prisma: PrismaService) {}
 
+  private readonly FALLBACK_ANNUAL_LEAVE_ALLOWANCE = 20;
+
+  private async getAnnualLeaveAllowance(): Promise<number> {
+    const settings = await this.prisma.companySettings.findFirst({
+      select: {
+        annualLeaveAllowanceDays: true,
+      },
+    });
+
+    return settings?.annualLeaveAllowanceDays ?? this.FALLBACK_ANNUAL_LEAVE_ALLOWANCE;
+  }
+
+  private async getYearlyLeaveUsage(
+    employeeId: string,
+    year: number,
+    excludeRequestId?: string,
+  ): Promise<{
+    approvedDays: number;
+    committedDays: number;
+  }> {
+    const startOfYear = new Date(year, 0, 1);
+    const endOfYear = new Date(year, 11, 31);
+
+    const requests = await this.prisma.leaveRequest.findMany({
+      where: {
+        employeeId,
+        id: excludeRequestId ? { not: excludeRequestId } : undefined,
+        startDate: {
+          gte: startOfYear,
+          lte: endOfYear,
+        },
+        status: {
+          in: ['APPROVED', 'PENDING'],
+        },
+      },
+    });
+
+    const approvedDays = requests
+      .filter((request) => request.status === 'APPROVED')
+      .reduce((sum, request) => sum + request.totalDays, 0);
+
+    const committedDays = requests.reduce((sum, request) => sum + request.totalDays, 0);
+
+    return { approvedDays, committedDays };
+  }
+
   async create(
     userId: string,
     employeeId: string,
@@ -52,6 +98,18 @@ export class LeaveRequestsService {
 
     if (overlapping) {
       throw new BadRequestException('Leave request overlaps with existing request');
+    }
+
+    const annualAllowance = await this.getAnnualLeaveAllowance();
+    const { committedDays } = await this.getYearlyLeaveUsage(
+      employeeId,
+      startDate.getFullYear(),
+    );
+
+    if (committedDays + createLeaveDto.totalDays > annualAllowance) {
+      throw new BadRequestException(
+        `Requested leave exceeds the annual allowance of ${annualAllowance} days.`,
+      );
     }
 
     return this.prisma.leaveRequest.create({
@@ -245,6 +303,21 @@ export class LeaveRequestsService {
       throw new BadRequestException('Can only review pending leave requests');
     }
 
+    if (approveDto.status === 'APPROVED') {
+      const annualAllowance = await this.getAnnualLeaveAllowance();
+      const { approvedDays } = await this.getYearlyLeaveUsage(
+        leaveRequest.employeeId,
+        leaveRequest.startDate.getFullYear(),
+        leaveRequest.id,
+      );
+
+      if (approvedDays + leaveRequest.totalDays > annualAllowance) {
+        throw new BadRequestException(
+          `Approving this request would exceed the annual allowance of ${annualAllowance} days.`,
+        );
+      }
+    }
+
     return this.prisma.leaveRequest.update({
       where: { id },
       data: {
@@ -331,8 +404,7 @@ export class LeaveRequestsService {
     // Calculate total days taken
     const totalDays = approvedLeaves.reduce((sum, leave) => sum + leave.totalDays, 0);
 
-    // Assume 20 days annual leave (configurable in production)
-    const annualAllowance = 20;
+    const annualAllowance = await this.getAnnualLeaveAllowance();
     const remaining = annualAllowance - totalDays;
 
     return {

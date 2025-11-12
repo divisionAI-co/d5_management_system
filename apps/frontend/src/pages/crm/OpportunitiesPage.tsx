@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DropResult } from '@hello-pangea/dnd';
 import { Filter, Plus, UploadCloud } from 'lucide-react';
@@ -13,7 +14,7 @@ import type {
   UpdateOpportunityPayload,
 } from '@/types/crm';
 import type { UserSummary } from '@/types/users';
-import { ContactImportDialog } from '@/components/crm/contacts/ContactImportDialog';
+import { OpportunitiesImportDialog } from '@/components/crm/opportunities/OpportunitiesImportDialog';
 import { OpportunitiesTable } from '@/components/crm/opportunities/OpportunitiesTable';
 import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm';
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
@@ -74,6 +75,7 @@ const PIPELINE_STAGE_ORDER = [
 
 export default function OpportunitiesPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,6 +87,7 @@ export default function OpportunitiesPage() {
   const [sortBy, setSortBy] = useState<NonNullable<OpportunityFilters['sortBy']>>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
@@ -285,6 +288,10 @@ export default function OpportunitiesPage() {
     }
   };
 
+  const handleViewOpportunity = (opportunity: Opportunity) => {
+    navigate(`/crm/opportunities/${opportunity.id}`);
+  };
+
   const handleMove = useCallback((opportunity: Opportunity, newStage: string) => {
     const payload: UpdateOpportunityPayload = { stage: newStage };
 
@@ -410,16 +417,10 @@ export default function OpportunitiesPage() {
         </div>
       </div>
 
-      <form
-        onSubmit={handleApplySearch}
-        className="rounded-lg border border-border bg-card p-4 shadow-sm"
-      >
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Search
-            </label>
-            <div className="relative">
+      <form onSubmit={handleApplySearch} className="rounded-lg border border-border bg-card shadow-sm">
+        <div className="border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
               <input
                 type="text"
                 value={searchTerm}
@@ -429,153 +430,166 @@ export default function OpportunitiesPage() {
               />
               <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Type
-            </label>
-            <select
-              value={typeFilter ?? ''}
-              onChange={(event) =>
-                setTypeFilter((event.target.value || undefined) as CustomerType | undefined)
-              }
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {TYPE_FILTERS.map((option) => (
-                <option key={option.label} value={option.value ?? ''}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Stage
-            </label>
-            <select
-              value={stageFilter ?? 'All stages'}
-              onChange={(event) => {
-                const value = event.target.value;
-                setStageFilter(value === 'All stages' ? undefined : value);
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {STAGE_OPTIONS.map((stage) => (
-                <option key={stage} value={stage}>
-                  {stage}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as 'all' | 'open' | 'closed');
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {STATUS_FILTER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Result
-            </label>
-            <select
-              value={resultFilter}
-              onChange={(event) => {
-                setResultFilter(event.target.value as 'all' | 'won' | 'lost');
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {RESULT_FILTER_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Owner
-            </label>
-            <select
-              value={assignedFilter ?? ''}
-              onChange={(event) => {
-                setAssignedFilter(event.target.value || undefined);
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All owners</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.firstName} {user.lastName}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Sort By
-            </label>
-            <select
-              value={sortBy}
-              onChange={(event) => {
-                setSortBy(event.target.value as NonNullable<OpportunityFilters['sortBy']>);
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-              Direction
-            </label>
             <button
               type="button"
-              onClick={() => {
-                setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                setPage(1);
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              onClick={() => setShowFilters((prev) => !prev)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
-              {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              Advanced filters
             </button>
           </div>
         </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-          >
-            Apply Filters
-          </button>
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="text-sm font-medium text-muted-foreground hover:text-muted-foreground"
-          >
-            Reset
-          </button>
-        </div>
+        {showFilters && (
+          <div className="space-y-4 px-4 py-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Type
+                </label>
+                <select
+                  value={typeFilter ?? ''}
+                  onChange={(event) =>
+                    setTypeFilter((event.target.value || undefined) as CustomerType | undefined)
+                  }
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {TYPE_FILTERS.map((option) => (
+                    <option key={option.label} value={option.value ?? ''}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Stage
+                </label>
+                <select
+                  value={stageFilter ?? 'All stages'}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setStageFilter(value === 'All stages' ? undefined : value);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {STAGE_OPTIONS.map((stage) => (
+                    <option key={stage} value={stage}>
+                      {stage}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => {
+                    setStatusFilter(event.target.value as 'all' | 'open' | 'closed');
+                    setPage(1);
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {STATUS_FILTER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Result
+                </label>
+                <select
+                  value={resultFilter}
+                  onChange={(event) => {
+                    setResultFilter(event.target.value as 'all' | 'won' | 'lost');
+                    setPage(1);
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {RESULT_FILTER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Owner
+                </label>
+                <select
+                  value={assignedFilter ?? ''}
+                  onChange={(event) => {
+                    setAssignedFilter(event.target.value || undefined);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All owners</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Sort By
+                </label>
+                <select
+                  value={sortBy}
+                  onChange={(event) => {
+                    setSortBy(event.target.value as NonNullable<OpportunityFilters['sortBy']>);
+                    setPage(1);
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                  Direction
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                    setPage(1);
+                  }}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 border-t border-border pt-3">
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+              >
+                Apply Filters
+              </button>
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-sm font-medium text-muted-foreground hover:text-muted-foreground"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
       </form>
 
       {viewMode === 'table' ? (
@@ -627,6 +641,7 @@ export default function OpportunitiesPage() {
           onEdit={handleEdit}
           onClose={handleCloseOpportunity}
           onDelete={handleDelete}
+          onView={handleViewOpportunity}
         />
       ) : (
         <OpportunitiesBoard
@@ -639,6 +654,7 @@ export default function OpportunitiesPage() {
           onDelete={handleDelete}
           onMove={handleMove}
           onOpportunityMove={handleOpportunityMoveOptimistic}
+          onView={handleViewOpportunity}
         />
       )}
 
@@ -665,9 +681,8 @@ export default function OpportunitiesPage() {
         />
       ) : null}
 
-      <ContactImportDialog
+      <OpportunitiesImportDialog
         open={importOpen}
-        importType="opportunities"
         customers={customers}
         onClose={() => setImportOpen(false)}
       />

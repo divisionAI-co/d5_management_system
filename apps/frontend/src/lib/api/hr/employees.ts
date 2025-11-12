@@ -4,12 +4,16 @@ import type {
   CreateEmployeeDto,
   UpdateEmployeeDto,
   EmployeeStats,
+  EmployeeFilters,
+  EmployeesListResponse,
 } from '@/types/hr';
 
 export const employeesApi = {
   // Get all employees
-  getAll: async (params?: { status?: string; department?: string }) => {
-    const { data } = await apiClient.get<Employee[]>('/hr/employees', { params });
+  getAll: async (params: EmployeeFilters = {}) => {
+    const { data } = await apiClient.get<EmployeesListResponse>('/hr/employees', {
+      params,
+    });
     return data;
   },
 

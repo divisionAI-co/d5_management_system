@@ -106,27 +106,38 @@ export class DashboardService {
 
     const lateReportsCount = allReports.filter((report) => report.isLate).length;
 
-    const missingReports = await this.calculateMissingReports(
-      userId,
-      user.employee?.hireDate ?? null,
-      allReports,
-      now,
-    );
-
     const tasksDueSoon = await this.getTasksDueSoon(userId, now);
     const activitiesDueSoon = await this.getActivitiesDueSoon(userId, now);
+
+    const monthBoundaries = this.getMonthBoundaries(now);
+    const referenceForMonth = this.toDateOnly(now) < monthBoundaries.end ? now : monthBoundaries.end;
+
+    const currentMonthReports = allReports.filter((report) =>
+      report.date >= monthBoundaries.start && report.date <= monthBoundaries.end,
+    );
+
+    const missingCurrentMonth = await this.calculateMissingReports(
+      userId,
+      user.employee?.hireDate ?? null,
+      currentMonthReports,
+      referenceForMonth,
+      {
+        startDate: monthBoundaries.start,
+        endDate: monthBoundaries.end,
+      },
+    );
 
     return {
       userRole: user.role,
       isAdminView: false,
       stats: {
-        missingReports: missingReports.count,
+        missingReports: missingCurrentMonth.count,
         lateReports: lateReportsCount,
         totalReports: allReports.length,
       },
       timeframe: {
-        start: missingReports.start,
-        end: missingReports.end,
+        start: missingCurrentMonth.start,
+        end: missingCurrentMonth.end,
       },
       recentReports,
       tasksDueSoon,
@@ -137,8 +148,12 @@ export class DashboardService {
   private async calculateMissingReports(
     userId: string,
     hireDate: Date | null,
-    reports: Array<{ date: Date }>,
+    reports: Array<{ date: Date }> ,
     referenceDate: Date,
+    options?: {
+      startDate?: Date;
+      endDate?: Date;
+    },
   ): Promise<MissingReportContext> {
     if (!hireDate && reports.length === 0) {
       return {
@@ -149,13 +164,16 @@ export class DashboardService {
     }
 
     const today = this.toDateOnly(referenceDate);
-    const endDate = this.addDays(today, -1); // Only past days should be counted
+    const computedEnd = this.addDays(today, -1); // Only past days should be counted
+    const optionalEnd = options?.endDate ? this.toDateOnly(options.endDate) : null;
+    const endDate = optionalEnd && optionalEnd < computedEnd ? optionalEnd : computedEnd;
 
-    if (endDate.getTime() < this.toDateOnly(referenceDate).getTime()) {
-      // If today is the first day, nothing to count yet
-      if (endDate < today) {
-        // still valid, continue
-      }
+    if (endDate < this.toDateOnly(hireDate ?? today)) {
+      return {
+        start: null,
+        end: null,
+        count: 0,
+      };
     }
 
     if (hireDate && this.toDateOnly(hireDate) > endDate) {
@@ -173,12 +191,14 @@ export class DashboardService {
       earliestReportDate,
     ].filter((value): value is Date => value !== null);
 
+    const explicitStart = options?.startDate ? this.toDateOnly(options.startDate) : null;
     const startDate =
-      startDateCandidates.length > 0
+      explicitStart ??
+      (startDateCandidates.length > 0
         ? startDateCandidates.reduce((acc, value) =>
             value < acc ? value : acc,
           )
-        : this.addDays(endDate, -30);
+        : this.addDays(endDate, -30));
 
     if (startDate > endDate) {
       return {
@@ -229,6 +249,9 @@ export class DashboardService {
     let cursor = new Date(startDate);
 
     while (cursor <= endDate) {
+      if (cursor > this.addDays(today, -1)) {
+        break;
+      }
       const isWeekend = cursor.getDay() === 0 || cursor.getDay() === 6;
       const dateKey = this.toDateKey(cursor);
       const isHoliday = holidaySet.has(dateKey);
@@ -526,6 +549,12 @@ export class DashboardService {
       }
     }
     return null;
+  }
+
+  private getMonthBoundaries(referenceDate: Date) {
+    const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+    return { start: this.toDateOnly(start), end: this.toDateOnly(end) };
   }
 }
 

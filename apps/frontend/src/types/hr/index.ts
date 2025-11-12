@@ -51,7 +51,7 @@ export interface EodReport {
   summary: string;
   tasksWorkedOn: Array<string | EodReportTask>;
   hoursWorked?: number | null;
-  submittedAt?: string | null;
+  submittedAt: string;
   isLate: boolean;
   createdAt: string;
   updatedAt: string;
@@ -87,6 +87,24 @@ export interface Employee {
     leaveRequests: number;
     performanceReviews: number;
     eodReports?: number;
+  };
+}
+
+export interface EmployeeFilters {
+  status?: string;
+  department?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface EmployeesListResponse {
+  data: Employee[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    pageCount: number;
   };
 }
 
@@ -206,7 +224,6 @@ export interface CreateEodReportDto {
   summary: string;
   tasks: EodReportTask[];
   hoursWorked?: number;
-  submit?: boolean;
 }
 
 export interface UpdateEodReportDto extends Partial<CreateEodReportDto> {}

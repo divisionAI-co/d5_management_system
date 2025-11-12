@@ -62,6 +62,10 @@ export class CompanySettingsService {
       data.reviewCycleDays = dto.reviewCycleDays;
     }
 
+    if (dto.annualLeaveAllowanceDays !== undefined) {
+      data.annualLeaveAllowanceDays = dto.annualLeaveAllowanceDays;
+    }
+
     return this.prisma.companySettings.update({
       where: { id: settings.id },
       data,

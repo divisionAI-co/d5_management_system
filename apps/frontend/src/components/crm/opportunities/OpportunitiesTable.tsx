@@ -8,6 +8,7 @@ interface OpportunitiesTableProps {
   onEdit: (opportunity: Opportunity) => void;
   onClose: (opportunity: Opportunity) => void;
   onDelete: (opportunity: Opportunity) => void;
+  onView?: (opportunity: Opportunity) => void;
 }
 
 const TYPE_LABELS: Record<Opportunity['type'], string> = {
@@ -29,6 +30,7 @@ export function OpportunitiesTable({
   onEdit,
   onClose,
   onDelete,
+  onView,
 }: OpportunitiesTableProps) {
   const rows = opportunities ?? [];
 
@@ -92,7 +94,13 @@ export function OpportunitiesTable({
                   : 'bg-blue-50 text-blue-700 border border-blue-200';
 
                 return (
-                  <tr key={opportunity.id} className="text-muted-foreground">
+                  <tr
+                    key={opportunity.id}
+                    className={`text-muted-foreground transition ${
+                      onView ? 'cursor-pointer hover:bg-muted/60' : 'hover:bg-muted/60'
+                    }`}
+                    onClick={() => onView?.(opportunity)}
+                  >
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
                         <span className="font-medium text-foreground">{opportunity.title}</span>
@@ -170,14 +178,20 @@ export function OpportunitiesTable({
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => onEdit(opportunity)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onEdit(opportunity);
+                          }}
                           className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
                         >
                           <Edit className="h-3.5 w-3.5" />
                           Edit
                         </button>
                         <button
-                          onClick={() => onClose(opportunity)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onClose(opportunity);
+                          }}
                           disabled={opportunity.isClosed}
                           className="inline-flex items-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
@@ -185,7 +199,10 @@ export function OpportunitiesTable({
                           {opportunity.isClosed ? 'Closed' : 'Close'}
                         </button>
                         <button
-                          onClick={() => onDelete(opportunity)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDelete(opportunity);
+                          }}
                           className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

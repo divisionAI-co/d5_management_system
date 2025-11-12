@@ -132,6 +132,16 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 
+# Google Drive - REQUIRED for shared drive integration
+GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL=service-account@your-project.iam.gserviceaccount.com
+GOOGLE_DRIVE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nABC123...\n-----END PRIVATE KEY-----\n"
+# ID of the shared drive you want to expose (leave empty to use My Drive of account)
+GOOGLE_DRIVE_SHARED_DRIVE_ID=your-shared-drive-id
+# Optional: comma separated scopes (defaults to full drive access). Example shown keeps default.
+# GOOGLE_DRIVE_SCOPES=https://www.googleapis.com/auth/drive
+# Optional: user to impersonate when using a Workspace service account
+# GOOGLE_DRIVE_IMPERSONATE_USER=admin@your-company.com
+
 # Keep other settings as default for now
 ```
 

@@ -1,13 +1,21 @@
 import { Module } from '@nestjs/common';
 
-import { ImportsController } from './imports.controller';
-import { ImportsService } from './imports.service';
-import { PrismaModule } from '../../common/prisma/prisma.module';
+import { ContactsImportModule } from './contacts/contacts-import.module';
+import { LeadsImportModule } from './leads/leads-import.module';
+import { EmployeesImportModule } from './employees/employees-import.module';
+import { EodImportModule } from './eod/eod-import.module';
+import { InvoicesImportModule } from './invoices/invoices-import.module';
+import { CandidatesImportModule } from './candidates/candidates-import.module';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [ImportsController],
-  providers: [ImportsService],
+  imports: [
+    ContactsImportModule,
+    LeadsImportModule,
+    EmployeesImportModule,
+    EodImportModule,
+    InvoicesImportModule,
+    CandidatesImportModule,
+  ],
 })
 export class ImportsModule {}
 

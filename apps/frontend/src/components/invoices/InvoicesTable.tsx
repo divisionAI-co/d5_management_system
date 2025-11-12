@@ -80,7 +80,19 @@ export function InvoicesTable({
         </thead>
         <tbody className="divide-y divide-border">
           {invoices.map((invoice) => (
-            <tr key={invoice.id} className="hover:bg-muted">
+            <tr
+              key={invoice.id}
+              className="cursor-pointer hover:bg-muted focus-within:bg-muted"
+              role="button"
+              tabIndex={0}
+              onClick={() => onView(invoice)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onView(invoice);
+                }
+              }}
+            >
               <td className="whitespace-nowrap px-4 py-3">
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-foreground">{invoice.invoiceNumber}</p>
@@ -127,14 +139,22 @@ export function InvoicesTable({
               <td className="px-4 py-3 text-right">
                 <div className="flex items-center justify-end gap-2">
                   <button
-                    onClick={() => onView(invoice)}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onView(invoice);
+                    }}
                     className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                   >
                     <Eye className="h-3.5 w-3.5" />
                     View
                   </button>
                   <button
-                    onClick={() => onEdit(invoice)}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(invoice);
+                    }}
                     className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -142,7 +162,11 @@ export function InvoicesTable({
                   </button>
                   <div className="relative">
                     <button
-                      onClick={() => onSend(invoice)}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSend(invoice);
+                      }}
                       className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                     >
                       <Send className="h-3.5 w-3.5" />
@@ -151,7 +175,11 @@ export function InvoicesTable({
                   </div>
                   {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && (
                     <button
-                      onClick={() => onMarkPaid(invoice)}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onMarkPaid(invoice);
+                      }}
                       className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
                     >
                       <CheckCircle className="h-3.5 w-3.5" />
@@ -159,7 +187,11 @@ export function InvoicesTable({
                     </button>
                   )}
                   <button
-                    onClick={() => onDelete(invoice)}
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(invoice);
+                    }}
                     className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

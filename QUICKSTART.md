@@ -214,9 +214,13 @@ SMTP_PASSWORD=your-app-password
 EMAIL_PROVIDER=sendgrid
 SENDGRID_API_KEY=your-sendgrid-key
 
-# Google Integration
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
+# Google Drive (Service Account)
+GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL=service-account@your-project.iam.gserviceaccount.com
+GOOGLE_DRIVE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nABC123...\n-----END PRIVATE KEY-----\n"
+GOOGLE_DRIVE_SHARED_DRIVE_ID=your-shared-drive-id
+# Optional overrides
+# GOOGLE_DRIVE_SCOPES=https://www.googleapis.com/auth/drive
+# GOOGLE_DRIVE_IMPERSONATE_USER=admin@your-company.com
 ```
 
 ### Frontend Environment Variables
@@ -302,16 +306,20 @@ npx prisma generate
 ## Google Drive Integration (Optional)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project
-3. Enable Google Drive API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:3000/api/integrations/google/callback`
-6. Update `.env`:
+2. Create or select a project and enable **Google Drive API**
+3. Create a **service account** with domain-wide delegation (if using Google Workspace)
+4. Generate a JSON key for the service account
+5. If using a shared drive, capture its ID from the Drive URL
+6. Update `apps/backend/.env` with:
    ```env
-   GOOGLE_CLIENT_ID=your-client-id
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   GOOGLE_REDIRECT_URI=http://localhost:3000/api/integrations/google/callback
+   GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL=service-account@your-project.iam.gserviceaccount.com
+   GOOGLE_DRIVE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nABC123...\n-----END PRIVATE KEY-----\n"
+   GOOGLE_DRIVE_SHARED_DRIVE_ID=your-shared-drive-id
+   # Optional
+   # GOOGLE_DRIVE_IMPERSONATE_USER=admin@your-company.com
+   # GOOGLE_DRIVE_SCOPES=https://www.googleapis.com/auth/drive
    ```
+7. Restart the backend service so the new credentials are loaded
 
 ## Support
 

@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, LeaveRequestStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateEodReportDto, EodReportTaskDto } from './dto/create-eod-report.dto';
 import { UpdateEodReportDto } from './dto/update-eod-report.dto';
@@ -44,6 +44,58 @@ export class EodReportsService {
     return submissionTime.getTime() > submissionDeadline.getTime();
   }
 
+  private toDateOnly(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private async isHoliday(date: Date) {
+    const result = await this.prisma.nationalHoliday.findFirst({
+      where: {
+        date: this.toDateOnly(date),
+        country: 'AL',
+      },
+    });
+
+    return !!result;
+  }
+
+  private async hasApprovedLeave(userId: string, date: Date) {
+    const leave = await this.prisma.leaveRequest.findFirst({
+      where: {
+        userId,
+        status: LeaveRequestStatus.APPROVED,
+        startDate: {
+          lte: date,
+        },
+        endDate: {
+          gte: date,
+        },
+      },
+      select: { id: true },
+    });
+
+    return !!leave;
+  }
+
+  private async isWorkingDay(userId: string, date: Date) {
+    const dateOnly = this.toDateOnly(date);
+
+    const isWeekend = dateOnly.getDay() === 0 || dateOnly.getDay() === 6;
+    if (isWeekend) {
+      return false;
+    }
+
+    if (await this.isHoliday(dateOnly)) {
+      return false;
+    }
+
+    if (await this.hasApprovedLeave(userId, dateOnly)) {
+      return false;
+    }
+
+    return true;
+  }
+
   async create(
     userId: string,
     employeeId: string,
@@ -74,6 +126,11 @@ export class EodReportsService {
     let submittedAt: Date | undefined;
 
     if (submit) {
+      const reportDate = new Date(rest.date);
+      const isWorkingDay = await this.isWorkingDay(userId, reportDate);
+      if (!isWorkingDay) {
+        throw new BadRequestException('EOD reports are not required on approved leave or holidays.');
+      }
       isLate = await this.computeIsLate(rest.date);
       submittedAt = new Date();
     }
@@ -182,14 +239,7 @@ export class EodReportsService {
       throw new ForbiddenException('You can only update your own EOD reports');
     }
 
-    if (!canManageOthers) {
-      const submissionDeadline = await this.getSubmissionDeadline(new Date(report.date));
-      if (new Date().getTime() > submissionDeadline.getTime()) {
-        throw new ForbiddenException('This EOD report can no longer be edited');
-      }
-    }
-
-    if (report.submittedAt && !canManageOthers) {
+    if (!canManageOthers && report.submittedAt) {
       throw new BadRequestException('This EOD report has already been submitted.');
     }
 
@@ -217,6 +267,11 @@ export class EodReportsService {
     }
 
     if (submit) {
+      const reportDate = report.date instanceof Date ? report.date : new Date(report.date);
+      const isWorkingDay = await this.isWorkingDay(report.userId, reportDate);
+      if (!isWorkingDay && !canManageOthers) {
+        throw new BadRequestException('EOD reports are not required on approved leave or holidays.');
+      }
       const currentTasks =
         nextTasks ??
         (Array.isArray(report.tasksWorkedOn)
@@ -229,6 +284,12 @@ export class EodReportsService {
 
       data.submittedAt = new Date();
       data.isLate = await this.computeIsLate(report.date.toISOString());
+    } else if (!canManageOthers) {
+      const reportDate = report.date instanceof Date ? report.date : new Date(report.date);
+      const isWorkingDay = await this.isWorkingDay(report.userId, reportDate);
+      if (!isWorkingDay) {
+        data.isLate = false;
+      }
     }
 
     return this.prisma.eodReport.update({

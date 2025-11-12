@@ -28,7 +28,7 @@ interface ThemeStore {
 export const useThemeStore = create<ThemeStore>()(
   persist(
     (set, get) => ({
-      theme: 'light',
+      theme: 'dark',
       setTheme: (theme) => {
         applyThemeToDocument(theme);
         set({ theme });
@@ -42,7 +42,7 @@ export const useThemeStore = create<ThemeStore>()(
     {
       name: 'd5-theme-storage',
       onRehydrateStorage: () => (state) => {
-        const restoredTheme = state?.theme ?? 'light';
+        const restoredTheme = state?.theme ?? 'dark';
         applyThemeToDocument(restoredTheme);
       },
     },
@@ -50,5 +50,9 @@ export const useThemeStore = create<ThemeStore>()(
 );
 
 export const getCurrentTheme = () => useThemeStore.getState().theme;
+
+if (typeof document !== 'undefined') {
+  applyThemeToDocument(useThemeStore.getState().theme);
+}
 
 

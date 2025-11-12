@@ -134,6 +134,22 @@ export class CreateCandidateDto {
   @IsString()
   @IsOptional()
   salaryCurrency?: string;
+
+  @ApiPropertyOptional({
+    description: 'Google Drive folder ID containing interviews and documents',
+    example: '1A2b3C4D5E6F7G8H',
+  })
+  @IsString()
+  @IsOptional()
+  driveFolderId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Google Drive folder share URL',
+    example: 'https://drive.google.com/drive/folders/1A2b3C4D5E6F7G8H?usp=sharing',
+  })
+  @IsString()
+  @IsOptional()
+  driveFolderUrl?: string;
 }
 
 

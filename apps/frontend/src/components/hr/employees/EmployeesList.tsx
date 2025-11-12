@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { employeesApi } from '@/lib/api/hr';
 import { EmploymentStatus, Employee } from '@/types/hr';
@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import {
   Users,
   UserPlus,
+  UploadCloud,
   Search,
   Eye,
   Edit,
@@ -17,19 +18,31 @@ interface EmployeesListProps {
   onView: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onCreateNew: () => void;
+  onImport?: () => void;
+  canImport?: boolean;
 }
 
-export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: EmployeesListProps) {
+export function EmployeesList({ onEdit, onView, onDelete, onCreateNew, onImport, canImport }: EmployeesListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 10;
 
-  const { data: employees, isLoading } = useQuery({
-    queryKey: ['employees', statusFilter, departmentFilter],
-    queryFn: () => employeesApi.getAll({
-      status: statusFilter || undefined,
-      department: departmentFilter || undefined,
-    }),
+  const {
+    data: employeesResponse,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ['employees', statusFilter, departmentFilter, searchTerm, page, pageSize],
+    queryFn: () =>
+      employeesApi.getAll({
+        status: statusFilter || undefined,
+        department: departmentFilter || undefined,
+        search: searchTerm || undefined,
+        page,
+        pageSize,
+      }),
   });
 
   const { data: departments } = useQuery({
@@ -37,11 +50,20 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
     queryFn: () => employeesApi.getDepartments(),
   });
 
-  const filteredEmployees = employees?.filter(employee =>
-    `${employee.user?.firstName} ${employee.user?.lastName} ${employee.jobTitle} ${employee.employeeNumber}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const employees = employeesResponse?.data ?? [];
+  const meta = employeesResponse?.meta;
+  const total = meta?.total ?? 0;
+  const currentPage = meta?.page ?? page;
+  const currentPageSize = meta?.pageSize ?? pageSize;
+  const pageCount = meta?.pageCount ?? Math.max(Math.ceil(total / currentPageSize), 1);
+  const startIndex = total === 0 ? 0 : (currentPage - 1) * currentPageSize + 1;
+  const endIndex = total === 0 ? 0 : Math.min(currentPage * currentPageSize, total);
+
+  useEffect(() => {
+    if (meta?.page && meta.page !== page) {
+      setPage(meta.page);
+    }
+  }, [meta?.page, page]);
 
   const getStatusBadge = (status: EmploymentStatus) => {
     const styles = {
@@ -56,7 +78,7 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
           <Users className="w-8 h-8 text-blue-600" />
           <div>
@@ -64,13 +86,24 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
             <p className="text-sm text-muted-foreground">Manage your team members</p>
           </div>
         </div>
-        <button
-          onClick={onCreateNew}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <UserPlus className="w-5 h-5" />
-          Add Employee
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {canImport && onImport && (
+            <button
+              onClick={onImport}
+              className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <UploadCloud className="w-4 h-4" />
+              Import Employees
+            </button>
+          )}
+          <button
+            onClick={onCreateNew}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <UserPlus className="w-5 h-5" />
+            Add Employee
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -83,7 +116,10 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
               type="text"
               placeholder="Search employees..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
               className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -91,7 +127,10 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
           {/* Status Filter */}
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Statuses</option>
@@ -104,7 +143,10 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
           {/* Department Filter */}
           <select
             value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value)}
+            onChange={(e) => {
+              setDepartmentFilter(e.target.value);
+              setPage(1);
+            }}
             className="px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Departments</option>
@@ -123,7 +165,7 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Loading employees...</p>
         </div>
-      ) : filteredEmployees?.length === 0 ? (
+      ) : employees.length === 0 ? (
         <div className="text-center py-12 bg-card rounded-lg shadow-sm border border-border">
           <Users className="mx-auto mb-4 h-16 w-16 text-border" />
           <h3 className="text-lg font-medium text-foreground mb-2">No employees found</h3>
@@ -165,8 +207,20 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
               </tr>
             </thead>
             <tbody className="bg-card divide-y divide-border">
-              {filteredEmployees?.map((employee) => (
-                <tr key={employee.id} className="hover:bg-muted transition-colors">
+              {employees.map((employee) => (
+                <tr
+                  key={employee.id}
+                  className="cursor-pointer transition-colors hover:bg-muted focus-within:bg-muted"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onView(employee)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onView(employee);
+                    }
+                  }}
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
@@ -209,21 +263,30 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => onView(employee)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onView(employee);
+                        }}
                         className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
                         title="View"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onEdit(employee)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit(employee);
+                        }}
                         className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50"
                         title="Edit"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onDelete(employee)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete(employee);
+                        }}
                         className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
                         title="Delete"
                       >
@@ -235,6 +298,32 @@ export function EmployeesList({ onEdit, onView, onDelete, onCreateNew }: Employe
               ))}
             </tbody>
           </table>
+          {meta && meta.total > 0 && (
+            <div className="flex flex-col gap-3 border-t border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+              <span>
+                Showing {startIndex.toLocaleString()}–{endIndex.toLocaleString()} of {total.toLocaleString()} employees
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage <= 1 || isFetching}
+                  className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  Page {currentPage} of {Math.max(pageCount, 1)}
+                </span>
+                <button
+                  onClick={() => setPage((prev) => (pageCount ? Math.min(prev + 1, pageCount) : prev + 1))}
+                  disabled={pageCount ? currentPage >= pageCount || isFetching : employees.length < currentPageSize}
+                  className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -32,6 +32,11 @@ export class UpdateCompanySettingsDto {
   @IsInt()
   @IsPositive()
   reviewCycleDays?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  annualLeaveAllowanceDays?: number;
 }
 
 

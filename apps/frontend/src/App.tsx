@@ -9,16 +9,20 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 // Auth Pages
 import LoginPage from '@/pages/auth/LoginPage';
 import TwoFactorPage from '@/pages/auth/TwoFactorPage';
+import ResetPasswordPage from '@/pages/auth/ResetPasswordPage';
 
 // Dashboard
 import DashboardPage from '@/pages/dashboard/DashboardPage';
+import CalendarPage from '@/pages/calendar/CalendarPage';
 
 // CRM
 import CustomersPage from '@/pages/crm/CustomersPage';
 import CustomerDetailPage from '@/pages/crm/CustomerDetailPage';
 import ContactsPage from '@/pages/crm/ContactsPage';
 import LeadsPage from '@/pages/crm/LeadsPage';
+import LeadDetailPage from '@/pages/crm/LeadDetailPage';
 import OpportunitiesPage from '@/pages/crm/OpportunitiesPage';
+import OpportunityDetailPage from '@/pages/crm/OpportunityDetailPage';
 import CampaignsPage from '@/pages/crm/CampaignsPage';
 
 // Recruitment
@@ -41,6 +45,9 @@ import TasksPage from '@/pages/tasks/TasksPage';
 import InvoicesPage from '@/pages/invoices/InvoicesPage';
 import InvoiceDetailPage from '@/pages/invoices/InvoiceDetailPage';
 
+// Documents
+import DocumentsPage from '@/pages/documents/DocumentsPage';
+
 // Settings
 import SettingsPage from '@/pages/settings/SettingsPage';
 import CompanySettingsPage from '@/pages/settings/CompanySettingsPage';
@@ -50,6 +57,8 @@ import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
 import TemplatesPage from '@/pages/settings/TemplatesPage';
 import ActivityTypesPage from '@/pages/settings/ActivityTypesPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
+import GoogleCalendarCallbackPage from '@/pages/integrations/GoogleCalendarCallbackPage';
+import AiActionsPage from '@/pages/settings/AiActionsPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -82,6 +91,7 @@ function App() {
           }
         >
           <Route index element={<DashboardPage />} />
+          <Route path="calendar" element={<CalendarPage />} />
           <Route path="profile" element={<ProfilePage />} />
 
           {/* CRM */}
@@ -90,7 +100,9 @@ function App() {
             <Route path="customers/:id" element={<CustomerDetailPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="leads" element={<LeadsPage />} />
+            <Route path="leads/:id" element={<LeadDetailPage />} />
             <Route path="opportunities" element={<OpportunitiesPage />} />
+            <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
           </Route>
 
@@ -113,6 +125,9 @@ function App() {
           {/* Tasks */}
           <Route path="tasks" element={<TasksPage />} />
 
+          {/* Documents */}
+          <Route path="documents" element={<DocumentsPage />} />
+
           {/* Invoices */}
           <Route path="invoices">
             <Route index element={<InvoicesPage />} />
@@ -129,8 +144,16 @@ function App() {
             <Route path="holidays" element={<HolidaysPage />} />
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="activity-types" element={<ActivityTypesPage />} />
+            <Route path="ai-actions" element={<AiActionsPage />} />
           </Route>
+
+          <Route
+            path="integrations/google-calendar/callback"
+            element={<GoogleCalendarCallbackPage />}
+          />
         </Route>
+
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

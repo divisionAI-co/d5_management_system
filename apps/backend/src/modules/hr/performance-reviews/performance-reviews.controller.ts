@@ -8,9 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   Res,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
@@ -33,63 +33,35 @@ export class PerformanceReviewsController {
     private readonly employeesService: EmployeesService,
   ) {}
 
+  private isPrivileged(role: UserRole) {
+    return role === UserRole.ADMIN || role === UserRole.HR;
+  }
+
   @Post()
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Create a new performance review' })
-  async create(
-    @Request() req: any,
-    @Body() createReviewDto: CreatePerformanceReviewDto,
-  ) {
-    const user = req.user;
-
-    if (user.role === UserRole.ADMIN || user.role === UserRole.HR) {
-      return this.reviewsService.create(createReviewDto);
-    }
-
-    if (user.role === UserRole.ACCOUNT_MANAGER) {
-      const manager = await this.employeesService.findByUserId(user.id);
-      const targetEmployee = await this.employeesService.findOne(createReviewDto.employeeId);
-
-      if (targetEmployee.managerId !== manager.id) {
-        throw new ForbiddenException('Managers can only review their direct reports.');
-      }
-
-      return this.reviewsService.create(createReviewDto);
-    }
-
-    throw new ForbiddenException('You are not allowed to create performance reviews.');
+  create(@Body() createReviewDto: CreatePerformanceReviewDto) {
+    return this.reviewsService.create(createReviewDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all performance reviews' })
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.EMPLOYEE)
+  @ApiOperation({ summary: 'Get performance reviews' })
   @ApiQuery({ name: 'employeeId', required: false, type: String })
-  async findAll(
-    @Request() req: any,
-    @Query('employeeId') employeeId?: string,
-  ) {
+  async findAll(@Request() req: any, @Query('employeeId') employeeId?: string) {
     const user = req.user;
 
-    if (user.role === UserRole.ADMIN || user.role === UserRole.HR) {
+    if (this.isPrivileged(user.role)) {
       return this.reviewsService.findAll(employeeId ? { employeeId } : undefined);
     }
 
-    let viewer;
-    try {
-      viewer = await this.employeesService.findByUserId(user.id);
-    } catch (error) {
-      throw new ForbiddenException('You are not allowed to view performance reviews.');
-    }
+    const employee = await this.employeesService.findByUserId(user.id);
 
-    if (!employeeId || employeeId === viewer.id) {
-      return this.reviewsService.findAll({ employeeId: viewer.id });
-    }
-
-    const targetEmployee = await this.employeesService.findOne(employeeId);
-
-    if (targetEmployee.managerId !== viewer.id) {
+    if (employeeId && employeeId !== employee.id) {
       throw new ForbiddenException('You are not allowed to view reviews for this employee.');
     }
 
-    return this.reviewsService.findAll({ employeeId });
+    return this.reviewsService.findAll({ employeeId: employee.id });
   }
 
   @Get('upcoming')
@@ -102,42 +74,43 @@ export class PerformanceReviewsController {
   }
 
   @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get performance review by ID' })
   async findOne(@Request() req: any, @Param('id') id: string) {
-    const user = req.user;
     const review = await this.reviewsService.findOne(id);
 
-    if (user.role === UserRole.ADMIN || user.role === UserRole.HR) {
+    if (this.isPrivileged(req.user.role)) {
       return review;
     }
 
-    let viewer;
-    try {
-      viewer = await this.employeesService.findByUserId(user.id);
-    } catch (error) {
+    const employee = await this.employeesService.findByUserId(req.user.id);
+
+    if (review.employeeId !== employee.id) {
       throw new ForbiddenException('You are not allowed to view this performance review.');
     }
 
-    if (review.employeeId === viewer.id) {
-      return review;
-    }
-
-    if (review.employee?.managerId === viewer.id) {
-      return review;
-    }
-
-    throw new ForbiddenException('You are not allowed to view this performance review.');
+    return review;
   }
 
   @Get(':id/pdf')
-  @Roles(UserRole.ADMIN, UserRole.HR)
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Download performance review as PDF' })
   async downloadPdf(
+    @Request() req: any,
     @Param('id') id: string,
     @Res() res: Response,
   ) {
-    const pdf = await this.reviewsService.generatePdf(id);
     const review = await this.reviewsService.findOne(id);
+
+    if (!this.isPrivileged(req.user.role)) {
+      const employee = await this.employeesService.findByUserId(req.user.id);
+
+      if (review.employeeId !== employee.id) {
+        throw new ForbiddenException('You are not allowed to download this performance review.');
+      }
+    }
+
+    const pdf = await this.reviewsService.generatePdf(id);
 
     res.set({
       'Content-Type': 'application/pdf',

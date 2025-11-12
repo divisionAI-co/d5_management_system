@@ -20,6 +20,13 @@ export const authApi = {
     const { data } = await apiClient.patch<{ message: string }>('/auth/2fa/disable', { code });
     return data;
   },
+
+  async requestPasswordReset(email: string) {
+    const { data } = await apiClient.post<{ message: string }>('/auth/password-reset/request', {
+      email,
+    });
+    return data;
+  },
 };
 
 

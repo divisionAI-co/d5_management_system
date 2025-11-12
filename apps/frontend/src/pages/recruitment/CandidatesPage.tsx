@@ -14,6 +14,9 @@ import { CandidateBoard, CANDIDATE_STAGE_LABELS } from '@/components/recruitment
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
 import { CandidateConvertToEmployeeModal } from '@/components/recruitment/CandidateConvertToEmployeeModal';
+import { CandidateImportDialog } from '@/components/recruitment/CandidateImportDialog';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { UserRole } from '@prisma/client';
 
 interface LocalFilters {
   search?: string;
@@ -36,6 +39,9 @@ export default function CandidatesPage() {
   const [linkCandidate, setLinkCandidate] = useState<Candidate | null>(null);
   const [convertCandidate, setConvertCandidate] = useState<Candidate | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const { user } = useAuthStore();
+  const canImport = user?.role === UserRole.ADMIN || user?.role === UserRole.HR || user?.role === UserRole.RECRUITER;
 
   const sanitizedFilters = useMemo<CandidateFilters>(() => {
     const payload: CandidateFilters = {
@@ -220,6 +226,7 @@ export default function CandidatesPage() {
               Linked to open position
             </label>
           </div>
+          {/* Actions moved to board header to avoid duplication */}
         </div>
       </div>
 
@@ -239,6 +246,7 @@ export default function CandidatesPage() {
         candidates={candidates}
         isLoading={candidatesQuery.isFetching}
         onCreateCandidate={handleOpenCreate}
+        onImportCandidates={canImport ? () => setImportOpen(true) : undefined}
         onRefresh={() => candidatesQuery.refetch()}
         onView={handleViewCandidate}
         onEdit={handleEditCandidate}
@@ -279,6 +287,10 @@ export default function CandidatesPage() {
           onClose={() => setConvertCandidate(null)}
           onSuccess={handleConversionSuccess}
         />
+      )}
+
+      {canImport && importOpen && (
+        <CandidateImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       )}
     </div>
   );

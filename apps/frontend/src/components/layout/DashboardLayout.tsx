@@ -19,7 +19,10 @@ type NavGroup = {
 const NAVIGATION_GROUPS: NavGroup[] = [
   {
     label: 'Overview',
-    items: [{ name: 'Dashboard', href: '/' }],
+    items: [
+      { name: 'Dashboard', href: '/' },
+      { name: 'Calendar', href: '/calendar', roles: ROLE_PERMISSIONS.CALENDAR },
+    ],
   },
   {
     label: 'CRM',
@@ -56,6 +59,10 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     items: [{ name: 'Tasks', href: '/tasks', roles: ROLE_PERMISSIONS.TASKS }],
   },
   {
+    label: 'Documents',
+    items: [{ name: 'Documents', href: '/documents', roles: ROLE_PERMISSIONS.DOCUMENTS }],
+  },
+  {
     label: 'Settings',
     items: [
       { name: 'User Management', href: '/settings', roles: ROLE_PERMISSIONS.USER_MANAGEMENT },
@@ -65,6 +72,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'Integrations', href: '/settings/integrations', roles: ROLE_PERMISSIONS.INTEGRATIONS },
       { name: 'Holidays', href: '/settings/holidays', roles: ROLE_PERMISSIONS.HOLIDAYS_SETTINGS },
       { name: 'Activity Types', href: '/settings/activity-types', roles: ROLE_PERMISSIONS.ACTIVITY_TYPES },
+      { name: 'Gemini Actions', href: '/settings/ai-actions', roles: ROLE_PERMISSIONS.AI_ACTIONS },
       { name: 'Templates', href: '/settings/templates', roles: ROLE_PERMISSIONS.TEMPLATES },
     ],
   },

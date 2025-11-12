@@ -30,6 +30,35 @@ export class EmailService {
     this.initializeEmailProvider();
   }
 
+  private getBooleanEnv(key: string, defaultValue = false): boolean {
+    const value = this.configService.get<string | boolean>(key);
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (value === undefined || value === null) {
+      return defaultValue;
+    }
+
+    const normalized = String(value).trim().toLowerCase();
+    return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
+  }
+
+  private getNumberEnv(key: string, defaultValue?: number): number | undefined {
+    const value = this.configService.get<string | number | undefined>(key);
+
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    if (value === undefined || value === null || value === '') {
+      return defaultValue;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : defaultValue;
+  }
+
   private initializeEmailProvider() {
     switch (this.provider) {
       case 'sendgrid':
@@ -44,11 +73,14 @@ export class EmailService {
       default:
         this.transporter = nodemailer.createTransport({
           host: this.configService.get<string>('SMTP_HOST'),
-          port: this.configService.get<number>('SMTP_PORT', 587),
-          secure: this.configService.get<boolean>('SMTP_SECURE', false),
+          port: this.getNumberEnv('SMTP_PORT', 587),
+          secure: this.getBooleanEnv('SMTP_SECURE', false),
           auth: {
             user: this.configService.get<string>('SMTP_USER'),
             pass: this.configService.get<string>('SMTP_PASSWORD'),
+          },
+          tls: {
+            rejectUnauthorized: this.getBooleanEnv('SMTP_REJECT_UNAUTHORIZED', true),
           },
         });
         this.logger.log('SMTP email provider initialized');

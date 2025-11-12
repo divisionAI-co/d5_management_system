@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Link2, MapPin, PenSquare, Pencil, Star } from 'lucide-react';
+import { ArrowLeft, FileText, Folder, Link2, MapPin, PenSquare, Pencil, Star } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
 import type { CandidateStage, CandidatePositionsResponse } from '@/types/recruitment';
 import {
@@ -12,6 +12,7 @@ import {
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
+import { CandidateDrivePreview } from '@/components/recruitment/CandidateDrivePreview';
 
 export default function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -247,6 +248,19 @@ export default function CandidateDetailPage() {
                         </a>
                       </li>
                     )}
+                    {candidate.driveFolderUrl && (
+                      <li>
+                        <a
+                          href={candidate.driveFolderUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 hover:underline"
+                        >
+                          <Folder className="h-4 w-4" />
+                          Drive Folder
+                        </a>
+                      </li>
+                    )}
                     {candidate.linkedinUrl && (
                       <li>
                         <a
@@ -331,6 +345,11 @@ export default function CandidateDetailPage() {
         </section>
 
         <aside className="space-y-6">
+          <CandidateDrivePreview
+            folderId={candidate.driveFolderId ?? undefined}
+            folderUrl={candidate.driveFolderUrl ?? undefined}
+            candidateName={`${candidate.firstName} ${candidate.lastName}`}
+          />
           <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-foreground">Linked Positions</h2>
             <p className="mt-1 text-sm text-muted-foreground">

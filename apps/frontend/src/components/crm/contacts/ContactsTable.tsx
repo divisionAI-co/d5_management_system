@@ -1,6 +1,7 @@
 import type { ContactSummary } from '@/types/crm';
 import { format } from 'date-fns';
 import { ClipboardList, Edit3, Mail, Phone, Trash2, UserPlus } from 'lucide-react';
+import clsx from 'clsx';
 
 interface ContactsTableProps {
   contacts?: ContactSummary[];
@@ -63,7 +64,22 @@ export function ContactsTable({
         </thead>
         <tbody className="divide-y divide-border bg-card">
           {contacts.map((contact) => (
-            <tr key={contact.id} className="transition hover:bg-muted">
+            <tr
+              key={contact.id}
+              className={clsx('transition hover:bg-muted', {
+                'cursor-pointer': Boolean(onSelect),
+              })}
+              role={onSelect ? 'button' : undefined}
+              tabIndex={onSelect ? 0 : undefined}
+              onClick={() => onSelect?.(contact)}
+              onKeyDown={(event) => {
+                if (!onSelect) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(contact);
+                }
+              }}
+            >
               <td className="px-6 py-4 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -91,7 +107,10 @@ export function ContactsTable({
                   {onSelect && (
                     <button
                       type="button"
-                      onClick={() => onSelect(contact)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onSelect(contact);
+                      }}
                       className="rounded-md border border-border px-2 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
                     >
                       View
@@ -127,7 +146,10 @@ export function ContactsTable({
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => onEdit(contact)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onEdit(contact);
+                    }}
                     className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-200 hover:text-blue-600"
                     title="Edit contact"
                   >
@@ -135,7 +157,10 @@ export function ContactsTable({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onDelete(contact)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDelete(contact);
+                    }}
                     className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-red-200 hover:text-red-600"
                     title="Delete contact"
                   >
