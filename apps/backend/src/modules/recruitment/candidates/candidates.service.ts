@@ -8,12 +8,15 @@ import { CandidateStage, EmploymentStatus, Prisma, UserRole } from '@prisma/clie
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { EmailService } from '../../../common/email/email.service';
+import { TemplatesService } from '../../templates/templates.service';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { FilterCandidatesDto } from './dto/filter-candidates.dto';
 import { UpdateCandidateStageDto } from './dto/update-candidate-stage.dto';
 import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
+import { MarkInactiveDto } from './dto/mark-inactive.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 export interface PaginatedResult<T> {
@@ -28,7 +31,11 @@ export interface PaginatedResult<T> {
 
 @Injectable()
 export class CandidatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+    private readonly templatesService: TemplatesService,
+  ) {}
 
   private formatCandidate(candidate: any) {
     if (!candidate) {
@@ -142,6 +149,13 @@ export class CandidatesService {
       // Filter out deleted candidates by default
       deletedAt: null,
     };
+
+    console.log('filters.isActive', filters.isActive);
+    // Only filter by isActive if explicitly provided
+    // If not provided, show all candidates (both active and inactive)
+    if (filters.isActive !== undefined) {
+      where.isActive = filters.isActive;
+    }
 
     if (filters.search) {
       const searchTerm = filters.search.trim();
@@ -288,6 +302,7 @@ export class CandidatesService {
         stage: createDto.stage ?? CandidateStage.VALIDATION,
         rating: createDto.rating,
         notes: createDto.notes,
+        isActive: createDto.isActive ?? true,
         city: createDto.city,
         country: createDto.country,
         availableFrom: createDto.availableFrom
@@ -470,6 +485,8 @@ export class CandidatesService {
           stage: updateDto.stage,
           rating: updateDto.rating,
           notes: updateDto.notes,
+          isActive:
+            updateDto.isActive !== undefined ? updateDto.isActive : undefined,
           city: updateDto.city,
           country: updateDto.country,
           availableFrom: updateDto.availableFrom
@@ -969,6 +986,105 @@ export class CandidatesService {
         employee: true,
       },
     });
+
+    return this.formatCandidate(updated);
+  }
+
+  async markInactive(id: string, dto: MarkInactiveDto) {
+    const candidate = await this.ensureCandidateExists(id);
+
+    if (!candidate.isActive) {
+      throw new BadRequestException('Candidate is already inactive.');
+    }
+
+    // Update candidate to inactive
+    const updated = await this.prisma.candidate.update({
+      where: { id },
+      data: {
+        isActive: false,
+        notes: dto.reason
+          ? `${candidate.notes ? candidate.notes + '\n\n' : ''}Marked inactive: ${dto.reason}`
+          : candidate.notes,
+      },
+      include: {
+        positions: {
+          include: {
+            position: {
+              include: {
+                opportunity: {
+                  include: {
+                    customer: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        employee: true,
+      },
+    });
+
+    // Send email if requested
+    if (dto.sendEmail) {
+      const recipientEmail = dto.emailTo || candidate.email;
+      if (!recipientEmail) {
+        throw new BadRequestException(
+          'Cannot send email: candidate has no email address and no recipient email was provided.',
+        );
+      }
+
+      let emailSubject: string;
+      let emailBody: string;
+
+      if (dto.templateId) {
+        // Use template
+        try {
+          const templateData = {
+            candidate: {
+              firstName: candidate.firstName,
+              lastName: candidate.lastName,
+              email: candidate.email,
+              fullName: `${candidate.firstName} ${candidate.lastName}`,
+            },
+            reason: dto.reason || 'No reason provided',
+          };
+
+          const renderedHtml = await this.templatesService.render(dto.templateId, templateData);
+          emailBody = renderedHtml;
+          emailSubject = `Update on Your Application - ${candidate.firstName} ${candidate.lastName}`;
+        } catch (error: any) {
+          throw new BadRequestException(
+            `Failed to render email template: ${error?.message ?? 'Unknown error'}`,
+          );
+        }
+      } else {
+        // Use custom email
+        if (!dto.emailSubject || !dto.emailBody) {
+          throw new BadRequestException(
+            'Email subject and body are required when not using a template.',
+          );
+        }
+        emailSubject = dto.emailSubject;
+        emailBody = dto.emailBody;
+      }
+
+      try {
+        await this.emailService.sendEmail({
+          to: recipientEmail,
+          subject: emailSubject,
+          html: emailBody,
+        });
+      } catch (error: any) {
+        // Log error but don't fail the operation
+        console.error('Failed to send email to candidate:', error);
+        // Still return the updated candidate even if email fails
+      }
+    }
 
     return this.formatCandidate(updated);
   }

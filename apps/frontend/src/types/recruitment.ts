@@ -58,6 +58,7 @@ export interface Candidate {
   stage: CandidateStage;
   rating?: number | null;
   notes?: string | null;
+  isActive: boolean;
   city?: string | null;
   country?: string | null;
   availableFrom?: string | null;
@@ -76,6 +77,7 @@ export interface CandidateFilters {
   positionId?: string;
   skills?: string[];
   hasOpenPosition?: boolean;
+  isActive?: boolean;
   page?: number;
   pageSize?: number;
   sortBy?: string;
@@ -104,6 +106,7 @@ export interface CreateCandidateDto {
   availableFrom?: string;
   expectedSalary?: number;
   salaryCurrency?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateCandidateDto extends Partial<CreateCandidateDto> {}
@@ -240,6 +243,15 @@ export interface ConvertCandidateToEmployeeResponse {
   employee: Employee;
   candidate: Candidate;
   temporaryPassword?: string;
+}
+
+export interface MarkInactivePayload {
+  reason?: string;
+  sendEmail?: boolean;
+  templateId?: string;
+  emailSubject?: string;
+  emailBody?: string;
+  emailTo?: string;
 }
 
 

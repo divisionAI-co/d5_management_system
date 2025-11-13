@@ -181,6 +181,12 @@ const CANDIDATE_FIELD_DEFINITIONS: CandidateImportFieldMetadata[] = [
     required: false,
   },
   {
+    key: CandidateImportField.IS_ACTIVE,
+    label: 'Is Active',
+    description: 'Whether the candidate is active (true/false, defaults to true).',
+    required: false,
+  },
+  {
     key: CandidateImportField.ODOO_ID,
     label: 'Odoo ID',
     description: 'Reference to Odoo candidate ID.',
@@ -473,10 +479,42 @@ export class CandidatesImportService {
     return parsed;
   }
 
-  private parseDecimal(value: string | undefined): Prisma.Decimal | undefined {
+  private parseBoolean(value: string | undefined): boolean | undefined {
     if (!value) {
       return undefined;
     }
+    const normalized = String(value).trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y') {
+      return true;
+    }
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'n') {
+      return false;
+    }
+    throw new BadRequestException(
+      `Value "${value}" is not a valid boolean. Expected: true/false, 1/0, yes/no, y/n.`,
+    );
+  }
+
+  private parseDecimal(value: string | undefined, isOdooImport = false): Prisma.Decimal | undefined {
+    if (!value) {
+      return undefined;
+    }
+    
+    // For Odoo imports, be more aggressive in parsing string values
+    if (isOdooImport && typeof value === 'string') {
+      // Remove common formatting: currency symbols, spaces, parentheses (for negative), etc.
+      const cleaned = value
+        .replace(/[^\d.,-]/g, '') // Remove all non-numeric characters except digits, dots, commas, and minus
+        .replace(/,/g, '.') // Replace comma with dot (European format)
+        .replace(/\.(?=.*\.)/g, ''); // Remove all dots except the last one (handles thousand separators)
+      
+      const parsed = Number(cleaned);
+      if (!Number.isNaN(parsed) && isFinite(parsed)) {
+        return new Prisma.Decimal(parsed);
+      }
+    }
+    
+    // Standard parsing for non-Odoo imports
     const normalized = value.replace(/[^0-9.,-]/g, '').replace(',', '.');
     if (!normalized) {
       return undefined;
@@ -772,6 +810,7 @@ export class CandidatesImportService {
       availableFrom?: Date;
       expectedSalary?: Prisma.Decimal;
       salaryCurrency: string;
+      isActive: boolean;
       odooId?: string;
       driveFolderId?: string;
     };
@@ -841,7 +880,12 @@ export class CandidatesImportService {
 
     const expectedSalary = this.parseDecimal(
       this.extractValue(row, mapping, CandidateImportField.EXPECTED_SALARY, isOdooImport),
+      isOdooImport,
     );
+
+    const isActive = this.parseBoolean(
+      this.extractValue(row, mapping, CandidateImportField.IS_ACTIVE, isOdooImport),
+    ) ?? true; // Default to true if not provided
 
     const skills = this.parseSkills(
       this.extractValue(row, mapping, CandidateImportField.SKILLS, isOdooImport),
@@ -898,6 +942,7 @@ export class CandidatesImportService {
           this.extractValue(row, mapping, CandidateImportField.SALARY_CURRENCY, isOdooImport) ??
           options.defaultSalaryCurrency ??
           'USD',
+        isActive,
         odooId: this.extractValue(row, mapping, CandidateImportField.ODOO_ID, isOdooImport),
         driveFolderId,
       },
@@ -996,6 +1041,7 @@ export class CandidatesImportService {
           const hasLastNameMapping = !!mapping[CandidateImportField.LAST_NAME] || !!mapping[CandidateImportField.FULL_NAME];
           const hasStageMapping = !!mapping[CandidateImportField.STAGE];
           const hasSkillsMapping = !!mapping[CandidateImportField.SKILLS];
+          const hasIsActiveMapping = !!mapping[CandidateImportField.IS_ACTIVE];
           const hasOdooIdMapping = !!mapping[CandidateImportField.ODOO_ID];
 
           // Handle odooId update carefully to avoid unique constraint violations
@@ -1049,6 +1095,7 @@ export class CandidatesImportService {
               availableFrom: candidateData.availableFrom ?? existingCandidate.availableFrom ?? null,
               expectedSalary: candidateData.expectedSalary ?? existingCandidate.expectedSalary ?? null,
               salaryCurrency: candidateData.salaryCurrency ?? existingCandidate.salaryCurrency ?? 'USD',
+              isActive: hasIsActiveMapping ? candidateData.isActive : existingCandidate.isActive,
               odooId: odooIdValue,
             },
           });
@@ -1056,7 +1103,7 @@ export class CandidatesImportService {
           summary.updatedCount += 1;
         } else {
           // For new candidates, check if odooId conflicts before creating
-          let odooIdForCreate = candidateData.odooId ?? null;
+          const odooIdForCreate = candidateData.odooId ?? null;
           if (odooIdForCreate) {
             const conflictingCandidate = await this.prisma.candidate.findUnique({
               where: { odooId: odooIdForCreate },
@@ -1095,6 +1142,7 @@ export class CandidatesImportService {
               availableFrom: candidateData.availableFrom ?? null,
               expectedSalary: candidateData.expectedSalary ?? null,
               salaryCurrency: candidateData.salaryCurrency ?? 'USD',
+              isActive: candidateData.isActive,
               odooId: odooIdForCreate,
             },
           });

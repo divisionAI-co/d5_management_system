@@ -7,6 +7,7 @@ import type {
 
 export interface GetAuthUrlParams {
   redirectUri?: string;
+  state?: string;
 }
 
 export interface ExchangeCodePayload {

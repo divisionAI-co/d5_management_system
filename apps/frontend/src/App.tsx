@@ -58,7 +58,7 @@ import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
 import TemplatesPage from '@/pages/settings/TemplatesPage';
 import ActivityTypesPage from '@/pages/settings/ActivityTypesPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
-import GoogleCalendarCallbackPage from '@/pages/integrations/GoogleCalendarCallbackPage';
+import GoogleOAuthCallbackPage from '@/pages/integrations/GoogleOAuthCallbackPage';
 import AiActionsPage from '@/pages/settings/AiActionsPage';
 
 // Protected Route Component
@@ -149,9 +149,10 @@ function App() {
             <Route path="ai-actions" element={<AiActionsPage />} />
           </Route>
 
+          {/* OAuth Callbacks - must be before catch-all routes */}
           <Route
-            path="integrations/google-calendar/callback"
-            element={<GoogleCalendarCallbackPage />}
+            path="integrations/google/callback"
+            element={<GoogleOAuthCallbackPage />}
           />
         </Route>
 

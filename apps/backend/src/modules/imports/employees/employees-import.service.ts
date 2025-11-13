@@ -23,6 +23,7 @@ import {
   EmployeeImportField,
   EmployeeMapImportDto,
 } from './dto/employee-map-import.dto';
+import { generateInitialMappings } from '../utils/field-mapping.util';
 
 export interface EmployeeUploadResult {
   id: string;
@@ -32,6 +33,7 @@ export interface EmployeeUploadResult {
   sampleRows: Record<string, string>[];
   totalRows: number;
   availableFields: EmployeeImportFieldMetadata[];
+  suggestedMappings?: Array<{ sourceColumn: string; targetField: string }>;
 }
 
 export interface EmployeeImportSummary {
@@ -289,6 +291,13 @@ export class EmployeesImportService {
       select: { id: true },
     });
 
+    // Generate suggested mappings based on column name similarity
+    const suggestedMappings = generateInitialMappings(
+      parsed.headers,
+      EMPLOYEE_FIELD_DEFINITIONS,
+      0.3, // Minimum confidence threshold
+    );
+
     return {
       id: importRecord.id,
       type: 'employees',
@@ -297,6 +306,7 @@ export class EmployeesImportService {
       sampleRows,
       totalRows: sanitizedRows.length,
       availableFields: EMPLOYEE_FIELD_DEFINITIONS,
+      suggestedMappings,
     };
   }
 

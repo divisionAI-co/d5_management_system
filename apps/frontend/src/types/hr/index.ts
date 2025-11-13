@@ -257,6 +257,7 @@ export interface CreateEodReportDto {
 
 export interface UpdateEodReportDto extends Partial<CreateEodReportDto> {
   submit?: boolean;
+  submittedAt?: string | null;
 }
 
 // National Holiday

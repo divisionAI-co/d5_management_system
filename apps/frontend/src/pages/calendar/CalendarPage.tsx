@@ -180,8 +180,8 @@ export default function CalendarPage() {
 
   const handleConnect = async () => {
     try {
-      const redirectUri = `${window.location.origin}/integrations/google-calendar/callback`;
-      const url = await googleCalendarApi.getAuthUrl({ redirectUri });
+      const redirectUri = `${window.location.origin}/integrations/google/callback`;
+      const {url} = await googleCalendarApi.getAuthUrl({ redirectUri, state: 'google_calendar' }) as unknown as {url: string};
       window.location.href = url;
     } catch (error) {
       toast({

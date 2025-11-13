@@ -17,6 +17,14 @@ export enum EodImportField {
   HOURS_WORKED = 'hoursWorked',
   SUBMITTED_AT = 'submittedAt',
   IS_LATE = 'isLate',
+  // Legacy task fields for individual task rows
+  TASK_DETAILS = 'taskDetails',
+  TASK_TICKET = 'taskTicket',
+  TASK_TYPE_OF_WORK = 'taskTypeOfWork',
+  TASK_ESTIMATED_TIME = 'taskEstimatedTime',
+  TASK_TIME_SPENT = 'taskTimeSpent',
+  TASK_LIFECYCLE = 'taskLifecycle',
+  TASK_STATUS = 'taskStatus',
 }
 
 export class EodFieldMappingEntry {

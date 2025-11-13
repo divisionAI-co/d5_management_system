@@ -25,7 +25,7 @@ export class GoogleCalendarController {
   @Get('auth-url')
   @ApiOperation({ summary: 'Generate Google Calendar OAuth authorization URL' })
   async getAuthUrl(@Query() query: GetGoogleCalendarAuthUrlDto) {
-    const url = await this.googleCalendarService.generateAuthUrl(query.redirectUri);
+    const url = await this.googleCalendarService.generateAuthUrl(query.redirectUri, query.state);
     return { url };
   }
 

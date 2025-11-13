@@ -31,44 +31,44 @@ model User {
   lastName  String
   role      UserRole
   isActive  Boolean  @default(true)
-  
+
   // Two-Factor Authentication
-  twoFactorSecret   String?
-  twoFactorEnabled  Boolean @default(false)
-  
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean @default(false)
+
   // Profile
-  phone             String?
-  avatar            String?
-  dateOfBirth       DateTime?
-  
+  phone       String?
+  avatar      String?
+  dateOfBirth DateTime?
+
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
-  
+
   // Relations
   employee              Employee?
   assignedLeads         Lead[]
   assignedOpportunities Opportunity[]
-  assignedTasks         Task[] @relation("AssignedTasks")
-  createdTasks          Task[] @relation("CreatedTasks")
+  assignedTasks         Task[]                    @relation("AssignedTasks")
+  createdTasks          Task[]                    @relation("CreatedTasks")
   activities            Activity[]
-  assignedActivities    Activity[] @relation("AssignedActivities")
+  assignedActivities    Activity[]                @relation("AssignedActivities")
   notifications         Notification[]
   notificationSettings  NotificationSettings?
   eodReports            EodReport[]
   leaveRequests         LeaveRequest[]
   remoteWorkLogs        RemoteWorkLog[]
-  createdInvoices       Invoice[] @relation("InvoiceCreator")
+  createdInvoices       Invoice[]                 @relation("InvoiceCreator")
   calendarIntegrations  UserCalendarIntegration[]
   sentCampaigns         EmailCampaign[]
   passwordResetTokens   PasswordResetToken[]
-  createdActivityTypes  ActivityType[] @relation("ActivityTypeCreatedBy")
-  aiActions             AiAction[] @relation("AiActionsCreatedBy")
-  aiActionAttachments   AiActionAttachment[] @relation("AiActionAttachmentsByUser")
-  aiActionExecutions    AiActionExecution[] @relation("AiActionExecutionsTriggeredBy")
+  createdActivityTypes  ActivityType[]            @relation("ActivityTypeCreatedBy")
+  aiActions             AiAction[]                @relation("AiActionsCreatedBy")
+  aiActionAttachments   AiActionAttachment[]      @relation("AiActionAttachmentsByUser")
+  aiActionExecutions    AiActionExecution[]       @relation("AiActionExecutionsTriggeredBy")
   sessions              UserSession[]
-  
+
   @@map("users")
 }
 
@@ -76,19 +76,19 @@ model NotificationSettings {
   id     String @id @default(uuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  emailEnabled     Boolean @default(true)
-  inAppEnabled     Boolean @default(true)
-  taskAssigned     Boolean @default(true)
-  taskDueSoon      Boolean @default(true)
-  leaveApproved    Boolean @default(true)
+
+  emailEnabled      Boolean @default(true)
+  inAppEnabled      Boolean @default(true)
+  taskAssigned      Boolean @default(true)
+  taskDueSoon       Boolean @default(true)
+  leaveApproved     Boolean @default(true)
   performanceReview Boolean @default(true)
-  newCandidate     Boolean @default(true)
-  newOpportunity   Boolean @default(true)
-  
+  newCandidate      Boolean @default(true)
+  newOpportunity    Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@map("notification_settings")
 }
 
@@ -126,92 +126,92 @@ enum CustomerSentiment {
 }
 
 model Customer {
-  id          String       @id @default(uuid())
-  name        String
-  email       String       @unique
-  phone       String?
-  website     String?
-  industry    String?
-  type        CustomerType
-  
+  id       String       @id @default(uuid())
+  name     String
+  email    String       @unique
+  phone    String?
+  website  String?
+  industry String?
+  type     CustomerType
+
   // Account Management
-  status      CustomerStatus   @default(ONBOARDING)
-  sentiment   CustomerSentiment @default(NEUTRAL)
-  
+  status    CustomerStatus    @default(ONBOARDING)
+  sentiment CustomerSentiment @default(NEUTRAL)
+
   // Address
-  address     String?
-  city        String?
-  country     String?
-  postalCode  String?
-  taxId       String?
+  address        String?
+  city           String?
+  country        String?
+  postalCode     String?
+  taxId          String?
   registrationId String?
-  
+
   // Financial
   monthlyValue Decimal? @db.Decimal(10, 2)
   currency     String?  @default("USD")
-  
+
   // Metadata
-  notes       String?
-  tags        String[]
-  
+  notes String?
+  tags  String[]
+
   // Odoo Migration
-  odooId      String?  @unique
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  odooId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  opportunities Opportunity[]
-  invoices     Invoice[]
-  activities   Activity[]
-  meetings     Meeting[]
-  reports      CustomerReport[]
-  contacts     Contact[]
-  convertedLeads Lead[] @relation("CustomerConvertedLeads")
-  
+  opportunities  Opportunity[]
+  invoices       Invoice[]
+  activities     Activity[]
+  meetings       Meeting[]
+  reports        CustomerReport[]
+  contacts       Contact[]
+  convertedLeads Lead[]           @relation("CustomerConvertedLeads")
+
   @@map("customers")
 }
 
 model Contact {
-  id           String    @id @default(uuid())
-  firstName    String
-  lastName     String
-  email        String    @unique
-  phone        String?
-  role         String?
-  companyName  String?
-  linkedinUrl  String?
-  notes        String?   @db.Text
+  id          String  @id @default(uuid())
+  firstName   String
+  lastName    String
+  email       String  @unique
+  phone       String?
+  role        String?
+  companyName String?
+  linkedinUrl String?
+  notes       String? @db.Text
 
-  customerId   String?
-  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  leads        Lead[]
-  activities   Activity[]
+  leads      Lead[]
+  activities Activity[]
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@map("contacts")
 }
 
 model Lead {
-  id          String     @id @default(uuid())
-  contactId   String
-  contact     Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  
+  id        String  @id @default(uuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
   title       String
   description String?
   status      LeadStatus @default(NEW)
   value       Decimal?   @db.Decimal(10, 2)
-  probability Int?       // 0-100
-  
+  probability Int? // 0-100
+
   assignedToId String?
   assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  
-  source      String? // e.g., "Website", "Referral", "Cold Call"
-  
+
+  source String? // e.g., "Website", "Referral", "Cold Call"
+
   expectedCloseDate DateTime?
   actualCloseDate   DateTime?
   lostReason        String?
@@ -222,14 +222,14 @@ model Lead {
   prospectCompanyName String?
   prospectWebsite     String?
   prospectIndustry    String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   opportunities Opportunity[]
   activities    Activity[]
-  
+
   @@index([contactId])
   @@index([convertedCustomerId])
   @@index([status])
@@ -238,36 +238,36 @@ model Lead {
 }
 
 model Opportunity {
-  id         String       @id @default(uuid())
-  leadId     String
-  lead       Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(uuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
   customerId String?
-  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  
-  title      String
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  title       String
   description String?
-  type       CustomerType
-  value      Decimal      @db.Decimal(10, 2)
-  
+  type        CustomerType
+  value       Decimal      @db.Decimal(10, 2)
+
   assignedToId String?
-  assignedTo   User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+
   // Staff Augmentation specific
   jobDescriptionUrl String?
-  
-  stage         String  @default("Negotiation") // Customizable
-  isClosed      Boolean @default(false)
-  isWon         Boolean @default(false)
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  closedAt      DateTime?
-  
+
+  stage    String  @default("Negotiation") // Customizable
+  isClosed Boolean @default(false)
+  isWon    Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
   // Relations
   openPosition OpenPosition?
   activities   Activity[]
-  
+
   @@index([customerId])
   @@index([type])
   @@index([assignedToId])
@@ -287,58 +287,58 @@ enum CampaignStatus {
 }
 
 model EmailCampaign {
-  id          String         @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   subject     String
-  htmlContent String         @db.Text
-  textContent String?        @db.Text
-  
-  status      CampaignStatus @default(DRAFT)
-  
+  htmlContent String  @db.Text
+  textContent String? @db.Text
+
+  status CampaignStatus @default(DRAFT)
+
   // Targeting
-  targetSegment String? // JSON string with filter criteria
-  recipientCount Int    @default(0)
-  
+  targetSegment  String? // JSON string with filter criteria
+  recipientCount Int     @default(0)
+
   // Scheduling
   scheduledAt DateTime?
   sentAt      DateTime?
-  
+
   // Analytics
   sentCount    Int @default(0)
   openedCount  Int @default(0)
   clickedCount Int @default(0)
-  
-  createdById  String
-  createdBy    User   @relation(fields: [createdById], references: [id])
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
+
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   logs EmailCampaignLog[]
-  
+
   @@map("email_campaigns")
 }
 
 model EmailCampaignLog {
-  id         String   @id @default(uuid())
+  id         String        @id @default(uuid())
   campaignId String
   campaign   EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  
+
   recipientEmail String
   recipientName  String?
-  
-  sent       Boolean   @default(false)
-  sentAt     DateTime?
-  opened     Boolean   @default(false)
-  openedAt   DateTime?
-  clicked    Boolean   @default(false)
-  clickedAt  DateTime?
-  
-  error      String?
-  
-  createdAt  DateTime  @default(now())
-  
+
+  sent      Boolean   @default(false)
+  sentAt    DateTime?
+  opened    Boolean   @default(false)
+  openedAt  DateTime?
+  clicked   Boolean   @default(false)
+  clickedAt DateTime?
+
+  error String?
+
+  createdAt DateTime @default(now())
+
   @@index([campaignId])
   @@index([recipientEmail])
   @@map("email_campaign_logs")
@@ -349,35 +349,35 @@ model EmailSequence {
   name        String
   description String?
   isActive    Boolean @default(true)
-  
+
   // Trigger
-  triggerOn   String // e.g., "lead_status_new", "opportunity_created"
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  triggerOn String // e.g., "lead_status_new", "opportunity_created"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   steps EmailSequenceStep[]
-  
+
   @@map("email_sequences")
 }
 
 model EmailSequenceStep {
-  id         String  @id @default(uuid())
+  id         String        @id @default(uuid())
   sequenceId String
   sequence   EmailSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  
+
   order      Int
-  delayDays  Int     @default(0)
-  delayHours Int     @default(0)
-  
-  subject    String
-  htmlContent String @db.Text
+  delayDays  Int @default(0)
+  delayHours Int @default(0)
+
+  subject     String
+  htmlContent String  @db.Text
   textContent String? @db.Text
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([sequenceId, order])
   @@map("email_sequence_steps")
 }
@@ -395,47 +395,47 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  id             String        @id @default(uuid())
-  invoiceNumber  String        @unique
-  
-  customerId     String
-  customer       Customer      @relation(fields: [customerId], references: [id])
-  
+  id            String @id @default(uuid())
+  invoiceNumber String @unique
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
   // Amounts
-  subtotal       Decimal       @db.Decimal(10, 2)
-  taxRate        Decimal       @default(0) @db.Decimal(5, 2)
-  taxAmount      Decimal       @default(0) @db.Decimal(10, 2)
-  total          Decimal       @db.Decimal(10, 2)
-  currency       String        @default("USD")
-  
+  subtotal  Decimal @db.Decimal(10, 2)
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Decimal @default(0) @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  currency  String  @default("USD")
+
   // Dates
-  issueDate      DateTime      @default(now())
-  dueDate        DateTime
-  paidDate       DateTime?
-  
-  status         InvoiceStatus @default(DRAFT)
-  
+  issueDate DateTime  @default(now())
+  dueDate   DateTime
+  paidDate  DateTime?
+
+  status InvoiceStatus @default(DRAFT)
+
   // Recurring
-  isRecurring    Boolean       @default(false)
-  recurringDay   Int?          // Day of month (1-28)
-  
+  isRecurring  Boolean @default(false)
+  recurringDay Int? // Day of month (1-28)
+
   // Content
-  items          Json          // Array of invoice items
-  notes          String?       @db.Text
-  
+  items Json // Array of invoice items
+  notes String? @db.Text
+
   // PDF
-  pdfUrl         String?
-  
+  pdfUrl String?
+
   // Reminders
-  remindersSent  Int           @default(0)
+  remindersSent  Int       @default(0)
   lastReminderAt DateTime?
-  
-  createdById    String
-  createdBy      User          @relation("InvoiceCreator", fields: [createdById], references: [id])
-  
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  
+
+  createdById String
+  createdBy   User   @relation("InvoiceCreator", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([customerId])
   @@index([status])
   @@index([dueDate])
@@ -460,90 +460,92 @@ enum CandidateStage {
 }
 
 model Candidate {
-  id          String         @id @default(uuid())
-  firstName   String
-  lastName    String
-  email       String         @unique
-  phone       String?
-  
+  id        String  @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String  @unique
+  phone     String?
+
   // Professional Info
-  currentTitle String?
+  currentTitle      String?
   yearsOfExperience Int?
-  skills      String[]
-  resume      String? // URL to resume file
-  linkedinUrl String?
-  githubUrl   String?
-  portfolioUrl String?
-  driveFolderId String? // Google Drive folder containing interviews/CV
-  
+  skills            String[]
+  resume            String? // URL to resume file
+  linkedinUrl       String?
+  githubUrl         String?
+  portfolioUrl      String?
+  driveFolderId     String? // Google Drive folder containing interviews/CV
+
   // Recruitment
-  stage       CandidateStage @default(VALIDATION)
-  rating      Int?           // 1-5
-  notes       String?        @db.Text
-  
+  stage    CandidateStage @default(VALIDATION)
+  rating   Int? // 1-5
+  notes    String?        @db.Text
+  isActive Boolean        @default(true) // Active candidates are visible in board by default
+
   // Location
-  city        String?
-  country     String?
-  
+  city    String?
+  country String?
+
   // Availability
-  availableFrom DateTime?
-  expectedSalary Decimal?    @db.Decimal(10, 2)
-  salaryCurrency String?     @default("USD")
-  
+  availableFrom  DateTime?
+  expectedSalary Decimal?  @db.Decimal(10, 2)
+  salaryCurrency String?   @default("USD")
+
   // Odoo Migration
-  odooId      String?        @unique
-  
+  odooId String? @unique
+
   // Soft delete
-  deletedAt   DateTime?
-  
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  positions   CandidatePosition[]
-  activities  Activity[]
-  employee    Employee?
-  
+  positions  CandidatePosition[]
+  activities Activity[]
+  employee   Employee?
+
   @@index([stage])
   @@index([email])
   @@index([deletedAt])
+  @@index([isActive])
   @@map("candidates")
 }
 
 model OpenPosition {
-  id             String      @id @default(uuid())
-  opportunityId  String      @unique
-  opportunity    Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  
-  title          String
-  description    String      @db.Text
-  requirements   String?     @db.Text
-  
-  status         String      @default("Open") // Open, Filled, Cancelled
-  
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  filledAt       DateTime?
-  
+  id            String      @id @default(uuid())
+  opportunityId String      @unique
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String  @db.Text
+  requirements String? @db.Text
+
+  status String @default("Open") // Open, Filled, Cancelled
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  filledAt  DateTime?
+
   // Relations
-  candidates     CandidatePosition[]
-  
+  candidates CandidatePosition[]
+
   @@index([status])
   @@map("open_positions")
 }
 
 model CandidatePosition {
-  id          String       @id @default(uuid())
+  id          String    @id @default(uuid())
   candidateId String
-  candidate   Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  
-  positionId  String
-  position    OpenPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
-  
-  appliedAt   DateTime     @default(now())
-  status      String       @default("Under Review")
-  notes       String?
-  
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  positionId String
+  position   OpenPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  appliedAt DateTime @default(now())
+  status    String   @default("Under Review")
+  notes     String?
+
   @@unique([candidateId, positionId])
   @@index([candidateId])
   @@index([positionId])
@@ -569,79 +571,79 @@ enum ContractType {
 }
 
 model Employee {
-  id              String           @id @default(uuid())
-  userId          String           @unique
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  candidateId     String?          @unique
-  candidate       Candidate?       @relation(fields: [candidateId], references: [id], onDelete: SetNull)
-  
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  candidateId String?    @unique
+  candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+
   // Employment Details
-  employeeNumber  String           @unique
-  department      String?
-  jobTitle        String
-  status          EmploymentStatus @default(ACTIVE)
-  contractType    ContractType
-  
+  employeeNumber String           @unique
+  department     String?
+  jobTitle       String
+  status         EmploymentStatus @default(ACTIVE)
+  contractType   ContractType
+
   // Dates
   hireDate        DateTime
   terminationDate DateTime?
-  
+
   // Compensation
-  salary          Decimal          @db.Decimal(10, 2)
-  salaryCurrency  String           @default("USD")
-  
+  salary         Decimal @db.Decimal(10, 2)
+  salaryCurrency String  @default("USD")
+
   // Manager
-  managerId       String?
-  manager         Employee?        @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
-  directReports   Employee[]       @relation("EmployeeManager")
-  
+  managerId     String?
+  manager       Employee?  @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports Employee[] @relation("EmployeeManager")
+
   // Emergency Contact
-  emergencyContactName  String?
-  emergencyContactPhone String?
+  emergencyContactName     String?
+  emergencyContactPhone    String?
   emergencyContactRelation String?
-  
+
   // Documents
-  documents       Json? // Array of document objects with name, url, type
-  
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  
+  documents Json? // Array of document objects with name, url, type
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
   performanceReviews PerformanceReview[]
   leaveRequests      LeaveRequest[]
   remoteWorkLogs     RemoteWorkLog[]
   activities         Activity[]
-  
+
   @@map("employees")
 }
 
 model PerformanceReview {
-  id          String   @id @default(uuid())
-  employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
   reviewPeriodStart DateTime
   reviewPeriodEnd   DateTime
-  
+
   // Ratings (1-5 scale or custom)
-  ratings     Json // Flexible structure for various rating criteria
-  
-  strengths   String?  @db.Text
+  ratings Json // Flexible structure for various rating criteria
+
+  strengths    String? @db.Text
   improvements String? @db.Text
-  goals       String?  @db.Text
-  
+  goals        String? @db.Text
+
   overallRating Decimal? @db.Decimal(3, 2)
-  
-  reviewedAt  DateTime?
+
+  reviewedAt   DateTime?
   reviewerName String?
-  
+
   // PDF Export
-  pdfUrl      String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  pdfUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([employeeId])
   @@map("performance_reviews")
 }
@@ -664,46 +666,46 @@ enum LeaveType {
 }
 
 model LeaveRequest {
-  id          String             @id @default(uuid())
-  userId      String
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  employeeId  String
-  employee    Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  
-  type        LeaveType
-  startDate   DateTime
-  endDate     DateTime
-  totalDays   Int
-  
-  reason      String?            @db.Text
-  status      LeaveRequestStatus @default(PENDING)
-  
-  approvedBy  String?
-  approvedAt  DateTime?
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type      LeaveType
+  startDate DateTime
+  endDate   DateTime
+  totalDays Int
+
+  reason String?            @db.Text
+  status LeaveRequestStatus @default(PENDING)
+
+  approvedBy      String?
+  approvedAt      DateTime?
   rejectionReason String?
-  
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([employeeId])
   @@index([status])
   @@map("leave_requests")
 }
 
 model RemoteWorkLog {
-  id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  
-  date       DateTime @db.Date
-  reason     String?
-  
-  createdAt  DateTime @default(now())
-  
+
+  date   DateTime @db.Date
+  reason String?
+
+  createdAt DateTime @default(now())
+
   @@unique([employeeId, date])
   @@index([employeeId])
   @@map("remote_work_logs")
@@ -715,37 +717,37 @@ model NationalHoliday {
   date        DateTime @db.Date
   country     String   @default("AL") // Albania
   isRecurring Boolean  @default(false) // For holidays like New Year's Day
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([date, country])
   @@map("national_holidays")
 }
 
 model CompanySettings {
-  id                       String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Remote Work Policy
-  remoteWorkFrequency      String   @default("WEEKLY") // WEEKLY, MONTHLY, etc.
-  remoteWorkLimit          Int      @default(3) // Number of times per period
-  remoteWorkWindowOpen     Boolean  @default(false)
-  remoteWorkWindowStart    DateTime?
-  remoteWorkWindowEnd      DateTime?
-  
+  remoteWorkFrequency   String    @default("WEEKLY") // WEEKLY, MONTHLY, etc.
+  remoteWorkLimit       Int       @default(3) // Number of times per period
+  remoteWorkWindowOpen  Boolean   @default(false)
+  remoteWorkWindowStart DateTime?
+  remoteWorkWindowEnd   DateTime?
+
   // EOD Settings
-  eodGraceDays             Int      @default(2)
-  eodReportDeadlineHour    Int      @default(23)
-  eodReportDeadlineMin     Int      @default(59)
-  
+  eodGraceDays          Int @default(2)
+  eodReportDeadlineHour Int @default(23)
+  eodReportDeadlineMin  Int @default(59)
+
   // Performance Review
-  reviewCycleDays          Int      @default(180) // 6 months
+  reviewCycleDays Int @default(180) // 6 months
 
   // Leave Policy
-  annualLeaveAllowanceDays Int      @default(20)
-  
-  updatedAt                DateTime @updatedAt
-  
+  annualLeaveAllowanceDays Int @default(20)
+
+  updatedAt DateTime @updatedAt
+
   @@map("company_settings")
 }
 
@@ -754,24 +756,24 @@ model CompanySettings {
 // ============================================
 
 model EodReport {
-  id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  date       DateTime @db.Date
-  
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date DateTime @db.Date
+
   // Content
-  summary    String   @db.Text
-  tasksWorkedOn Json  // Array of task IDs or descriptions
-  hoursWorked Decimal? @db.Decimal(4, 2)
-  
+  summary       String   @db.Text
+  tasksWorkedOn Json // Array of task IDs or descriptions
+  hoursWorked   Decimal? @db.Decimal(4, 2)
+
   // Submission tracking
   submittedAt DateTime?
-  isLate      Boolean  @default(false)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  isLate      Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([userId, date])
   @@index([userId])
   @@index([date])
@@ -798,39 +800,39 @@ enum TaskStatus {
 }
 
 model Task {
-  id          String       @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String
-  description String?      @db.Text
-  
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
-  
+  description String? @db.Text
+
+  status   TaskStatus   @default(TODO)
+  priority TaskPriority @default(MEDIUM)
+
   // Assignment
   assignedToId String?
-  assignedTo   User?       @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
-  
-  createdById  String
-  createdBy    User        @relation("CreatedTasks", fields: [createdById], references: [id])
-  
+  assignedTo   User?   @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdById String
+  createdBy   User   @relation("CreatedTasks", fields: [createdById], references: [id])
+
   // Dates
   dueDate     DateTime?
   startDate   DateTime?
   completedAt DateTime?
-  
+
   // Customer/Project relation
-  customerId  String?
-  
+  customerId String?
+
   // Metadata
-  tags        String[]
+  tags           String[]
   estimatedHours Decimal? @db.Decimal(5, 2)
   actualHours    Decimal? @db.Decimal(5, 2)
-  
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  activities  Activity[]
-  
+  activities Activity[]
+
   @@index([assignedToId])
   @@index([status])
   @@index([customerId])
@@ -842,54 +844,54 @@ model Task {
 // ============================================
 
 model Activity {
-  id             String        @id @default(uuid())
+  id             String             @id @default(uuid())
   activityTypeId String
-  activityType   ActivityType  @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
+  activityType   ActivityType       @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
   subject        String
-  body           String?       @db.Text
-  activityDate DateTime?
-  reminderAt  DateTime?
-  isReminderSent Boolean   @default(false)
-  isPinned    Boolean      @default(false)
-  isCompleted Boolean      @default(false)
-  visibility  ActivityVisibility @default(PUBLIC)
-  
+  body           String?            @db.Text
+  activityDate   DateTime?
+  reminderAt     DateTime?
+  isReminderSent Boolean            @default(false)
+  isPinned       Boolean            @default(false)
+  isCompleted    Boolean            @default(false)
+  visibility     ActivityVisibility @default(PUBLIC)
+
   // Relations (polymorphic-style)
-  customerId    String?
-  customer      Customer?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  leadId        String?
-  lead          Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
   opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  
-  candidateId   String?
-  candidate     Candidate?   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  
-  employeeId    String?
-  employee      Employee?    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  contactId     String?
-  contact       Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  
-  taskId        String?
-  task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  candidateId String?
+  candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
 
-  assignedToId  String?
-  assignedTo    User?        @relation("AssignedActivities", fields: [assignedToId], references: [id], onDelete: SetNull)
-  
+  employeeId String?
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedActivities", fields: [assignedToId], references: [id], onDelete: SetNull)
+
   // Creator
-  createdById   String
-  createdBy     User         @relation(fields: [createdById], references: [id])
-  
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
   // Metadata
-  metadata      Json?        // For additional flexible data
-  
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  aiExecutions  AiActionExecution[] @relation("ActivityExecutions")
-  
+  metadata Json? // For additional flexible data
+
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  aiExecutions AiActionExecution[] @relation("ActivityExecutions")
+
   @@index([activityTypeId])
   @@index([customerId])
   @@index([leadId])
@@ -910,23 +912,23 @@ enum ActivityVisibility {
 }
 
 model ActivityType {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
-  key         String   @unique
+  key         String  @unique
   description String?
-  color       String?  @default("#2563EB")
-  icon        String?  // Icon key
-  isActive    Boolean  @default(true)
-  isSystem    Boolean  @default(false)
-  order       Int      @default(0)
+  color       String? @default("#2563EB")
+  icon        String? // Icon key
+  isActive    Boolean @default(true)
+  isSystem    Boolean @default(false)
+  order       Int     @default(0)
 
   createdById String?
-  createdBy   User?    @relation("ActivityTypeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?   @relation("ActivityTypeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  activities  Activity[]
+  activities Activity[]
 
   @@index([isActive])
   @@index([order])
@@ -968,52 +970,52 @@ enum AiCollectionFormat {
 }
 
 model AiAction {
-  id              String     @id @default(uuid())
-  name            String
-  description     String?
-  promptTemplate  String     @db.Text
-  entityType      AiEntityType
-  model           String?    // Optional override, defaults in service
-  isSystem        Boolean    @default(false)
-  isActive        Boolean    @default(true)
-  createdById     String?
-  createdBy       User?      @relation("AiActionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  fields          AiActionField[]
-  collections     AiActionCollection[]
-  attachments     AiActionAttachment[]
-  executions      AiActionExecution[]
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id             String               @id @default(uuid())
+  name           String
+  description    String?
+  promptTemplate String               @db.Text
+  entityType     AiEntityType
+  model          String? // Optional override, defaults in service
+  isSystem       Boolean              @default(false)
+  isActive       Boolean              @default(true)
+  createdById    String?
+  createdBy      User?                @relation("AiActionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  fields         AiActionField[]
+  collections    AiActionCollection[]
+  attachments    AiActionAttachment[]
+  executions     AiActionExecution[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 
-  @@map("ai_actions")
   @@index([entityType])
   @@index([isActive])
+  @@map("ai_actions")
 }
 
 model AiActionField {
-  id         String    @id @default(uuid())
+  id         String   @id @default(uuid())
   actionId   String
-  action     AiAction  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  action     AiAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
   fieldKey   String
   fieldLabel String
   metadata   Json?
-  order      Int       @default(0)
-  createdAt  DateTime  @default(now())
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
 
   @@unique([actionId, fieldKey])
   @@map("ai_action_fields")
 }
 
 model AiActionCollection {
-  id            String             @id @default(uuid())
+  id            String                    @id @default(uuid())
   actionId      String
-  action        AiAction           @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  action        AiAction                  @relation(fields: [actionId], references: [id], onDelete: Cascade)
   collectionKey AiCollectionKey
-  format        AiCollectionFormat @default(TABLE)
+  format        AiCollectionFormat        @default(TABLE)
   limit         Int?
-  order         Int                @default(0)
+  order         Int                       @default(0)
   metadata      Json?
-  createdAt     DateTime           @default(now())
+  createdAt     DateTime                  @default(now())
   fields        AiActionCollectionField[]
 
   @@index([actionId])
@@ -1021,28 +1023,28 @@ model AiActionCollection {
 }
 
 model AiActionCollectionField {
-  id           String              @id @default(uuid())
+  id           String             @id @default(uuid())
   collectionId String
-  collection   AiActionCollection  @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  collection   AiActionCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
   fieldKey     String
   fieldLabel   String
   metadata     Json?
-  order        Int                 @default(0)
+  order        Int                @default(0)
 
   @@unique([collectionId, fieldKey])
   @@map("ai_action_collection_fields")
 }
 
 model AiActionAttachment {
-  id            String     @id @default(uuid())
-  actionId      String
-  action        AiAction   @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  entityType    AiEntityType
-  entityId      String
-  attachedById  String?
-  attachedBy    User?      @relation("AiActionAttachmentsByUser", fields: [attachedById], references: [id], onDelete: SetNull)
-  createdAt     DateTime   @default(now())
-  executions    AiActionExecution[]
+  id           String              @id @default(uuid())
+  actionId     String
+  action       AiAction            @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  entityType   AiEntityType
+  entityId     String
+  attachedById String?
+  attachedBy   User?               @relation("AiActionAttachmentsByUser", fields: [attachedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime            @default(now())
+  executions   AiActionExecution[]
 
   @@unique([actionId, entityType, entityId])
   @@index([entityType, entityId])
@@ -1050,25 +1052,25 @@ model AiActionAttachment {
 }
 
 model AiActionExecution {
-  id             String                    @id @default(uuid())
-  actionId       String?
-  action         AiAction?                 @relation(fields: [actionId], references: [id], onDelete: SetNull)
-  attachmentId   String?
-  attachment     AiActionAttachment?       @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
-  entityType     AiEntityType
-  entityId       String
-  prompt         String                    @db.Text
-  inputs         Json?
-  output         Json?
-  rawOutput      String?                   @db.Text
-  status         AiActionExecutionStatus   @default(PENDING)
-  errorMessage   String?
-  triggeredById  String?
-  triggeredBy    User?                     @relation("AiActionExecutionsTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
-  activityId     String?
-  activity       Activity?                 @relation("ActivityExecutions", fields: [activityId], references: [id], onDelete: SetNull)
-  createdAt      DateTime                  @default(now())
-  completedAt    DateTime?
+  id            String                  @id @default(uuid())
+  actionId      String?
+  action        AiAction?               @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  attachmentId  String?
+  attachment    AiActionAttachment?     @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  entityType    AiEntityType
+  entityId      String
+  prompt        String                  @db.Text
+  inputs        Json?
+  output        Json?
+  rawOutput     String?                 @db.Text
+  status        AiActionExecutionStatus @default(PENDING)
+  errorMessage  String?
+  triggeredById String?
+  triggeredBy   User?                   @relation("AiActionExecutionsTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  activityId    String?
+  activity      Activity?               @relation("ActivityExecutions", fields: [activityId], references: [id], onDelete: SetNull)
+  createdAt     DateTime                @default(now())
+  completedAt   DateTime?
 
   @@index([entityType, entityId])
   @@index([status])
@@ -1080,59 +1082,59 @@ model AiActionExecution {
 // ============================================
 
 model Meeting {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   title       String
-  description String?  @db.Text
-  
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  startTime   DateTime
-  endTime     DateTime
-  location    String?
-  meetingUrl  String?  // For virtual meetings
-  
+  description String? @db.Text
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  startTime  DateTime
+  endTime    DateTime
+  location   String?
+  meetingUrl String? // For virtual meetings
+
   // Calendar Integration
-  googleEventId String?
+  googleEventId    String?
   microsoftEventId String?
-  
-  attendees   Json     // Array of attendee objects
-  
-  notes       String?  @db.Text
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+
+  attendees Json // Array of attendee objects
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([customerId])
   @@index([startTime])
   @@map("meetings")
 }
 
 model CustomerReport {
-  id          String   @id @default(uuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   title       String
   periodStart DateTime
   periodEnd   DateTime
-  
+
   // Content
-  content     Json     // Structured report data
-  htmlContent String?  @db.Text
-  
+  content     Json // Structured report data
+  htmlContent String? @db.Text
+
   // PDF
-  pdfUrl      String?
-  
+  pdfUrl String?
+
   // Collaboration
-  contributors Json?   // Array of user IDs who contributed
-  
-  status      String   @default("Draft") // Draft, Sent
-  sentAt      DateTime?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  contributors Json? // Array of user IDs who contributed
+
+  status String    @default("Draft") // Draft, Sent
+  sentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([customerId])
   @@map("customer_reports")
 }
@@ -1156,41 +1158,41 @@ enum NotificationType {
 }
 
 model Notification {
-  id        String           @id @default(uuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type      NotificationType
-  title     String
-  message   String           @db.Text
-  
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type    NotificationType
+  title   String
+  message String           @db.Text
+
   // Link to related entity
-  entityType String?         // "task", "leave_request", "candidate", etc.
+  entityType String? // "task", "leave_request", "candidate", etc.
   entityId   String?
-  
-  isRead    Boolean          @default(false)
-  readAt    DateTime?
-  
+
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
   // Email notification
-  emailSent Boolean          @default(false)
+  emailSent   Boolean   @default(false)
   emailSentAt DateTime?
-  
-  createdAt DateTime         @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@index([userId])
   @@index([isRead])
   @@map("notifications")
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  reason    String   @default("RESET")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  reason    String    @default("RESET")
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@map("password_reset_tokens")
@@ -1208,22 +1210,22 @@ enum TemplateType {
 }
 
 model Template {
-  id          String       @id @default(uuid())
-  name        String
-  type        TemplateType
-  
-  htmlContent String       @db.Text
-  cssContent  String?      @db.Text
-  
+  id   String       @id @default(uuid())
+  name String
+  type TemplateType
+
+  htmlContent String  @db.Text
+  cssContent  String? @db.Text
+
   // Variables that can be used in template
-  variables   Json         // Array of available variables
-  
-  isDefault   Boolean      @default(false)
-  isActive    Boolean      @default(true)
-  
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  
+  variables Json // Array of available variables
+
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("templates")
 }
 
@@ -1239,27 +1241,27 @@ enum ImportStatus {
 }
 
 model DataImport {
-  id          String       @id @default(uuid())
-  type        String       // "customers", "candidates", "activities"
-  fileName    String
-  fileUrl     String
-  
-  status      ImportStatus @default(PENDING)
-  
+  id       String @id @default(uuid())
+  type     String // "customers", "candidates", "activities"
+  fileName String
+  fileUrl  String
+
+  status ImportStatus @default(PENDING)
+
   // Mapping
-  fieldMapping Json?       // Column to field mapping
-  
+  fieldMapping Json? // Column to field mapping
+
   // Results
-  totalRecords    Int      @default(0)
-  successCount    Int      @default(0)
-  failureCount    Int      @default(0)
-  errors          Json?    // Array of error messages
-  
+  totalRecords Int   @default(0)
+  successCount Int   @default(0)
+  failureCount Int   @default(0)
+  errors       Json? // Array of error messages
+
   startedAt   DateTime?
   completedAt DateTime?
-  
-  createdAt   DateTime     @default(now())
-  
+
+  createdAt DateTime @default(now())
+
   @@map("data_imports")
 }
 
@@ -1268,39 +1270,39 @@ model DataImport {
 // ============================================
 
 model Integration {
-  id          String   @id @default(uuid())
-  name        String   @unique // "google_drive", "google_calendar", "microsoft"
-  
-  isActive    Boolean  @default(false)
-  
+  id   String @id @default(uuid())
+  name String @unique // "google_drive", "google_calendar", "microsoft"
+
+  isActive Boolean @default(false)
+
   // OAuth tokens (encrypted)
-  accessToken  String? @db.Text
-  refreshToken String? @db.Text
+  accessToken  String?   @db.Text
+  refreshToken String?   @db.Text
   expiresAt    DateTime?
-  
+
   // Configuration
-  config      Json?    // Provider-specific configuration
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  config Json? // Provider-specific configuration
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("integrations")
 }
 
 model UserCalendarIntegration {
-  id                String   @id @default(uuid())
-  userId            String   @map("user_id")
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
   provider          String
-  accessToken       String?  @db.Text @map("access_token")
-  refreshToken      String?  @db.Text @map("refresh_token")
+  accessToken       String?   @map("access_token") @db.Text
+  refreshToken      String?   @map("refresh_token") @db.Text
   expiresAt         DateTime? @map("expires_at")
   scope             String?
-  externalAccountId String?  @map("external_account_id")
-  externalEmail     String?  @map("external_email")
-  syncToken         String?  @db.Text @map("sync_token")
+  externalAccountId String?   @map("external_account_id")
+  externalEmail     String?   @map("external_email")
+  syncToken         String?   @map("sync_token") @db.Text
   lastSyncedAt      DateTime? @map("last_synced_at")
-  connectedAt       DateTime @default(now()) @map("connected_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  connectedAt       DateTime  @default(now()) @map("connected_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1309,16 +1311,16 @@ model UserCalendarIntegration {
 }
 
 model UserSession {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  tokenHash  String   @db.Text @map("token_hash")
-  expiresAt  DateTime @map("expires_at")
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @map("token_hash") @db.Text
+  expiresAt  DateTime  @map("expires_at")
   revokedAt  DateTime? @map("revoked_at")
   lastUsedAt DateTime? @map("last_used_at")
-  userAgent  String?  @map("user_agent")
-  ipAddress  String?  @map("ip_address")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1332,25 +1334,24 @@ model UserSession {
 // ============================================
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   userId    String?
   userEmail String?
-  
-  action    String   // "CREATE", "UPDATE", "DELETE"
-  entity    String   // "customer", "employee", etc.
-  entityId  String
-  
-  changes   Json?    // Before/after values
-  
+
+  action   String // "CREATE", "UPDATE", "DELETE"
+  entity   String // "customer", "employee", etc.
+  entityId String
+
+  changes Json? // Before/after values
+
   ipAddress String?
   userAgent String?
-  
+
   createdAt DateTime @default(now())
-  
+
   @@index([userId])
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
 }
-

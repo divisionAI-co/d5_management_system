@@ -48,6 +48,7 @@ const DEFAULT_FORM_VALUES: CreateCandidateDto = {
   resume: '',
   driveFolderId: '',
   driveFolderUrl: '',
+  isActive: true,
 };
 
 export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormProps) {
@@ -84,6 +85,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
       resume: candidate.resume ?? '',
       driveFolderId: candidate.driveFolderId ?? '',
       driveFolderUrl: candidate.driveFolderUrl ?? '',
+      isActive: candidate.isActive ?? true,
     };
   }, [candidate]);
 
@@ -677,6 +679,24 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                       className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     />
                   </div>
+                </div>
+
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                  <input
+                    id="is-active"
+                    type="checkbox"
+                    {...register('isActive')}
+                    className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                  />
+                  <label
+                    htmlFor="is-active"
+                    className="flex-1 text-sm font-medium text-muted-foreground"
+                  >
+                    Active Candidate
+                    <span className="ml-2 text-xs text-muted-foreground/70">
+                      (Active candidates are visible in the board by default)
+                    </span>
+                  </label>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

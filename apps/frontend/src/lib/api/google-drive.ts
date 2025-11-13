@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { DriveFile, ListDriveFilesResponse } from '@/types/integrations';
+import type { DriveFile, ListDriveFilesResponse, DrivePermission, UserFilePermissions } from '@/types/integrations';
 
 export interface ListFilesParams {
   parentId?: string;
@@ -55,6 +55,70 @@ export const googleDriveApi = {
 
   async deleteFile(fileId: string) {
     await apiClient.delete(`/drive/files/${fileId}`);
+  },
+
+  // Permissions
+  async getFilePermissions(fileId: string) {
+    const { data } = await apiClient.get<DrivePermission[]>(`/drive/files/${fileId}/permissions`);
+    return data;
+  },
+
+  async getMyPermissions(fileId: string) {
+    const { data } = await apiClient.get<UserFilePermissions>(`/drive/files/${fileId}/permissions/me`);
+    return data;
+  },
+
+  async getUserPermissions(fileId: string, userEmail: string) {
+    const { data } = await apiClient.get<UserFilePermissions>(
+      `/drive/files/${fileId}/permissions/user`,
+      {
+        params: { email: userEmail },
+      },
+    );
+    return data;
+  },
+
+  async checkPermission(fileId: string, userEmail: string, role: DrivePermission['role']) {
+    const { data } = await apiClient.get<boolean>(`/drive/files/${fileId}/permissions/check`, {
+      params: { email: userEmail, role },
+    });
+    return data;
+  },
+
+  // OAuth Connection
+  async getConnectionStatus() {
+    const { data } = await apiClient.get<{
+      connected: boolean;
+      externalEmail: string | null;
+      externalAccountId: string | null;
+      expiresAt: string | null;
+      scope: string | null;
+      lastSyncedAt: string | null;
+      connectedAt: string | null;
+    }>('/drive/status');
+    return data;
+  },
+
+  async generateAuthUrl(redirectUri?: string, state?: string) {
+    const params: Record<string, string> = {};
+    if (redirectUri) params.redirectUri = redirectUri;
+    if (state) params.state = state;
+    const { data } = await apiClient.get<{ url: string }>('/drive/connect', {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
+    return data.url;
+  },
+
+  async exchangeCode(code: string, redirectUri?: string) {
+    const { data } = await apiClient.post('/drive/connect/callback', {
+      code,
+      redirectUri,
+    });
+    return data;
+  },
+
+  async disconnect() {
+    await apiClient.delete('/drive/disconnect');
   },
 };
 

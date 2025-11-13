@@ -4,6 +4,10 @@ export class GetGoogleCalendarAuthUrlDto {
   @IsOptional()
   @IsString()
   redirectUri?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
 }
 
 

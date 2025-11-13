@@ -35,15 +35,24 @@ export class FilterUsersDto {
     example: true,
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === undefined || value === null || value === '') return undefined;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-      const normalized = value.toLowerCase();
-      if (['true', '1', 'yes'].includes(normalized)) return true;
-      if (['false', '0', 'no'].includes(normalized)) return false;
+  @Transform(({ value, obj, key }) => {
+    const raw = obj?.[key] ?? value;
+    if (raw === undefined || raw === null || raw === '') {
+      return undefined;
     }
-    return value;
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+        return false;
+      }
+    }
+    return undefined;
   })
   @IsBoolean()
   isActive?: boolean;

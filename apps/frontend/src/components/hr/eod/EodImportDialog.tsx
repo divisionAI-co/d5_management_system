@@ -14,6 +14,7 @@ interface EodImportDialogProps {
 interface EodExecuteOptions {
   markMissingAsSubmitted: boolean;
   defaultIsLate: boolean;
+  useLegacyFormat: boolean;
 }
 
 export function EodImportDialog({ open, onClose }: EodImportDialogProps) {
@@ -31,15 +32,39 @@ export function EodImportDialog({ open, onClose }: EodImportDialogProps) {
       initialOptions={() => ({
         markMissingAsSubmitted: false,
         defaultIsLate: false,
+        useLegacyFormat: false,
       })}
       buildExecutePayload={({ updateExisting, options }) => ({
         updateExisting,
         markMissingAsSubmitted: options.markMissingAsSubmitted,
         defaultIsLate: options.defaultIsLate,
+        useLegacyFormat: options.useLegacyFormat,
       })}
       invalidateQueries={['eod-reports']}
       renderExecuteOptions={({ options, setOptions }) => (
         <div className="space-y-4">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              checked={options.useLegacyFormat}
+              onChange={(event) =>
+                setOptions((prev) => ({
+                  ...prev,
+                  useLegacyFormat: event.target.checked,
+                }))
+              }
+              className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+            />
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Import legacy Google Form export
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Aggregates multiple task rows per email/date, approximates Gmail addresses to work emails, and parses “report for…” notes to adjust the report date.
+              </p>
+            </div>
+          </label>
+
           <label className="flex items-start gap-3">
             <input
               type="checkbox"

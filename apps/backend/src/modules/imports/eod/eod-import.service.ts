@@ -12,6 +12,13 @@ import * as XLSX from 'xlsx';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { EodMapImportDto, EodFieldMappingEntry, EodImportField } from './dto/eod-map-import.dto';
 import { ExecuteEodImportDto } from './dto/execute-eod-import.dto';
+import {
+  buildEodPayload,
+  BuildEodPayloadOptions,
+  EodFieldMapping,
+} from './eod-import.helpers';
+import { LegacyEodImportService } from './legacy-eod-import.service';
+import { generateInitialMappings } from '../utils/field-mapping.util';
 
 export interface EodUploadResult {
   id: string;
@@ -21,6 +28,7 @@ export interface EodUploadResult {
   sampleRows: Record<string, string>[];
   totalRows: number;
   availableFields: EodImportFieldMetadata[];
+  suggestedMappings?: Array<{ sourceColumn: string; targetField: string }>;
 }
 
 export interface EodImportSummary {
@@ -40,8 +48,6 @@ export interface EodImportFieldMetadata {
   description: string;
   required: boolean;
 }
-
-type EodFieldMapping = Partial<Record<EodImportField, string>>;
 
 type ParsedSheet = {
   headers: string[];
@@ -93,6 +99,48 @@ const EOD_FIELD_DEFINITIONS: EodImportFieldMetadata[] = [
     description: 'Whether the report was submitted late (true/false). Optional.',
     required: false,
   },
+  {
+    key: EodImportField.TASK_DETAILS,
+    label: 'Task Details',
+    description: 'Task description or client details for individual task rows (legacy format).',
+    required: false,
+  },
+  {
+    key: EodImportField.TASK_TICKET,
+    label: 'Task Ticket/Reference',
+    description: 'Ticket or task identifier for individual task rows (legacy format).',
+    required: false,
+  },
+  {
+    key: EodImportField.TASK_TYPE_OF_WORK,
+    label: 'Task Type of Work',
+    description: 'Type of work: PLANNING, RESEARCH, IMPLEMENTATION, or TESTING (legacy format). Defaults to PLANNING if not mapped.',
+    required: false,
+  },
+  {
+    key: EodImportField.TASK_ESTIMATED_TIME,
+    label: 'Task Estimated Time',
+    description: 'Estimated time for the task in hours (legacy format).',
+    required: false,
+  },
+  {
+    key: EodImportField.TASK_TIME_SPENT,
+    label: 'Task Time Spent',
+    description: 'Time spent on the task in hours (legacy format).',
+    required: false,
+  },
+  {
+    key: EodImportField.TASK_LIFECYCLE,
+    label: 'Task Lifecycle',
+    description: 'Task lifecycle: NEW or RETURNED (legacy format).',
+    required: false,
+  },
+  {
+    key: EodImportField.TASK_STATUS,
+    label: 'Task Status',
+    description: 'Task status: IN_PROGRESS or DONE (legacy format).',
+    required: false,
+  },
 ];
 
 @Injectable()
@@ -105,7 +153,10 @@ export class EodImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly legacyEodImportService: LegacyEodImportService,
+  ) {}
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -200,6 +251,14 @@ export class EodImportService {
       select: { id: true },
     });
 
+    // Generate suggested mappings with lenient matching for legacy formats
+    // Use lower threshold (0.25) to catch more variations like "Status" -> "Task Status"
+    const suggestedMappings = generateInitialMappings(
+      parsed.headers,
+      EOD_FIELD_DEFINITIONS,
+      0.25, // Lower threshold for fuzzy/legacy matching
+    );
+
     return {
       id: importRecord.id,
       type: 'eod_reports',
@@ -208,6 +267,7 @@ export class EodImportService {
       sampleRows,
       totalRows: sanitizedRows.length,
       availableFields: EOD_FIELD_DEFINITIONS,
+      suggestedMappings,
     };
   }
 
@@ -325,99 +385,6 @@ export class EodImportService {
     };
   }
 
-  private extractValue(
-    row: Record<string, string>,
-    mapping: EodFieldMapping,
-    key: EodImportField,
-  ) {
-    const column = mapping[key];
-    if (!column) {
-      return undefined;
-    }
-    const value = row[column];
-    if (value === undefined || value === null) {
-      return undefined;
-    }
-    const trimmed = String(value).trim();
-    return trimmed.length ? trimmed : undefined;
-  }
-
-  private parseDate(value: string | undefined): Date | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(
-        `Value "${value}" is not a valid date (expected YYYY-MM-DD).`,
-      );
-    }
-    return parsed;
-  }
-
-  private parseDateTime(value: string | undefined): Date | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(
-        `Value "${value}" is not a valid datetime (expected ISO format).`,
-      );
-    }
-    return parsed;
-  }
-
-  private parseBoolean(value: string | undefined): boolean | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const normalized = value.trim().toLowerCase();
-    if (['true', '1', 'yes', 'y'].includes(normalized)) {
-      return true;
-    }
-    if (['false', '0', 'no', 'n'].includes(normalized)) {
-      return false;
-    }
-    return undefined;
-  }
-
-  private parseDecimal(value: string | undefined): Prisma.Decimal | undefined {
-    if (!value) {
-      return undefined;
-    }
-    const normalized = value.replace(/[^0-9.,-]/g, '').replace(',', '.');
-    if (!normalized) {
-      return undefined;
-    }
-    const parsed = Number(normalized);
-    if (Number.isNaN(parsed)) {
-      throw new BadRequestException(
-        `Value "${value}" is not a valid number for hours worked.`,
-      );
-    }
-    return new Prisma.Decimal(parsed);
-  }
-
-  private parseTasks(value: string | undefined) {
-    if (!value) {
-      return [] as Prisma.JsonArray;
-    }
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return parsed as Prisma.JsonArray;
-      }
-    } catch (error) {
-      // Fallback to newline-separated text
-    }
-    const lines = value
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    return lines.length ? (lines as Prisma.JsonArray) : ([] as Prisma.JsonArray);
-  }
-
   private async resolveUserIdByEmail(email: string): Promise<{ userId: string }> {
     const normalized = email.trim().toLowerCase();
     const user = await this.prisma.user.findUnique({
@@ -435,54 +402,6 @@ export class EodImportService {
     }
 
     return { userId: user.id };
-  }
-
-  private buildEodPayload(
-    row: Record<string, string>,
-    mapping: EodFieldMapping,
-    options: {
-      markMissingAsSubmitted: boolean;
-      defaultIsLate: boolean;
-    },
-  ) {
-    const email = this.extractValue(row, mapping, EodImportField.EMAIL);
-    if (!email) {
-      throw new BadRequestException('Email is required for each EOD row.');
-    }
-
-    const dateValue = this.extractValue(row, mapping, EodImportField.DATE);
-    const reportDate = this.parseDate(dateValue);
-    if (!reportDate) {
-      throw new BadRequestException('Date is required for each EOD row.');
-    }
-
-    const summary = this.extractValue(row, mapping, EodImportField.SUMMARY) ?? '';
-
-    const submittedAt =
-      this.parseDateTime(this.extractValue(row, mapping, EodImportField.SUBMITTED_AT)) ??
-      (options.markMissingAsSubmitted ? new Date() : undefined);
-
-    const isLate =
-      this.parseBoolean(this.extractValue(row, mapping, EodImportField.IS_LATE)) ??
-      options.defaultIsLate;
-
-    const hoursWorked = this.parseDecimal(
-      this.extractValue(row, mapping, EodImportField.HOURS_WORKED),
-    );
-
-    const tasks = this.parseTasks(
-      this.extractValue(row, mapping, EodImportField.TASKS),
-    );
-
-    return {
-      email,
-      reportDate,
-      summary,
-      submittedAt: submittedAt ?? null,
-      isLate,
-      hoursWorked,
-      tasks,
-    };
   }
 
   async executeEodImport(
@@ -515,10 +434,11 @@ export class EodImportService {
     const rows = parsed.rows.map((row) => this.normalizeRowValues(row));
 
     const updateExisting = dto.updateExisting ?? true;
-    const options = {
+    const options: BuildEodPayloadOptions = {
       markMissingAsSubmitted: dto.markMissingAsSubmitted ?? false,
       defaultIsLate: dto.defaultIsLate ?? false,
     };
+    const useLegacyFormat = dto.useLegacyFormat ?? false;
 
     await this.prisma.dataImport.update({
       where: { id },
@@ -530,8 +450,65 @@ export class EodImportService {
       },
     });
 
+    const totalRecords = rows.length;
+
+    let summary: EodImportSummary | null = null;
+    try {
+      summary = useLegacyFormat
+        ? await this.legacyEodImportService.processLegacyImport({
+            importId: id,
+            rows,
+            mapping: mappingPayload.fields!,
+            options,
+            updateExisting,
+          })
+        : await this.processStandardImport({
+            importId: id,
+            rows,
+            mapping: mappingPayload.fields!,
+            options,
+            updateExisting,
+          });
+
+      await this.prisma.dataImport.update({
+        where: { id },
+        data: {
+          status: ImportStatus.COMPLETED,
+          successCount: summary.createdCount + summary.updatedCount,
+          failureCount: summary.failedCount,
+          totalRecords,
+          errors: summary.errors,
+          completedAt: new Date(),
+        },
+      });
+
+      return summary;
+    } catch (error) {
+      await this.prisma.dataImport.update({
+        where: { id },
+        data: {
+          status: ImportStatus.FAILED,
+          errors: summary?.errors ?? [],
+          failureCount: summary?.failedCount ?? 0,
+          totalRecords,
+          completedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+  }
+
+  private async processStandardImport(params: {
+    importId: string;
+    rows: Record<string, string>[];
+    mapping: EodFieldMapping;
+    options: BuildEodPayloadOptions;
+    updateExisting: boolean;
+  }): Promise<EodImportSummary> {
+    const { importId, rows, mapping, options, updateExisting } = params;
+
     const summary: EodImportSummary = {
-      importId: id,
+      importId,
       totalRows: rows.length,
       processedRows: 0,
       createdCount: 0,
@@ -560,7 +537,7 @@ export class EodImportService {
     for (let index = 0; index < rows.length; index += 1) {
       const rowNumber = index + 2;
       try {
-        const payload = this.buildEodPayload(rows[index], mappingPayload.fields!, options);
+        const payload = buildEodPayload(rows[index], mapping, options);
         const key = `${payload.email.toLowerCase()}|${payload.reportDate
           .toISOString()
           .slice(0, 10)}`;
@@ -637,7 +614,8 @@ export class EodImportService {
           ? group.tasks
           : ([] as Prisma.JsonArray);
 
-        const submittedAtValue = group.submittedAt ?? (options.markMissingAsSubmitted ? new Date() : null);
+        const submittedAtValue =
+          group.submittedAt ?? (options.markMissingAsSubmitted ? new Date() : null);
 
         const aggregatedSummary = group.summaries.length
           ? group.summaries.join('\n')
@@ -694,35 +672,9 @@ export class EodImportService {
       }
     };
 
-    try {
       for (const group of groupedEntries) {
         // eslint-disable-next-line no-await-in-loop
         await processGroup(group);
-      }
-
-      await this.prisma.dataImport.update({
-        where: { id },
-        data: {
-          status: ImportStatus.COMPLETED,
-          successCount: summary.createdCount + summary.updatedCount,
-          failureCount: summary.failedCount,
-          totalRecords: rows.length,
-          errors: summary.errors,
-          completedAt: new Date(),
-        },
-      });
-    } catch (error) {
-      await this.prisma.dataImport.update({
-        where: { id },
-        data: {
-          status: ImportStatus.FAILED,
-          errors: summary.errors,
-          failureCount: summary.failedCount,
-          totalRecords: rows.length,
-          completedAt: new Date(),
-        },
-      });
-      throw error;
     }
 
     return summary;

@@ -26,4 +26,13 @@ export class ExecuteEodImportDto {
   @IsOptional()
   @IsBoolean()
   defaultIsLate?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Enable this when importing the legacy Google Form export so the importer aggregates tasks per email/day and matches users approximately.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  useLegacyFormat?: boolean;
 }

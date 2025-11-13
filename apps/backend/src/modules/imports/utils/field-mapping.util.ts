@@ -22,10 +22,11 @@ export interface SuggestedMapping {
  * - Contains match
  * - Levenshtein distance (normalized)
  * - Word overlap
+ * - Partial word matching (for abbreviations and variations)
  */
 function calculateSimilarity(str1: string, str2: string): number {
-  const s1 = str1.trim().toLowerCase();
-  const s2 = str2.trim().toLowerCase();
+  const s1 = str1.trim().toLowerCase().replace(/[^\w\s]/g, ''); // Remove punctuation
+  const s2 = str2.trim().toLowerCase().replace(/[^\w\s]/g, '');
 
   // Exact match
   if (s1 === s2) {
@@ -41,19 +42,42 @@ function calculateSimilarity(str1: string, str2: string): number {
   const words1 = s1.split(/\s+|[-_]/).filter((w) => w.length > 0);
   const words2 = s2.split(/\s+|[-_]/).filter((w) => w.length > 0);
 
-  // Count matching words
-  const matchingWords = words1.filter((w1) =>
-    words2.some((w2) => w1 === w2 || w1.includes(w2) || w2.includes(w1)),
-  );
-  const wordOverlap = matchingWords.length / Math.max(words1.length, words2.length);
+  // Count matching words with fuzzy matching
+  let matchCount = 0;
+  for (const w1 of words1) {
+    for (const w2 of words2) {
+      // Exact word match
+      if (w1 === w2) {
+        matchCount += 1.0;
+      }
+      // One word contains the other (e.g., "status" matches "task status")
+      else if (w1.includes(w2) || w2.includes(w1)) {
+        matchCount += 0.8;
+      }
+      // Words start with same letters (e.g., "est" matches "estimated")
+      else if (w1.length >= 3 && w2.length >= 3 && 
+               (w1.startsWith(w2.substring(0, 3)) || w2.startsWith(w1.substring(0, 3)))) {
+        matchCount += 0.6;
+      }
+      // Similar words (small edit distance)
+      else if (Math.abs(w1.length - w2.length) <= 2) {
+        const dist = levenshteinDistance(w1, w2);
+        if (dist <= 2) {
+          matchCount += 0.5;
+        }
+      }
+    }
+  }
+  
+  const wordOverlap = matchCount / Math.max(words1.length, words2.length);
 
-  // Levenshtein distance (normalized)
+  // Levenshtein distance (normalized) - more weight for similar strings
   const maxLength = Math.max(s1.length, s2.length);
   const distance = levenshteinDistance(s1, s2);
   const normalizedDistance = 1 - distance / maxLength;
 
-  // Combine scores (weighted average)
-  return wordOverlap * 0.6 + normalizedDistance * 0.4;
+  // Combine scores (favor word overlap for better matching)
+  return wordOverlap * 0.7 + normalizedDistance * 0.3;
 }
 
 /**

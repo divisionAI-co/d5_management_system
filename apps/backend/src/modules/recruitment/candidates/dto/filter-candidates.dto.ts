@@ -61,16 +61,52 @@ export class FilterCandidatesDto {
   })
   @IsBoolean()
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === undefined || value === null || value === '') {
+  @Transform(({ value, obj, key }) => {
+    const raw = obj?.[key] ?? value;
+    if (raw === undefined || raw === null || raw === '') {
       return undefined;
     }
-    if (typeof value === 'boolean') {
-      return value;
+    if (typeof raw === 'boolean') {
+      return raw;
     }
-    return value === 'true';
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+    }
+    return undefined;
   })
   hasOpenPosition?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter by active status. If not provided, defaults to true (only active candidates). Set to false to show inactive candidates, or null to show all.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  @Transform(({ value, obj, key }) => {
+    const raw = obj?.[key] ?? value;
+    if (raw === undefined || raw === null || raw === '') {
+      return undefined;
+    }
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+    }
+    return undefined;
+  })
+  isActive?: boolean;
 
   @ApiPropertyOptional({
     description: 'Page number for pagination',
@@ -95,7 +131,8 @@ export class FilterCandidatesDto {
     if (Number.isNaN(parsed)) {
       return 25;
     }
-    return Math.min(Math.max(parsed, 1), 100);
+    // Allow up to 5000 for board views that need to show all candidates
+    return Math.min(Math.max(parsed, 1), 5000);
   })
   pageSize?: number = 25;
 

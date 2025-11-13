@@ -25,4 +25,25 @@ export interface ListDriveFilesResponse {
   driveId: string | null;
 }
 
+export interface DrivePermission {
+  id: string;
+  type: 'user' | 'group' | 'domain' | 'anyone';
+  role: 'owner' | 'organizer' | 'fileOrganizer' | 'writer' | 'commenter' | 'reader';
+  emailAddress?: string;
+  displayName?: string;
+  domain?: string;
+  allowFileDiscovery?: boolean;
+}
+
+export interface UserFilePermissions {
+  fileId: string;
+  userEmail: string;
+  canView: boolean;
+  canComment: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  isOwner: boolean;
+  permissions: DrivePermission[];
+}
+
 

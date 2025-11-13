@@ -7,6 +7,7 @@ import type {
   ConvertCandidateToEmployeeResponse,
   CreateCandidateDto,
   LinkCandidatePositionDto,
+  MarkInactivePayload,
   PaginatedResponse,
   UpdateCandidateDto,
   UpdateCandidateStageDto,
@@ -94,6 +95,14 @@ export const candidatesApi = {
   async delete(id: string) {
     const { data } = await apiClient.delete<{ success: boolean; message: string }>(
       `/recruitment/candidates/${id}`,
+    );
+    return data;
+  },
+
+  async markInactive(id: string, payload: MarkInactivePayload) {
+    const { data } = await apiClient.patch<Candidate>(
+      `/recruitment/candidates/${id}/mark-inactive`,
+      payload,
     );
     return data;
   },

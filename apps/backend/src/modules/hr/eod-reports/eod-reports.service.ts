@@ -44,6 +44,12 @@ export class EodReportsService {
     return submissionTime.getTime() > submissionDeadline.getTime();
   }
 
+  private async computeIsLateForTimestamp(date: string, submissionTime: Date) {
+    const reportDate = new Date(date);
+    const submissionDeadline = await this.getSubmissionDeadline(reportDate);
+    return submissionTime.getTime() > submissionDeadline.getTime();
+  }
+
   private toDateOnly(date: Date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
   }
@@ -251,15 +257,46 @@ export class EodReportsService {
       throw new ForbiddenException('You can only update your own EOD reports');
     }
 
+    // Regular users cannot edit submitted reports, but ADMIN/HR can
     if (!canManageOthers && report.submittedAt) {
-      throw new BadRequestException('This EOD report has already been submitted.');
+      throw new BadRequestException('This EOD report has already been submitted and cannot be edited.');
     }
 
-    const { submit, ...rest } = updateDto;
+    const { submit, submittedAt, ...rest } = updateDto;
     const data: Prisma.EodReportUpdateInput = {};
 
     if (rest.summary !== undefined) {
       data.summary = rest.summary;
+    }
+
+    // Allow ADMIN/HR to change the report date
+    if (rest.date !== undefined && canManageOthers) {
+      this.ensureNotFutureDate(rest.date);
+      const newDate = new Date(rest.date);
+      const currentDate = report.date instanceof Date ? report.date : new Date(report.date);
+      
+      // Check if date is actually changing
+      const dateChanged = newDate.toISOString().split('T')[0] !== currentDate.toISOString().split('T')[0];
+      
+      if (dateChanged) {
+        // Check if another report already exists for this user on the new date
+        const existingReport = await this.prisma.eodReport.findUnique({
+          where: {
+            userId_date: {
+              userId: report.userId,
+              date: newDate,
+            },
+          },
+        });
+
+        if (existingReport && existingReport.id !== id) {
+          throw new BadRequestException(
+            `An EOD report already exists for this user on ${rest.date}. Please delete or update the existing report first.`,
+          );
+        }
+      }
+      
+      data.date = newDate;
     }
 
     let nextTasks: EodReportTaskDto[] | undefined;
@@ -276,6 +313,19 @@ export class EodReportsService {
       data.hoursWorked = rest.hoursWorked !== null
         ? new Prisma.Decimal(rest.hoursWorked)
         : null;
+    }
+
+    // Allow ADMIN/HR to manually set or clear submittedAt
+    if (submittedAt !== undefined && canManageOthers) {
+      data.submittedAt = submittedAt ? new Date(submittedAt) : null;
+      // Recalculate isLate based on the provided submittedAt and report date
+      if (submittedAt) {
+        const reportDateToUse = rest.date ? new Date(rest.date) : report.date;
+        data.isLate = await this.computeIsLateForTimestamp(
+          reportDateToUse.toISOString(),
+          new Date(submittedAt),
+        );
+      }
     }
 
     if (submit) {

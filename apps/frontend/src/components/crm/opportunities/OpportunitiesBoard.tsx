@@ -23,6 +23,11 @@ interface OpportunitiesBoardProps {
   onMove: (opportunity: Opportunity, newStage: string) => void;
   onOpportunityMove?: (result: DropResult, opportunity: Opportunity) => void;
   onView?: (opportunity: Opportunity) => void;
+  // Per-column pagination
+  columnLimits?: Record<string, number>;
+  columnTotals?: Record<string, number>;
+  onLoadMore?: (stage: string) => void;
+  isLoadingMore?: Record<string, boolean>;
 }
 
 const VALUE_FORMATTER = new Intl.NumberFormat('en-US', {
@@ -46,6 +51,10 @@ export function OpportunitiesBoard({
   onMove,
   onOpportunityMove,
   onView,
+  columnLimits,
+  columnTotals,
+  onLoadMore,
+  isLoadingMore,
 }: OpportunitiesBoardProps) {
   const itemsByStage = stages.reduce<Record<string, Opportunity[]>>((acc, stage) => {
     acc[stageKey(stage)] = [];
@@ -115,35 +124,44 @@ export function OpportunitiesBoard({
         </div>
       ) : (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid w-full gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-            {stages.map((stage) => {
-              const key = stageKey(stage);
-              const columnItems = itemsByStage[key] ?? [];
-              return (
-                <Droppable droppableId={key} key={key}>
-                  {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`flex min-h-[320px] flex-col rounded-xl border border-border bg-muted transition ${
-                        snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                        <div>
-                          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                            {stage}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">{columnItems.length} deal(s)</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-1 flex-col gap-3 p-3">
-                        {columnItems.length === 0 ? (
-                          <div className="rounded-lg border border-dashed border-border bg-card px-4 py-8 text-center text-xs text-muted-foreground">
-                            Drop opportunities here
+          <div className="overflow-x-auto pb-4">
+            <div className="inline-flex min-w-full gap-4">
+              {stages.map((stage) => {
+                const key = stageKey(stage);
+                const columnItems = itemsByStage[key] ?? [];
+                const total = columnTotals?.[key] ?? columnItems.length;
+                const limit = columnLimits?.[key] ?? columnItems.length;
+                const hasMore = total > limit;
+                const isColumnLoading = isLoadingMore?.[key] ?? false;
+                
+                return (
+                  <Droppable droppableId={key} key={key}>
+                    {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex min-h-[320px] min-w-[320px] max-w-[320px] flex-col rounded-xl border border-border bg-muted transition ${
+                          snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                          <div>
+                            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                              {stage}
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                              {columnItems.length} deal(s)
+                              {total > columnItems.length && ` / ${total}`}
+                            </p>
                           </div>
-                        ) : null}
-                        {columnItems.map((opportunity, index) => (
+                        </div>
+                        <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+                          {columnItems.length === 0 ? (
+                            <div className="rounded-lg border border-dashed border-border bg-card px-4 py-8 text-center text-xs text-muted-foreground">
+                              Drop opportunities here
+                            </div>
+                          ) : null}
+                          {columnItems.map((opportunity, index) => (
                           <Draggable key={opportunity.id} draggableId={opportunity.id} index={index}>
                             {(dragProvided: DraggableProvided, dragSnapshot: DraggableStateSnapshot) => {
                               const isExpanded = expandedCards[opportunity.id] ?? false;
@@ -280,14 +298,32 @@ export function OpportunitiesBoard({
                               );
                             }}
                           </Draggable>
-                        ))}
-                        {provided.placeholder}
+                          ))}
+                          {provided.placeholder}
+                          
+                          {hasMore && onLoadMore && (
+                            <button
+                              onClick={() => onLoadMore(key)}
+                              disabled={isColumnLoading}
+                              className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {isColumnLoading ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                                  Loading...
+                                </span>
+                              ) : (
+                                `Load more (${total - limit} remaining)`
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </Droppable>
-              );
-            })}
+                    )}
+                  </Droppable>
+                );
+              })}
+            </div>
           </div>
         </DragDropContext>
       )}

@@ -11,12 +11,13 @@ import type {
   ConvertCandidateToEmployeeResponse,
   PaginatedResponse,
 } from '@/types/recruitment';
-import { CandidateBoard, CANDIDATE_STAGE_LABELS } from '@/components/recruitment/CandidateBoard';
+import { CandidateBoard, CANDIDATE_STAGE_LABELS, CANDIDATE_STAGE_ORDER } from '@/components/recruitment/CandidateBoard';
 import { CandidateTable } from '@/components/recruitment/CandidateTable';
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
 import { CandidateConvertToEmployeeModal } from '@/components/recruitment/CandidateConvertToEmployeeModal';
 import { CandidateImportDialog } from '@/components/recruitment/CandidateImportDialog';
+import { MarkInactiveModal } from '@/components/recruitment/MarkInactiveModal';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
@@ -25,6 +26,7 @@ interface LocalFilters {
   search?: string;
   stage?: CandidateStage | 'ALL';
   hasOpenPosition?: boolean;
+  isActive?: boolean | 'all'; // 'all' means show both active and inactive
 }
 
 export default function CandidatesPage() {
@@ -35,15 +37,32 @@ export default function CandidatesPage() {
     search: '',
     stage: 'ALL',
     hasOpenPosition: false,
+    isActive: true, // Default to showing only active candidates
   });
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  // Per-column pagination for board view
+  const [columnLimits, setColumnLimits] = useState<Record<CandidateStage, number>>(() => {
+    const initial: Record<CandidateStage, number> = {} as Record<CandidateStage, number>;
+    CANDIDATE_STAGE_ORDER.forEach((stage) => {
+      initial[stage] = 10; // Initial limit per column
+    });
+    return initial;
+  });
+  const [isLoadingMore, setIsLoadingMore] = useState<Record<CandidateStage, boolean>>(() => {
+    const initial: Record<CandidateStage, boolean> = {} as Record<CandidateStage, boolean>;
+    CANDIDATE_STAGE_ORDER.forEach((stage) => {
+      initial[stage] = false;
+    });
+    return initial;
+  });
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | undefined>();
   const [linkCandidate, setLinkCandidate] = useState<Candidate | null>(null);
   const [convertCandidate, setConvertCandidate] = useState<Candidate | null>(null);
+  const [markInactiveCandidate, setMarkInactiveCandidate] = useState<Candidate | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const { user } = useAuthStore();
@@ -52,8 +71,8 @@ export default function CandidatesPage() {
 
   const sanitizedFilters = useMemo<CandidateFilters>(() => {
     const payload: CandidateFilters = {
-      page,
-      pageSize,
+      page: viewMode === 'board' ? 1 : page,
+      pageSize: viewMode === 'board' ? 1000 : pageSize, // Fetch all for board view
       sortBy: 'createdAt',
       sortOrder: 'desc',
     };
@@ -62,7 +81,8 @@ export default function CandidatesPage() {
       payload.search = filters.search.trim();
     }
 
-    if (filters.stage && filters.stage !== 'ALL') {
+    // Don't filter by stage in board view - we'll show all stages
+    if (viewMode === 'list' && filters.stage && filters.stage !== 'ALL') {
       payload.stage = filters.stage;
     }
 
@@ -70,18 +90,76 @@ export default function CandidatesPage() {
       payload.hasOpenPosition = true;
     }
 
+    // Handle isActive filter: true = active only, false = inactive only, 'all' = both
+    if (filters.isActive !== undefined && filters.isActive !== 'all') {
+      payload.isActive = filters.isActive === true;
+    }
+    // If isActive is 'all', don't set it in payload (backend will show all)
+
     return payload;
-  }, [filters, page, pageSize]);
+  }, [
+    filters.search,
+    filters.stage,
+    filters.hasOpenPosition,
+    filters.isActive,
+    page,
+    pageSize,
+    viewMode,
+  ]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.stage, filters.hasOpenPosition]);
+    // Reset column limits when filters change in board view
+    if (viewMode === 'board') {
+      setColumnLimits(() => {
+        const initial: Record<CandidateStage, number> = {} as Record<CandidateStage, number>;
+        CANDIDATE_STAGE_ORDER.forEach((stage) => {
+          initial[stage] = 10;
+        });
+        return initial;
+      });
+    }
+  }, [filters.search, filters.stage, filters.hasOpenPosition, filters.isActive, viewMode]);
+
+  // Create a stable queryKey that always reflects filter state
+  const queryKey = useMemo(
+    () => [
+      'candidates',
+      viewMode,
+      filters.search || '',
+      filters.stage || 'ALL',
+      filters.hasOpenPosition || false,
+      filters.isActive === true ? 'active' : filters.isActive === false ? 'inactive' : 'all',
+      viewMode === 'board' ? 1 : page,
+      viewMode === 'board' ? 1000 : pageSize,
+      'createdAt',
+      'desc',
+    ],
+    [
+      viewMode,
+      filters.search,
+      filters.stage,
+      filters.hasOpenPosition,
+      filters.isActive,
+      page,
+      pageSize,
+    ],
+  );
 
   const candidatesQuery = useQuery({
-    queryKey: ['candidates', sanitizedFilters],
+    queryKey,
     queryFn: () => candidatesApi.list(sanitizedFilters),
+    staleTime: 0, // Always consider data stale to ensure refetch on filter changes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus (already disabled globally)
   });
+
+  // Debug: Log queryKey changes
+  useEffect(() => {
+    console.log('QueryKey changed:', queryKey);
+  }, [queryKey]);
 
   const stageMutation = useMutation({
     mutationFn: ({
@@ -115,6 +193,17 @@ export default function CandidatesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       setFeedback('Candidate deleted successfully.');
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      candidatesApi.update(id, { isActive }),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      setFeedback(
+        `${updated.firstName} ${updated.lastName} marked as ${updated.isActive ? 'active' : 'inactive'}.`,
+      );
     },
   });
 
@@ -158,6 +247,26 @@ export default function CandidatesPage() {
     ) {
       deleteMutation.mutate(candidate.id);
     }
+  };
+
+  const handleToggleActive = (candidate: Candidate) => {
+    if (candidate.isActive) {
+      // Show modal for marking inactive
+      setMarkInactiveCandidate(candidate);
+    } else {
+      // Directly mark as active (no modal needed)
+      toggleActiveMutation.mutate({
+        id: candidate.id,
+        isActive: true,
+      });
+    }
+  };
+
+  const handleMarkInactiveSuccess = (updated: Candidate) => {
+    setMarkInactiveCandidate(null);
+    setFeedback(
+      `${updated.firstName} ${updated.lastName} has been marked as inactive.${updated.isActive === false ? ' Email sent.' : ''}`,
+    );
   };
 
   const handleConversionSuccess = (result: ConvertCandidateToEmployeeResponse) => {
@@ -217,6 +326,105 @@ export default function CandidatesPage() {
   const currentPageSize = meta?.pageSize ?? pageSize;
   const startIndex = total > 0 ? (currentPage - 1) * currentPageSize + 1 : 0;
   const endIndex = Math.min(currentPage * currentPageSize, total);
+
+  // Debug: Log candidate stages to help diagnose matching issues
+  useEffect(() => {
+    if (viewMode === 'board' && candidates.length > 0) {
+      const stageCounts = candidates.reduce((acc, c) => {
+        const stage = String(c.stage);
+        acc[stage] = (acc[stage] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      console.log('=== Candidate Board Debug ===');
+      console.log('Total candidates fetched:', candidates.length);
+      console.log('Total candidates in database:', meta?.total ?? 'unknown');
+      console.log('Page size requested:', sanitizedFilters.pageSize);
+      if (meta && meta.total > candidates.length) {
+        console.warn(`⚠️ Only fetched ${candidates.length} of ${meta.total} total candidates! Some stages may be missing.`);
+      }
+      console.log('All candidate stages found:', stageCounts);
+      console.log('Expected stages:', CANDIDATE_STAGE_ORDER);
+      console.log('Column limits:', columnLimits);
+      
+      const unmatchedStages = Object.keys(stageCounts).filter(
+        (s) => !CANDIDATE_STAGE_ORDER.includes(s as CandidateStage)
+      );
+      if (unmatchedStages.length > 0) {
+        console.warn('Candidates with unmatched stages:', unmatchedStages, stageCounts);
+      }
+      
+      // Check which stages have candidates but no column limit
+      Object.keys(stageCounts).forEach((stage) => {
+        if (CANDIDATE_STAGE_ORDER.includes(stage as CandidateStage) && !columnLimits[stage as CandidateStage]) {
+          console.warn(`Stage "${stage}" has ${stageCounts[stage]} candidates but no column limit!`);
+        }
+      });
+      
+      // Check which expected stages have no candidates
+      const missingStages = CANDIDATE_STAGE_ORDER.filter(
+        (stage) => !Object.keys(stageCounts).includes(stage)
+      );
+      if (missingStages.length > 0) {
+        console.log('Expected stages with no candidates in current fetch:', missingStages);
+      }
+      console.log('=== End Debug ===');
+    }
+  }, [candidates, viewMode, columnLimits, meta, sanitizedFilters.pageSize]);
+
+  // Calculate column totals and visible candidates for board view
+  const columnTotals = useMemo(() => {
+    const totals: Record<CandidateStage, number> = {} as Record<CandidateStage, number>;
+    CANDIDATE_STAGE_ORDER.forEach((stage) => {
+      // Count candidates matching this stage (case-insensitive for safety)
+      totals[stage] = candidates.filter((c) => 
+        c.stage === stage || c.stage?.toLowerCase() === stage.toLowerCase()
+      ).length;
+    });
+    return totals;
+  }, [candidates]);
+
+  const visibleCandidates = useMemo(() => {
+    if (viewMode === 'list') {
+      return candidates;
+    }
+    // In board view, limit candidates per column
+    return candidates.filter((candidate) => {
+      const stage = String(candidate.stage) as CandidateStage;
+      
+      // If stage is not in our known stages, show it (fallback)
+      if (!CANDIDATE_STAGE_ORDER.includes(stage)) {
+        console.warn(`Candidate ${candidate.id} has unknown stage: "${stage}"`);
+        return true;
+      }
+      
+      // Get all candidates for this stage (case-insensitive)
+      const stageCandidates = candidates.filter((c) => 
+        String(c.stage).toLowerCase() === stage.toLowerCase()
+      );
+      const index = stageCandidates.findIndex((c) => c.id === candidate.id);
+      const limit = columnLimits[stage] ?? 10; // Fallback to 10 if not initialized
+      
+      if (index >= limit) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [candidates, viewMode, columnLimits]);
+
+  const handleLoadMore = (stage: CandidateStage) => {
+    setIsLoadingMore((prev) => ({ ...prev, [stage]: true }));
+    // Increase limit by 10
+    setColumnLimits((prev) => ({
+      ...prev,
+      [stage]: (prev[stage] || 10) + 10,
+    }));
+    // Simulate loading delay for better UX
+    setTimeout(() => {
+      setIsLoadingMore((prev) => ({ ...prev, [stage]: false }));
+    }, 300);
+  };
 
   return (
     <div className="py-8 space-y-6">
@@ -282,6 +490,27 @@ export default function CandidatesPage() {
             >
               Linked to open position
             </label>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Status
+            </label>
+            <select
+              value={filters.isActive === true ? 'active' : filters.isActive === false ? 'inactive' : 'all'}
+              onChange={(event) => {
+                const value = event.target.value;
+                setFilters((prev) => ({
+                  ...prev,
+                  isActive: value === 'active' ? true : value === 'inactive' ? false : 'all',
+                }));
+              }}
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+              <option value="all">All Candidates</option>
+            </select>
           </div>
           {/* Actions moved to board header to avoid duplication */}
         </div>
@@ -364,7 +593,7 @@ export default function CandidatesPage() {
 
       {viewMode === 'board' ? (
         <CandidateBoard
-          candidates={candidates}
+          candidates={visibleCandidates}
           isLoading={candidatesQuery.isFetching}
           onCreateCandidate={handleOpenCreate}
           onImportCandidates={canImport ? () => setImportOpen(true) : undefined}
@@ -377,7 +606,12 @@ export default function CandidatesPage() {
           onConvertToEmployee={handleConvertCandidate}
           onArchive={handleArchiveCandidate}
           onDelete={canDelete ? handleDeleteCandidate : undefined}
+          onToggleActive={handleToggleActive}
           canDelete={canDelete}
+          columnLimits={columnLimits}
+          columnTotals={columnTotals}
+          onLoadMore={handleLoadMore}
+          isLoadingMore={isLoadingMore}
         />
       ) : (
         <CandidateTable
@@ -394,7 +628,7 @@ export default function CandidatesPage() {
         />
       )}
 
-      {meta && total > 0 && (
+      {viewMode === 'list' && meta && total > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <span>
@@ -472,6 +706,14 @@ export default function CandidatesPage() {
           candidate={convertCandidate}
           onClose={() => setConvertCandidate(null)}
           onSuccess={handleConversionSuccess}
+        />
+      )}
+
+      {markInactiveCandidate && (
+        <MarkInactiveModal
+          candidate={markInactiveCandidate}
+          onClose={() => setMarkInactiveCandidate(null)}
+          onSuccess={handleMarkInactiveSuccess}
         />
       )}
 

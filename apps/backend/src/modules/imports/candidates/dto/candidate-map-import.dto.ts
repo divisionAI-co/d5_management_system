@@ -30,6 +30,7 @@ export enum CandidateImportField {
   AVAILABLE_FROM = 'availableFrom',
   EXPECTED_SALARY = 'expectedSalary',
   SALARY_CURRENCY = 'salaryCurrency',
+  IS_ACTIVE = 'isActive',
   ODOO_ID = 'odooId',
   ACTIVITIES = 'activities',
 }

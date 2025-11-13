@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DropResult } from '@hello-pangea/dnd';
@@ -116,8 +116,24 @@ export default function OpportunitiesPage() {
     enabled: isAdmin,
   });
 
+  // Per-column pagination for board view
+  const [columnLimits, setColumnLimits] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    PIPELINE_STAGE_ORDER.forEach((stage) => {
+      initial[stage] = 10; // Initial limit per column
+    });
+    return initial;
+  });
+  const [isLoadingMore, setIsLoadingMore] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    PIPELINE_STAGE_ORDER.forEach((stage) => {
+      initial[stage] = false;
+    });
+    return initial;
+  });
+
   const effectivePage = viewMode === 'board' ? 1 : page;
-  const effectivePageSize = viewMode === 'board' ? BOARD_PAGE_SIZE : PAGE_SIZE;
+  const effectivePageSize = viewMode === 'board' ? 1000 : PAGE_SIZE; // Fetch all for board view
 
   const sanitizedFilters = useMemo<OpportunityFilters>(() => {
     const payload: OpportunityFilters = {
@@ -133,7 +149,8 @@ export default function OpportunitiesPage() {
     if (typeFilter) {
       payload.type = typeFilter;
     }
-    if (stageFilter && stageFilter !== 'All stages') {
+    // Don't filter by stage in board view - we'll show all stages
+    if (viewMode === 'table' && stageFilter && stageFilter !== 'All stages') {
       payload.stage = stageFilter;
     }
     if (assignedFilter) {
@@ -162,6 +179,7 @@ export default function OpportunitiesPage() {
     stageFilter,
     statusFilter,
     typeFilter,
+    viewMode,
   ]);
 
   const opportunitiesQuery = useQuery<OpportunitiesListResponse>({
@@ -234,12 +252,60 @@ export default function OpportunitiesPage() {
   const opportunities = opportunitiesQuery.data?.data ?? [];
   const meta = opportunitiesQuery.data?.meta;
 
+  // Calculate column totals and visible opportunities for board view
+  const columnTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    PIPELINE_STAGE_ORDER.forEach((stage) => {
+      totals[stage] = opportunities.filter((o) => o.stage === stage).length;
+    });
+    return totals;
+  }, [opportunities]);
+
+  const visibleOpportunities = useMemo(() => {
+    if (viewMode === 'table') {
+      return opportunities;
+    }
+    // In board view, limit opportunities per column
+    return opportunities.filter((opportunity) => {
+      const stage = opportunity.stage || 'Unspecified';
+      const stageOpportunities = opportunities.filter((o) => (o.stage || 'Unspecified') === stage);
+      const index = stageOpportunities.findIndex((o) => o.id === opportunity.id);
+      return index < (columnLimits[stage] || 10);
+    });
+  }, [opportunities, viewMode, columnLimits]);
+
+  const handleLoadMore = (stage: string) => {
+    setIsLoadingMore((prev) => ({ ...prev, [stage]: true }));
+    // Increase limit by 10
+    setColumnLimits((prev) => ({
+      ...prev,
+      [stage]: (prev[stage] || 10) + 10,
+    }));
+    // Simulate loading delay for better UX
+    setTimeout(() => {
+      setIsLoadingMore((prev) => ({ ...prev, [stage]: false }));
+    }, 300);
+  };
+
   const paginationInfo = useMemo(() => {
     if (!meta) return '0 opportunities';
     const start = (meta.page - 1) * meta.pageSize + 1;
     const end = Math.min(meta.page * meta.pageSize, meta.total);
     return `${start}-${end} of ${meta.total}`;
   }, [meta]);
+
+  // Reset column limits when filters change in board view
+  useEffect(() => {
+    if (viewMode === 'board') {
+      setColumnLimits(() => {
+        const initial: Record<string, number> = {};
+        PIPELINE_STAGE_ORDER.forEach((stage) => {
+          initial[stage] = 10;
+        });
+        return initial;
+      });
+    }
+  }, [searchTerm, typeFilter, stageFilter, statusFilter, resultFilter, assignedFilter, viewMode]);
 
   const handleApplySearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -643,7 +709,7 @@ export default function OpportunitiesPage() {
       ) : (
         <OpportunitiesBoard
           stages={boardStages}
-          opportunities={opportunities}
+          opportunities={visibleOpportunities}
           isLoading={opportunitiesQuery.isFetching && viewMode === 'board'}
           onCreate={handleCreate}
           onEdit={handleEdit}
@@ -652,6 +718,10 @@ export default function OpportunitiesPage() {
           onMove={handleMove}
           onOpportunityMove={handleOpportunityMoveOptimistic}
           onView={handleViewOpportunity}
+          columnLimits={columnLimits}
+          columnTotals={columnTotals}
+          onLoadMore={handleLoadMore}
+          isLoadingMore={isLoadingMore}
         />
       )}
 

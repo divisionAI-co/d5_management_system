@@ -6,6 +6,8 @@ import type { CreateEodReportDto, EodReport, EodReportTask, UpdateEodReportDto }
 import { X } from 'lucide-react';
 import { format } from 'date-fns';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { UserRole } from '@/types/enums';
 
 interface EodReportFormProps {
   report?: EodReport;
@@ -29,6 +31,7 @@ type FormValues = {
   summary: string;
   tasks: TaskFormValue[];
   hoursWorked?: number;
+  submittedAt?: string;
 };
 
 const DEFAULT_TASK: TaskFormValue = {
@@ -43,9 +46,13 @@ const DEFAULT_TASK: TaskFormValue = {
 
 export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodReportFormProps) {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const isEdit = !!report;
   const [mutationError, setMutationError] = useState<string | null>(null);
+  
+  // Check if user is privileged (ADMIN or HR)
+  const isPrivileged = user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
 
   const initialValues = useMemo<FormValues>(() => {
     if (!report) {
@@ -93,6 +100,9 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
         report.hoursWorked !== undefined && report.hoursWorked !== null
           ? Number(report.hoursWorked)
           : undefined,
+      submittedAt: report.submittedAt 
+        ? new Date(report.submittedAt).toISOString().slice(0, 16)
+        : undefined,
     };
   }, [report, today]);
 
@@ -179,6 +189,11 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
         summary: data.summary,
         tasks: normalizedTasks,
         hoursWorked: data.hoursWorked !== undefined ? data.hoursWorked : undefined,
+        // Include date and submittedAt for privileged users
+        ...(isPrivileged && data.date && { date: data.date }),
+        ...(isPrivileged && data.submittedAt !== undefined && { 
+          submittedAt: data.submittedAt ? new Date(data.submittedAt).toISOString() : null 
+        }),
       };
 
       updateMutation.mutate(
@@ -226,6 +241,9 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
   const isSubmitting = isEdit ? updateMutation.isPending : createMutation.isPending;
   const isSubmitted = Boolean(report?.submittedAt);
+  
+  // Disable editing only if submitted AND user is not privileged
+  const isDisabled = isSubmitted && !isPrivileged;
 
   const handleSave = handleSubmit((data) => onSubmit(data, false));
   const handleSubmitFinal = handleSubmit((data) => onSubmit(data, true));
@@ -272,15 +290,35 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
         </div>
 
         <form onSubmit={handleSave} className="space-y-6 px-6 py-6">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-muted-foreground">Report Date *</label>
-            <input
-              type="date"
-              {...register('date', { required: 'Report date is required' })}
-              disabled={isEdit}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            />
-            {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>}
+          <div className={isEdit && isPrivileged ? "grid gap-4 md:grid-cols-2" : ""}>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Report Date *</label>
+              <input
+                type="date"
+                {...register('date', { required: 'Report date is required' })}
+                disabled={isEdit && !isPrivileged}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:bg-muted disabled:cursor-not-allowed"
+              />
+              {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>}
+            </div>
+
+            {isEdit && isPrivileged && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                  Submitted At {isSubmitted && '*'}
+                  <span className="ml-1 text-xs text-muted-foreground/70">(ADMIN/HR only)</span>
+                </label>
+                <input
+                  type="datetime-local"
+                  {...register('submittedAt')}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  placeholder="Leave empty for draft"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Leave empty to mark as draft, or set a timestamp to mark as submitted
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
@@ -290,7 +328,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
               {...register('summary', { required: 'Summary is required' })}
               placeholder="What were the highlights of your day?"
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitted}
+              disabled={isDisabled}
             />
             {errors.summary && (
               <p className="mt-1 text-sm text-red-600">{errors.summary.message}</p>
@@ -310,7 +348,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                   })
                 }
                   className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
-                  disabled={isSubmitted}
+                  disabled={isDisabled}
               >
                 Add Task
               </button>
@@ -327,7 +365,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       type="text"
                       {...register(`tasks.${index}.clientDetails`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     />
                   </div>
                   <div>
@@ -338,7 +376,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       type="text"
                       {...register(`tasks.${index}.ticket`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     />
                   </div>
                 </div>
@@ -351,7 +389,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                     <select
                       {...register(`tasks.${index}.typeOfWorkDone`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     >
                       <option value="PLANNING">Planning</option>
                       <option value="RESEARCH">Research</option>
@@ -366,7 +404,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                     <select
                       {...register(`tasks.${index}.taskLifecycle`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     >
                       <option value="NEW">New</option>
                       <option value="RETURNED">Returned</option>
@@ -379,7 +417,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                     <select
                       {...register(`tasks.${index}.taskStatus`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     >
                       <option value="IN_PROGRESS">In progress</option>
                       <option value="DONE">Done</option>
@@ -398,7 +436,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       min="0"
                       {...register(`tasks.${index}.taskEstimatedTime`)}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     />
                   </div>
                   <div>
@@ -411,7 +449,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       min="0"
                       {...register(`tasks.${index}.timeSpentOnTicket`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     />
                   </div>
                 </div>
@@ -422,7 +460,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                       type="button"
                       onClick={() => remove(index)}
                         className="text-xs font-medium text-red-600 hover:underline"
-                        disabled={isSubmitted}
+                        disabled={isDisabled}
                     >
                       Remove
                     </button>
@@ -445,7 +483,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
               {...register('hoursWorked')}
               placeholder="8"
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitted}
+              disabled={isDisabled}
             />
           </div>
 
@@ -459,7 +497,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || isSubmitted}
+              disabled={isSubmitting || isDisabled}
               className="rounded-lg bg-muted px-4 py-2 text-muted-foreground transition hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Saving...' : 'Save Draft'}
@@ -467,7 +505,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
             <button
               type="button"
               onClick={handleSubmitFinal}
-              disabled={isSubmitting || isSubmitted}
+              disabled={isSubmitting || isDisabled}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitted ? 'Submitted' : isSubmitting ? 'Submitting...' : 'Submit Report'}

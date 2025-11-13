@@ -81,6 +81,7 @@ export interface EodMapPayload extends MapPayloadBase {}
 export interface ExecuteEodImportPayload extends ExecutePayloadBase {
   markMissingAsSubmitted?: boolean;
   defaultIsLate?: boolean;
+  useLegacyFormat?: boolean;
 }
 
 export type UploadInvoicesResult = UploadBaseResult;

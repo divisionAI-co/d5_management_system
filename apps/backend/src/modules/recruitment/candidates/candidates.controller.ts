@@ -17,6 +17,7 @@ import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { UpdateCandidateStageDto } from './dto/update-candidate-stage.dto';
 import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
+import { MarkInactiveDto } from './dto/mark-inactive.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -122,6 +123,17 @@ export class CandidatesController {
   })
   restore(@Param('id') id: string) {
     return this.candidatesService.restore(id);
+  }
+
+  @Patch(':id/mark-inactive')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Mark a candidate as inactive',
+    description:
+      'Marks a candidate as inactive with an optional reason and sends an optional email notification.',
+  })
+  markInactive(@Param('id') id: string, @Body() dto: MarkInactiveDto) {
+    return this.candidatesService.markInactive(id, dto);
   }
 
   @Delete(':id')

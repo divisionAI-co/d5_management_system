@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Folder, FileText, ArrowLeft, RefreshCcw, Upload, Download, Edit, Trash2, Search, ListTree, Link as LinkIcon, Check } from 'lucide-react';
+import { Folder, FileText, ArrowLeft, RefreshCcw, Upload, Download, Edit, Trash2, Search, ListTree, Link as LinkIcon, Check, Shield, Link2, XCircle } from 'lucide-react';
 
 import { googleDriveApi } from '@/lib/api/google-drive';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
-import type { DriveFile } from '@/types/integrations';
+import { DrivePermissionsModal } from './DrivePermissionsModal';
+import { useToast } from '@/components/ui/use-toast';
+import type { DriveFile, UserFilePermissions } from '@/types/integrations';
 
 type Breadcrumb = {
   id: string | null;
@@ -32,6 +34,7 @@ function getFileIcon(file: DriveFile) {
 
 export function DriveBrowser() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [breadcrumbs, setBreadcrumbs] = useState<Breadcrumb[]>([
@@ -44,8 +47,45 @@ export function DriveBrowser() {
   const [listError, setListError] = useState<string | null>(null);
   const [recursiveSearch, setRecursiveSearch] = useState(false);
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null);
+  const [permissionsModalFile, setPermissionsModalFile] = useState<DriveFile | null>(null);
+  const [filePermissions, setFilePermissions] = useState<Record<string, UserFilePermissions>>({});
 
   const parentId = useMemo(() => breadcrumbs[breadcrumbs.length - 1]?.id ?? undefined, [breadcrumbs]);
+
+  // Check connection status
+  const { data: connectionStatus, isLoading: isStatusLoading } = useQuery({
+    queryKey: ['drive-status'],
+    queryFn: googleDriveApi.getConnectionStatus,
+  });
+
+  // Connect mutation
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const redirectUri = `${window.location.origin}/integrations/google/callback`;
+      const url = await googleDriveApi.generateAuthUrl(redirectUri, 'google_drive');
+      window.location.href = url;
+    },
+  });
+
+  // Disconnect mutation
+  const disconnectMutation = useMutation({
+    mutationFn: googleDriveApi.disconnect,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['drive-status'] });
+      queryClient.invalidateQueries({ queryKey: ['drive-files'] });
+      toast({
+        title: 'Google Drive disconnected',
+        description: 'Your Google Drive connection has been removed.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Could not disconnect Google Drive',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const listQuery = useQuery({
     queryKey: ['drive-files', parentId, activeSearch],
@@ -56,7 +96,39 @@ export function DriveBrowser() {
         pageSize: PAGE_SIZE,
         recursive: recursiveSearch || undefined,
       }),
+    enabled: connectionStatus?.connected === true, // Only fetch files if connected
   });
+
+  // Load permissions for all files when they're loaded
+  // Only load permissions for files (not folders) to avoid unnecessary API calls
+  useEffect(() => {
+    if (listQuery.data?.files) {
+      const loadPermissions = async () => {
+        const permissionsMap: Record<string, UserFilePermissions> = {};
+        // Only load permissions for files, not folders, and only for files we don't already have permissions for
+        const filesToCheck = listQuery.data.files.filter(
+          (file) => !file.isFolder && !permissionsMap[file.id]
+        );
+        
+        await Promise.allSettled(
+          filesToCheck.map(async (file) => {
+            try {
+              const perms = await googleDriveApi.getMyPermissions(file.id);
+              permissionsMap[file.id] = perms;
+            } catch (error: any) {
+              // Silently fail - permissions might not be accessible
+              // This is common for files shared with the user where they can view but not see permissions
+              if (error?.response?.status !== 403) {
+                console.warn(`Could not load permissions for file ${file.id}`, error);
+              }
+            }
+          }),
+        );
+        setFilePermissions((prev) => ({ ...prev, ...permissionsMap }));
+      };
+      loadPermissions();
+    }
+  }, [listQuery.data?.files]);
 
   useEffect(() => {
     if (listQuery.isError) {
@@ -216,6 +288,10 @@ export function DriveBrowser() {
       });
   }, []);
 
+  const handleShowPermissions = useCallback((file: DriveFile) => {
+    setPermissionsModalFile(file);
+  }, []);
+
   const handleDownload = useCallback(
     async (file: DriveFile) => {
       try {
@@ -270,27 +346,61 @@ export function DriveBrowser() {
         <div>
           <h2 className="text-lg font-semibold text-foreground">Google Drive</h2>
           <p className="text-sm text-muted-foreground">
-            Browse and manage files stored in your shared Google Drive without leaving division5.
+            Browse and manage files stored in your Google Drive without leaving division5.
           </p>
+          {!isStatusLoading && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {connectionStatus?.connected ? (
+                <>
+                  Connected as <span className="font-medium text-foreground">{connectionStatus.externalEmail}</span>
+                </>
+              ) : (
+                'Not connected. Connect your Google account to access your files.'
+              )}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={handleUploadClick}
-            disabled={uploadMutation.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Upload className="h-4 w-4" />
-            {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
-          </button>
+          {connectionStatus?.connected ? (
+            <>
+              <button
+                type="button"
+                onClick={() => disconnectMutation.mutate()}
+                disabled={disconnectMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <XCircle className="h-4 w-4" />
+                {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadClick}
+                disabled={uploadMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Upload className="h-4 w-4" />
+                {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Link2 className="h-4 w-4" />
+              {connectMutation.isPending ? 'Connecting...' : 'Connect Google Drive'}
+            </button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -301,6 +411,15 @@ export function DriveBrowser() {
       </div>
 
         <div className="space-y-4 px-6 py-6">
+        {!connectionStatus?.connected && !isStatusLoading && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+            <p className="font-medium">Google Drive not connected</p>
+            <p className="mt-1 text-xs">
+              Connect your Google account to view and manage your Drive files. Click "Connect Google Drive" above to get started.
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ArrowLeft className="h-4 w-4" />
@@ -383,94 +502,144 @@ export function DriveBrowser() {
                   </td>
                 </tr>
               ) : (
-                listQuery.data?.files.map((file) => (
-                  <tr key={file.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-3">
-                      {file.isFolder ? (
-                        <button
-                          type="button"
-                          className="flex items-center gap-3 text-left text-sm font-medium text-foreground hover:text-blue-600"
-                          onClick={() => handleOpenFolder(file)}
-                        >
-                          {getFileIcon(file)}
-                          <span>{file.name}</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="flex items-center gap-3 text-left text-sm font-medium text-blue-600 hover:text-blue-500"
-                          onClick={() => handleOpenFile(file)}
-                        >
-                          {getFileIcon(file)}
-                          <span>{file.name}</span>
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {file.modifiedTime
-                        ? new Date(file.modifiedTime).toLocaleString()
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {file.isFolder
-                        ? '—'
-                        : file.size
-                        ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {file.owners?.[0]?.displayName ?? file.owners?.[0]?.emailAddress ?? '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        {!file.isFolder && (
-                          <button
-                            type="button"
-                            onClick={() => handleDownload(file)}
-                            disabled={downloadingFileId === file.id}
-                            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {downloadingFileId === file.id ? 'Downloading...' : 'Download'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleCopyLink(file)}
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                        >
-                          {copySuccessId === file.id ? (
-                            <>
-                              <Check className="h-3.5 w-3.5 text-emerald-600" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <LinkIcon className="h-3.5 w-3.5" />
-                              Copy link
-                            </>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRename(file)}
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                        >
-                          <Edit className="h-3.5 w-3.5" />
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(file)}
-                          className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                (() => {
+                  // Separate folders and files for better organization
+                  const folders = listQuery.data?.files.filter((f) => f.isFolder) ?? [];
+                  const files = listQuery.data?.files.filter((f) => !f.isFolder) ?? [];
+                  
+                  return (
+                    <>
+                      {folders.map((file) => (
+                        <tr key={file.id} className="hover:bg-muted/50">
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              className="flex items-center gap-3 text-left text-sm font-medium text-foreground hover:text-blue-600"
+                              onClick={() => handleOpenFolder(file)}
+                            >
+                              {getFileIcon(file)}
+                              <span>{file.name}</span>
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {file.modifiedTime ? new Date(file.modifiedTime).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">-</td>
+                          <td className="px-4 py-3 text-xs">
+                            {file.owners?.[0]?.displayName || file.owners?.[0]?.emailAddress || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleShowPermissions(file)}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                              >
+                                <Shield className="h-3.5 w-3.5" />
+                                Permissions
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {files.map((file) => (
+                        <tr key={file.id} className="hover:bg-muted/50">
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              className="flex items-center gap-3 text-left text-sm font-medium text-blue-600 hover:text-blue-500"
+                              onClick={() => handleOpenFile(file)}
+                            >
+                              {getFileIcon(file)}
+                              <span>{file.name}</span>
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {file.modifiedTime
+                              ? new Date(file.modifiedTime).toLocaleString()
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {file.size
+                              ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {file.owners?.[0]?.displayName ?? file.owners?.[0]?.emailAddress ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleDownload(file)}
+                                disabled={downloadingFileId === file.id}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                {downloadingFileId === file.id ? 'Downloading...' : 'Download'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyLink(file)}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                              >
+                                {copySuccessId === file.id ? (
+                                  <>
+                                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                    Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <LinkIcon className="h-3.5 w-3.5" />
+                                    Copy link
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShowPermissions(file)}
+                                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                              >
+                                <Shield className="h-3.5 w-3.5" />
+                                Permissions
+                              </button>
+                              {(() => {
+                                const perms = filePermissions[file.id];
+                                const canEdit = perms?.canEdit ?? true; // Default to true if permissions not loaded yet
+                                const canDelete = perms?.canDelete ?? true;
+
+                                return (
+                                  <>
+                                    {canEdit && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRename(file)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                      >
+                                        <Edit className="h-3.5 w-3.5" />
+                                        Rename
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDelete(file)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        Delete
+                                      </button>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  );
+                })()
               )}
             </tbody>
           </table>
@@ -490,6 +659,15 @@ export function DriveBrowser() {
 
         </div>
       </div>
+
+      {permissionsModalFile && (
+        <DrivePermissionsModal
+          fileId={permissionsModalFile.id}
+          fileName={permissionsModalFile.name}
+          open={!!permissionsModalFile}
+          onClose={() => setPermissionsModalFile(null)}
+        />
+      )}
     </>
   );
 }

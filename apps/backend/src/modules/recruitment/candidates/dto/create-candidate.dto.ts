@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CandidateStage } from '@prisma/client';
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
@@ -150,6 +151,14 @@ export class CreateCandidateDto {
   @IsString()
   @IsOptional()
   driveFolderUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether the candidate is active (visible in board by default). Defaults to true.',
+    default: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }
 
 

@@ -171,7 +171,7 @@ export class OdooProcessor {
       const hrefMatches = Array.from(normalizedHtml.matchAll(hrefPattern));
       for (const match of hrefMatches) {
         if (match[1]) {
-          let url = match[1].trim().replace(/^["']|["']$/g, ''); // Remove surrounding quotes
+          const url = match[1].trim().replace(/^["']|["']$/g, ''); // Remove surrounding quotes
           
           // Skip if empty
           if (!url) continue;
@@ -326,11 +326,15 @@ export class OdooProcessor {
     if (extractedDriveLink) {
       // Validate the extracted link
       if (this.isValidDriveUrl(extractedDriveLink)) {
-        // The extracted link is already properly formatted, just use it directly
         // Check if it's a folder or file based on the URL structure
         if (extractedDriveLink.includes('/drive/folders/') || extractedDriveLink.includes('/folders/')) {
-          // It's a folder - goes to driveFolderId
-          driveFolderId = extractedDriveLink;
+          // It's a folder - extract just the folder ID (not the full URL)
+          // The URL is already clean, so we can use a simple regex to extract the ID
+          const folderIdMatch = extractedDriveLink.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/) ||
+                                extractedDriveLink.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+          if (folderIdMatch && folderIdMatch[1]) {
+            driveFolderId = folderIdMatch[1];
+          }
         } else if (extractedDriveLink.includes('/file/d/')) {
           // It's a file - goes to resume (only if resume is not already set)
           if (!resume) {

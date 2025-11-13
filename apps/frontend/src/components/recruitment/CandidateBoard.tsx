@@ -65,8 +65,14 @@ interface CandidateBoardProps {
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
   onDelete?: (candidate: Candidate) => void;
+  onToggleActive?: (candidate: Candidate) => void;
   onImportCandidates?: () => void;
   canDelete?: boolean;
+  // Per-column pagination
+  columnLimits?: Record<CandidateStage, number>;
+  columnTotals?: Record<CandidateStage, number>;
+  onLoadMore?: (stage: CandidateStage) => void;
+  isLoadingMore?: Record<CandidateStage, boolean>;
 }
 
 export function CandidateBoard({
@@ -82,15 +88,57 @@ export function CandidateBoard({
   onConvertToEmployee,
   onArchive,
   onDelete,
+  onToggleActive,
   onImportCandidates,
   canDelete = false,
+  columnLimits,
+  columnTotals,
+  onLoadMore,
+  isLoadingMore,
 }: CandidateBoardProps) {
   const grouped = useMemo(() => {
     const map = new Map<CandidateStage, Candidate[]>();
     STAGE_ORDER.forEach((stage) => map.set(stage, []));
+    
+    // Debug: Log all candidate stages
+    const stageValues = new Set(candidates.map(c => c.stage));
+    if (stageValues.size > 0) {
+      console.log('Candidate stages found:', Array.from(stageValues));
+      console.log('Expected stages:', STAGE_ORDER);
+    }
+    
     candidates.forEach((candidate) => {
-      map.get(candidate.stage)?.push(candidate);
+      // Handle both exact matches and case-insensitive matching
+      const candidateStage = candidate.stage as string;
+      const candidateStageStr = String(candidateStage);
+      
+      // Try exact match first
+      if (map.has(candidateStageStr as CandidateStage)) {
+        map.get(candidateStageStr as CandidateStage)?.push(candidate);
+        return;
+      }
+      
+      // Try case-insensitive match
+      const matchedStage = STAGE_ORDER.find(
+        (s) => String(s).toLowerCase() === candidateStageStr.toLowerCase()
+      );
+      if (matchedStage) {
+        map.get(matchedStage)?.push(candidate);
+        return;
+      }
+      
+      // If still no match, log and add to first stage as fallback
+      console.warn(`Unknown candidate stage: "${candidateStage}" (type: ${typeof candidateStage}) for candidate ${candidate.id} - ${candidate.firstName} ${candidate.lastName}`);
+      map.get(STAGE_ORDER[0])?.push(candidate);
     });
+    
+    // Debug: Log grouped counts
+    const groupedCounts: Record<string, number> = {};
+    map.forEach((candidates, stage) => {
+      groupedCounts[stage] = candidates.length;
+    });
+    console.log('Grouped candidates by stage:', groupedCounts);
+    
     return map;
   }, [candidates]);
 
@@ -122,78 +170,104 @@ export function CandidateBoard({
   return (
     <div className="space-y-4">
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid w-full gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-          {STAGE_ORDER.map((stage) => {
-            const items = grouped.get(stage) ?? [];
-            return (
-              <Droppable droppableId={stage} key={stage}>
-                {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className={`flex h-full flex-col rounded-xl border border-border bg-muted shadow-sm transition ${
-                      snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
-                    }`}
-                  >
-                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STAGE_COLORS[stage]}`}>
-                        {STAGE_LABELS[stage]}
-                      </span>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {items.length} {items.length === 1 ? 'candidate' : 'candidates'}
-                      </span>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-3 p-4">
-                      {isLoading && items.length === 0 ? (
-                        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border bg-muted">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                            Loading candidates...
+        <div className="overflow-x-auto pb-4">
+          <div className="inline-flex min-w-full gap-4">
+            {STAGE_ORDER.map((stage) => {
+              const items = grouped.get(stage) ?? [];
+              const total = columnTotals?.[stage] ?? items.length;
+              const limit = columnLimits?.[stage] ?? items.length;
+              const hasMore = total > limit;
+              const isColumnLoading = isLoadingMore?.[stage] ?? false;
+              
+              return (
+                <Droppable droppableId={stage} key={stage}>
+                  {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`flex h-full min-w-[320px] max-w-[320px] flex-col rounded-xl border border-border bg-muted shadow-sm transition ${
+                        snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STAGE_COLORS[stage]}`}>
+                          {STAGE_LABELS[stage]}
+                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {items.length} {items.length === 1 ? 'candidate' : 'candidates'}
+                          {total > items.length && ` / ${total}`}
+                        </span>
+                      </div>
+                      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+                        {isLoading && items.length === 0 ? (
+                          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border bg-muted">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                              Loading candidates...
+                            </div>
                           </div>
-                        </div>
-                      ) : items.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-border bg-muted p-4 text-center text-sm text-muted-foreground">
-                          No candidates in this stage yet.
-                        </div>
-                      ) : null}
+                        ) : items.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-border bg-muted p-4 text-center text-sm text-muted-foreground">
+                            No candidates in this stage yet.
+                          </div>
+                        ) : null}
 
-                      {items.map((candidate, index) => (
-                        <Draggable key={candidate.id} draggableId={candidate.id} index={index}>
-                          {(dragProvided: DraggableProvided, dragSnapshot: DraggableStateSnapshot) => (
-                            <div
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
-                              style={{
-                                width: '100%',
-                                ...(dragProvided.draggableProps.style ?? {}),
-                              }}
-                              className={`space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm transition ${
-                                dragSnapshot.isDragging ? 'border-blue-300 shadow-lg' : 'hover:shadow-md'
-                              }`}
-                            >
-                              <CandidateCard
-                                candidate={candidate}
-                                onView={onView}
-                                onEdit={onEdit}
-                                onMoveStage={onMoveStage}
-                                onLinkPosition={onLinkPosition}
-                                onConvertToEmployee={onConvertToEmployee}
+                        {items.map((candidate, index) => (
+                          <Draggable key={candidate.id} draggableId={candidate.id} index={index}>
+                            {(dragProvided: DraggableProvided, dragSnapshot: DraggableStateSnapshot) => (
+                              <div
+                                ref={dragProvided.innerRef}
+                                {...dragProvided.draggableProps}
+                                {...dragProvided.dragHandleProps}
+                                style={{
+                                  width: '100%',
+                                  ...(dragProvided.draggableProps.style ?? {}),
+                                }}
+                                className={`space-y-3 rounded-xl border border-border bg-card p-4 shadow-sm transition ${
+                                  dragSnapshot.isDragging ? 'border-blue-300 shadow-lg' : 'hover:shadow-md'
+                                }`}
+                              >
+                                <CandidateCard
+                                  candidate={candidate}
+                                  onView={onView}
+                                  onEdit={onEdit}
+                                  onMoveStage={onMoveStage}
+                                  onLinkPosition={onLinkPosition}
+                                  onConvertToEmployee={onConvertToEmployee}
                                 onArchive={onArchive}
                                 onDelete={onDelete}
+                                onToggleActive={onToggleActive}
                                 canDelete={canDelete}
                               />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        
+                        {hasMore && onLoadMore && (
+                          <button
+                            onClick={() => onLoadMore(stage)}
+                            disabled={isColumnLoading}
+                            className="mt-2 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isColumnLoading ? (
+                              <span className="inline-flex items-center gap-2">
+                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                                Loading...
+                              </span>
+                            ) : (
+                              `Load more (${total - limit} remaining)`
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </Droppable>
-            );
-          })}
+                  )}
+                </Droppable>
+              );
+            })}
+          </div>
         </div>
       </DragDropContext>
     </div>
@@ -209,6 +283,7 @@ interface CandidateCardProps {
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
   onDelete?: (candidate: Candidate) => void;
+  onToggleActive?: (candidate: Candidate) => void;
   canDelete?: boolean;
 }
 
@@ -221,6 +296,7 @@ function CandidateCard({
   onConvertToEmployee,
   onArchive,
   onDelete,
+  onToggleActive,
   canDelete = false,
 }: CandidateCardProps) {
   const nextStages = STAGE_ORDER.filter((stage) => stage !== candidate.stage);
@@ -404,6 +480,23 @@ function CandidateCard({
                   </option>
                 ))}
               </select>
+            )}
+
+            {onToggleActive && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleActive(candidate);
+                }}
+                className={`w-full rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                  candidate.isActive
+                    ? 'border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100'
+                    : 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100'
+                }`}
+              >
+                {candidate.isActive ? 'Mark Inactive' : 'Mark Active'}
+              </button>
             )}
 
             {onArchive && (
