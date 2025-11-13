@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Send, Loader2, Mail } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment/candidates';
 import { templatesApi } from '@/lib/api/templates';
 import type { Candidate, MarkInactivePayload } from '@/types/recruitment';
-import type { TemplateModel } from '@/types/templates';
 
 interface MarkInactiveModalProps {
   candidate: Candidate;

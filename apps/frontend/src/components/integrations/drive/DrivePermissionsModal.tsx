@@ -3,7 +3,7 @@ import { X, Shield, User, Globe, Users, Lock, Check, X as XIcon } from 'lucide-r
 import { googleDriveApi } from '@/lib/api/google-drive';
 import type { DrivePermission, UserFilePermissions } from '@/types/integrations';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface DrivePermissionsModalProps {
   fileId: string;
@@ -38,23 +38,27 @@ const TYPE_LABELS: Record<DrivePermission['type'], string> = {
 export function DrivePermissionsModal({ fileId, fileName, open, onClose }: DrivePermissionsModalProps) {
   const [error, setError] = useState<string | null>(null);
 
-  const { data: allPermissions, isLoading: loadingAll } = useQuery({
+  const { data: allPermissions, isLoading: loadingAll, error: allPermissionsError } = useQuery<DrivePermission[]>({
     queryKey: ['drive-permissions', fileId],
     queryFn: () => googleDriveApi.getFilePermissions(fileId),
     enabled: open,
-    onError: () => {
-      setError('Unable to load permissions. Please try again.');
-    },
   });
 
-  const { data: myPermissions, isLoading: loadingMy } = useQuery({
+  const { data: myPermissions, isLoading: loadingMy, error: myPermissionsError } = useQuery<UserFilePermissions>({
     queryKey: ['drive-my-permissions', fileId],
     queryFn: () => googleDriveApi.getMyPermissions(fileId),
     enabled: open,
-    onError: () => {
-      setError('Unable to load your permissions. Please try again.');
-    },
   });
+
+  useEffect(() => {
+    if (allPermissionsError) {
+      setError('Unable to load permissions. Please try again.');
+    } else if (myPermissionsError) {
+      setError('Unable to load your permissions. Please try again.');
+    } else {
+      setError(null);
+    }
+  }, [allPermissionsError, myPermissionsError]);
 
   if (!open) {
     return null;

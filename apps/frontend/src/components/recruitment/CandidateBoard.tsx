@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, ChevronDown, MoveRight, Plus, Trash2, UploadCloud, UserRound } from 'lucide-react';
+import { Archive, ChevronDown, Trash2, UserRound } from 'lucide-react';
 import {
   DragDropContext,
   Droppable,
@@ -78,8 +78,8 @@ interface CandidateBoardProps {
 export function CandidateBoard({
   candidates,
   isLoading,
-  onCreateCandidate,
-  onRefresh,
+  onCreateCandidate: _onCreateCandidate,
+  onRefresh: _onRefresh,
   onView,
   onEdit,
   onMoveStage,
@@ -89,7 +89,7 @@ export function CandidateBoard({
   onArchive,
   onDelete,
   onToggleActive,
-  onImportCandidates,
+  onImportCandidates: _onImportCandidates,
   canDelete = false,
   columnLimits,
   columnTotals,

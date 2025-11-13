@@ -62,7 +62,6 @@ const SORT_OPTIONS: Array<{ label: string; value: NonNullable<OpportunityFilters
 ];
 
 const PAGE_SIZE = 10;
-const BOARD_PAGE_SIZE = 200;
 const PIPELINE_STAGE_ORDER = [
   'Prospecting',
   'Discovery',
