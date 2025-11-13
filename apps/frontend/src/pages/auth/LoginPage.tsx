@@ -95,12 +95,6 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </div>
-
-          <div className="text-center text-sm text-muted-foreground">
-            <p>Test Accounts:</p>
-            <p>admin@division5.com / admin123</p>
-            <p>sales@division5.com / sales123</p>
-          </div>
         </form>
       </div>
     </div>

@@ -13,6 +13,7 @@ export enum CandidateImportField {
   EMAIL = 'email',
   FIRST_NAME = 'firstName',
   LAST_NAME = 'lastName',
+  FULL_NAME = 'fullName',
   PHONE = 'phone',
   CITY = 'city',
   COUNTRY = 'country',
@@ -30,6 +31,7 @@ export enum CandidateImportField {
   EXPECTED_SALARY = 'expectedSalary',
   SALARY_CURRENCY = 'salaryCurrency',
   ODOO_ID = 'odooId',
+  ACTIVITIES = 'activities',
 }
 
 export class CandidateFieldMappingEntry {

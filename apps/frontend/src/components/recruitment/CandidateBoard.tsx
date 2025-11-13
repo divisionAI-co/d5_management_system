@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, MoveRight, Plus, UploadCloud, UserRound } from 'lucide-react';
+import { Archive, ChevronDown, MoveRight, Plus, Trash2, UploadCloud, UserRound } from 'lucide-react';
 import {
   DragDropContext,
   Droppable,
@@ -18,6 +18,9 @@ const STAGE_ORDER: CandidateStage[] = [
   CandidateStage.CULTURAL_INTERVIEW,
   CandidateStage.TECHNICAL_INTERVIEW,
   CandidateStage.CUSTOMER_INTERVIEW,
+  CandidateStage.ON_HOLD,
+  CandidateStage.CUSTOMER_REVIEW,
+  CandidateStage.CONTRACT_PROPOSAL,
   CandidateStage.CONTRACT_SIGNING,
   CandidateStage.HIRED,
   CandidateStage.REJECTED,
@@ -28,6 +31,9 @@ const STAGE_LABELS: Record<CandidateStage, string> = {
   [CandidateStage.CULTURAL_INTERVIEW]: 'Cultural Interview',
   [CandidateStage.TECHNICAL_INTERVIEW]: 'Technical Interview',
   [CandidateStage.CUSTOMER_INTERVIEW]: 'Customer Interview',
+  [CandidateStage.ON_HOLD]: 'On Hold',
+  [CandidateStage.CUSTOMER_REVIEW]: 'Customer Review',
+  [CandidateStage.CONTRACT_PROPOSAL]: 'Contract Proposal',
   [CandidateStage.CONTRACT_SIGNING]: 'Contract Signing',
   [CandidateStage.HIRED]: 'Hired',
   [CandidateStage.REJECTED]: 'Rejected',
@@ -38,6 +44,9 @@ const STAGE_COLORS: Record<CandidateStage, string> = {
   [CandidateStage.CULTURAL_INTERVIEW]: 'bg-purple-100 text-purple-700',
   [CandidateStage.TECHNICAL_INTERVIEW]: 'bg-amber-100 text-amber-700',
   [CandidateStage.CUSTOMER_INTERVIEW]: 'bg-cyan-100 text-cyan-700',
+  [CandidateStage.ON_HOLD]: 'bg-orange-100 text-orange-700',
+  [CandidateStage.CUSTOMER_REVIEW]: 'bg-teal-100 text-teal-700',
+  [CandidateStage.CONTRACT_PROPOSAL]: 'bg-yellow-100 text-yellow-700',
   [CandidateStage.CONTRACT_SIGNING]: 'bg-emerald-100 text-emerald-700',
   [CandidateStage.HIRED]: 'bg-green-100 text-green-700',
   [CandidateStage.REJECTED]: 'bg-rose-100 text-rose-700',
@@ -54,7 +63,10 @@ interface CandidateBoardProps {
   onLinkPosition?: (candidate: Candidate) => void;
   onCandidateMove?: (result: DropResult, candidate: Candidate) => void;
   onConvertToEmployee?: (candidate: Candidate) => void;
+  onArchive?: (candidate: Candidate) => void;
+  onDelete?: (candidate: Candidate) => void;
   onImportCandidates?: () => void;
+  canDelete?: boolean;
 }
 
 export function CandidateBoard({
@@ -68,7 +80,10 @@ export function CandidateBoard({
   onLinkPosition,
   onCandidateMove,
   onConvertToEmployee,
+  onArchive,
+  onDelete,
   onImportCandidates,
+  canDelete = false,
 }: CandidateBoardProps) {
   const grouped = useMemo(() => {
     const map = new Map<CandidateStage, Candidate[]>();
@@ -106,49 +121,6 @@ export function CandidateBoard({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Recruitment Board</h1>
-          <p className="text-sm text-muted-foreground">
-            Track candidates as they progress from screening to contract
-            signing. Use the actions on each card to advance stages, update
-            details or link to open positions.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition"
-            >
-              <MoveRight className={`h-4 w-4 ${isLoading ? 'animate-pulse' : ''}`} />
-              Refresh
-            </button>
-          )}
-          {onImportCandidates && (
-            <button
-              onClick={onImportCandidates}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition disabled:opacity-60"
-              disabled={isLoading}
-              type="button"
-            >
-              <UploadCloud className="h-4 w-4" />
-              Import Candidates
-            </button>
-          )}
-          {onCreateCandidate && (
-            <button
-              onClick={onCreateCandidate}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-60"
-              disabled={isLoading}
-            >
-              <Plus className="h-4 w-4" />
-              New Candidate
-            </button>
-          )}
-        </div>
-      </div>
-
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid w-full gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
           {STAGE_ORDER.map((stage) => {
@@ -207,6 +179,9 @@ export function CandidateBoard({
                                 onMoveStage={onMoveStage}
                                 onLinkPosition={onLinkPosition}
                                 onConvertToEmployee={onConvertToEmployee}
+                                onArchive={onArchive}
+                                onDelete={onDelete}
+                                canDelete={canDelete}
                               />
                             </div>
                           )}
@@ -232,6 +207,9 @@ interface CandidateCardProps {
   onMoveStage?: (candidate: Candidate, stage: CandidateStage) => void;
   onLinkPosition?: (candidate: Candidate) => void;
   onConvertToEmployee?: (candidate: Candidate) => void;
+  onArchive?: (candidate: Candidate) => void;
+  onDelete?: (candidate: Candidate) => void;
+  canDelete?: boolean;
 }
 
 function CandidateCard({
@@ -241,6 +219,9 @@ function CandidateCard({
   onMoveStage,
   onLinkPosition,
   onConvertToEmployee,
+  onArchive,
+  onDelete,
+  canDelete = false,
 }: CandidateCardProps) {
   const nextStages = STAGE_ORDER.filter((stage) => stage !== candidate.stage);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -423,6 +404,34 @@ function CandidateCard({
                   </option>
                 ))}
               </select>
+            )}
+
+            {onArchive && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onArchive(candidate);
+                }}
+                className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-600 transition hover:bg-amber-100"
+              >
+                <Archive className="mr-2 inline h-4 w-4" />
+                Archive
+              </button>
+            )}
+
+            {canDelete && onDelete && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(candidate);
+                }}
+                className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+              >
+                <Trash2 className="mr-2 inline h-4 w-4" />
+                Delete
+              </button>
             )}
           </div>
         </>

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -101,6 +102,36 @@ export class CandidatesController {
   })
   getCandidatePositions(@Param('id') id: string) {
     return this.candidatesService.getPositions(id);
+  }
+
+  @Patch(':id/archive')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Archive a candidate (soft delete)',
+    description: 'Archives a candidate by setting deletedAt. Archived candidates are excluded from normal queries.',
+  })
+  archive(@Param('id') id: string) {
+    return this.candidatesService.archive(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Restore an archived candidate',
+    description: 'Restores an archived candidate by clearing deletedAt.',
+  })
+  restore(@Param('id') id: string) {
+    return this.candidatesService.restore(id);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({
+    summary: 'Permanently delete a candidate',
+    description: 'Permanently deletes a candidate. Cannot delete candidates linked to employees.',
+  })
+  delete(@Param('id') id: string) {
+    return this.candidatesService.delete(id);
   }
 }
 

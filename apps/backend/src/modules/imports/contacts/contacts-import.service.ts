@@ -16,6 +16,7 @@ import {
   ContactMapImportDto,
   ContactFieldMappingEntry,
 } from './dto/contact-map-import.dto';
+import { generateInitialMappings } from '../utils/field-mapping.util';
 
 export interface ContactUploadResult {
   id: string;
@@ -25,6 +26,7 @@ export interface ContactUploadResult {
   sampleRows: Record<string, string>[];
   totalRows: number;
   availableFields: ContactImportFieldMetadata[];
+  suggestedMappings?: Array<{ sourceColumn: string; targetField: string }>;
 }
 
 export interface ContactImportFieldMetadata {
@@ -228,6 +230,13 @@ export class ContactsImportService {
       },
     });
 
+    // Generate suggested mappings based on column name similarity
+    const suggestedMappings = generateInitialMappings(
+      parsed.headers,
+      CONTACT_FIELD_DEFINITIONS,
+      0.3, // Minimum confidence threshold
+    );
+
     return {
       id: importRecord.id,
       type: 'contacts',
@@ -236,6 +245,7 @@ export class ContactsImportService {
       sampleRows,
       totalRows: sanitizedRows.length,
       availableFields: CONTACT_FIELD_DEFINITIONS,
+      suggestedMappings,
     };
   }
 

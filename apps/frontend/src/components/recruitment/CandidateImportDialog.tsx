@@ -15,6 +15,7 @@ interface CandidateImportDialogProps {
 interface CandidateExecuteOptions {
   defaultStage: CandidateStage | '';
   defaultSalaryCurrency: string;
+  isOdooImport: boolean;
 }
 
 const CANDIDATE_STAGE_LABELS: Record<CandidateStage, string> = {
@@ -22,6 +23,9 @@ const CANDIDATE_STAGE_LABELS: Record<CandidateStage, string> = {
   CULTURAL_INTERVIEW: 'Cultural Interview',
   TECHNICAL_INTERVIEW: 'Technical Interview',
   CUSTOMER_INTERVIEW: 'Customer Interview',
+  ON_HOLD: 'On Hold',
+  CUSTOMER_REVIEW: 'Customer Review',
+  CONTRACT_PROPOSAL: 'Contract Proposal',
   CONTRACT_SIGNING: 'Contract Signing',
   HIRED: 'Hired',
   REJECTED: 'Rejected',
@@ -47,11 +51,13 @@ export function CandidateImportDialog({ open, onClose }: CandidateImportDialogPr
       initialOptions={() => ({
         defaultStage: '',
         defaultSalaryCurrency: 'USD',
+        isOdooImport: false,
       })}
       buildExecutePayload={({ updateExisting, options }) => ({
         updateExisting,
         defaultStage: options.defaultStage || undefined,
         defaultSalaryCurrency: options.defaultSalaryCurrency || undefined,
+        isOdooImport: options.isOdooImport,
       })}
       invalidateQueries={['candidates']}
       renderExecuteOptions={({ options, setOptions }) => (
@@ -101,6 +107,32 @@ export function CandidateImportDialog({ open, onClose }: CandidateImportDialogPr
             <p className="mt-1 text-xs text-muted-foreground">
               Provide a three-letter ISO currency code (e.g., USD, EUR).
             </p>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              id="is-odoo-import"
+              checked={options.isOdooImport}
+              onChange={(event) =>
+                setOptions((prev) => ({
+                  ...prev,
+                  isOdooImport: event.target.checked,
+                }))
+              }
+              className="mt-1 h-4 w-4 rounded border-border text-blue-600 focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <label
+                htmlFor="is-odoo-import"
+                className="text-sm font-medium text-muted-foreground"
+              >
+                Odoo Import
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enable Odoo-specific processing: extract Google Drive links from HTML notes and convert HTML fields to plain text.
+              </p>
+            </div>
           </div>
         </div>
       )}

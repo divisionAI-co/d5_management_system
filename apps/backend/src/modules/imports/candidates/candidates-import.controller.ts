@@ -16,6 +16,7 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 
 import { CandidatesImportService } from './candidates-import.service';
@@ -76,7 +77,14 @@ export class CandidatesImportController {
   @Post(':id/execute')
   @Roles(UserRole.ADMIN, UserRole.HR, UserRole.RECRUITER)
   @ApiOperation({ summary: 'Execute the candidate import after mapping' })
-  execute(@Param('id') id: string, @Body() dto: ExecuteCandidateImportDto) {
-    return this.candidatesImportService.executeCandidatesImport(id, dto);
+  execute(
+    @Param('id') id: string,
+    @Body() dto: ExecuteCandidateImportDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.candidatesImportService.executeCandidatesImport(id, {
+      ...dto,
+      createdById: dto.createdById ?? userId,
+    });
   }
 }

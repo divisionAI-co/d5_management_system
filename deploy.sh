@@ -32,8 +32,10 @@ APP_USER="d5app"
 APP_DIR="/home/${APP_USER}/d5-management"
 DB_NAME="d5_management"
 DB_USER="d5user"
+DB_PASSWORD="d5app!"  # Set this to your desired database password, or leave empty to be prompted
+APP_NAME="D5 Management System"  # Application name (shown in frontend)
 NGINX_SITE="d5-management"
-DOMAIN=""
+DOMAIN="app.division5.co"
 EMAIL=""
 NGINX_PORT="80"  # Default port, can be changed if 80 is in use
 
@@ -581,34 +583,55 @@ get_user_input() {
         NGINX_PORT="${NGINX_PORT:-80}"
     fi
     
-    # Domain and email (from env vars or prompt)
+    # Domain and email (from script variables, env vars, or prompt)
     if [ "$NON_INTERACTIVE" = true ]; then
-        DOMAIN="${DEPLOY_DOMAIN:-}"
-        EMAIL="${DEPLOY_EMAIL:-}"
+        # Non-interactive mode: use env var or script variable
+        DOMAIN="${DEPLOY_DOMAIN:-$DOMAIN}"
+        EMAIL="${DEPLOY_EMAIL:-$EMAIL}"
         print_info "Domain: ${DOMAIN:-not set}"
         print_info "Email: ${EMAIL:-not set}"
     else
-        read -p "Enter your domain name (e.g., example.com) [optional]: " DOMAIN
-        read -p "Enter your email for SSL certificate [optional]: " EMAIL
+        # Interactive mode: use script variable if set, otherwise prompt
+        if [ -z "$DOMAIN" ]; then
+            read -p "Enter your domain name (e.g., example.com) [optional]: " DOMAIN
+        else
+            print_info "Using domain from script variable: $DOMAIN"
+        fi
+        
+        if [ -z "$EMAIL" ]; then
+            read -p "Enter your email for SSL certificate [optional]: " EMAIL
+        else
+            print_info "Using email from script variable: $EMAIL"
+        fi
     fi
     
-    # Database password (from env var or prompt)
+    # Database password (from script variable, env var, or prompt)
     if [ "$NON_INTERACTIVE" = true ]; then
-        DB_PASSWORD="${DEPLOY_DB_PASSWORD:-}"
+        # Non-interactive mode: use env var or script variable
+        DB_PASSWORD="${DEPLOY_DB_PASSWORD:-$DB_PASSWORD}"
         if [ -z "$DB_PASSWORD" ]; then
-            print_error "DEPLOY_DB_PASSWORD environment variable is required in non-interactive mode"
+            print_error "DEPLOY_DB_PASSWORD environment variable or DB_PASSWORD script variable is required in non-interactive mode"
             exit 1
         fi
-        print_info "Using database password from DEPLOY_DB_PASSWORD environment variable"
+        if [ -n "$DEPLOY_DB_PASSWORD" ]; then
+            print_info "Using database password from DEPLOY_DB_PASSWORD environment variable"
+        else
+            print_info "Using database password from script variable"
+        fi
     else
-        read -p "Enter database password for ${DB_USER}: " -s DB_PASSWORD
-        echo
-        read -p "Confirm database password: " -s DB_PASSWORD_CONFIRM
-        echo
-        
-        if [ "$DB_PASSWORD" != "$DB_PASSWORD_CONFIRM" ]; then
-            print_error "Passwords do not match!"
-            exit 1
+        # Interactive mode: use script variable if set, otherwise prompt
+        if [ -z "$DB_PASSWORD" ]; then
+            read -p "Enter database password for ${DB_USER}: " -s DB_PASSWORD
+            echo
+            read -p "Confirm database password: " -s DB_PASSWORD_CONFIRM
+            echo
+            
+            if [ "$DB_PASSWORD" != "$DB_PASSWORD_CONFIRM" ]; then
+                print_error "Passwords do not match!"
+                exit 1
+            fi
+        else
+            print_info "Using database password from script variable"
         fi
     fi
     
@@ -662,6 +685,7 @@ update_system() {
 install_dependencies() {
     print_header "Installing Dependencies"
     
+    # Install base dependencies
     sudo apt install -y \
         curl \
         wget \
@@ -672,6 +696,34 @@ install_dependencies() {
         ca-certificates \
         gnupg \
         lsb-release
+    
+    # Install Puppeteer/Chrome dependencies (required for PDF generation)
+    print_info "Installing Puppeteer/Chrome dependencies..."
+    # Detect correct ALSA package for Ubuntu version
+    # Ubuntu 24.04+ uses libasound2t64, older versions use libasound2
+    ALSA_PKG="libasound2t64"
+    if ! apt-cache show libasound2t64 &>/dev/null; then
+        # Fallback to libasound2 for older Ubuntu versions
+        ALSA_PKG="libasound2"
+    fi
+    
+    sudo apt install -y \
+        $ALSA_PKG \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libgbm1 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libx11-xcb1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxkbcommon0 \
+        libxrandr2 \
+        xdg-utils
     
     print_success "Dependencies installed"
 }
@@ -1090,10 +1142,13 @@ configure_frontend() {
     
     cd $APP_DIR/apps/frontend
     
-    # Create .env file
+    # Backup existing .env if it exists
     if [ -f .env ]; then
         print_info "Frontend .env exists, backing up..."
         sudo -u $APP_USER cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+        
+        # Preserve any custom variables from existing .env (excluding VITE_API_URL and VITE_APP_NAME which we'll update)
+        print_info "Preserving custom variables from existing .env..."
     fi
     
     # Determine API URL (backend uses /api/v1 due to versioning)
@@ -1111,10 +1166,33 @@ configure_frontend() {
         fi
     fi
     
-    sudo -u $APP_USER cat > .env <<EOF
-VITE_API_URL=${API_URL}
-VITE_APP_NAME=D5 Management System
-EOF
+    # Use APP_NAME from script variable or environment variable, with fallback
+    local FRONTEND_APP_NAME="${DEPLOY_APP_NAME:-$APP_NAME}"
+    if [ -z "$FRONTEND_APP_NAME" ]; then
+        FRONTEND_APP_NAME="D5 Management System"
+    fi
+    
+    # Extract any custom variables from existing .env (excluding VITE_API_URL and VITE_APP_NAME)
+    # Store them in a temp file to preserve them
+    local TEMP_ENV=$(mktemp)
+    if [ -f .env ]; then
+        # Get all lines that are not VITE_API_URL or VITE_APP_NAME and are not empty or comments
+        grep -v "^VITE_API_URL=" .env 2>/dev/null | grep -v "^VITE_APP_NAME=" | grep -v "^#" | grep -v "^$" > "$TEMP_ENV" 2>/dev/null || true
+    fi
+    
+    # Create new .env file
+    {
+        echo "VITE_API_URL=${API_URL}"
+        echo "VITE_APP_NAME=${FRONTEND_APP_NAME}"
+        # Append custom variables if any exist
+        if [ -s "$TEMP_ENV" ]; then
+            echo ""
+            cat "$TEMP_ENV"
+        fi
+    } | sudo -u $APP_USER tee .env > /dev/null
+    
+    # Clean up temp file
+    rm -f "$TEMP_ENV"
     
     print_success "Frontend configured"
 }

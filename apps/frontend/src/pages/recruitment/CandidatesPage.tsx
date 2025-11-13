@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DropResult } from '@hello-pangea/dnd';
+import { Columns, Kanban, MoveRight, Plus, UploadCloud } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
 import type {
   Candidate,
@@ -11,6 +12,7 @@ import type {
   PaginatedResponse,
 } from '@/types/recruitment';
 import { CandidateBoard, CANDIDATE_STAGE_LABELS } from '@/components/recruitment/CandidateBoard';
+import { CandidateTable } from '@/components/recruitment/CandidateTable';
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
 import { CandidateConvertToEmployeeModal } from '@/components/recruitment/CandidateConvertToEmployeeModal';
@@ -35,6 +37,9 @@ export default function CandidatesPage() {
     hasOpenPosition: false,
   });
 
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCandidate, setEditingCandidate] = useState<Candidate | undefined>();
   const [linkCandidate, setLinkCandidate] = useState<Candidate | null>(null);
@@ -43,11 +48,12 @@ export default function CandidatesPage() {
   const [importOpen, setImportOpen] = useState(false);
   const { user } = useAuthStore();
   const canImport = user?.role === UserRole.ADMIN || user?.role === UserRole.HR || user?.role === UserRole.RECRUITER;
+  const canDelete = user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
 
   const sanitizedFilters = useMemo<CandidateFilters>(() => {
     const payload: CandidateFilters = {
-      page: 1,
-      pageSize: 200,
+      page,
+      pageSize,
       sortBy: 'createdAt',
       sortOrder: 'desc',
     };
@@ -65,7 +71,12 @@ export default function CandidatesPage() {
     }
 
     return payload;
-  }, [filters]);
+  }, [filters, page, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters.search, filters.stage, filters.hasOpenPosition]);
 
   const candidatesQuery = useQuery({
     queryKey: ['candidates', sanitizedFilters],
@@ -89,6 +100,24 @@ export default function CandidatesPage() {
     },
   });
 
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => candidatesApi.archive(id),
+    onSuccess: (archived) => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      setFeedback(
+        `${archived.firstName} ${archived.lastName} has been archived.`,
+      );
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => candidatesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      setFeedback('Candidate deleted successfully.');
+    },
+  });
+
   const handleOpenCreate = () => {
     setEditingCandidate(undefined);
     setIsFormOpen(true);
@@ -109,6 +138,26 @@ export default function CandidatesPage() {
 
   const handleConvertCandidate = (candidate: Candidate) => {
     setConvertCandidate(candidate);
+  };
+
+  const handleArchiveCandidate = (candidate: Candidate) => {
+    if (
+      window.confirm(
+        `Archive "${candidate.firstName} ${candidate.lastName}"? They will be hidden from the candidate list but can be restored later.`,
+      )
+    ) {
+      archiveMutation.mutate(candidate.id);
+    }
+  };
+
+  const handleDeleteCandidate = (candidate: Candidate) => {
+    if (
+      window.confirm(
+        `Permanently delete "${candidate.firstName} ${candidate.lastName}"? This action cannot be undone.`,
+      )
+    ) {
+      deleteMutation.mutate(candidate.id);
+    }
   };
 
   const handleConversionSuccess = (result: ConvertCandidateToEmployeeResponse) => {
@@ -161,6 +210,13 @@ export default function CandidatesPage() {
   }, [queryClient, sanitizedFilters, stageMutation]);
 
   const candidates = candidatesQuery.data?.data ?? [];
+  const meta = candidatesQuery.data?.meta;
+  const total = meta?.total ?? 0;
+  const pageCount = meta?.pageCount ?? 1;
+  const currentPage = meta?.page ?? page;
+  const currentPageSize = meta?.pageSize ?? pageSize;
+  const startIndex = total > 0 ? (currentPage - 1) * currentPageSize + 1 : 0;
+  const endIndex = Math.min(currentPage * currentPageSize, total);
 
   return (
     <div className="py-8 space-y-6">
@@ -239,19 +295,152 @@ export default function CandidatesPage() {
         />
       )}
 
-      <CandidateBoard
-        candidates={candidates}
-        isLoading={candidatesQuery.isFetching}
-        onCreateCandidate={handleOpenCreate}
-        onImportCandidates={canImport ? () => setImportOpen(true) : undefined}
-        onRefresh={() => candidatesQuery.refetch()}
-        onView={handleViewCandidate}
-        onEdit={handleEditCandidate}
-        onLinkPosition={handleLinkPosition}
-        onMoveStage={handleMoveStage}
-        onCandidateMove={handleCandidateMoveOptimistic}
-        onConvertToEmployee={handleConvertCandidate}
-      />
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Recruitment Board</h1>
+            <p className="text-sm text-muted-foreground">
+              Track candidates as they progress from screening to contract signing.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-lg border border-border bg-card p-1 text-sm font-medium text-muted-foreground">
+            <button
+              onClick={() => setViewMode('board')}
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 transition ${
+                viewMode === 'board'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'hover:bg-muted/70'
+              }`}
+            >
+              <Kanban className="h-4 w-4" /> Board
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 transition ${
+                viewMode === 'list'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'hover:bg-muted/70'
+              }`}
+            >
+              <Columns className="h-4 w-4" /> List
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => candidatesQuery.refetch()}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition"
+            >
+              <MoveRight
+                className={`h-4 w-4 ${
+                  candidatesQuery.isFetching ? 'animate-pulse' : ''
+                }`}
+              />
+              Refresh
+            </button>
+            {canImport && (
+              <button
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition disabled:opacity-60"
+                disabled={candidatesQuery.isFetching}
+                type="button"
+              >
+                <UploadCloud className="h-4 w-4" />
+                Import Candidates
+              </button>
+            )}
+            <button
+              onClick={handleOpenCreate}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition disabled:opacity-60"
+              disabled={candidatesQuery.isFetching}
+            >
+              <Plus className="h-4 w-4" />
+              New Candidate
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {viewMode === 'board' ? (
+        <CandidateBoard
+          candidates={candidates}
+          isLoading={candidatesQuery.isFetching}
+          onCreateCandidate={handleOpenCreate}
+          onImportCandidates={canImport ? () => setImportOpen(true) : undefined}
+          onRefresh={() => candidatesQuery.refetch()}
+          onView={handleViewCandidate}
+          onEdit={handleEditCandidate}
+          onLinkPosition={handleLinkPosition}
+          onMoveStage={handleMoveStage}
+          onCandidateMove={handleCandidateMoveOptimistic}
+          onConvertToEmployee={handleConvertCandidate}
+          onArchive={handleArchiveCandidate}
+          onDelete={canDelete ? handleDeleteCandidate : undefined}
+          canDelete={canDelete}
+        />
+      ) : (
+        <CandidateTable
+          candidates={candidates}
+          onView={handleViewCandidate}
+          onEdit={handleEditCandidate}
+          onMoveStage={handleMoveStage}
+          onLinkPosition={handleLinkPosition}
+          onConvertToEmployee={handleConvertCandidate}
+          onArchive={handleArchiveCandidate}
+          onDelete={canDelete ? handleDeleteCandidate : undefined}
+          disableStageChange={stageMutation.isPending}
+          canDelete={canDelete}
+        />
+      )}
+
+      {meta && total > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <span>
+              Showing {startIndex.toLocaleString()}–{endIndex.toLocaleString()} of {total.toLocaleString()} candidates
+            </span>
+            <div className="flex items-center gap-2">
+              <label htmlFor="page-size-select" className="text-xs">
+                Per page:
+              </label>
+              <select
+                id="page-size-select"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded-lg border border-border bg-card px-2 py-1 text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage <= 1 || candidatesQuery.isFetching}
+              className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Previous
+            </button>
+            <span className="text-xs text-muted-foreground">
+              Page {currentPage} of {Math.max(pageCount, 1)}
+            </span>
+            <button
+              onClick={() => setPage((prev) => (pageCount ? Math.min(prev + 1, pageCount) : prev + 1))}
+              disabled={pageCount ? currentPage >= pageCount || candidatesQuery.isFetching : candidates.length < currentPageSize}
+              className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {isFormOpen && (
         <CandidateForm

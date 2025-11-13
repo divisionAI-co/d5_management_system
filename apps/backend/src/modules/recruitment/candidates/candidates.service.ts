@@ -97,14 +97,19 @@ export class CandidatesService {
     try {
       const url = new URL(trimmed);
 
-      const folderMatch = url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      // Only extract folder IDs, not file IDs
+      // Check for folder pattern first: /drive/folders/ID or /folders/ID
+      const folderMatch = url.pathname.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/) || 
+                         url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
       if (folderMatch?.[1]) {
         return folderMatch[1];
       }
 
-      const fileMatch = url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      // If it's a file URL (/file/d/ID), reject it - this is not a folder
+      const fileMatch = url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
       if (fileMatch?.[1]) {
-        return fileMatch[1];
+        // This is a file, not a folder - return undefined
+        return undefined;
       }
 
       const idFromQuery = url.searchParams.get('id');
@@ -133,7 +138,10 @@ export class CandidatesService {
   private buildWhereClause(
     filters: FilterCandidatesDto,
   ): Prisma.CandidateWhereInput {
-    const where: Prisma.CandidateWhereInput = {};
+    const where: Prisma.CandidateWhereInput = {
+      // Filter out deleted candidates by default
+      deletedAt: null,
+    };
 
     if (filters.search) {
       const searchTerm = filters.search.trim();
@@ -253,16 +261,14 @@ export class CandidatesService {
       );
     }
 
-    const driveFolderId = this.extractDriveFolderId(
-      createDto.driveFolderId ?? createDto.driveFolderUrl,
-    );
+    const inputValue = createDto.driveFolderId ?? createDto.driveFolderUrl;
+    const driveFolderId = this.extractDriveFolderId(inputValue);
 
-    if (
-      (createDto.driveFolderId ?? createDto.driveFolderUrl) &&
-      !driveFolderId
-    ) {
+    // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
+    // throw an error for create (since we need valid data), but allow null for updates
+    if (inputValue && !driveFolderId) {
       throw new BadRequestException(
-        'Unable to extract Google Drive folder ID from the provided value.',
+        'Unable to extract Google Drive folder ID from the provided value. Please provide a valid folder URL or ID, not a file URL.',
       );
     }
 
@@ -377,8 +383,11 @@ export class CandidatesService {
   }
 
   async findOne(id: string) {
-    const candidate = await this.prisma.candidate.findUnique({
-      where: { id },
+    const candidate = await this.prisma.candidate.findFirst({
+      where: {
+        id,
+        deletedAt: null,
+      },
       include: {
         positions: {
           include: {
@@ -422,21 +431,24 @@ export class CandidatesService {
       updateDto.driveFolderId !== undefined ||
       updateDto.driveFolderUrl !== undefined
     ) {
-      const resolved = this.extractDriveFolderId(
-        updateDto.driveFolderId ?? updateDto.driveFolderUrl,
-      );
+      const inputValue = updateDto.driveFolderId ?? updateDto.driveFolderUrl;
+      
+      // If the input is an empty string or null, explicitly clear the field
+      if (!inputValue || (typeof inputValue === 'string' && inputValue.trim().length === 0)) {
+        driveFolderIdUpdate = null;
+      } else {
+        const resolved = this.extractDriveFolderId(inputValue);
 
-      if (
-        (updateDto.driveFolderId ?? updateDto.driveFolderUrl) &&
-        !resolved
-      ) {
-        throw new BadRequestException(
-          'Unable to extract Google Drive folder ID from the provided value.',
-        );
+        // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
+        // silently ignore it rather than throwing an error - this allows users to clear invalid values
+        if (!resolved) {
+          // Invalid value provided (e.g., file URL instead of folder URL) - set to null to clear it
+          driveFolderIdUpdate = null;
+        } else {
+          // Valid folder ID extracted
+          driveFolderIdUpdate = resolved;
+        }
       }
-
-      driveFolderIdUpdate =
-        resolved !== undefined ? resolved : null;
     }
 
     try {
@@ -856,6 +868,127 @@ export class CandidatesService {
           }
         : null,
     }));
+  }
+
+  async archive(id: string) {
+    const candidate = await this.ensureCandidateExists(id);
+
+    if (candidate.deletedAt) {
+      throw new BadRequestException('Candidate is already archived.');
+    }
+
+    const updated = await this.prisma.candidate.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
+      include: {
+        positions: {
+          include: {
+            position: {
+              include: {
+                opportunity: {
+                  include: {
+                    customer: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        employee: true,
+      },
+    });
+
+    return this.formatCandidate(updated);
+  }
+
+  async restore(id: string) {
+    const candidate = await this.prisma.candidate.findUnique({
+      where: { id },
+      include: {
+        positions: {
+          include: {
+            position: {
+              include: {
+                opportunity: {
+                  include: {
+                    customer: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        employee: true,
+      },
+    });
+
+    if (!candidate) {
+      throw new NotFoundException(`Candidate with ID ${id} not found`);
+    }
+
+    if (!candidate.deletedAt) {
+      throw new BadRequestException('Candidate is not archived.');
+    }
+
+    const updated = await this.prisma.candidate.update({
+      where: { id },
+      data: {
+        deletedAt: null,
+      },
+      include: {
+        positions: {
+          include: {
+            position: {
+              include: {
+                opportunity: {
+                  include: {
+                    customer: {
+                      select: {
+                        id: true,
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        employee: true,
+      },
+    });
+
+    return this.formatCandidate(updated);
+  }
+
+  async delete(id: string) {
+    const candidate = await this.ensureCandidateExists(id);
+
+    // Check if candidate is linked to an employee
+    if (candidate.employee) {
+      throw new BadRequestException(
+        'Cannot delete candidate that is linked to an employee. Archive it instead.',
+      );
+    }
+
+    // Hard delete the candidate
+    await this.prisma.candidate.delete({
+      where: { id },
+    });
+
+    return { success: true, message: 'Candidate deleted successfully.' };
   }
 }
 

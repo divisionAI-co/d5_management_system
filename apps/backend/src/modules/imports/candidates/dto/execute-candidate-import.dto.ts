@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 import { CandidateStage } from '@prisma/client';
 
@@ -27,4 +27,21 @@ export class ExecuteCandidateImportDto {
   @IsOptional()
   @IsString()
   defaultSalaryCurrency?: string;
+
+  @ApiPropertyOptional({
+    description: 'User ID who is performing the import (for activity creation).',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  createdById?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Enable Odoo-specific processing: extract Google Drive links from HTML notes and parse HTML fields to plain text.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isOdooImport?: boolean;
 }

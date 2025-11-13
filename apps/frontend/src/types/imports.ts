@@ -13,6 +13,7 @@ export interface UploadBaseResult {
   sampleRows: Record<string, string>[];
   totalRows: number;
   availableFields: ImportFieldMetadata[];
+  suggestedMappings?: Array<{ sourceColumn: string; targetField: string }>;
 }
 
 export interface ImportSummaryBase {
@@ -99,6 +100,7 @@ export interface CandidateMapPayload extends MapPayloadBase {}
 export interface ExecuteCandidateImportPayload extends ExecutePayloadBase {
   defaultStage?: string;
   defaultSalaryCurrency?: string;
+  isOdooImport?: boolean;
 }
 
 

@@ -76,6 +76,27 @@ export const candidatesApi = {
     );
     return data;
   },
+
+  async archive(id: string) {
+    const { data } = await apiClient.patch<Candidate>(
+      `/recruitment/candidates/${id}/archive`,
+    );
+    return data;
+  },
+
+  async restore(id: string) {
+    const { data } = await apiClient.patch<Candidate>(
+      `/recruitment/candidates/${id}/restore`,
+    );
+    return data;
+  },
+
+  async delete(id: string) {
+    const { data } = await apiClient.delete<{ success: boolean; message: string }>(
+      `/recruitment/candidates/${id}`,
+    );
+    return data;
+  },
 };
 
 

@@ -98,6 +98,16 @@ export function ImportDialog<
     mutationFn: (file: File) => upload(file),
     onSuccess: (data) => {
       setPending({ importId: data.id, upload: data });
+      
+      // Initialize mapping with suggested mappings if available
+      if (data.suggestedMappings && data.suggestedMappings.length > 0) {
+        const initialMapping: FieldMapping = {};
+        data.suggestedMappings.forEach(({ sourceColumn, targetField }) => {
+          initialMapping[targetField] = sourceColumn;
+        });
+        setMapping(initialMapping);
+      }
+      
       setStep('map');
     },
   });
@@ -253,17 +263,17 @@ export function ImportDialog<
       <div className="rounded-lg border border-dashed border-border bg-muted p-6 text-center">
         <UploadCloud className="mx-auto h-10 w-10 text-blue-500" />
         <p className="mt-4 text-sm text-muted-foreground">
-          Upload the CSV file exported from Odoo. Only the first sheet will be
+          Upload a CSV or Excel (XLSX) file exported from Odoo. Only the first sheet will be
           processed.
         </p>
         <label className="mt-6 inline-flex cursor-pointer items-center justify-center gap-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">
           <input
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={handleFileChange}
             className="hidden"
           />
-          Choose CSV File
+          Choose File
         </label>
         {selectedFile && (
           <p className="mt-3 text-sm text-muted-foreground">{selectedFile.name}</p>
@@ -307,10 +317,10 @@ export function ImportDialog<
 
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
           <h3 className="text-lg font-semibold text-foreground">
-            Map CSV Columns
+            Map Columns
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Map each {entityLabel.toLowerCase()} field to a column from your CSV.
+            Map each {entityLabel.toLowerCase()} field to a column from your file.
             Required fields must be mapped before continuing.
           </p>
 
@@ -323,7 +333,7 @@ export function ImportDialog<
                     Description
                   </th>
                   <th className="px-4 py-2 text-left font-semibold">
-                    CSV Column
+                    File Column
                   </th>
                 </tr>
               </thead>

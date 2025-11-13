@@ -153,8 +153,6 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
       'githubUrl',
       'portfolioUrl',
       'resume',
-      'driveFolderId',
-      'driveFolderUrl',
     ];
 
     optionalStringFields.forEach((field) => {
@@ -164,6 +162,21 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
         dto[field] = trimToUndefined(value);
       }
     });
+
+    // Handle driveFolderId and driveFolderUrl separately to allow clearing them
+    // Empty strings should be sent as empty strings (not undefined) so backend can clear the field
+    if ('driveFolderId' in dto) {
+      const value = dto.driveFolderId;
+      if (value !== undefined) {
+        dto.driveFolderId = typeof value === 'string' && value.trim().length === 0 ? '' : value;
+      }
+    }
+    if ('driveFolderUrl' in dto) {
+      const value = dto.driveFolderUrl;
+      if (value !== undefined) {
+        dto.driveFolderUrl = typeof value === 'string' && value.trim().length === 0 ? '' : value;
+      }
+    }
 
     if (dto.availableFrom && dto.availableFrom.length === 0) {
       dto.availableFrom = undefined;
