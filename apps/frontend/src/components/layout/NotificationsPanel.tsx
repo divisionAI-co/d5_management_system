@@ -138,10 +138,6 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
           ) : notifications && notifications.length > 0 ? (
             <ul className="divide-y divide-border">
               {notifications.map((notification) => {
-                const isMarkedAsRead =
-                  notification.isRead ||
-                  markAsReadMutation.isPending && markAsReadMutation.variables === notification.id;
-
                 return (
                   <li
                     key={notification.id}

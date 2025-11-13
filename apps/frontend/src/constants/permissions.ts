@@ -32,6 +32,9 @@ export const ROLE_PERMISSIONS = {
   DOCUMENTS: ['ADMIN', 'HR'],
   AI_ACTIONS: ['ADMIN'],
   REMOTE_WORK: ALL_ROLES,
+  APPEARANCE_SETTINGS: ['ADMIN'],
+  ACTIVITY_TYPES: ['ADMIN'],
+  TEMPLATES: ['ADMIN'],
 } satisfies Record<string, UserRole[]>;
 
 

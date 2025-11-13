@@ -5,7 +5,7 @@ import { EodReportsList } from '@/components/hr/eod/EodReportsList';
 import { EodReportForm } from '@/components/hr/eod/EodReportForm';
 import { EodImportDialog } from '@/components/hr/eod/EodImportDialog';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/types/enums';
 import type { EodReport } from '@/types/hr';
 
 export default function EodReportsPage() {

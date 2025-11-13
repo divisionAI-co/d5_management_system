@@ -10,6 +10,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      external: ['@prisma/client', '.prisma/client'],
+    },
+  },
+  optimizeDeps: {
+    exclude: ['@prisma/client', '.prisma/client'],
+  },
   server: {
     port: 5173,
     proxy: {

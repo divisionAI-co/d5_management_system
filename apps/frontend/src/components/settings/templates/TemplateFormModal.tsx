@@ -76,8 +76,8 @@ const INPUT_DENSE_CLASS =
 const TEXTAREA_MONO_CLASS =
   'w-full rounded-lg border border-border bg-muted/20 px-3 py-2 font-mono text-xs leading-5 text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
 
-const TOGGLE_BUTTON_BASE =
-  'rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+// const TOGGLE_BUTTON_BASE =
+//   'rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
 
 const DATA_CONTEXT_HELP: Record<
   TemplateType,

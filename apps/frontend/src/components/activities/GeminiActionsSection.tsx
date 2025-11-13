@@ -17,7 +17,6 @@ import { useToast } from '@/components/ui/use-toast';
 import type {
   AiActionAttachment,
   AiActionExecution,
-  AiActionField,
   AiActionSummary,
   AiEntityType,
   AiFieldDefinition,
@@ -371,7 +370,7 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
   );
 }
 
-export function GeminiActionsSection({ entityId, entityType, onDismiss }: GeminiActionsSectionProps) {
+export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSectionProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const aiEntityType = useMemo(() => toAiEntityType(entityType), [entityType]);
@@ -387,10 +386,10 @@ export function GeminiActionsSection({ entityId, entityType, onDismiss }: Gemini
     queryFn: () => aiActionsApi.listAttachments({ entityType: aiEntityType, entityId }),
   });
 
-  const executionsQuery = useQuery({
-    queryKey: ['ai-actions', 'executions', aiEntityType, entityId],
-    queryFn: () => aiActionsApi.listExecutions({ entityType: aiEntityType, entityId, limit: 10 }),
-  });
+  // const executionsQuery = useQuery({
+  //   queryKey: ['ai-actions', 'executions', aiEntityType, entityId],
+  //   queryFn: () => aiActionsApi.listExecutions({ entityType: aiEntityType, entityId, limit: 10 }),
+  // });
 
   const availableActionsQuery = useQuery({
     queryKey: ['ai-actions', 'available', aiEntityType],
@@ -518,7 +517,6 @@ export function GeminiActionsSection({ entityId, entityType, onDismiss }: Gemini
   });
 
   const attachments = attachmentsQuery.data ?? [];
-  const executions = executionsQuery.data ?? [];
 
   const availableActions = useMemo(() => {
     const alreadyAttachedIds = new Set(attachments.map((attachment) => attachment.actionId));

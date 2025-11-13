@@ -5,7 +5,7 @@ import type {
   ExecuteCandidateImportPayload,
   UploadCandidatesResult,
 } from '@/types/imports';
-import { CandidateStage } from '@prisma/client';
+import { CandidateStage } from '@/types/recruitment';
 
 interface CandidateImportDialogProps {
   open: boolean;

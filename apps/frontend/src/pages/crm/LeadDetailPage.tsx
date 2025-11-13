@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { leadsApi } from '@/lib/api/crm/leads';
-import type { Lead } from '@/types/crm';
+// import type { Lead } from '@/types/crm';
 import {
   Activity,
   ArrowLeft,
@@ -440,3 +440,9 @@ export default function LeadDetailPage() {
     </div>
   );
 }
+
+
+
+
+
+

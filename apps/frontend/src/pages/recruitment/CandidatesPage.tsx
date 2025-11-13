@@ -16,7 +16,7 @@ import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandida
 import { CandidateConvertToEmployeeModal } from '@/components/recruitment/CandidateConvertToEmployeeModal';
 import { CandidateImportDialog } from '@/components/recruitment/CandidateImportDialog';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/types/enums';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface LocalFilters {

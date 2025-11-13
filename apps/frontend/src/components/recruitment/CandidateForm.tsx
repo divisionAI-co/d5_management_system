@@ -183,7 +183,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
   const formStage = watch('stage') as CandidateStage | undefined;
   const skillsValue = watch('skills');
   const driveFolderIdValue = watch('driveFolderId') as string | undefined;
-  const driveFolderUrlValue = watch('driveFolderUrl');
+  // const driveFolderUrlValue = watch('driveFolderUrl');
   const resolvedDriveFolderId = driveFolderIdValue && driveFolderIdValue.trim().length > 0
     ? driveFolderIdValue.trim()
     : candidate?.driveFolderId ?? undefined;

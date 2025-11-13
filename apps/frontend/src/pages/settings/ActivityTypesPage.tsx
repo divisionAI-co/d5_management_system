@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Palette, Pencil, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
 
 import { activitiesApi } from '@/lib/api/activities';
-import type { ActivityType, ActivityTypePayload } from '@/types/activities';
+import type { ActivityType, ActivityTypePayload, ActivityTypeUpdatePayload } from '@/types/activities';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 type FormMode = 'create' | 'edit';
@@ -46,7 +46,7 @@ export default function ActivityTypesPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: ActivityTypePayload }) =>
+    mutationFn: ({ id, payload }: { id: string; payload: ActivityTypePayload | ActivityTypeUpdatePayload }) =>
       activitiesApi.updateType(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activity-types'] });
@@ -136,7 +136,11 @@ export default function ActivityTypesPage() {
   const toggleActive = (activityType: ActivityType) => {
     updateMutation.mutate({
       id: activityType.id,
-      payload: { isActive: !activityType.isActive },
+      payload: { 
+        name: activityType.name,
+        key: activityType.key,
+        isActive: !activityType.isActive 
+      } as ActivityTypePayload,
     });
   };
 

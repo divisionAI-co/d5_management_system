@@ -6,7 +6,7 @@ import {
   Plus,
   RefreshCw,
   CalendarIcon,
-  ArrowUpRight,
+  // ArrowUpRight,
   UploadCloud,
 } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
@@ -17,7 +17,7 @@ import { InvoiceSendDialog } from '@/components/invoices/InvoiceSendDialog';
 import { InvoiceMarkPaidDialog } from '@/components/invoices/InvoiceMarkPaidDialog';
 import { InvoiceImportDialog } from '@/components/invoices/InvoiceImportDialog';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/types/enums';
 import type {
   InvoiceDetail,
   InvoiceFilters,

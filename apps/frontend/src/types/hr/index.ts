@@ -252,9 +252,12 @@ export interface CreateEodReportDto {
   summary: string;
   tasks: EodReportTask[];
   hoursWorked?: number;
+  submit?: boolean;
 }
 
-export interface UpdateEodReportDto extends Partial<CreateEodReportDto> {}
+export interface UpdateEodReportDto extends Partial<CreateEodReportDto> {
+  submit?: boolean;
+}
 
 // National Holiday
 export interface NationalHoliday {

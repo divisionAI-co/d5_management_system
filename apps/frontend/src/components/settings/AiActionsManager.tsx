@@ -809,13 +809,13 @@ export function AiActionsManager() {
                                   !Array.isArray(collection.metadata) &&
                                   collection.metadata.filters &&
                                   typeof collection.metadata.filters === 'object' &&
-                                  !Array.isArray(collection.metadata.filters) && (
+                                  !Array.isArray(collection.metadata.filters) ? (
                                     <span className="rounded-full bg-muted px-2 py-0.5">
                                       Filters:{' '}
                                       {Object.keys(collection.metadata.filters as Record<string, unknown>).join(', ') ||
                                         'None'}
                                     </span>
-                                  )}
+                                  ) : null}
                               </div>
                             </div>
                             <div className="flex items-center gap-1">
@@ -1116,13 +1116,13 @@ function CollectionEditorModal({
         );
       }
       case 'number': {
-        const value = typeof currentValue === 'number' ? currentValue : currentValue ?? '';
+        const value = typeof currentValue === 'number' ? currentValue : (currentValue as string) ?? '';
         return (
           <div key={filter.key} className="space-y-1">
             <label className="block text-xs font-semibold uppercase text-muted-foreground">{filter.label}</label>
             <input
               type="number"
-              value={value}
+              value={value as string | number}
               onChange={(event) => {
                 const raw = event.target.value;
                 updateFilterValue(filter.key, raw === '' ? undefined : Number(raw));

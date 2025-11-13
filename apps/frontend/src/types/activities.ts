@@ -86,15 +86,15 @@ export interface CreateActivityPayload {
   };
 }
 
-export interface UpdateActivityPayload extends Partial<CreateActivityPayload> {
+export interface UpdateActivityPayload extends Partial<Omit<CreateActivityPayload, 'targets'>> {
   targets?: {
-    customerId?: string | null;
-    leadId?: string | null;
-    opportunityId?: string | null;
-    candidateId?: string | null;
-    employeeId?: string | null;
-    contactId?: string | null;
-    taskId?: string | null;
+    customerId?: string;
+    leadId?: string;
+    opportunityId?: string;
+    candidateId?: string;
+    employeeId?: string;
+    contactId?: string;
+    taskId?: string;
   };
   isPinned?: boolean;
   isCompleted?: boolean;

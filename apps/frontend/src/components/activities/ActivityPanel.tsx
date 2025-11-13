@@ -105,7 +105,7 @@ function ActivityItem({
               )}
               style={getTypeStyles(activity)}
             >
-              {activity.typeLabel ?? activity.activityType?.name ?? activity.type}
+              {activity.typeLabel ?? activity.activityType?.name ?? 'Activity'}
             </span>
             {activity.isPinned && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
@@ -263,12 +263,13 @@ export function ActivityPanel({
 
   const filter = useMemo(() => buildFilter(entityType, entityId), [entityId, entityType]);
 
-  const activitiesQuery = useInfiniteQuery({
+  const activitiesQuery = useInfiniteQuery<import('@/types/activities').ActivityListResponse, Error>({
     queryKey: ['activities', entityType, entityId],
+    initialPageParam: 1,
     queryFn: ({ pageParam = 1 }) =>
       activitiesApi.list({
         ...filter,
-        page: pageParam,
+        page: pageParam as number,
         pageSize: 10,
         sortBy: 'createdAt',
         sortOrder: 'desc',
@@ -329,7 +330,7 @@ export function ActivityPanel({
     activityTypesQuery.data?.filter((type) => type.isActive || type.isSystem) ?? [];
 
   const activities =
-    activitiesQuery.data?.pages.flatMap((page) => page.data as Activity[]) ?? [];
+    activitiesQuery.data?.pages.flatMap((page: import('@/types/activities').ActivityListResponse) => page.data as Activity[]) ?? [];
 
   const isLoading =
     activitiesQuery.isLoading ||

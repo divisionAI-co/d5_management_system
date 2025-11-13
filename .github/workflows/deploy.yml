@@ -1,0 +1,68 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Test SSH connection
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT || 22 }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "echo 'SSH connection successful'"
+      
+      - name: Deploy application
+        env:
+          DEPLOY_NON_INTERACTIVE: 'true'
+          DEPLOY_DOMAIN: ${{ secrets.DEPLOY_DOMAIN }}
+          DEPLOY_EMAIL: ${{ secrets.DEPLOY_EMAIL }}
+          DEPLOY_DB_PASSWORD: ${{ secrets.DEPLOY_DB_PASSWORD }}
+          DEPLOY_JWT_SECRET: ${{ secrets.DEPLOY_JWT_SECRET }}
+          DEPLOY_JWT_REFRESH_SECRET: ${{ secrets.DEPLOY_JWT_REFRESH_SECRET }}
+          NGINX_PORT: ${{ secrets.NGINX_PORT || '8080' }}
+        run: |
+          chmod +x deploy.sh
+          ./deploy.sh \
+            --remote ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            --key ~/.ssh/deploy_key \
+            --port ${{ secrets.SSH_PORT || 22 }} \
+            --allow-root
+      
+      - name: Deployment status
+        if: success()
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "Application should be available at:"
+          if [ -n "${{ secrets.DEPLOY_DOMAIN }}" ]; then
+            echo "  https://${{ secrets.DEPLOY_DOMAIN }}"
+          else
+            echo "  http://${{ secrets.SSH_HOST }}:${{ secrets.NGINX_PORT || '8080' }}"
+          fi
+      
+      - name: Deployment failed
+        if: failure()
+        run: |
+          echo "❌ Deployment failed. Check the logs above for details."
+

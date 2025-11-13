@@ -182,7 +182,8 @@ export function CandidateConvertToEmployeeModal({
   };
 
   const managerOptions = useMemo(() => {
-    return (employeesQuery.data ?? []).filter((employee) => employee.id !== candidate.employee?.id);
+    const employees = employeesQuery.data?.data ?? [];
+    return employees.filter((employee) => employee.id !== candidate.employee?.id);
   }, [employeesQuery.data, candidate.employee?.id]);
 
   const isSubmitting = convertMutation.isPending;

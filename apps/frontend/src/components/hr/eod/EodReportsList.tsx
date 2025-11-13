@@ -5,7 +5,7 @@ import type { EodReport } from '@/types/hr';
 import { addDays, endOfDay, format } from 'date-fns';
 import { ChevronDown, ChevronRight, ClipboardList, Edit3, Plus, UploadCloud } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@/types/enums';
 
 interface EodReportsListProps {
   onCreateNew?: () => void;
