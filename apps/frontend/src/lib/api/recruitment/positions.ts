@@ -1,6 +1,7 @@
 import apiClient from '@/lib/api/client';
 import type {
   ClosePositionDto,
+  CreatePositionDto,
   OpenPosition,
   OpenPositionSummary,
   PaginatedResponse,
@@ -22,6 +23,14 @@ export const positionsApi = {
   async getById(id: string) {
     const { data } = await apiClient.get<OpenPosition>(
       `/recruitment/positions/${id}`,
+    );
+    return data;
+  },
+
+  async create(payload: CreatePositionDto) {
+    const { data } = await apiClient.post<OpenPosition>(
+      '/recruitment/positions',
+      payload,
     );
     return data;
   },

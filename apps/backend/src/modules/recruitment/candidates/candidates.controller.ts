@@ -46,6 +46,15 @@ export class CandidatesController {
     return this.candidatesService.findAll(filters);
   }
 
+  @Get('recruiters')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'List recruiters available for candidate assignment',
+  })
+  listRecruiters() {
+    return this.candidatesService.listRecruiters();
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
   @ApiOperation({ summary: 'Get candidate details' })
@@ -80,6 +89,15 @@ export class CandidatesController {
     @Body() linkDto: LinkCandidatePositionDto,
   ) {
     return this.candidatesService.linkToPosition(id, linkDto);
+  }
+
+  @Delete(':id/positions/:positionId')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Remove a position link from a candidate',
+  })
+  unlinkPosition(@Param('id') id: string, @Param('positionId') positionId: string) {
+    return this.candidatesService.unlinkPosition(id, positionId);
   }
 
   @Post(':id/convert-to-employee')

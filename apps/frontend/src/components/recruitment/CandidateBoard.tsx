@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Archive, ChevronDown, Trash2, UserRound } from 'lucide-react';
+import { Archive, ChevronDown, Trash2, UserRound, Mail } from 'lucide-react';
 import {
   DragDropContext,
   Droppable,
@@ -65,7 +65,7 @@ interface CandidateBoardProps {
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
   onDelete?: (candidate: Candidate) => void;
-  onToggleActive?: (candidate: Candidate) => void;
+  onUnlinkCandidate?: (candidate: Candidate) => void;
   onImportCandidates?: () => void;
   canDelete?: boolean;
   // Per-column pagination
@@ -88,7 +88,7 @@ export function CandidateBoard({
   onConvertToEmployee,
   onArchive,
   onDelete,
-  onToggleActive,
+  onUnlinkCandidate,
   onImportCandidates: _onImportCandidates,
   canDelete = false,
   columnLimits,
@@ -234,11 +234,11 @@ export function CandidateBoard({
                                   onMoveStage={onMoveStage}
                                   onLinkPosition={onLinkPosition}
                                   onConvertToEmployee={onConvertToEmployee}
-                                onArchive={onArchive}
-                                onDelete={onDelete}
-                                onToggleActive={onToggleActive}
-                                canDelete={canDelete}
-                              />
+                                  onArchive={onArchive}
+                                  onDelete={onDelete}
+                                  onUnlinkCandidate={onUnlinkCandidate}
+                                  canDelete={canDelete}
+                                />
                               </div>
                             )}
                           </Draggable>
@@ -283,7 +283,7 @@ interface CandidateCardProps {
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
   onDelete?: (candidate: Candidate) => void;
-  onToggleActive?: (candidate: Candidate) => void;
+  onUnlinkCandidate?: (candidate: Candidate) => void;
   canDelete?: boolean;
 }
 
@@ -296,7 +296,7 @@ function CandidateCard({
   onConvertToEmployee,
   onArchive,
   onDelete,
-  onToggleActive,
+  onUnlinkCandidate,
   canDelete = false,
 }: CandidateCardProps) {
   const nextStages = STAGE_ORDER.filter((stage) => stage !== candidate.stage);
@@ -348,11 +348,22 @@ function CandidateCard({
       {!isExpanded && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-2">
-            <UserRound className="h-3.5 w-3.5" />
+            <Mail className="h-3.5 w-3.5" />
             <a href={`mailto:${candidate.email}`} className="hover:underline">
               {candidate.email}
             </a>
           </span>
+          {candidate.recruiter ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 font-semibold text-blue-700">
+              <UserRound className="h-3 w-3" />
+              {candidate.recruiter.firstName}
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 px-2 py-0.5 font-medium text-muted-foreground">
+              <UserRound className="h-3 w-3" />
+              Unassigned
+            </span>
+          )}
           {previewSkills.map((skill) => (
             <span
               key={skill}
@@ -384,10 +395,30 @@ function CandidateCard({
 
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <UserRound className="h-4 w-4 text-muted-foreground" />
+              <Mail className="h-4 w-4 text-muted-foreground" />
               <a href={`mailto:${candidate.email}`} className="truncate hover:underline">
                 {candidate.email}
               </a>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Recruiter
+              </span>
+              {candidate.recruiter ? (
+                <div className="flex flex-col text-sm text-foreground">
+                  <span className="font-medium">
+                    {candidate.recruiter.firstName} {candidate.recruiter.lastName}
+                  </span>
+                  <a
+                    href={`mailto:${candidate.recruiter.email}`}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    {candidate.recruiter.email}
+                  </a>
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">Not assigned</span>
+              )}
             </div>
             {candidate.phone && (
               <div className="flex items-center gap-2">
@@ -482,20 +513,25 @@ function CandidateCard({
               </select>
             )}
 
-            {onToggleActive && (
+            {onUnlinkCandidate && candidate.positions && candidate.positions.length > 0 && (
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onToggleActive(candidate);
+                  onUnlinkCandidate(candidate);
                 }}
-                className={`w-full rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                  candidate.isActive
-                    ? 'border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100'
-                    : 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100'
-                }`}
+                className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-100"
               >
-                {candidate.isActive ? 'Mark Inactive' : 'Mark Active'}
+                Unlink from Positions
+              </button>
+            )}
+            {onUnlinkCandidate && (!candidate.positions || candidate.positions.length === 0) && (
+              <button
+                type="button"
+                disabled
+                className="w-full cursor-not-allowed rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm font-semibold text-muted-foreground"
+              >
+                No Linked Positions
               </button>
             )}
 

@@ -10,19 +10,35 @@ import {
   DraggableStateSnapshot,
 } from '@hello-pangea/dnd';
 import type { Opportunity } from '@/types/crm';
-import { ChevronDown, Edit, Loader2, Lock, Trash2, Trophy } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ChevronDown,
+  Edit,
+  Loader2,
+  Lock,
+  Plus,
+  Trash2,
+  Trophy,
+  X,
+} from 'lucide-react';
 
 interface OpportunitiesBoardProps {
   stages: string[];
   opportunities: Opportunity[];
   isLoading: boolean;
-  onCreate: () => void;
   onEdit: (opportunity: Opportunity) => void;
   onClose: (opportunity: Opportunity) => void;
   onDelete: (opportunity: Opportunity) => void;
   onMove: (opportunity: Opportunity, newStage: string) => void;
   onOpportunityMove?: (result: DropResult, opportunity: Opportunity) => void;
   onView?: (opportunity: Opportunity) => void;
+  onCreatePosition?: (opportunity: Opportunity) => void;
+  onAddStage?: (stage: string) => void;
+  onRemoveStage?: (stage: string) => void;
+  onMoveStageLeft?: (stage: string) => void;
+  onMoveStageRight?: (stage: string) => void;
   // Per-column pagination
   columnLimits?: Record<string, number>;
   columnTotals?: Record<string, number>;
@@ -44,13 +60,17 @@ export function OpportunitiesBoard({
   stages,
   opportunities,
   isLoading,
-  onCreate,
   onEdit,
   onClose,
   onDelete,
   onMove,
   onOpportunityMove,
   onView,
+  onCreatePosition,
+  onAddStage,
+  onRemoveStage,
+  onMoveStageLeft,
+  onMoveStageRight,
   columnLimits,
   columnTotals,
   onLoadMore,
@@ -70,6 +90,8 @@ export function OpportunitiesBoard({
   });
 
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
+  const [isAddingStage, setIsAddingStage] = useState(false);
+  const [newStageName, setNewStageName] = useState('');
 
   const handleDragEnd = (result: DropResult) => {
     const { destination, draggableId } = result;
@@ -100,19 +122,65 @@ export function OpportunitiesBoard({
     setExpandedCards((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const handleAddStageSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const value = newStageName.trim();
+    if (!value) {
+      return;
+    }
+    onAddStage?.(value);
+    setNewStageName('');
+    setIsAddingStage(false);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Board</h2>
           <p className="text-xs text-muted-foreground">Drag opportunities to update their pipeline stage.</p>
         </div>
-        <button
-          onClick={onCreate}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          Create Opportunity
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {onAddStage &&
+            (isAddingStage ? (
+              <form
+                onSubmit={handleAddStageSubmit}
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2"
+              >
+                <input
+                  autoFocus
+                  value={newStageName}
+                  onChange={(event) => setNewStageName(event.target.value)}
+                  placeholder="New stage name"
+                  className="w-40 rounded-md border border-border px-2 py-1 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-md bg-emerald-600 p-1 text-white shadow-sm hover:bg-emerald-700"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingStage(false);
+                    setNewStageName('');
+                  }}
+                  className="inline-flex items-center rounded-md border border-border p-1 text-muted-foreground hover:bg-muted"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => setIsAddingStage(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted"
+              >
+                <Plus className="h-4 w-4" />
+                Add Stage
+              </button>
+            ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -126,13 +194,17 @@ export function OpportunitiesBoard({
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="overflow-x-auto pb-4">
             <div className="inline-flex min-w-full gap-4">
-              {stages.map((stage) => {
+              {stages.map((stage, index) => {
                 const key = stageKey(stage);
                 const columnItems = itemsByStage[key] ?? [];
                 const total = columnTotals?.[key] ?? columnItems.length;
                 const limit = columnLimits?.[key] ?? columnItems.length;
                 const hasMore = total > limit;
                 const isColumnLoading = isLoadingMore?.[key] ?? false;
+                const isFirst = index === 0;
+                const isLast = index === stages.length - 1;
+                const canRemoveStage =
+                  !total && typeof onRemoveStage === 'function';
                 
                 return (
                   <Droppable droppableId={key} key={key}>
@@ -154,6 +226,59 @@ export function OpportunitiesBoard({
                               {total > columnItems.length && ` / ${total}`}
                             </p>
                           </div>
+                          {(onMoveStageLeft || onMoveStageRight || onRemoveStage) && (
+                            <div className="flex items-center gap-1">
+                              {onMoveStageLeft && !isFirst && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onMoveStageLeft(stage);
+                                  }}
+                                  className="rounded-md border border-border bg-card p-1 text-muted-foreground transition hover:bg-muted"
+                                  title="Move column left"
+                                >
+                                  <ArrowLeft className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {onMoveStageRight && !isLast && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    onMoveStageRight(stage);
+                                  }}
+                                  className="rounded-md border border-border bg-card p-1 text-muted-foreground transition hover:bg-muted"
+                                  title="Move column right"
+                                >
+                                  <ArrowRight className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {onRemoveStage && (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    if (canRemoveStage) {
+                                      onRemoveStage(stage);
+                                    }
+                                  }}
+                                  disabled={!canRemoveStage}
+                                  className="rounded-md border border-border bg-card p-1 text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                                  title={
+                                    canRemoveStage
+                                      ? 'Remove stage'
+                                      : 'Move or close all opportunities before removing'
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-3">
                           {columnItems.length === 0 ? (
@@ -174,6 +299,10 @@ export function OpportunitiesBoard({
                               const ownerLabel = opportunity.assignedTo
                                 ? `${opportunity.assignedTo.firstName} ${opportunity.assignedTo.lastName}`
                                 : 'Unassigned';
+                              const canCreatePosition =
+                                (opportunity.type === 'STAFF_AUGMENTATION' ||
+                                  opportunity.type === 'BOTH') &&
+                                !opportunity.openPosition;
 
                               return (
                                 <div
@@ -275,6 +404,18 @@ export function OpportunitiesBoard({
                                           <Trash2 className="h-3.5 w-3.5" />
                                           Delete
                                         </button>
+                                        {canCreatePosition && onCreatePosition ? (
+                                          <button
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              onCreatePosition(opportunity);
+                                            }}
+                                            className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                                          >
+                                            <Plus className="h-3.5 w-3.5" />
+                                            Job Position
+                                          </button>
+                                        ) : null}
                                       </div>
 
                                       {opportunity.isClosed ? (

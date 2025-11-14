@@ -126,9 +126,9 @@ export function MarkInactiveModal({ candidate, onClose, onSuccess }: MarkInactiv
       <div className="w-full max-w-3xl rounded-xl bg-card shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Mark Candidate Inactive</h2>
+            <h2 className="text-lg font-semibold text-foreground">Unlink Candidate from Positions</h2>
             <p className="text-sm text-muted-foreground">
-              Mark {candidate.firstName} {candidate.lastName} as inactive
+              Remove {candidate.firstName} {candidate.lastName} from all linked positions
             </p>
           </div>
           <button
@@ -145,7 +145,7 @@ export function MarkInactiveModal({ candidate, onClose, onSuccess }: MarkInactiv
             {/* Reason Selection */}
             <div>
               <label className="mb-2 block text-sm font-medium text-muted-foreground">
-                Reason for marking inactive <span className="text-red-500">*</span>
+                Reason for unlinking <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {INACTIVE_REASONS.map((r) => (
@@ -339,12 +339,12 @@ export function MarkInactiveModal({ candidate, onClose, onSuccess }: MarkInactiv
               {markInactiveMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Marking Inactive...
+                  Unlinking...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Mark Inactive
+                  Unlink Positions
                 </>
               )}
             </button>

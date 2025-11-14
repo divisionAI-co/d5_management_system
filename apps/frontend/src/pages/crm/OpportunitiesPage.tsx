@@ -19,7 +19,10 @@ import { OpportunitiesTable } from '@/components/crm/opportunities/Opportunities
 import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm';
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
 import { OpportunitiesBoard } from '@/components/crm/opportunities/OpportunitiesBoard';
+import { CreatePositionModal } from '@/components/recruitment/CreatePositionModal';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useOpportunityStagesStore } from '@/lib/stores/opportunity-stages-store';
+import { OPPORTUNITY_STAGES } from '@/constants/opportunities';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const TYPE_FILTERS: Array<{ label: string; value?: CustomerType }> = [
@@ -29,17 +32,6 @@ const TYPE_FILTERS: Array<{ label: string; value?: CustomerType }> = [
   { label: 'Hybrid', value: 'BOTH' },
 ];
 
-const STAGE_OPTIONS = [
-  'All stages',
-  'Prospecting',
-  'Discovery',
-  'Qualification',
-  'Proposal',
-  'Negotiation',
-  'Contract',
-  'Closed Won',
-  'Closed Lost',
-];
 
 const STATUS_FILTER_OPTIONS: Array<{ label: string; value: 'all' | 'open' | 'closed' }> = [
   { label: 'All statuses', value: 'all' },
@@ -62,20 +54,14 @@ const SORT_OPTIONS: Array<{ label: string; value: NonNullable<OpportunityFilters
 ];
 
 const PAGE_SIZE = 10;
-const PIPELINE_STAGE_ORDER = [
-  'Prospecting',
-  'Discovery',
-  'Qualification',
-  'Proposal',
-  'Negotiation',
-  'Contract',
-  'Closed Won',
-  'Closed Lost',
-] as const;
-
 export default function OpportunitiesPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const stages = useOpportunityStagesStore((state) => state.stages);
+  const addStage = useOpportunityStagesStore((state) => state.addStage);
+  const registerStages = useOpportunityStagesStore((state) => state.registerStages);
+  const removeStage = useOpportunityStagesStore((state) => state.removeStage);
+  const moveStage = useOpportunityStagesStore((state) => state.moveStage);
 
   const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
   const [searchTerm, setSearchTerm] = useState('');
@@ -94,6 +80,7 @@ export default function OpportunitiesPage() {
   const [closingOpportunity, setClosingOpportunity] = useState<Opportunity | undefined>(undefined);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [positionModalOpportunity, setPositionModalOpportunity] = useState<Opportunity | null>(null);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
 
@@ -118,14 +105,14 @@ export default function OpportunitiesPage() {
   // Per-column pagination for board view
   const [columnLimits, setColumnLimits] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
-    PIPELINE_STAGE_ORDER.forEach((stage) => {
+    stages.forEach((stage) => {
       initial[stage] = 10; // Initial limit per column
     });
     return initial;
   });
   const [isLoadingMore, setIsLoadingMore] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    PIPELINE_STAGE_ORDER.forEach((stage) => {
+    stages.forEach((stage) => {
       initial[stage] = false;
     });
     return initial;
@@ -249,16 +236,74 @@ export default function OpportunitiesPage() {
   const users = (usersQuery.data?.data ?? []) as UserSummary[];
   const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
   const opportunities = opportunitiesQuery.data?.data ?? [];
+  useEffect(() => {
+    if (stages.length === 0) {
+      registerStages([...OPPORTUNITY_STAGES]);
+    }
+  }, [stages.length, registerStages]);
+
+  useEffect(() => {
+    if (opportunities.length > 0) {
+      registerStages(
+        opportunities
+          .map((opportunity) => opportunity.stage)
+          .filter((stage): stage is string => Boolean(stage)),
+      );
+    }
+  }, [opportunities, registerStages]);
+
+  useEffect(() => {
+    setColumnLimits((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      stages.forEach((stage) => {
+        if (next[stage] === undefined) {
+          next[stage] = 10;
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((stage) => {
+        if (!stages.includes(stage)) {
+          delete next[stage];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    setIsLoadingMore((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      stages.forEach((stage) => {
+        if (next[stage] === undefined) {
+          next[stage] = false;
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((stage) => {
+        if (!stages.includes(stage)) {
+          delete next[stage];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [stages]);
+
+  useEffect(() => {
+    if (stageFilter && !stages.includes(stageFilter)) {
+      setStageFilter(undefined);
+    }
+  }, [stageFilter, stages]);
   const meta = opportunitiesQuery.data?.meta;
 
   // Calculate column totals and visible opportunities for board view
   const columnTotals = useMemo(() => {
     const totals: Record<string, number> = {};
-    PIPELINE_STAGE_ORDER.forEach((stage) => {
+    stages.forEach((stage) => {
       totals[stage] = opportunities.filter((o) => o.stage === stage).length;
     });
     return totals;
-  }, [opportunities]);
+  }, [opportunities, stages]);
 
   const visibleOpportunities = useMemo(() => {
     if (viewMode === 'table') {
@@ -298,13 +343,22 @@ export default function OpportunitiesPage() {
     if (viewMode === 'board') {
       setColumnLimits(() => {
         const initial: Record<string, number> = {};
-        PIPELINE_STAGE_ORDER.forEach((stage) => {
+        stages.forEach((stage) => {
           initial[stage] = 10;
         });
         return initial;
       });
     }
-  }, [searchTerm, typeFilter, stageFilter, statusFilter, resultFilter, assignedFilter, viewMode]);
+  }, [
+    searchTerm,
+    typeFilter,
+    stageFilter,
+    statusFilter,
+    resultFilter,
+    assignedFilter,
+    viewMode,
+    stages,
+  ]);
 
   const handleApplySearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -352,6 +406,10 @@ export default function OpportunitiesPage() {
     ) {
       deleteMutation.mutate(opportunity.id);
     }
+  };
+
+  const handleCreatePositionFromOpportunity = (opportunity: Opportunity) => {
+    setPositionModalOpportunity(opportunity);
   };
 
   const handleViewOpportunity = (opportunity: Opportunity) => {
@@ -413,23 +471,30 @@ export default function OpportunitiesPage() {
     };
   }, [handleMove, queryClient, sanitizedFilters]);
 
-  const boardStages = useMemo(() => {
-    const stageSet = new Set<string>(PIPELINE_STAGE_ORDER);
-    opportunities.forEach((opportunity) => {
-      if (opportunity.stage) {
-        stageSet.add(opportunity.stage);
+  const stageFilterOptions = useMemo(() => ['All stages', ...stages], [stages]);
+  const boardStages = stages;
+  const handleRemoveStage = useCallback(
+    (stage: string) => {
+      const hasDeals = opportunities.some(
+        (opportunity) => opportunity.stage === stage,
+      );
+      if (hasDeals) {
+        window.alert(
+          'Please move or close all opportunities in this stage before removing it.',
+        );
+        return;
       }
-    });
+      removeStage(stage);
+    },
+    [opportunities, removeStage],
+  );
 
-    const ordered = PIPELINE_STAGE_ORDER.filter((stage) => stageSet.has(stage));
-    const extras = Array.from(stageSet).filter(
-      (stage) => !PIPELINE_STAGE_ORDER.includes(stage as typeof PIPELINE_STAGE_ORDER[number]),
-    );
-
-    extras.sort((a, b) => a.localeCompare(b));
-
-    return [...ordered, ...extras];
-  }, [opportunities]);
+  const handleReorderStage = useCallback(
+    (stage: string, direction: 'left' | 'right') => {
+      moveStage(stage, direction);
+    },
+    [moveStage],
+  );
 
   return (
     <div className="py-8 space-y-6">
@@ -539,7 +604,7 @@ export default function OpportunitiesPage() {
                   }}
                   className="w-full rounded-lg border border-border px-3 py-2 focus-border-transparent focus:ring-2 focus:ring-blue-500"
                 >
-                  {STAGE_OPTIONS.map((stage) => (
+                  {stageFilterOptions.map((stage) => (
                     <option key={stage} value={stage}>
                       {stage}
                     </option>
@@ -699,24 +764,28 @@ export default function OpportunitiesPage() {
         <OpportunitiesTable
           opportunities={opportunities}
           isLoading={opportunitiesQuery.isLoading || opportunitiesQuery.isFetching}
-          onCreate={handleCreate}
           onEdit={handleEdit}
           onClose={handleCloseOpportunity}
           onDelete={handleDelete}
           onView={handleViewOpportunity}
+          onCreatePosition={handleCreatePositionFromOpportunity}
         />
       ) : (
         <OpportunitiesBoard
           stages={boardStages}
           opportunities={visibleOpportunities}
           isLoading={opportunitiesQuery.isFetching && viewMode === 'board'}
-          onCreate={handleCreate}
           onEdit={handleEdit}
           onClose={handleCloseOpportunity}
           onDelete={handleDelete}
           onMove={handleMove}
           onOpportunityMove={handleOpportunityMoveOptimistic}
           onView={handleViewOpportunity}
+          onCreatePosition={handleCreatePositionFromOpportunity}
+          onAddStage={addStage}
+          onRemoveStage={handleRemoveStage}
+          onMoveStageLeft={(stage) => handleReorderStage(stage, 'left')}
+          onMoveStageRight={(stage) => handleReorderStage(stage, 'right')}
           columnLimits={columnLimits}
           columnTotals={columnTotals}
           onLoadMore={handleLoadMore}
@@ -752,6 +821,23 @@ export default function OpportunitiesPage() {
         customers={customers}
         onClose={() => setImportOpen(false)}
       />
+
+      {positionModalOpportunity ? (
+        <CreatePositionModal
+          defaultOpportunity={{
+            id: positionModalOpportunity.id,
+            title: positionModalOpportunity.title,
+            customerName: positionModalOpportunity.customer?.name ?? undefined,
+          }}
+          onClose={() => setPositionModalOpportunity(null)}
+          onCreated={(position) => {
+            setPositionModalOpportunity(null);
+            setFeedback(`Job position "${position.title}" created from opportunity.`);
+            queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+            queryClient.invalidateQueries({ queryKey: ['positions'] });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

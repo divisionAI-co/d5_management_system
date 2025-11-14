@@ -48,6 +48,13 @@ export const usersApi = {
     return data;
   },
 
+  resendPasswordReset: async (id: string) => {
+    const { data } = await apiClient.post<{ message: string }>(
+      `/users/${id}/resend-password-reset`,
+    );
+    return data;
+  },
+
   getProfile: async () => {
     const { data } = await apiClient.get<UserDetail>('/users/me');
     return data;

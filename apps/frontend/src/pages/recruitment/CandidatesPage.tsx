@@ -7,6 +7,7 @@ import { candidatesApi } from '@/lib/api/recruitment';
 import type {
   Candidate,
   CandidateFilters,
+  CandidateRecruiter,
   CandidateStage,
   ConvertCandidateToEmployeeResponse,
   PaginatedResponse,
@@ -25,8 +26,8 @@ import { FeedbackToast } from '@/components/ui/feedback-toast';
 interface LocalFilters {
   search?: string;
   stage?: CandidateStage | 'ALL';
-  hasOpenPosition?: boolean;
-  isActive?: boolean | 'all'; // 'all' means show both active and inactive
+  hasOpenPosition?: 'linked' | 'unlinked' | 'all';
+  recruiterId?: string;
 }
 
 export default function CandidatesPage() {
@@ -36,8 +37,8 @@ export default function CandidatesPage() {
   const [filters, setFilters] = useState<LocalFilters>({
     search: '',
     stage: 'ALL',
-    hasOpenPosition: false,
-    isActive: true, // Default to showing only active candidates
+    hasOpenPosition: 'linked',
+    recruiterId: undefined,
   });
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
@@ -69,6 +70,13 @@ export default function CandidatesPage() {
   const canImport = user?.role === UserRole.ADMIN || user?.role === UserRole.HR || user?.role === UserRole.RECRUITER;
   const canDelete = user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
 
+  const recruitersQuery = useQuery({
+    queryKey: ['candidate-recruiters'],
+    queryFn: () => candidatesApi.listRecruiters(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const recruiterOptions: CandidateRecruiter[] = recruitersQuery.data ?? [];
+
   const sanitizedFilters = useMemo<CandidateFilters>(() => {
     const payload: CandidateFilters = {
       page: viewMode === 'board' ? 1 : page,
@@ -86,22 +94,22 @@ export default function CandidatesPage() {
       payload.stage = filters.stage;
     }
 
-    if (filters.hasOpenPosition) {
+    if (filters.hasOpenPosition === 'linked') {
       payload.hasOpenPosition = true;
+    } else if (filters.hasOpenPosition === 'unlinked') {
+      payload.hasOpenPosition = false;
     }
 
-    // Handle isActive filter: true = active only, false = inactive only, 'all' = both
-    if (filters.isActive !== undefined && filters.isActive !== 'all') {
-      payload.isActive = filters.isActive === true;
+    if (filters.recruiterId) {
+      payload.recruiterId = filters.recruiterId;
     }
-    // If isActive is 'all', don't set it in payload (backend will show all)
 
     return payload;
   }, [
     filters.search,
     filters.stage,
     filters.hasOpenPosition,
-    filters.isActive,
+    filters.recruiterId,
     page,
     pageSize,
     viewMode,
@@ -120,7 +128,7 @@ export default function CandidatesPage() {
         return initial;
       });
     }
-  }, [filters.search, filters.stage, filters.hasOpenPosition, filters.isActive, viewMode]);
+  }, [filters.search, filters.stage, filters.hasOpenPosition, filters.recruiterId, viewMode]);
 
   // Create a stable queryKey that always reflects filter state
   const queryKey = useMemo(
@@ -129,8 +137,8 @@ export default function CandidatesPage() {
       viewMode,
       filters.search || '',
       filters.stage || 'ALL',
-      filters.hasOpenPosition || false,
-      filters.isActive === true ? 'active' : filters.isActive === false ? 'inactive' : 'all',
+      filters.hasOpenPosition ?? 'linked',
+      filters.recruiterId || 'all',
       viewMode === 'board' ? 1 : page,
       viewMode === 'board' ? 1000 : pageSize,
       'createdAt',
@@ -141,7 +149,7 @@ export default function CandidatesPage() {
       filters.search,
       filters.stage,
       filters.hasOpenPosition,
-      filters.isActive,
+      filters.recruiterId,
       page,
       pageSize,
     ],
@@ -196,17 +204,6 @@ export default function CandidatesPage() {
     },
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      candidatesApi.update(id, { isActive }),
-    onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['candidates'] });
-      setFeedback(
-        `${updated.firstName} ${updated.lastName} marked as ${updated.isActive ? 'active' : 'inactive'}.`,
-      );
-    },
-  });
-
   const handleOpenCreate = () => {
     setEditingCandidate(undefined);
     setIsFormOpen(true);
@@ -249,24 +246,17 @@ export default function CandidatesPage() {
     }
   };
 
-  const handleToggleActive = (candidate: Candidate) => {
-    if (candidate.isActive) {
-      // Show modal for marking inactive
-      setMarkInactiveCandidate(candidate);
-    } else {
-      // Directly mark as active (no modal needed)
-      toggleActiveMutation.mutate({
-        id: candidate.id,
-        isActive: true,
-      });
+  const handleUnlinkCandidate = (candidate: Candidate) => {
+    if (!candidate.positions || candidate.positions.length === 0) {
+      setFeedback(`${candidate.firstName} ${candidate.lastName} is not linked to any positions.`);
+      return;
     }
+    setMarkInactiveCandidate(candidate);
   };
 
   const handleMarkInactiveSuccess = (updated: Candidate) => {
     setMarkInactiveCandidate(null);
-    setFeedback(
-      `${updated.firstName} ${updated.lastName} has been marked as inactive.${updated.isActive === false ? ' Email sent.' : ''}`,
-    );
+    setFeedback(`${updated.firstName} ${updated.lastName} has been unlinked from their positions.`);
   };
 
   const handleConversionSuccess = (result: ConvertCandidateToEmployeeResponse) => {
@@ -429,7 +419,7 @@ export default function CandidatesPage() {
   return (
     <div className="py-8 space-y-6">
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-4 md:items-end">
+        <div className="grid gap-4 md:grid-cols-5 md:items-end">
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Search
@@ -471,48 +461,51 @@ export default function CandidatesPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-2.5">
-            <input
-              id="filter-has-position"
-              type="checkbox"
-              checked={Boolean(filters.hasOpenPosition)}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Recruiter
+            </label>
+            <select
+              value={filters.recruiterId ?? ''}
               onChange={(event) =>
                 setFilters((prev) => ({
                   ...prev,
-                  hasOpenPosition: event.target.checked,
+                  recruiterId: event.target.value || undefined,
                 }))
               }
-              className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
-            />
-            <label
-              htmlFor="filter-has-position"
-              className="flex-1 text-sm font-medium text-muted-foreground"
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              disabled={recruitersQuery.isLoading && !recruitersQuery.data}
             >
-              Linked to open position
-            </label>
+              <option value="">
+                {recruitersQuery.isLoading ? 'Loading recruiters…' : 'All recruiters'}
+              </option>
+              {recruiterOptions.map((recruiter) => (
+                <option key={recruiter.id} value={recruiter.id}>
+                  {recruiter.firstName} {recruiter.lastName}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Status
+              Linked to position
             </label>
             <select
-              value={filters.isActive === true ? 'active' : filters.isActive === false ? 'inactive' : 'all'}
-              onChange={(event) => {
-                const value = event.target.value;
+              value={filters.hasOpenPosition ?? 'linked'}
+              onChange={(event) =>
                 setFilters((prev) => ({
                   ...prev,
-                  isActive: value === 'active' ? true : value === 'inactive' ? false : 'all',
-                }));
-              }}
+                  hasOpenPosition: event.target.value as 'linked' | 'unlinked' | 'all',
+                }))
+              }
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             >
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
-              <option value="all">All Candidates</option>
+              <option value="linked">Linked candidates</option>
+              <option value="unlinked">Not linked</option>
+              <option value="all">All candidates</option>
             </select>
           </div>
-          {/* Actions moved to board header to avoid duplication */}
         </div>
       </div>
 
@@ -606,7 +599,7 @@ export default function CandidatesPage() {
           onConvertToEmployee={handleConvertCandidate}
           onArchive={handleArchiveCandidate}
           onDelete={canDelete ? handleDeleteCandidate : undefined}
-          onToggleActive={handleToggleActive}
+          onUnlinkCandidate={handleUnlinkCandidate}
           canDelete={canDelete}
           columnLimits={columnLimits}
           columnTotals={columnTotals}

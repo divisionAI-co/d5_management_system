@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { CreatePositionDto } from './dto/create-position.dto';
 
 @ApiTags('Recruitment - Positions')
 @ApiBearerAuth()
@@ -32,6 +33,13 @@ export class OpenPositionsController {
   })
   findAll(@Query() filters: FilterPositionsDto) {
     return this.positionsService.findAll(filters);
+  }
+
+  @Post()
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({ summary: 'Create a new job position' })
+  create(@Body() createDto: CreatePositionDto) {
+    return this.positionsService.create(createDto);
   }
 
   @Get(':id')

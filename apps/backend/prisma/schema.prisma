@@ -68,6 +68,7 @@ model User {
   aiActionAttachments   AiActionAttachment[]      @relation("AiActionAttachmentsByUser")
   aiActionExecutions    AiActionExecution[]       @relation("AiActionExecutionsTriggeredBy")
   sessions              UserSession[]
+  recruitedCandidates   Candidate[]               @relation("CandidateRecruiter")
 
   @@map("users")
 }
@@ -475,6 +476,8 @@ model Candidate {
   githubUrl         String?
   portfolioUrl      String?
   driveFolderId     String? // Google Drive folder containing interviews/CV
+  recruiterId       String?
+  recruiter         User?   @relation("CandidateRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
 
   // Recruitment
   stage    CandidateStage @default(VALIDATION)
@@ -509,13 +512,14 @@ model Candidate {
   @@index([email])
   @@index([deletedAt])
   @@index([isActive])
+  @@index([recruiterId])
   @@map("candidates")
 }
 
 model OpenPosition {
   id            String      @id @default(uuid())
-  opportunityId String      @unique
-  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  opportunityId String?     @unique
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
   title        String
   description  String  @db.Text

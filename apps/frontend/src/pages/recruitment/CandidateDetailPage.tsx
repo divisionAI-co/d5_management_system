@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Folder, Link2, MapPin, PenSquare, Pencil, Star } from 'lucide-react';
+import { ArrowLeft, FileText, Folder, Link2, MapPin, PenSquare, Pencil, Star, Trash2, UserRound } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
 import type { CandidateStage, CandidatePositionsResponse } from '@/types/recruitment';
 import {
@@ -51,6 +51,35 @@ export default function CandidateDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       setFeedback(
         `${updated.firstName} ${updated.lastName} moved to ${CANDIDATE_STAGE_LABELS[updated.stage]}.`,
+      );
+    },
+  });
+
+  const unlinkPositionMutation = useMutation({
+    mutationFn: ({
+      candidateId,
+      positionId,
+    }: {
+      candidateId: string;
+      positionId: string;
+      positionTitle?: string;
+    }) => candidatesApi.unlinkPosition(candidateId, positionId),
+    onSuccess: (updated, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['candidate', updated.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['candidate', updated.id, 'positions'],
+      });
+      setFeedback(
+        variables.positionTitle
+          ? `Removed ${updated.firstName} ${updated.lastName} from ${variables.positionTitle}.`
+          : 'Position link removed.',
+      );
+    },
+    onError: (_error, variables) => {
+      setFeedback(
+        variables?.positionTitle
+          ? `Unable to remove link to ${variables.positionTitle}.`
+          : 'Unable to remove link.',
       );
     },
   });
@@ -207,6 +236,32 @@ export default function CandidateDetailPage() {
                     </p>
                     {candidate.phone && <p>{candidate.phone}</p>}
                   </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Recruiter
+                  </p>
+                  {candidate.recruiter ? (
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="rounded-full bg-blue-50 p-2 text-blue-600">
+                        <UserRound className="h-4 w-4" />
+                      </div>
+                      <div className="text-sm">
+                        <p className="font-semibold text-foreground">
+                          {candidate.recruiter.firstName} {candidate.recruiter.lastName}
+                        </p>
+                        <a
+                          href={`mailto:${candidate.recruiter.email}`}
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          {candidate.recruiter.email}
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">No recruiter assigned.</p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -380,7 +435,7 @@ export default function CandidateDetailPage() {
                       </p>
                       <p>Position status: {link.position.status}</p>
                     </div>
-                    <div className="mt-3 flex items-center justify-between">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <button
                         onClick={() =>
                           navigate(
@@ -391,13 +446,34 @@ export default function CandidateDetailPage() {
                       >
                         View position
                       </button>
-                      {link.notes && (
-                        <span className="text-xs text-muted-foreground">
-                          Note: {link.notes.slice(0, 60)}
-                          {link.notes.length > 60 ? '…' : ''}
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          unlinkPositionMutation.mutate({
+                            candidateId: candidate.id,
+                            positionId: link.positionId,
+                            positionTitle: link.position.title,
+                          })
+                        }
+                        disabled={
+                          unlinkPositionMutation.isPending &&
+                          unlinkPositionMutation.variables?.positionId === link.positionId
+                        }
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 transition hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {unlinkPositionMutation.isPending &&
+                        unlinkPositionMutation.variables?.positionId === link.positionId
+                          ? 'Removing...'
+                          : 'Remove link'}
+                      </button>
                     </div>
+                    {link.notes && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Note: {link.notes.slice(0, 80)}
+                        {link.notes.length > 80 ? '…' : ''}
+                      </p>
+                    )}
                   </div>
                 ))
               ) : (

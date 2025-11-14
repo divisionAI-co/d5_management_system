@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { LeadMapImportDto, LeadFieldMappingEntry, LeadImportField } from './dto/lead-map-import.dto';
 import { ExecuteLeadImportDto } from './dto/execute-lead-import.dto';
+import { generateInitialMappings } from '../utils/field-mapping.util';
 
 export interface LeadImportFieldMetadata {
   key: LeadImportField;
@@ -28,6 +29,7 @@ export interface LeadUploadResult {
   sampleRows: Record<string, string>[];
   totalRows: number;
   availableFields: LeadImportFieldMetadata[];
+  suggestedMappings?: Array<{ sourceColumn: string; targetField: string }>;
 }
 
 export interface LeadImportSummary {
@@ -261,6 +263,11 @@ export class LeadsImportService {
       },
     });
 
+    const suggestedMappings = generateInitialMappings(
+      parsed.headers,
+      LEAD_FIELD_DEFINITIONS,
+    );
+
     return {
       id: importRecord.id,
       type: 'leads',
@@ -269,6 +276,7 @@ export class LeadsImportService {
       sampleRows,
       totalRows: sanitizedRows.length,
       availableFields: LEAD_FIELD_DEFINITIONS,
+      suggestedMappings,
     };
   }
 

@@ -42,6 +42,9 @@ export function CandidateTable({
             <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Stage
             </th>
+          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Recruiter
+          </th>
             <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Skills
             </th>
@@ -123,6 +126,23 @@ export function CandidateTable({
                   >
                     {CANDIDATE_STAGE_LABELS[candidate.stage]}
                   </span>
+                )}
+              </td>
+              <td className="px-6 py-4">
+                {candidate.recruiter ? (
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-foreground">
+                      {candidate.recruiter.firstName} {candidate.recruiter.lastName}
+                    </span>
+                    <a
+                      href={`mailto:${candidate.recruiter.email}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {candidate.recruiter.email}
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Unassigned</span>
                 )}
               </td>
               <td className="px-6 py-4">

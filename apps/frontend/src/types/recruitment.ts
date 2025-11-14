@@ -40,6 +40,14 @@ export interface CandidatePositionLink {
   position?: OpenPositionSummary | null;
 }
 
+export interface CandidateRecruiter {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  avatar?: string | null;
+}
+
 export interface Candidate {
   id: string;
   firstName: string;
@@ -69,6 +77,7 @@ export interface Candidate {
   positions?: CandidatePositionLink[];
   activities?: CandidateActivity[];
   employee?: Employee | null;
+  recruiter?: CandidateRecruiter | null;
 }
 
 export interface CandidateFilters {
@@ -82,6 +91,7 @@ export interface CandidateFilters {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  recruiterId?: string;
 }
 
 export interface CreateCandidateDto {
@@ -107,6 +117,7 @@ export interface CreateCandidateDto {
   expectedSalary?: number;
   salaryCurrency?: string;
   isActive?: boolean;
+  recruiterId?: string;
 }
 
 export interface UpdateCandidateDto extends Partial<CreateCandidateDto> {}
@@ -188,6 +199,14 @@ export interface PositionFilters {
   pageSize?: number;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+}
+
+export interface CreatePositionDto {
+  title: string;
+  description?: string;
+  requirements?: string;
+  status?: PositionStatus;
+  opportunityId?: string;
 }
 
 export interface UpdatePositionDto {

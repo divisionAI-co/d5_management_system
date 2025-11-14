@@ -19,6 +19,14 @@ import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employ
 import { MarkInactiveDto } from './dto/mark-inactive.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
+const RECRUITER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  avatar: true,
+};
+
 export interface PaginatedResult<T> {
   data: T[];
   meta: {
@@ -36,6 +44,46 @@ export class CandidatesService {
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
   ) {}
+
+  private candidateInclude() {
+    return {
+      positions: {
+        include: {
+          position: {
+            include: {
+              opportunity: {
+                include: {
+                  customer: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      employee: true,
+      recruiter: {
+        select: RECRUITER_SELECT,
+      },
+    };
+  }
+
+  private async ensureRecruiterExists(recruiterId: string) {
+    const recruiter = await this.prisma.user.findUnique({
+      where: { id: recruiterId },
+      select: { id: true },
+    });
+
+    if (!recruiter) {
+      throw new BadRequestException('Recruiter not found.');
+    }
+
+    return recruiter.id;
+  }
 
   private formatCandidate(candidate: any) {
     if (!candidate) {
@@ -71,6 +119,16 @@ export class CandidatesService {
     formatted.driveFolderId = candidate.driveFolderId ?? null;
     formatted.driveFolderUrl = candidate.driveFolderId
       ? `https://drive.google.com/drive/folders/${candidate.driveFolderId}`
+      : null;
+
+    formatted.recruiter = candidate.recruiter
+      ? {
+          id: candidate.recruiter.id,
+          firstName: candidate.recruiter.firstName,
+          lastName: candidate.recruiter.lastName,
+          email: candidate.recruiter.email,
+          avatar: candidate.recruiter.avatar ?? null,
+        }
       : null;
 
     if (Array.isArray(candidate?.activities)) {
@@ -197,6 +255,10 @@ export class CandidatesService {
       where.stage = filters.stage;
     }
 
+    if (filters.recruiterId) {
+      where.recruiterId = filters.recruiterId;
+    }
+
     const positionFilters: Prisma.CandidatePositionListRelationFilter = {};
 
     if (filters.positionId) {
@@ -243,18 +305,7 @@ export class CandidatesService {
   private async ensureCandidateExists(id: string) {
     const candidate = await this.prisma.candidate.findUnique({
       where: { id },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: true,
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     if (!candidate) {
@@ -286,6 +337,11 @@ export class CandidatesService {
       );
     }
 
+    let recruiterId: string | undefined;
+    if (createDto.recruiterId) {
+      recruiterId = await this.ensureRecruiterExists(createDto.recruiterId);
+    }
+
     const candidate = await this.prisma.candidate.create({
       data: {
         firstName: createDto.firstName,
@@ -315,28 +371,9 @@ export class CandidatesService {
             : undefined,
         salaryCurrency: createDto.salaryCurrency,
         driveFolderId,
+        recruiterId,
       },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     return this.formatCandidate(candidate);
@@ -362,27 +399,7 @@ export class CandidatesService {
         orderBy: {
           [sortBy]: sortOrder,
         },
-        include: {
-          positions: {
-            include: {
-              position: {
-                include: {
-                  opportunity: {
-                    include: {
-                      customer: {
-                        select: {
-                          id: true,
-                          name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          employee: true,
-        },
+        include: this.candidateInclude(),
       }),
     ]);
 
@@ -404,30 +421,12 @@ export class CandidatesService {
         deletedAt: null,
       },
       include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        ...this.candidateInclude(),
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 5,
           include: ACTIVITY_SUMMARY_INCLUDE,
         },
-        employee: true,
       },
     });
 
@@ -466,6 +465,13 @@ export class CandidatesService {
       }
     }
 
+    let recruiterIdUpdate: string | null | undefined = undefined;
+    if (updateDto.recruiterId !== undefined) {
+      recruiterIdUpdate = updateDto.recruiterId
+        ? await this.ensureRecruiterExists(updateDto.recruiterId)
+        : null;
+    }
+
     try {
       const candidate = await this.prisma.candidate.update({
         where: { id },
@@ -502,28 +508,10 @@ export class CandidatesService {
               : undefined,
           salaryCurrency: updateDto.salaryCurrency,
           driveFolderId: driveFolderIdUpdate,
+          recruiterId:
+            recruiterIdUpdate !== undefined ? recruiterIdUpdate : undefined,
         },
-        include: {
-          positions: {
-            include: {
-              position: {
-                include: {
-                  opportunity: {
-                    include: {
-                      customer: {
-                        select: {
-                          id: true,
-                          name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          employee: true,
-        },
+        include: this.candidateInclude(),
       });
 
       return this.formatCandidate(candidate);
@@ -553,27 +541,7 @@ export class CandidatesService {
     const updated = await this.prisma.candidate.update({
       where: { id },
       data,
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     return this.formatCandidate(updated);
@@ -641,30 +609,49 @@ export class CandidatesService {
 
     const refreshed = await this.prisma.candidate.findUnique({
       where: { id: candidateId },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     return this.formatCandidate(refreshed);
+  }
+
+  async unlinkPosition(candidateId: string, positionId: string) {
+    await this.ensureCandidateExists(candidateId);
+
+    const existingLink = await this.prisma.candidatePosition.findUnique({
+      where: {
+        candidateId_positionId: {
+          candidateId,
+          positionId,
+        },
+      },
+    });
+
+    if (!existingLink) {
+      throw new NotFoundException(
+        `Candidate ${candidateId} is not linked to position ${positionId}`,
+      );
+    }
+
+    await this.prisma.candidatePosition.delete({
+      where: {
+        candidateId_positionId: {
+          candidateId,
+          positionId,
+        },
+      },
+    });
+
+    const updated = await this.prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: this.candidateInclude(),
+    });
+
+    if (!updated) {
+      throw new NotFoundException(`Candidate with ID ${candidateId} not found`);
+    }
+
+    return this.formatCandidate(updated);
   }
 
   private generateSecurePassword() {
@@ -805,27 +792,7 @@ export class CandidatesService {
         data: {
           stage: CandidateStage.HIRED,
         },
-        include: {
-          positions: {
-            include: {
-              position: {
-                include: {
-                  opportunity: {
-                    include: {
-                      customer: {
-                        select: {
-                          id: true,
-                          name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          employee: true,
-        },
+        include: this.candidateInclude(),
       });
 
       return {
@@ -899,27 +866,7 @@ export class CandidatesService {
       data: {
         deletedAt: new Date(),
       },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     return this.formatCandidate(updated);
@@ -928,27 +875,7 @@ export class CandidatesService {
   async restore(id: string) {
     const candidate = await this.prisma.candidate.findUnique({
       where: { id },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     if (!candidate) {
@@ -964,27 +891,7 @@ export class CandidatesService {
       data: {
         deletedAt: null,
       },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+      include: this.candidateInclude(),
     });
 
     return this.formatCandidate(updated);
@@ -993,45 +900,42 @@ export class CandidatesService {
   async markInactive(id: string, dto: MarkInactiveDto) {
     const candidate = await this.ensureCandidateExists(id);
 
-    if (!candidate.isActive) {
-      throw new BadRequestException('Candidate is already inactive.');
+    if (!candidate.positions || candidate.positions.length === 0) {
+      throw new BadRequestException('Candidate is not linked to any positions.');
     }
 
-    // Update candidate to inactive
-    const updated = await this.prisma.candidate.update({
-      where: { id },
-      data: {
-        isActive: false,
-        notes: dto.reason
-          ? `${candidate.notes ? candidate.notes + '\n\n' : ''}Marked inactive: ${dto.reason}`
-          : candidate.notes,
-      },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: {
-                opportunity: {
-                  include: {
-                    customer: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        employee: true,
-      },
+    const updateData: Prisma.CandidateUpdateInput = {};
+    if (dto.reason) {
+      updateData.notes = candidate.notes
+        ? `${candidate.notes}\n\n[Unlinked ${new Date().toISOString()}]\n${dto.reason}`
+        : dto.reason;
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(updateData).length > 0) {
+        await tx.candidate.update({
+          where: { id },
+          data: updateData,
+        });
+      }
+
+      await tx.candidatePosition.deleteMany({
+        where: { candidateId: id },
+      });
+
+      return tx.candidate.findUnique({
+        where: { id },
+        include: this.candidateInclude(),
+      });
     });
+
+    if (!updated) {
+      throw new NotFoundException(`Candidate with ID ${id} not found`);
+    }
 
     // Send email if requested
     if (dto.sendEmail) {
-      const recipientEmail = dto.emailTo || candidate.email;
+      const recipientEmail = dto.emailTo || updated.email;
       if (!recipientEmail) {
         throw new BadRequestException(
           'Cannot send email: candidate has no email address and no recipient email was provided.',
@@ -1046,17 +950,17 @@ export class CandidatesService {
         try {
           const templateData = {
             candidate: {
-              firstName: candidate.firstName,
-              lastName: candidate.lastName,
-              email: candidate.email,
-              fullName: `${candidate.firstName} ${candidate.lastName}`,
+              firstName: updated.firstName,
+              lastName: updated.lastName,
+              email: updated.email,
+              fullName: `${updated.firstName} ${updated.lastName}`,
             },
             reason: dto.reason || 'No reason provided',
           };
 
           const renderedHtml = await this.templatesService.render(dto.templateId, templateData);
           emailBody = renderedHtml;
-          emailSubject = `Update on Your Application - ${candidate.firstName} ${candidate.lastName}`;
+          emailSubject = `Update on Your Application - ${updated.firstName} ${updated.lastName}`;
         } catch (error: any) {
           throw new BadRequestException(
             `Failed to render email template: ${error?.message ?? 'Unknown error'}`,
@@ -1105,6 +1009,27 @@ export class CandidatesService {
     });
 
     return { success: true, message: 'Candidate deleted successfully.' };
+  }
+
+  async listRecruiters() {
+    return this.prisma.user.findMany({
+      where: {
+        role: {
+          in: [UserRole.RECRUITER, UserRole.HR, UserRole.ADMIN],
+        },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        avatar: true,
+      },
+      orderBy: {
+        firstName: 'asc',
+      },
+    });
   }
 }
 

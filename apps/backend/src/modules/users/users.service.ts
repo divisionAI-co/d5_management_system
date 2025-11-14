@@ -124,6 +124,10 @@ export class UsersService {
     return this.getNumberConfig('USER_INVITE_EXPIRY_HOURS', 72);
   }
 
+  private getPasswordResetExpiryHours() {
+    return this.getNumberConfig('PASSWORD_RESET_TOKEN_EXPIRY_HOURS', 1);
+  }
+
   private getNumberConfig(key: string, fallback: number) {
     const rawValue = this.configService.get<string>(key);
 
@@ -530,6 +534,38 @@ export class UsersService {
         updatedAt: true,
       },
     });
+  }
+
+  async resendPasswordResetLink(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        isActive: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    if (!user.isActive) {
+      throw new BadRequestException('Cannot send reset link for an inactive user.');
+    }
+
+    const { token } = await this.generatePasswordResetToken(
+      user.id,
+      this.getPasswordResetExpiryHours(),
+      'RESET',
+    );
+
+    await this.emailService.sendPasswordResetEmail(user.email, token);
+
+    return {
+      message: 'Password reset email has been sent.',
+    };
   }
 }
 

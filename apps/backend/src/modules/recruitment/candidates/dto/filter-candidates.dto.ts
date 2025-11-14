@@ -153,6 +153,13 @@ export class FilterCandidatesDto {
   @IsString()
   @IsOptional()
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @ApiPropertyOptional({
+    description: 'Filter by recruiter user ID',
+  })
+  @IsString()
+  @IsOptional()
+  recruiterId?: string;
 }
 
 

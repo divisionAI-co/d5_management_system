@@ -4,6 +4,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { FilterPositionsDto } from './dto/filter-positions.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { ClosePositionDto } from './dto/close-position.dto';
+import { CreatePositionDto } from './dto/create-position.dto';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -50,6 +51,74 @@ export class OpenPositionsService {
           : null,
       })),
     };
+  }
+
+  async create(createDto: CreatePositionDto) {
+    if (createDto.opportunityId) {
+      const opportunity = await this.prisma.opportunity.findUnique({
+        where: { id: createDto.opportunityId },
+        include: {
+          openPosition: {
+            select: { id: true },
+          },
+        },
+      });
+
+      if (!opportunity) {
+        throw new NotFoundException(
+          `Opportunity with ID ${createDto.opportunityId} not found`,
+        );
+      }
+
+      if (opportunity.openPosition) {
+        throw new BadRequestException(
+          'This opportunity already has a linked job position.',
+        );
+      }
+    }
+
+    const positionData: Prisma.OpenPositionUncheckedCreateInput = {
+      title: createDto.title,
+      description: createDto.description ?? 'TBD',
+      requirements: createDto.requirements,
+      status: createDto.status ?? 'Open',
+      opportunityId: createDto.opportunityId ?? null,
+    };
+
+    const position = await this.prisma.openPosition.create({
+      data: positionData,
+      include: {
+        opportunity: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        candidates: {
+          take: 5,
+          orderBy: { appliedAt: 'desc' },
+          include: {
+            candidate: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                stage: true,
+                rating: true,
+                expectedSalary: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.formatPosition(position);
   }
 
   private validateSortField(sortBy?: string) {
@@ -111,7 +180,8 @@ export class OpenPositionsService {
     }
 
     if (filters.customerId) {
-      const relationFilter = (where.opportunity as Prisma.OpportunityRelationFilter | undefined) ?? {};
+      const relationFilter =
+        (where.opportunity as Prisma.OpportunityNullableRelationFilter | undefined) ?? {};
       const currentIs = relationFilter.is ?? {};
       where.opportunity = {
         ...relationFilter,

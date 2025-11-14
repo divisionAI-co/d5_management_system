@@ -800,6 +800,221 @@ EOF
     print_success "Database and user created (with CREATEDB permission for Prisma Migrate)"
 }
 
+# Ensure migrations that define enums are marked as applied when schema already exists
+ensure_migration_synced_with_type() {
+    local migration_name="$1"
+    local type_name="$2"
+
+    if [ -z "$migration_name" ] || [ -z "$type_name" ]; then
+        return
+    fi
+
+    local type_query_output
+    if ! type_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = '${type_name}');" 2>/dev/null); then
+        print_warning "Could not verify if type \"${type_name}\" exists (skipping guard)."
+        return
+    fi
+    local type_exists=$(echo "$type_query_output" | tr -d '[:space:]')
+
+    if [ "$type_exists" != "t" ]; then
+        return
+    fi
+
+    local prisma_table_output
+    if ! prisma_table_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'prisma_migrations');" 2>/dev/null); then
+        print_warning "Could not verify prisma_migrations table (skipping guard for ${migration_name})."
+        return
+    fi
+    local prisma_table_exists=$(echo "$prisma_table_output" | tr -d '[:space:]')
+    local migration_recorded="f"
+
+    if [ "$prisma_table_exists" = "t" ]; then
+        local migration_query_output
+        if ! migration_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM public.prisma_migrations WHERE migration_name = '${migration_name}');" 2>/dev/null); then
+            print_warning "Could not check prisma_migrations entry for ${migration_name} (skipping guard)."
+            return
+        fi
+        migration_recorded=$(echo "$migration_query_output" | tr -d '[:space:]')
+    fi
+
+    if [ "$migration_recorded" = "t" ]; then
+        return
+    fi
+
+    print_warning "Detected existing type \"${type_name}\" without recorded migration ${migration_name}. Marking migration as applied to avoid duplicate enum errors..."
+    local resolve_output
+    if ! resolve_output=$(sudo -u $APP_USER npx prisma migrate resolve --applied ${migration_name} 2>&1); then
+        if echo "$resolve_output" | grep -q "P3008"; then
+            print_info "Migration ${migration_name} is already recorded as applied. Continuing..."
+        else
+            echo "$resolve_output"
+            print_error "Failed to mark migration ${migration_name} as applied. Please resolve the database state manually."
+            exit 1
+        fi
+    fi
+}
+
+ensure_migration_synced_with_enum_label() {
+    local migration_name="$1"
+    local enum_name="$2"
+    local enum_label="$3"
+
+    if [ -z "$migration_name" ] || [ -z "$enum_name" ] || [ -z "$enum_label" ]; then
+        return
+    fi
+
+    local enum_query_output
+    if ! enum_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid = t.oid WHERE t.typname = '${enum_name}' AND e.enumlabel = '${enum_label}');" 2>/dev/null); then
+        print_warning "Could not verify enum label \"${enum_label}\" on enum \"${enum_name}\" (skipping guard)."
+        return
+    fi
+    local label_exists=$(echo "$enum_query_output" | tr -d '[:space:]')
+
+    if [ "$label_exists" != "t" ]; then
+        return
+    fi
+
+    local prisma_table_output
+    if ! prisma_table_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'prisma_migrations');" 2>/dev/null); then
+        print_warning "Could not verify prisma_migrations table (skipping guard for ${migration_name})."
+        return
+    fi
+    local prisma_table_exists=$(echo "$prisma_table_output" | tr -d '[:space:]')
+    local migration_recorded="f"
+
+    if [ "$prisma_table_exists" = "t" ]; then
+        local migration_query_output
+        if ! migration_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM public.prisma_migrations WHERE migration_name = '${migration_name}');" 2>/dev/null); then
+            print_warning "Could not check prisma_migrations entry for ${migration_name} (skipping guard)."
+            return
+        fi
+        migration_recorded=$(echo "$migration_query_output" | tr -d '[:space:]')
+    fi
+
+    if [ "$migration_recorded" = "t" ]; then
+        return
+    fi
+
+    print_warning "Detected existing enum label \"${enum_label}\" on \"${enum_name}\" without recorded migration ${migration_name}. Marking migration as applied..."
+    local resolve_output
+    if ! resolve_output=$(sudo -u $APP_USER npx prisma migrate resolve --applied ${migration_name} 2>&1); then
+        if echo "$resolve_output" | grep -q "P3008"; then
+            print_info "Migration ${migration_name} is already recorded as applied. Continuing..."
+        else
+            echo "$resolve_output"
+            print_error "Failed to mark migration ${migration_name} as applied. Please resolve the database state manually."
+            exit 1
+        fi
+    fi
+}
+
+ensure_migration_synced_with_column() {
+    local migration_name="$1"
+    local table_name="$2"
+    local column_name="$3"
+
+    if [ -z "$migration_name" ] || [ -z "$table_name" ] || [ -z "$column_name" ]; then
+        return
+    fi
+
+    local column_query_output
+    if ! column_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '${table_name}' AND column_name = '${column_name}');" 2>/dev/null); then
+        print_warning "Could not verify column \"${column_name}\" on table \"${table_name}\" (skipping guard)."
+        return
+    fi
+    local column_exists=$(echo "$column_query_output" | tr -d '[:space:]')
+
+    if [ "$column_exists" != "t" ]; then
+        return
+    fi
+
+    local prisma_table_output
+    if ! prisma_table_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'prisma_migrations');" 2>/dev/null); then
+        print_warning "Could not verify prisma_migrations table (skipping guard for ${migration_name})."
+        return
+    fi
+    local prisma_table_exists=$(echo "$prisma_table_output" | tr -d '[:space:]')
+    local migration_recorded="f"
+
+    if [ "$prisma_table_exists" = "t" ]; then
+        local migration_query_output
+        if ! migration_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM public.prisma_migrations WHERE migration_name = '${migration_name}');" 2>/dev/null); then
+            print_warning "Could not check prisma_migrations entry for ${migration_name} (skipping guard)."
+            return
+        fi
+        migration_recorded=$(echo "$migration_query_output" | tr -d '[:space:]')
+    fi
+
+    if [ "$migration_recorded" = "t" ]; then
+        return
+    fi
+
+    print_warning "Detected existing column \"${column_name}\" on table \"${table_name}\" without recorded migration ${migration_name}. Marking migration as applied..."
+    local resolve_output
+    if ! resolve_output=$(sudo -u $APP_USER npx prisma migrate resolve --applied ${migration_name} 2>&1); then
+        if echo "$resolve_output" | grep -q "P3008"; then
+            print_info "Migration ${migration_name} is already recorded as applied. Continuing..."
+        else
+            echo "$resolve_output"
+            print_error "Failed to mark migration ${migration_name} as applied. Please resolve the database state manually."
+            exit 1
+        fi
+    fi
+}
+
+ensure_migration_synced_with_table() {
+    local migration_name="$1"
+    local table_name="$2"
+
+    if [ -z "$migration_name" ] || [ -z "$table_name" ]; then
+        return
+    fi
+
+    local table_query_output
+    if ! table_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${table_name}');" 2>/dev/null); then
+        print_warning "Could not verify table \"${table_name}\" (skipping guard)."
+        return
+    fi
+    local table_exists=$(echo "$table_query_output" | tr -d '[:space:]')
+
+    if [ "$table_exists" != "t" ]; then
+        return
+    fi
+
+    local prisma_table_output
+    if ! prisma_table_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'prisma_migrations');" 2>/dev/null); then
+        print_warning "Could not verify prisma_migrations table (skipping guard for ${migration_name})."
+        return
+    fi
+    local prisma_table_exists=$(echo "$prisma_table_output" | tr -d '[:space:]')
+    local migration_recorded="f"
+
+    if [ "$prisma_table_exists" = "t" ]; then
+        local migration_query_output
+        if ! migration_query_output=$(sudo -u postgres psql -d ${DB_NAME} -tAc "SELECT EXISTS (SELECT 1 FROM public.prisma_migrations WHERE migration_name = '${migration_name}');" 2>/dev/null); then
+            print_warning "Could not check prisma_migrations entry for ${migration_name} (skipping guard)."
+            return
+        fi
+        migration_recorded=$(echo "$migration_query_output" | tr -d '[:space:]')
+    fi
+
+    if [ "$migration_recorded" = "t" ]; then
+        return
+    fi
+
+    print_warning "Detected existing table \"${table_name}\" without recorded migration ${migration_name}. Marking migration as applied..."
+    local resolve_output
+    if ! resolve_output=$(sudo -u $APP_USER npx prisma migrate resolve --applied ${migration_name} 2>&1); then
+        if echo "$resolve_output" | grep -q "P3008"; then
+            print_info "Migration ${migration_name} is already recorded as applied. Continuing..."
+        else
+            echo "$resolve_output"
+            print_error "Failed to mark migration ${migration_name} as applied. Please resolve the database state manually."
+            exit 1
+        fi
+    fi
+}
+
 # Install Nginx
 install_nginx() {
     print_header "Installing Nginx"
@@ -1033,8 +1248,12 @@ configure_backend() {
     # Determine FRONTEND_URL for email links
     local FRONTEND_URL="${DEPLOY_FRONTEND_URL:-}"
     if [ -z "$FRONTEND_URL" ] && [ -n "$DOMAIN" ]; then
-        # Use app subdomain if domain is set (Apache proxies on port 80)
-        FRONTEND_URL="http://app.${DOMAIN}"
+        local frontend_subdomain="${DEPLOY_FRONTEND_SUBDOMAIN:-app}"
+        if [[ "$DOMAIN" == "${frontend_subdomain}."* ]]; then
+            FRONTEND_URL="https://${DOMAIN}"
+        else
+            FRONTEND_URL="https://${frontend_subdomain}.${DOMAIN}"
+        fi
     elif [ -z "$FRONTEND_URL" ]; then
         FRONTEND_URL="http://localhost:5173"
     fi
@@ -1153,10 +1372,11 @@ configure_frontend() {
     
     # Determine API URL (backend uses /api/v1 due to versioning)
     if [ -n "$DOMAIN" ]; then
-        if [ "$NGINX_PORT" = "80" ]; then
+        local api_subdomain="${DEPLOY_FRONTEND_SUBDOMAIN:-app}"
+        if [[ "$DOMAIN" == "${api_subdomain}."* ]]; then
             API_URL="https://${DOMAIN}/api/v1"
         else
-            API_URL="http://${DOMAIN}:${NGINX_PORT}/api/v1"
+            API_URL="https://${api_subdomain}.${DOMAIN}/api/v1"
         fi
     else
         if [ "$NGINX_PORT" = "80" ]; then
@@ -1165,6 +1385,7 @@ configure_frontend() {
             API_URL="http://localhost:${NGINX_PORT}/api/v1"
         fi
     fi
+    [ -n "$DEPLOY_API_URL" ] && API_URL="$DEPLOY_API_URL"
     
     # Use APP_NAME from script variable or environment variable, with fallback
     local FRONTEND_APP_NAME="${DEPLOY_APP_NAME:-$APP_NAME}"
@@ -1205,6 +1426,22 @@ setup_database_schema() {
     
     # Ensure proper ownership
     sudo chown -R $APP_USER:$APP_USER .
+
+    # Guard against duplicate enum/type creation when schema already exists
+    ensure_migration_synced_with_type "20251111000000_initial_schema" "UserRole"
+    ensure_migration_synced_with_type "20251112072149_" "ActivityVisibility"
+    ensure_migration_synced_with_type "20251112131500_add_ai_actions" "AiEntityType"
+    ensure_migration_synced_with_type "20251112174500_add_ai_action_collections" "AiCollectionKey"
+    ensure_migration_synced_with_column "20251112093047_add_annual_leave_allowance" "company_settings" "annualLeaveAllowanceDays"
+    ensure_migration_synced_with_table "20251112120000_add_user_calendar_integrations" "user_calendar_integrations"
+    ensure_migration_synced_with_column "20251112123513_add_drive_folder_to_candidate" "candidates" "driveFolderId"
+    ensure_migration_synced_with_table "20251112150000_add_ai_action_collections" "ai_action_collections"
+    ensure_migration_synced_with_column "20251113072419_" "company_settings" "remoteWorkWindowEnd"
+    ensure_migration_synced_with_column "20251113122650_add_candidate_deleted_at" "candidates" "deletedAt"
+    ensure_migration_synced_with_enum_label "20251113131034_add_candidate_stages_and_odoo_import" "CandidateStage" "ON_HOLD"
+    ensure_migration_synced_with_enum_label "20251113131034_add_candidate_stages_and_odoo_import" "CandidateStage" "CUSTOMER_REVIEW"
+    ensure_migration_synced_with_enum_label "20251113131034_add_candidate_stages_and_odoo_import" "CandidateStage" "CONTRACT_PROPOSAL"
+    ensure_migration_synced_with_column "20251114072519_" "candidates" "isActive"
     
     # Generate Prisma Client
     sudo -u $APP_USER npx prisma generate

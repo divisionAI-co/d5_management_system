@@ -12,6 +12,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -159,6 +160,13 @@ export class CreateCandidateDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'User ID of the recruiter responsible for this candidate',
+  })
+  @IsUUID()
+  @IsOptional()
+  recruiterId?: string;
 }
 
 

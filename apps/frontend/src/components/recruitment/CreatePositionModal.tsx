@@ -1,242 +1,302 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
-import { leadsApi } from '@/lib/api/crm/leads';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Loader2, Search, X } from 'lucide-react';
+import { positionsApi } from '@/lib/api/recruitment';
 import { opportunitiesApi } from '@/lib/api/crm/opportunities';
-import type { CreateOpportunityPayload, Lead } from '@/types/crm';
-import { FeedbackToast } from '@/components/ui/feedback-toast';
+import type { Opportunity } from '@/types/crm';
+import type {
+  CreatePositionDto,
+  PositionStatus,
+  OpenPosition,
+  UpdatePositionDto,
+} from '@/types/recruitment';
 
 interface CreatePositionModalProps {
   onClose: () => void;
-  onCreated?: (positionId?: string | null) => void;
+  onCreated?: (position: OpenPosition) => void;
+  onUpdated?: (position: OpenPosition) => void;
+  defaultOpportunity?: {
+    id: string;
+    title: string;
+    customerName?: string;
+  };
+  position?: OpenPosition | null;
 }
 
 interface FormValues {
-  leadId: string;
   title: string;
   description?: string;
-  value: number;
-  jobDescriptionUrl?: string;
-  positionTitle?: string;
-  positionDescription?: string;
-  positionRequirements?: string;
+  requirements?: string;
+  opportunityId?: string;
+  status: PositionStatus;
 }
 
-export function CreatePositionModal({ onClose, onCreated }: CreatePositionModalProps) {
-  const [leadSearch, setLeadSearch] = useState('');
+export function CreatePositionModal({
+  onClose,
+  onCreated,
+  onUpdated,
+  defaultOpportunity,
+  position,
+}: CreatePositionModalProps) {
+  const queryClient = useQueryClient();
+  const [opportunitySearch, setOpportunitySearch] = useState('');
+  const isEditMode = Boolean(position);
 
-  const leadsQuery = useQuery({
-    queryKey: ['leads', 'position-select', leadSearch],
-    queryFn: () => leadsApi.list({ search: leadSearch, page: 1, pageSize: 100 }),
+  const opportunitiesQuery = useQuery({
+    queryKey: ['opportunities', 'position-select', opportunitySearch],
+    enabled: !defaultOpportunity,
+    queryFn: () =>
+      opportunitiesApi.list({
+        search: opportunitySearch || undefined,
+        page: 1,
+        pageSize: 50,
+      }),
   });
+
+  const opportunities = useMemo<Opportunity[]>(
+    () => opportunitiesQuery.data?.data ?? [],
+    [opportunitiesQuery.data],
+  );
 
   const {
     register,
     handleSubmit,
-    watch,
+    reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
-      title: '',
-      description: '',
-      value: 0,
-      jobDescriptionUrl: '',
-      positionTitle: '',
-      positionDescription: '',
-      positionRequirements: '',
+      title: position?.title ?? defaultOpportunity?.title ?? '',
+      description: position?.description ?? '',
+      requirements: position?.requirements ?? '',
+      opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
+      status: position?.status ?? 'Open',
     },
   });
 
-  const titleValue = watch('title');
+  const selectedOpportunityId = watch('opportunityId');
 
-  const mutation = useMutation({
-    mutationFn: (payload: CreateOpportunityPayload) => opportunitiesApi.create(payload),
-    onSuccess: (opportunity) => {
-      onCreated?.(opportunity.openPosition?.id ?? null);
+  useEffect(() => {
+    reset({
+      title: position?.title ?? defaultOpportunity?.title ?? '',
+      description: position?.description ?? '',
+      requirements: position?.requirements ?? '',
+      opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
+      status: position?.status ?? 'Open',
+    });
+  }, [defaultOpportunity, position, reset]);
+
+  useEffect(() => {
+    if (defaultOpportunity || position) {
+      return;
+    }
+    if (opportunities.length === 0) {
+      return;
+    }
+    const first = opportunities[0];
+    const selectionExists = opportunities.some(
+      (opportunity) => opportunity.id === selectedOpportunityId,
+    );
+    if (!selectedOpportunityId || !selectionExists) {
+      setValue('opportunityId', first.id, { shouldDirty: true });
+    }
+  }, [defaultOpportunity, position, opportunities, selectedOpportunityId, setValue]);
+
+  const createMutation = useMutation({
+    mutationFn: (payload: CreatePositionDto) => positionsApi.create(payload),
+    onSuccess: (position) => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      if (position.opportunity) {
+        queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      }
+      onCreated?.(position);
       onClose();
     },
   });
 
-  const leads = useMemo(() => leadsQuery.data?.data ?? [], [leadsQuery.data]);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdatePositionDto }) =>
+      positionsApi.update(id, payload),
+    onSuccess: (position) => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['position', position.id] });
+      onUpdated?.(position);
+      onClose();
+    },
+  });
+
+  const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const onSubmit = (values: FormValues) => {
-    const payload: CreateOpportunityPayload = {
-      leadId: values.leadId,
-      title: values.title,
-      description: values.description || undefined,
-      type: 'STAFF_AUGMENTATION',
-      value: Number.isFinite(values.value) ? Number(values.value) : 0,
-      jobDescriptionUrl: values.jobDescriptionUrl || undefined,
-      positionTitle: values.positionTitle || values.title,
-      positionDescription: values.positionDescription || undefined,
-      positionRequirements: values.positionRequirements || undefined,
-      stage: 'Discovery',
+    if (isEditMode && position) {
+      const payload: UpdatePositionDto = {
+        title: values.title.trim(),
+        description: values.description?.trim() || undefined,
+        requirements: values.requirements?.trim() || undefined,
+        status: values.status,
+      };
+      updateMutation.mutate({ id: position.id, payload });
+      return;
+    }
+
+    const payload: CreatePositionDto = {
+      title: values.title.trim(),
+      description: values.description?.trim() || undefined,
+      requirements: values.requirements?.trim() || undefined,
+      status: values.status,
+      opportunityId: defaultOpportunity
+        ? defaultOpportunity.id
+        : values.opportunityId || undefined,
     };
 
-    mutation.mutate(payload);
+    createMutation.mutate(payload);
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-2xl font-semibold text-foreground">Create New Position</h2>
+            <h2 className="text-2xl font-semibold text-foreground">
+              {isEditMode ? 'Edit Job Position' : 'Create Job Position'}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Positions are generated from staff augmentation opportunities. Provide lead details below to create the opportunity and linked position.
+              {isEditMode
+                ? 'Update position details to keep recruiting and delivery aligned.'
+                : 'Job positions can exist independently or be linked to an opportunity. Link it when you’re ready to source candidates.'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"
+            className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-2">
-          <section className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Lead *
-              </label>
-              <input
-                type="text"
-                value={leadSearch}
-                onChange={(event) => setLeadSearch(event.target.value)}
-                placeholder="Search lead by title or contact..."
-                className="mb-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-              {leadsQuery.isLoading ? (
-                <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                  Loading leads...
-                </div>
-              ) : leads.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-muted px-4 py-3 text-sm text-muted-foreground">
-                  No leads found. Create a lead first so we can attach the position to the correct client context.
-                </div>
-              ) : (
-                <select
-                  {...register('leadId', { required: 'Lead is required' })}
-                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                >
-                  <option value="">Select a lead</option>
-                  {leads.map((lead: Lead) => (
-                    <option key={lead.id} value={lead.id}>
-                      {lead.title} — {lead.contact.firstName} {lead.contact.lastName}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {errors.leadId && (
-                <p className="mt-1 text-xs text-red-500">{errors.leadId.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Opportunity Title *
+                Position Title<span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 {...register('title', { required: 'Title is required' })}
-                onBlur={() => {
-                  const currentTitle = titleValue;
-                  if (currentTitle) {
-                    setValue('positionTitle', currentTitle, { shouldValidate: false });
-                  }
-                }}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Senior React Developer"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="Senior React Engineer"
               />
               {errors.title && (
-                <p className="mt-1 text-xs text-red-500">{errors.title.message}</p>
+                <p className="mt-1 text-xs text-rose-600">{errors.title.message}</p>
               )}
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Opportunity Description
+                Status
+              </label>
+              <select
+                {...register('status')}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="Open">Open</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Filled">Filled</option>
+              </select>
+            </div>
+            </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                Description
               </label>
               <textarea
                 rows={4}
                 {...register('description')}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Context about the client need, timeline, and expectations."
+                placeholder="Overview of responsibilities and context."
               />
             </div>
-
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Projected Value (USD)
+                Requirements
               </label>
-              <input
-                type="number"
-                step="100"
-                {...register('value', { valueAsNumber: true, min: { value: 0, message: 'Value must be positive' } })}
+              <textarea
+                rows={4}
+                {...register('requirements')}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="15000"
+                placeholder="Key skills, location/timezone expectations, availability, etc."
               />
-              {errors.value && (
-                <p className="mt-1 text-xs text-red-500">{errors.value.message}</p>
+            </div>
+            </div>
+
+          {!isEditMode && (
+            <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Opportunity Link</p>
+                  <p className="text-xs text-muted-foreground">
+                    Optional. Link to an opportunity when you want CRM context for this role.
+                  </p>
+                </div>
+                {defaultOpportunity ? (
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    Locked from opportunity
+                  </span>
+                ) : null}
+              </div>
+
+              {defaultOpportunity ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  <p className="font-semibold">{defaultOpportunity.title}</p>
+                  {defaultOpportunity.customerName ? (
+                    <p className="text-xs text-blue-700">{defaultOpportunity.customerName}</p>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={opportunitySearch}
+                        onChange={(event) => setOpportunitySearch(event.target.value)}
+                        placeholder="Search opportunity by title or client"
+                        className="w-full rounded-lg border border-border px-9 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      />
+                    </div>
+                  </div>
+
+                  {opportunitiesQuery.isLoading ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading opportunities...
+                    </div>
+                  ) : (
+                    <select
+                      {...register('opportunityId')}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    >
+                      <option value="">No opportunity link</option>
+                      {opportunities.map((opportunity) => (
+                        <option key={opportunity.id} value={opportunity.id}>
+                          {opportunity.title}
+                          {opportunity.customer ? ` — ${opportunity.customer.name}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </>
               )}
             </div>
+          )}
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Job Description URL
-              </label>
-              <input
-                type="url"
-                {...register('jobDescriptionUrl')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="https://..."
-              />
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Position Title
-              </label>
-              <input
-                type="text"
-                {...register('positionTitle')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Same as opportunity title by default"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Position Description
-              </label>
-              <textarea
-                rows={4}
-                {...register('positionDescription')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Responsibilities, tech stack, and expectations for the candidate."
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Position Requirements
-              </label>
-              <textarea
-                rows={4}
-                {...register('positionRequirements')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                placeholder="Must-have skills, years of experience, timezone coverage, etc."
-              />
-            </div>
-          </section>
-
-          <div className="flex flex-col gap-3 border-t border-border pt-4 lg:col-span-2 lg:flex-row lg:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border pt-4 md:flex-row md:justify-end">
             <button
               type="button"
               onClick={onClose}
@@ -246,20 +306,18 @@ export function CreatePositionModal({ onClose, onCreated }: CreatePositionModalP
             </button>
             <button
               type="submit"
-              disabled={mutation.isPending || leads.length === 0}
+              disabled={isSubmitting}
               className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {mutation.isPending ? 'Creating...' : 'Create Position'}
+              {isSubmitting
+                ? isEditMode
+                  ? 'Saving…'
+                  : 'Creating…'
+                : isEditMode
+                ? 'Save Changes'
+                : 'Create Position'}
             </button>
           </div>
-
-          {mutation.isError && (
-            <FeedbackToast
-              message="Unable to create the position right now. Please verify the lead details and try again."
-              onDismiss={() => mutation.reset()}
-              tone="error"
-            />
-          )}
         </form>
       </div>
     </div>

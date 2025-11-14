@@ -43,6 +43,7 @@ export default function OpenPositionsPage() {
   const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingPosition, setEditingPosition] = useState<OpenPosition | null>(null);
 
   useEffect(() => {
     if (highlightId) {
@@ -92,6 +93,16 @@ export default function OpenPositionsPage() {
       queryClient.invalidateQueries({ queryKey: ['positions'] });
       queryClient.invalidateQueries({ queryKey: ['position', updated.id] });
       setFeedback(`Position "${updated.title}" marked as filled.`);
+    },
+  });
+
+  const editPositionLoader = useMutation({
+    mutationFn: positionsApi.getById,
+    onSuccess: (position) => {
+      setEditingPosition(position);
+    },
+    onError: () => {
+      setFeedback('Unable to load position for editing.');
     },
   });
 
@@ -150,6 +161,23 @@ export default function OpenPositionsPage() {
     }
 
     updateStatusMutation.mutate({ id: position.id, status: nextStatus });
+  };
+
+  const handleEditPositionFromSummary = (position: OpenPositionSummary) => {
+    editPositionLoader.mutate(position.id);
+  };
+
+  const handleEditPositionFromDetail = (position: OpenPosition) => {
+    setEditingPosition(position);
+  };
+
+  const handlePositionUpdated = (position: OpenPosition) => {
+    setEditingPosition(null);
+    setFeedback(`Position "${position.title}" saved successfully.`);
+    queryClient.invalidateQueries({ queryKey: ['positions'] });
+    queryClient.invalidateQueries({ queryKey: ['position', position.id] });
+    positionsQuery.refetch();
+    setSelectedPositionId(position.id);
   };
 
   return (
@@ -235,6 +263,7 @@ export default function OpenPositionsPage() {
         isLoading={positionsQuery.isFetching}
         onSelect={handleSelectPosition}
         onClosePosition={handleClosePosition}
+        onEdit={handleEditPositionFromSummary}
       />
 
       {selectedPositionId && (
@@ -244,20 +273,26 @@ export default function OpenPositionsPage() {
           onClose={() => setSelectedPositionId(null)}
           onChangeStatus={handleStatusChange}
           statusUpdating={updateStatusMutation.isPending || closeMutation.isPending}
+          onEdit={handleEditPositionFromDetail}
         />
       )}
 
       {isCreateModalOpen && (
         <CreatePositionModal
           onClose={() => setIsCreateModalOpen(false)}
-          onCreated={(newPositionId) => {
+          onCreated={(position) => {
             setIsCreateModalOpen(false);
             positionsQuery.refetch();
-            if (newPositionId) {
-              setSelectedPositionId(newPositionId);
-            }
-            setFeedback('Position created successfully.');
+            setSelectedPositionId(position.id);
+            setFeedback(`Position "${position.title}" created successfully.`);
           }}
+        />
+      )}
+      {editingPosition && (
+        <CreatePositionModal
+          position={editingPosition}
+          onClose={() => setEditingPosition(null)}
+          onUpdated={handlePositionUpdated}
         />
       )}
     </div>
@@ -270,9 +305,17 @@ interface PositionDetailDrawerProps {
   onClose: () => void;
   onChangeStatus: (position: OpenPosition, status: PositionStatus) => void;
   statusUpdating?: boolean;
+  onEdit?: (position: OpenPosition) => void;
 }
 
-function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, statusUpdating }: PositionDetailDrawerProps) {
+function PositionDetailDrawer({
+  position,
+  isLoading,
+  onClose,
+  onChangeStatus,
+  statusUpdating,
+  onEdit,
+}: PositionDetailDrawerProps) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
@@ -283,6 +326,14 @@ function PositionDetailDrawer({ position, isLoading, onClose, onChangeStatus, st
               Review role requirements and candidate pipeline health.
             </p>
           </div>
+          {position && onEdit && (
+            <button
+              onClick={() => onEdit(position)}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted"
+            >
+              Edit Position
+            </button>
+          )}
           <button
             onClick={onClose}
             className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"

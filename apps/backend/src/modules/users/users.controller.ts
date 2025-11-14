@@ -100,6 +100,13 @@ export class UsersController {
     return this.usersService.resetPassword(id, dto);
   }
 
+  @Post(':id/resend-password-reset')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Resend a password reset link to a user (Admin only)' })
+  resendPasswordReset(@Param('id') id: string) {
+    return this.usersService.resendPasswordResetLink(id);
+  }
+
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete user (Admin only)' })

@@ -1,14 +1,14 @@
 import type { Opportunity } from '@/types/crm';
-import { Edit, Loader2, Lock, Trash2, Trophy } from 'lucide-react';
+import { Edit, Loader2, Lock, Plus, Trash2, Trophy } from 'lucide-react';
 
 interface OpportunitiesTableProps {
   opportunities?: Opportunity[];
   isLoading: boolean;
-  onCreate: () => void;
   onEdit: (opportunity: Opportunity) => void;
   onClose: (opportunity: Opportunity) => void;
   onDelete: (opportunity: Opportunity) => void;
   onView?: (opportunity: Opportunity) => void;
+  onCreatePosition?: (opportunity: Opportunity) => void;
 }
 
 const TYPE_LABELS: Record<Opportunity['type'], string> = {
@@ -26,11 +26,11 @@ const VALUE_FORMATTER = new Intl.NumberFormat('en-US', {
 export function OpportunitiesTable({
   opportunities,
   isLoading,
-  onCreate,
   onEdit,
   onClose,
   onDelete,
   onView,
+  onCreatePosition,
 }: OpportunitiesTableProps) {
   const rows = opportunities ?? [];
 
@@ -41,12 +41,6 @@ export function OpportunitiesTable({
           <h2 className="text-lg font-semibold text-foreground">Pipeline</h2>
           <p className="text-xs text-muted-foreground">Monitor opportunity stages, owners, and outcomes.</p>
         </div>
-        <button
-          onClick={onCreate}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
-        >
-          Create Opportunity
-        </button>
       </div>
 
       <div className="overflow-x-auto">
@@ -93,6 +87,11 @@ export function OpportunitiesTable({
                     : 'bg-rose-50 text-rose-700 border border-rose-200'
                   : 'bg-blue-50 text-blue-700 border border-blue-200';
 
+                const canCreatePosition =
+                  (opportunity.type === 'STAFF_AUGMENTATION' ||
+                    opportunity.type === 'BOTH') &&
+                  !opportunity.openPosition;
+
                 return (
                   <tr
                     key={opportunity.id}
@@ -133,7 +132,9 @@ export function OpportunitiesTable({
                           <span className="text-xs text-muted-foreground">
                             Position: <span className="font-semibold text-muted-foreground">{opportunity.openPosition.status}</span>
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No position</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold text-foreground">
@@ -160,7 +161,7 @@ export function OpportunitiesTable({
                             <Lock className="h-3.5 w-3.5" />
                           )
                         ) : (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                          <span className="h-3.5 w-3.5 rounded-full bg-blue-500" />
                         )}
                         {statusLabel}
                       </span>
@@ -208,6 +209,18 @@ export function OpportunitiesTable({
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
                         </button>
+                        {canCreatePosition && onCreatePosition ? (
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onCreatePosition(opportunity);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Job Position
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

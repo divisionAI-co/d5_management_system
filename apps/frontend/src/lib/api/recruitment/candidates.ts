@@ -1,6 +1,7 @@
 import apiClient from '@/lib/api/client';
 import type {
   Candidate,
+  CandidateRecruiter,
   CandidateFilters,
   CandidatePositionsResponse,
   ConvertCandidateToEmployeePayload,
@@ -63,6 +64,13 @@ export const candidatesApi = {
     return data;
   },
 
+  async unlinkPosition(candidateId: string, positionId: string) {
+    const { data } = await apiClient.delete<Candidate>(
+      `/recruitment/candidates/${candidateId}/positions/${positionId}`,
+    );
+    return data;
+  },
+
   async getPositions(id: string) {
     const { data } = await apiClient.get<CandidatePositionsResponse[]>(
       `/recruitment/candidates/${id}/positions`,
@@ -74,6 +82,13 @@ export const candidatesApi = {
     const { data } = await apiClient.post<ConvertCandidateToEmployeeResponse>(
       `/recruitment/candidates/${id}/convert-to-employee`,
       payload,
+    );
+    return data;
+  },
+
+  async listRecruiters() {
+    const { data } = await apiClient.get<CandidateRecruiter[]>(
+      '/recruitment/candidates/recruiters',
     );
     return data;
   },

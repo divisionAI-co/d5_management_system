@@ -15,6 +15,7 @@ interface OpenPositionsTableProps {
   onRefresh?: () => void;
   onSelect?: (position: OpenPositionSummary) => void;
   onClosePosition?: (position: OpenPositionSummary) => void;
+  onEdit?: (position: OpenPositionSummary) => void;
 }
 
 export function OpenPositionsTable({
@@ -22,6 +23,7 @@ export function OpenPositionsTable({
   isLoading,
   onSelect,
   onClosePosition,
+  onEdit,
 }: OpenPositionsTableProps) {
   const totalCandidates = useMemo(
     () =>
@@ -159,7 +161,7 @@ export function OpenPositionsTable({
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-wrap justify-end gap-2">
                       {onSelect && (
                         <Link
                           to="#"
@@ -171,6 +173,15 @@ export function OpenPositionsTable({
                         >
                           View
                         </Link>
+                      )}
+                      {onEdit && (
+                        <button
+                          type="button"
+                          onClick={() => onEdit(position)}
+                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/70"
+                        >
+                          Edit
+                        </button>
                       )}
                       {onClosePosition && position.status === 'Open' && (
                         <button

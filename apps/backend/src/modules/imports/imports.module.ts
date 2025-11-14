@@ -6,6 +6,7 @@ import { EmployeesImportModule } from './employees/employees-import.module';
 import { EodImportModule } from './eod/eod-import.module';
 import { InvoicesImportModule } from './invoices/invoices-import.module';
 import { CandidatesImportModule } from './candidates/candidates-import.module';
+import { OpportunitiesImportModule } from './opportunities/opportunities-import.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CandidatesImportModule } from './candidates/candidates-import.module';
     EodImportModule,
     InvoicesImportModule,
     CandidatesImportModule,
+    OpportunitiesImportModule,
   ],
 })
 export class ImportsModule {}

@@ -323,15 +323,40 @@ export class OpportunitiesService {
     return lead;
   }
 
-  private async ensureUserExists(userId: string): Promise<void> {
+  private readonly allowedAssigneeRoles = new Set<UserRole>([
+    UserRole.ADMIN,
+    UserRole.SALESPERSON,
+  ]);
+
+  private async ensureEligibleAssignee(userId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: { id: true, role: true, isActive: true },
     });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
+
+    if (!user.isActive) {
+      throw new BadRequestException('Opportunities can only be assigned to active users.');
+    }
+
+    if (!this.allowedAssigneeRoles.has(user.role)) {
+      throw new BadRequestException(
+        'Opportunities can only be assigned to admins or salespeople.',
+      );
+    }
+  }
+
+  private shouldCreatePositionFromDto(
+    dto: Partial<Pick<CreateOpportunityDto, 'positionTitle' | 'positionDescription' | 'positionRequirements'>>,
+  ): boolean {
+    return Boolean(
+      dto.positionTitle?.trim() ||
+        dto.positionDescription?.trim() ||
+        dto.positionRequirements?.trim(),
+    );
   }
 
   private async notifyRecruiters(
@@ -398,7 +423,7 @@ export class OpportunitiesService {
     const customer = await this.findCustomerSummary(resolvedCustomerId);
 
     if (createDto.assignedToId) {
-      await this.ensureUserExists(createDto.assignedToId);
+      await this.ensureEligibleAssignee(createDto.assignedToId);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -423,10 +448,8 @@ export class OpportunitiesService {
         } as Prisma.OpportunityUncheckedCreateInput,
       });
 
-      if (
-        createDto.type === CustomerType.STAFF_AUGMENTATION ||
-        createDto.type === CustomerType.BOTH
-      ) {
+      const shouldCreatePosition = this.shouldCreatePositionFromDto(createDto);
+      if (shouldCreatePosition) {
         await tx.openPosition.create({
           data: {
             opportunityId: opportunity.id,
@@ -439,7 +462,12 @@ export class OpportunitiesService {
             status: 'Open',
           },
         });
+      }
 
+      if (
+        createDto.type === CustomerType.STAFF_AUGMENTATION ||
+        createDto.type === CustomerType.BOTH
+      ) {
         await this.notifyRecruiters(tx, {
           opportunityId: opportunity.id,
           opportunityTitle: createDto.title,
@@ -531,7 +559,7 @@ export class OpportunitiesService {
       updateDto.assignedToId &&
       updateDto.assignedToId !== existing.assignedToId
     ) {
-      await this.ensureUserExists(updateDto.assignedToId);
+      await this.ensureEligibleAssignee(updateDto.assignedToId);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -568,20 +596,55 @@ export class OpportunitiesService {
         updateDto.positionRequirements !== undefined ||
         updateDto.description !== undefined ||
         updateDto.title !== undefined;
+      const shouldCreatePosition = this.shouldCreatePositionFromDto(updateDto);
 
-      if (requiresOpenPosition) {
-        await tx.openPosition.upsert({
-          where: { opportunityId: updated.id },
-          update: {
-            title: updateDto.positionTitle ?? updateDto.title ?? updated.title,
-            description:
-              updateDto.positionDescription ??
-              updateDto.description ??
-              updated.description ??
-              'TBD',
-            requirements: updateDto.positionRequirements,
-          },
-          create: {
+      if (existing.openPosition) {
+        if (shouldCreatePosition) {
+          await tx.openPosition.update({
+            where: { id: existing.openPosition.id },
+            data: {
+              title:
+                updateDto.positionTitle ??
+                updateDto.title ??
+                existing.openPosition.title,
+              description:
+                updateDto.positionDescription ??
+                updateDto.description ??
+                existing.openPosition.description ??
+                'TBD',
+              requirements:
+                updateDto.positionRequirements ??
+                existing.openPosition.requirements,
+            },
+          });
+        }
+
+        if (!requiresOpenPosition) {
+          await tx.openPosition.update({
+            where: { id: existing.openPosition.id },
+            data: {
+              status: 'Cancelled',
+              ...(positionFieldsProvided
+                ? {
+                    title:
+                      updateDto.positionTitle ??
+                      updateDto.title ??
+                      existing.openPosition.title,
+                    description:
+                      updateDto.positionDescription ??
+                      updateDto.description ??
+                      existing.openPosition.description,
+                    requirements:
+                      updateDto.positionRequirements ??
+                      existing.openPosition.requirements,
+                  }
+                : {}),
+            },
+          });
+        }
+      } else if (shouldCreatePosition) {
+        await tx.openPosition.create({
+          data: {
             opportunityId: updated.id,
             title: updateDto.positionTitle ?? updateDto.title ?? updated.title,
             description:
@@ -591,28 +654,6 @@ export class OpportunitiesService {
               'TBD',
             requirements: updateDto.positionRequirements,
             status: 'Open',
-          },
-        });
-      } else if (existing.openPosition) {
-        await tx.openPosition.update({
-          where: { opportunityId: existing.id },
-          data: {
-            status: 'Cancelled',
-            ...(positionFieldsProvided
-              ? {
-                  title:
-                    updateDto.positionTitle ??
-                    updateDto.title ??
-                    existing.openPosition.title,
-                  description:
-                    updateDto.positionDescription ??
-                    updateDto.description ??
-                    existing.openPosition.description,
-                  requirements:
-                    updateDto.positionRequirements ??
-                    existing.openPosition.requirements,
-                }
-              : {}),
           },
         });
       }

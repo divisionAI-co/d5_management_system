@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { opportunitiesApi, customersApi, leadsApi } from '@/lib/api/crm';
 import { usersApi } from '@/lib/api/users';
+import { DEFAULT_OPPORTUNITY_STAGE, OPPORTUNITY_STAGES } from '@/constants/opportunities';
+import { useOpportunityStagesStore } from '@/lib/stores/opportunity-stages-store';
 import type {
   CreateOpportunityPayload,
   OpportunityDetail,
@@ -33,17 +35,6 @@ type FormValues = {
   positionRequirements?: string;
 };
 
-const DEFAULT_STAGE = 'Discovery';
-const STAGE_OPTIONS = [
-  'Prospecting',
-  'Discovery',
-  'Qualification',
-  'Proposal',
-  'Negotiation',
-  'Contract',
-  'Closed Won',
-  'Closed Lost',
-];
 const CUSTOMER_TYPE_OPTIONS: Array<{ label: string; value: CustomerType }> = [
   { label: 'Staff Augmentation', value: 'STAFF_AUGMENTATION' },
   { label: 'Software Subscription', value: 'SOFTWARE_SUBSCRIPTION' },
@@ -53,6 +44,8 @@ const CUSTOMER_TYPE_OPTIONS: Array<{ label: string; value: CustomerType }> = [
 export function OpportunityForm({ opportunityId, onClose, onSuccess }: OpportunityFormProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(opportunityId);
+  const stageStoreStages = useOpportunityStagesStore((state) => state.stages);
+  const registerStages = useOpportunityStagesStore((state) => state.registerStages);
 
   const opportunityQuery = useQuery({
     queryKey: ['opportunity', opportunityId],
@@ -194,6 +187,33 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
   }, [baseLeads, opportunity]);
 
   const users = usersQuery.data?.data ?? [];
+  const eligibleUsers = useMemo(
+    () =>
+      users.filter(
+        (user) =>
+          user.isActive && (user.role === 'ADMIN' || user.role === 'SALESPERSON'),
+      ),
+    [users],
+  );
+  const stageOptions = useMemo(() => {
+    if (
+      opportunity?.stage &&
+      !stageStoreStages.some(
+        (stage) => stage.toLowerCase() === opportunity.stage.toLowerCase(),
+      )
+    ) {
+      return [...stageStoreStages, opportunity.stage];
+    }
+    return stageStoreStages.length > 0 ? stageStoreStages : OPPORTUNITY_STAGES;
+  }, [stageStoreStages, opportunity?.stage]);
+
+  const defaultStageValue = stageOptions[0] ?? DEFAULT_OPPORTUNITY_STAGE;
+
+  useEffect(() => {
+    if (opportunity?.stage) {
+      registerStages([opportunity.stage]);
+    }
+  }, [opportunity?.stage, registerStages]);
 
   const defaultValues = useMemo<FormValues>(() => {
     if (!opportunity) {
@@ -204,7 +224,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
         description: '',
         type: 'STAFF_AUGMENTATION',
         value: 0,
-        stage: DEFAULT_STAGE,
+        stage: defaultStageValue,
         assignedToId: undefined,
         jobDescriptionUrl: '',
         positionTitle: '',
@@ -220,14 +240,14 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
       description: opportunity.description ?? '',
       type: opportunity.type,
       value: opportunity.value ?? 0,
-      stage: opportunity.stage ?? DEFAULT_STAGE,
+      stage: opportunity.stage ?? defaultStageValue,
       assignedToId: opportunity.assignedToId ?? undefined,
       jobDescriptionUrl: opportunity.jobDescriptionUrl ?? '',
       positionTitle: opportunity.openPosition?.title ?? '',
       positionDescription: opportunity.openPosition?.description ?? '',
       positionRequirements: opportunity.openPosition?.requirements ?? '',
     };
-  }, [opportunity]);
+  }, [opportunity, defaultStageValue]);
 
   const {
     register,
@@ -290,7 +310,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
       value: Number.isFinite(values.value) ? values.value : 0,
       assignedToId: values.assignedToId || undefined,
       jobDescriptionUrl: values.jobDescriptionUrl || undefined,
-      stage: values.stage || DEFAULT_STAGE,
+      stage: values.stage || DEFAULT_OPPORTUNITY_STAGE,
     };
 
     if (requiresPositionDetails) {
@@ -425,17 +445,16 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Stage<span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
-                list="stage-options"
+              <select
                 {...register('stage', { required: 'Stage is required' })}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              />
-              <datalist id="stage-options">
-                {STAGE_OPTIONS.map((stage) => (
-                  <option key={stage} value={stage} />
+              >
+                {stageOptions.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {stage}
+                  </option>
                 ))}
-              </datalist>
+              </select>
               {errors.stage ? <p className="mt-1 text-sm text-rose-600">{errors.stage.message}</p> : null}
             </div>
             <div>
@@ -462,12 +481,15 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Unassigned</option>
-                {users.map((user) => (
+                {eligibleUsers.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.firstName} {user.lastName} ({user.role})
                   </option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Only active admins and salespeople can own opportunities.
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">Job Description URL</label>

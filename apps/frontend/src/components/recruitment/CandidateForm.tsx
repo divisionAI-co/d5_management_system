@@ -6,6 +6,7 @@ import { candidatesApi } from '@/lib/api/recruitment';
 import { googleDriveApi } from '@/lib/api/google-drive';
 import type {
   Candidate,
+  CandidateRecruiter,
   CandidateStage,
   CreateCandidateDto,
   UpdateCandidateDto,
@@ -49,12 +50,19 @@ const DEFAULT_FORM_VALUES: CreateCandidateDto = {
   driveFolderId: '',
   driveFolderUrl: '',
   isActive: true,
+  recruiterId: '',
 };
 
 export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormProps) {
   const isEdit = Boolean(candidate);
   const queryClient = useQueryClient();
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const recruitersQuery = useQuery({
+    queryKey: ['candidate-recruiters', 'form'],
+    queryFn: () => candidatesApi.listRecruiters(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const recruiterOptions: CandidateRecruiter[] = recruitersQuery.data ?? [];
 
   const initialValues: CreateCandidateDto = useMemo(() => {
     if (!candidate) {
@@ -86,6 +94,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
       driveFolderId: candidate.driveFolderId ?? '',
       driveFolderUrl: candidate.driveFolderUrl ?? '',
       isActive: candidate.isActive ?? true,
+      recruiterId: candidate.recruiter?.id ?? '',
     };
   }, [candidate]);
 
@@ -155,6 +164,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
       'githubUrl',
       'portfolioUrl',
       'resume',
+      'recruiterId',
     ];
 
     optionalStringFields.forEach((field) => {
@@ -198,6 +208,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
   const formStage = watch('stage') as CandidateStage | undefined;
   const skillsValue = watch('skills');
   const driveFolderIdValue = watch('driveFolderId') as string | undefined;
+  const recruiterValue = watch('recruiterId') as string | undefined;
   // const driveFolderUrlValue = watch('driveFolderUrl');
   const resolvedDriveFolderId = driveFolderIdValue && driveFolderIdValue.trim().length > 0
     ? driveFolderIdValue.trim()
@@ -679,6 +690,34 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                       className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     />
                   </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                    Recruiter
+                  </label>
+                  <select
+                    value={recruiterValue ?? ''}
+                    onChange={(event) =>
+                      setValue('recruiterId', event.target.value, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      })
+                    }
+                    className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="">
+                      {recruitersQuery.isLoading ? 'Loading recruiters…' : 'Unassigned'}
+                    </option>
+                    {recruiterOptions.map((recruiter) => (
+                      <option key={recruiter.id} value={recruiter.id}>
+                        {recruiter.firstName} {recruiter.lastName}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Assign the recruiter responsible for shepherding this candidate.
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">

@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldAlert, ShieldCheck, UserPlus, RefreshCcw, Trash2, X, Wand2, Loader2 } from 'lucide-react';
+import {
+  ShieldAlert,
+  ShieldCheck,
+  UserPlus,
+  RefreshCcw,
+  Trash2,
+  X,
+  Wand2,
+  Loader2,
+  Mail,
+} from 'lucide-react';
 
 import { usersApi } from '@/lib/api/users';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -129,6 +139,16 @@ export function UserManagementPanel() {
     },
     onError: () => {
       setErrorMessage('Unable to delete user at this time.');
+    },
+  });
+
+  const resendResetMutation = useMutation({
+    mutationFn: (id: string) => usersApi.resendPasswordReset(id),
+    onSuccess: () => {
+      setFeedback('Password reset email sent.');
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message ?? 'Unable to resend password reset email.');
     },
   });
 
@@ -267,6 +287,10 @@ export function UserManagementPanel() {
     ) {
       deleteMutation.mutate(userRecord.id);
     }
+  };
+
+  const handleResendReset = (userRecord: UserSummary) => {
+    resendResetMutation.mutate(userRecord.id);
   };
 
   const handleFilterChange = <K extends keyof UserListFilters>(key: K, value: UserListFilters[K]) => {
@@ -458,6 +482,24 @@ export function UserManagementPanel() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleResendReset(userRecord)}
+                          disabled={!userRecord.isActive || resendResetMutation.isPending}
+                          className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          title={
+                            userRecord.isActive
+                              ? 'Send password reset link to this user'
+                              : 'User must be active to receive reset link'
+                          }
+                        >
+                          {resendResetMutation.isPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Mail className="h-3.5 w-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Send reset</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => openEditForm(userRecord)}
