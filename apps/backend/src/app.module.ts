@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { configValidationSchema } from './common/config/config.schema';
 
 // Core modules
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -48,13 +49,21 @@ import { AiActionsModule } from './modules/ai-actions/ai-actions.module';
 // Services
 import { EmailModule } from './common/email/email.module';
 import { PdfModule } from './common/pdf/pdf.module';
+import { EncryptionModule } from './common/encryption/encryption.module';
+import { RateLimitingModule } from './common/rate-limiting/rate-limiting.module';
+import { CacheModule } from './common/cache/cache.module';
 
 @Module({
   imports: [
-    // Configuration
+    // Configuration with validation
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validationSchema: configValidationSchema,
+      validationOptions: {
+        allowUnknown: true,
+        abortEarly: false,
+      },
     }),
 
     // Scheduling for cron jobs
@@ -113,6 +122,9 @@ import { PdfModule } from './common/pdf/pdf.module';
     // Services
     EmailModule,
     PdfModule,
+    EncryptionModule,
+    RateLimitingModule,
+    CacheModule,
   ],
 })
 export class AppModule {}

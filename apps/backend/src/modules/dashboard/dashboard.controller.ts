@@ -1,9 +1,11 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, UseInterceptors } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Version } from '@nestjs/common';
+import { Cache } from '../../common/decorators/cache.decorator';
+import { CacheInterceptor } from '../../common/interceptors/cache.interceptor';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -15,6 +17,8 @@ export class DashboardController {
   @Get('me')
   @Version('1')
   @ApiOperation({ summary: 'Get current user dashboard overview' })
+  @UseInterceptors(CacheInterceptor)
+  @Cache(300, 'dashboard') // Cache for 5 minutes (300 seconds)
   getMyDashboard(@CurrentUser('id') userId: string) {
     return this.dashboardService.getMyDashboard(userId);
   }

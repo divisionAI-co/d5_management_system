@@ -47,19 +47,19 @@ print_header() {
 }
 
 print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo -e "${GREEN}âœ… $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}❌ $1${NC}"
+    echo -e "${RED}âŒ $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+    echo -e "${YELLOW}âš ï¸  $1${NC}"
 }
 
 print_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
+    echo -e "${BLUE}â„¹ï¸  $1${NC}"
 }
 
 # Parse command line arguments
@@ -400,7 +400,7 @@ deploy_remote() {
         fi
     fi
     
-    print_header "Remote Deployment Complete! 🎉"
+    print_header "Remote Deployment Complete! ðŸŽ‰"
     print_success "Application has been deployed to $REMOTE_USER@$REMOTE_HOST"
 }
 
@@ -644,6 +644,7 @@ get_user_input() {
     if [ "$NON_INTERACTIVE" = true ]; then
         JWT_SECRET="${DEPLOY_JWT_SECRET:-$(openssl rand -base64 32)}"
         JWT_REFRESH_SECRET="${DEPLOY_JWT_REFRESH_SECRET:-$(openssl rand -base64 32)}"
+        ENCRYPTION_KEY="${DEPLOY_ENCRYPTION_KEY:-$(openssl rand -hex 32)}"
         if [ -n "$DEPLOY_JWT_SECRET" ]; then
             print_info "Using JWT secret from DEPLOY_JWT_SECRET"
         else
@@ -654,9 +655,15 @@ get_user_input() {
         else
             print_info "Generated JWT refresh secret"
         fi
+        if [ -n "$DEPLOY_ENCRYPTION_KEY" ]; then
+            print_info "Using encryption key from DEPLOY_ENCRYPTION_KEY"
+        else
+            print_info "Generated encryption key"
+        fi
     else
         read -p "Enter JWT secret (or press Enter to generate): " JWT_SECRET
         read -p "Enter JWT refresh secret (or press Enter to generate): " JWT_REFRESH_SECRET
+        read -p "Enter encryption key (64 hex characters, or press Enter to generate): " ENCRYPTION_KEY
         
         # Generate secrets if not provided
         if [ -z "$JWT_SECRET" ]; then
@@ -668,6 +675,30 @@ get_user_input() {
             JWT_REFRESH_SECRET=$(openssl rand -base64 32)
             print_info "Generated JWT refresh secret"
         fi
+        
+        if [ -z "$ENCRYPTION_KEY" ]; then
+            ENCRYPTION_KEY=$(openssl rand -hex 32)
+            print_info "Generated encryption key (64 hex characters)"
+        else
+            # Validate encryption key format (must be 64 hex characters)
+            if ! [[ "$ENCRYPTION_KEY" =~ ^[0-9a-fA-F]{64}$ ]]; then
+                print_error "Encryption key must be exactly 64 hexadecimal characters"
+                print_info "Generating a new encryption key..."
+                ENCRYPTION_KEY=$(openssl rand -hex 32)
+                print_info "Generated encryption key (64 hex characters)"
+            fi
+        fi
+    fi
+    
+    # Validate JWT secrets length (minimum 32 characters)
+    if [ ${#JWT_SECRET} -lt 32 ]; then
+        print_error "JWT_SECRET must be at least 32 characters long"
+        exit 1
+    fi
+    
+    if [ ${#JWT_REFRESH_SECRET} -lt 32 ]; then
+        print_error "JWT_REFRESH_SECRET must be at least 32 characters long"
+        exit 1
     fi
 }
 
@@ -1258,6 +1289,20 @@ configure_backend() {
         FRONTEND_URL="http://localhost:5173"
     fi
     
+    # Rate limiting configuration (with defaults)
+    local RATE_LIMIT_WINDOW_MS="${DEPLOY_RATE_LIMIT_WINDOW_MS:-900000}"  # 15 minutes
+    local RATE_LIMIT_MAX_ATTEMPTS="${DEPLOY_RATE_LIMIT_MAX_ATTEMPTS:-5}"
+    local MAX_FAILED_LOGIN_ATTEMPTS="${DEPLOY_MAX_FAILED_LOGIN_ATTEMPTS:-5}"
+    local ACCOUNT_LOCKOUT_DURATION_MS="${DEPLOY_ACCOUNT_LOCKOUT_DURATION_MS:-1800000}"  # 30 minutes
+    
+    # Determine CORS_ORIGINS
+    local CORS_ORIGINS="${DEPLOY_CORS_ORIGINS:-}"
+    if [ -z "$CORS_ORIGINS" ] && [ -n "$DOMAIN" ]; then
+        CORS_ORIGINS="https://${DOMAIN},https://www.${DOMAIN}"
+    elif [ -z "$CORS_ORIGINS" ]; then
+        CORS_ORIGINS="http://localhost:5173"
+    fi
+    
     # If .env exists, try to preserve existing values for optional configs
     if [ -f .env ]; then
         print_info "Preserving existing configuration values from .env..."
@@ -1273,6 +1318,12 @@ configure_backend() {
         [ -z "$GOOGLE_CALENDAR_REDIRECT_URI" ] && GOOGLE_CALENDAR_REDIRECT_URI=$(grep "^GOOGLE_CALENDAR_REDIRECT_URI=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
         [ -z "$GEMINI_API_KEY" ] && GEMINI_API_KEY=$(grep "^GEMINI_API_KEY=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
         [ -z "$FRONTEND_URL" ] && FRONTEND_URL=$(grep "^FRONTEND_URL=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+        [ -z "$ENCRYPTION_KEY" ] && ENCRYPTION_KEY=$(grep "^ENCRYPTION_KEY=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+        [ -z "$CORS_ORIGINS" ] && CORS_ORIGINS=$(grep "^CORS_ORIGINS=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+        [ -z "$RATE_LIMIT_WINDOW_MS" ] && RATE_LIMIT_WINDOW_MS=$(grep "^RATE_LIMIT_WINDOW_MS=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "900000")
+        [ -z "$RATE_LIMIT_MAX_ATTEMPTS" ] && RATE_LIMIT_MAX_ATTEMPTS=$(grep "^RATE_LIMIT_MAX_ATTEMPTS=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "5")
+        [ -z "$MAX_FAILED_LOGIN_ATTEMPTS" ] && MAX_FAILED_LOGIN_ATTEMPTS=$(grep "^MAX_FAILED_LOGIN_ATTEMPTS=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "5")
+        [ -z "$ACCOUNT_LOCKOUT_DURATION_MS" ] && ACCOUNT_LOCKOUT_DURATION_MS=$(grep "^ACCOUNT_LOCKOUT_DURATION_MS=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "1800000")
     fi
     
     # Generate .env with comprehensive structure
@@ -1293,13 +1344,18 @@ DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}?s
 # ============================================
 JWT_SECRET=${JWT_SECRET}
 JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-JWT_EXPIRES_IN=7d
+JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=30d
+
+# ============================================
+# ENCRYPTION (for sensitive data at rest)
+# ============================================
+ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
 # ============================================
 # CORS
 # ============================================
-CORS_ORIGINS=${DOMAIN:+https://${DOMAIN},https://www.${DOMAIN}}http://localhost:5173
+CORS_ORIGINS=${CORS_ORIGINS}
 
 # ============================================
 # API
@@ -1350,6 +1406,14 @@ GEMINI_MODEL_ID=${GEMINI_MODEL_ID:-gemini-1.5-pro-latest}
 # FRONTEND URL (for email links)
 # ============================================
 FRONTEND_URL=${FRONTEND_URL}
+
+# ============================================
+# RATE LIMITING & ACCOUNT LOCKOUT
+# ============================================
+RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS}
+RATE_LIMIT_MAX_ATTEMPTS=${RATE_LIMIT_MAX_ATTEMPTS}
+MAX_FAILED_LOGIN_ATTEMPTS=${MAX_FAILED_LOGIN_ATTEMPTS}
+ACCOUNT_LOCKOUT_DURATION_MS=${ACCOUNT_LOCKOUT_DURATION_MS}
 EOF
     
     print_success "Backend configured"
@@ -1750,7 +1814,7 @@ create_deploy_script() {
 #!/bin/bash
 set -e
 
-echo "🚀 Starting update..."
+echo "ðŸš€ Starting update..."
 
 cd /home/d5app/d5-management
 
@@ -1778,7 +1842,7 @@ npm run build
 cd ../..
 pm2 restart d5-backend
 
-echo "✅ Update complete!"
+echo "âœ… Update complete!"
 UPDATE_EOF
     
     sudo chmod +x $APP_DIR/update.sh
@@ -1842,7 +1906,7 @@ main() {
     create_deploy_script
     
     # Final summary
-    print_header "Deployment Complete! 🎉"
+    print_header "Deployment Complete! ðŸŽ‰"
     
     echo -e "\n${GREEN}Application Information:${NC}"
     if [ "$NGINX_PORT" = "80" ]; then
@@ -1885,11 +1949,16 @@ main() {
     echo "  Admin: admin@d5.com / admin123"
     echo "  Sales: sales@d5.com / sales123"
     
-    echo -e "\n${YELLOW}⚠️  Important:${NC}"
+    echo -e "\n${YELLOW}âš ï¸  Important:${NC}"
     echo "  - Change default passwords in production!"
     echo "  - Configure email, Google Drive, and Gemini API as needed"
     echo "  - Set up database backups"
     echo "  - Review security settings"
+    echo "  - Security features enabled:"
+    echo "    â€¢ Encryption at rest (ENCRYPTION_KEY)"
+    echo "    â€¢ Rate limiting & account lockout"
+    echo "    â€¢ Secure token handling (HttpOnly cookies)"
+    echo "    â€¢ CORS protection (CORS_ORIGINS)"
     
     echo -e "\n"
 }

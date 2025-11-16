@@ -19,12 +19,12 @@ export default function LoginPage() {
 
     try {
       const response = await apiClient.post('/auth/login', { email, password });
-      const { user, accessToken, refreshToken, requiresTwoFactor } = response.data;
+      const { user, accessToken, requiresTwoFactor } = response.data;
 
       if (requiresTwoFactor) {
         navigate('/auth/2fa', { state: { email, password } });
       } else {
-        setAuth(user, accessToken, refreshToken);
+        setAuth(user, accessToken);
         navigate('/');
       }
     } catch (err: any) {

@@ -15,7 +15,7 @@ export class PdfService {
       const executablePath = this.configService.get<string>('PUPPETEER_EXECUTABLE_PATH');
       
       this.browser = await puppeteer.launch({
-        headless: 'new',
+        headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
         ...(executablePath && { executablePath }),
       });

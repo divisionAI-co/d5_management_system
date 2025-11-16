@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -70,6 +71,13 @@ export class OpenPositionsController {
   @ApiOperation({ summary: 'Mark a position as filled' })
   close(@Param('id') id: string, @Body() closeDto: ClosePositionDto) {
     return this.positionsService.close(id, closeDto);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({ summary: 'Delete a job position' })
+  remove(@Param('id') id: string) {
+    return this.positionsService.remove(id);
   }
 }
 

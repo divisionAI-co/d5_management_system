@@ -46,7 +46,6 @@ Thumbs.db
 *.iml
 
 # Prisma
-apps/backend/prisma/migrations/
 *.db
 *.db-journal
 

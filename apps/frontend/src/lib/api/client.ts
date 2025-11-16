@@ -8,6 +8,8 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Allow backend to set/read HttpOnly cookies for refresh tokens
+  withCredentials: true,
 });
 
 // Request interceptor to add auth token
@@ -31,24 +33,23 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
-      const refreshToken = useAuthStore.getState().refreshToken;
-
-      if (!refreshToken) {
-        return Promise.reject(error);
-      }
-
       originalRequest._retry = true;
 
       try {
-        const response = await axios.post(`${API_URL}/auth/refresh`, {
-          refreshToken,
-        });
+        // Refresh token is sent via HttpOnly cookie; no body payload needed
+        const response = await axios.post(
+          `${API_URL}/auth/refresh`,
+          {},
+          {
+            withCredentials: true,
+          }
+        );
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        const { accessToken } = response.data;
         const user = useAuthStore.getState().user;
 
-        if (user) {
-          useAuthStore.getState().setAuth(user, accessToken, newRefreshToken);
+        if (user && accessToken) {
+          useAuthStore.getState().setAuth(user, accessToken);
         }
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;

@@ -9,6 +9,7 @@ import { google } from 'googleapis';
 import type { Credentials } from 'google-auth-library';
 import type { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { EncryptionService } from '../../common/encryption/encryption.service';
 
 export interface GoogleOAuthConfig {
   clientIdEnvKey: string;
@@ -36,6 +37,7 @@ export class GoogleOAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   /**
@@ -51,8 +53,12 @@ export class GoogleOAuthService {
       },
     });
 
+    // Note: We don't decrypt tokens here, just check if they exist
+    const hasTokens = Boolean(
+      connection?.accessToken && connection?.refreshToken,
+    );
     return {
-      connected: Boolean(connection?.accessToken && connection?.refreshToken),
+      connected: hasTokens,
       externalEmail: connection?.externalEmail ?? null,
       externalAccountId: connection?.externalAccountId ?? null,
       expiresAt: connection?.expiresAt ?? null,
@@ -196,9 +202,17 @@ export class GoogleOAuthService {
     // Create OAuth client - redirect URI is not needed for token refresh
     const oauthClient = this.createOAuthClient(config);
 
+    // Decrypt tokens before using them
+    const decryptedAccessToken = connection.accessToken
+      ? this.encryptionService.decrypt(connection.accessToken)
+      : null;
+    const decryptedRefreshToken = connection.refreshToken
+      ? this.encryptionService.decrypt(connection.refreshToken)
+      : null;
+
     oauthClient.setCredentials({
-      access_token: connection.accessToken ?? undefined,
-      refresh_token: connection.refreshToken ?? undefined,
+      access_token: decryptedAccessToken ?? undefined,
+      refresh_token: decryptedRefreshToken ?? undefined,
       expiry_date: connection.expiresAt ? connection.expiresAt.getTime() : undefined,
       scope: connection.scope ?? undefined,
     });
@@ -269,7 +283,7 @@ export class GoogleOAuthService {
   }
 
   /**
-   * Persist OAuth tokens for a user
+   * Persist OAuth tokens for a user (encrypted)
    */
   private async persistTokens(
     userId: string,
@@ -285,6 +299,14 @@ export class GoogleOAuthService {
         ? new Date(credentials.expiry_date)
         : null;
 
+    // Encrypt tokens before storing
+    const encryptedAccessToken = credentials.access_token
+      ? this.encryptionService.encrypt(credentials.access_token)
+      : null;
+    const encryptedRefreshToken = credentials.refresh_token
+      ? this.encryptionService.encrypt(credentials.refresh_token)
+      : null;
+
     await this.prisma.userCalendarIntegration.upsert({
       where: {
         userId_provider: {
@@ -295,16 +317,16 @@ export class GoogleOAuthService {
       create: {
         userId,
         provider,
-        accessToken: credentials.access_token ?? null,
-        refreshToken: credentials.refresh_token ?? null,
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
         expiresAt,
         scope: credentials.scope ?? null,
         externalEmail: metadata?.externalEmail ?? null,
         externalAccountId: metadata?.externalAccountId ?? null,
       },
       update: {
-        accessToken: credentials.access_token ?? null,
-        refreshToken: credentials.refresh_token ?? null,
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
         expiresAt,
         scope: credentials.scope ?? null,
         externalEmail: metadata?.externalEmail ?? null,

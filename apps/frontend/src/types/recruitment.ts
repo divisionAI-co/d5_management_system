@@ -214,6 +214,7 @@ export interface UpdatePositionDto {
   description?: string;
   requirements?: string;
   status?: PositionStatus;
+  opportunityId?: string | null;
 }
 
 export interface ClosePositionDto {

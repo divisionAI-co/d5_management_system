@@ -76,45 +76,66 @@ export class DashboardService {
     }
 
     const now = new Date();
-    const allReports = await this.prisma.eodReport.findMany({
-      where: { userId },
-      orderBy: { date: 'asc' },
-      select: {
-        id: true,
-        date: true,
-        isLate: true,
-        hoursWorked: true,
-        submittedAt: true,
-        summary: true,
-      },
-    });
-
-    const recentReports = [...allReports]
-      .slice(-3)
-      .reverse()
-      .map((report) => ({
-        id: report.id,
-        date: report.date.toISOString(),
-        isLate: report.isLate,
-        submittedAt: report.submittedAt ? report.submittedAt.toISOString() : null,
-        summary: report.summary,
-        hoursWorked:
-          report.hoursWorked !== undefined && report.hoursWorked !== null
-            ? Number(report.hoursWorked)
-            : null,
-      }));
-
-    const lateReportsCount = allReports.filter((report) => report.isLate).length;
-
-    const tasksDueSoon = await this.getTasksDueSoon(userId, now);
-    const activitiesDueSoon = await this.getActivitiesDueSoon(userId, now);
-
     const monthBoundaries = this.getMonthBoundaries(now);
     const referenceForMonth = this.toDateOnly(now) < monthBoundaries.end ? now : monthBoundaries.end;
 
-    const currentMonthReports = allReports.filter((report) =>
-      report.date >= monthBoundaries.start && report.date <= monthBoundaries.end,
-    );
+    // Optimized: Use database-level filtering and aggregation instead of loading all reports
+    const [recentReports, lateReportsCount, totalReportsCount, currentMonthReports] =
+      await Promise.all([
+        // Fetch only the 3 most recent reports
+        this.prisma.eodReport.findMany({
+          where: { userId },
+          orderBy: { date: 'desc' },
+          take: 3,
+          select: {
+            id: true,
+            date: true,
+            isLate: true,
+            hoursWorked: true,
+            submittedAt: true,
+            summary: true,
+          },
+        }),
+        // Use database aggregation for late reports count
+        this.prisma.eodReport.count({
+          where: {
+            userId,
+            isLate: true,
+          },
+        }),
+        // Use database aggregation for total reports count
+        this.prisma.eodReport.count({
+          where: { userId },
+        }),
+        // Fetch only current month reports for missing report calculation
+        this.prisma.eodReport.findMany({
+          where: {
+            userId,
+            date: {
+              gte: monthBoundaries.start,
+              lte: monthBoundaries.end,
+            },
+          },
+          select: {
+            date: true,
+          },
+        }),
+      ]);
+
+    const formattedRecentReports = recentReports.map((report) => ({
+      id: report.id,
+      date: report.date.toISOString(),
+      isLate: report.isLate,
+      submittedAt: report.submittedAt ? report.submittedAt.toISOString() : null,
+      summary: report.summary,
+      hoursWorked:
+        report.hoursWorked !== undefined && report.hoursWorked !== null
+          ? Number(report.hoursWorked)
+          : null,
+    }));
+
+    const tasksDueSoon = await this.getTasksDueSoon(userId, now);
+    const activitiesDueSoon = await this.getActivitiesDueSoon(userId, now);
 
     const missingCurrentMonth = await this.calculateMissingReports(
       userId,
@@ -133,13 +154,13 @@ export class DashboardService {
       stats: {
         missingReports: missingCurrentMonth.count,
         lateReports: lateReportsCount,
-        totalReports: allReports.length,
+        totalReports: totalReportsCount,
       },
       timeframe: {
         start: missingCurrentMonth.start,
         end: missingCurrentMonth.end,
       },
-      recentReports,
+      recentReports: formattedRecentReports,
       tasksDueSoon,
       activitiesDueSoon,
     };
@@ -322,14 +343,42 @@ export class DashboardService {
     const upperLimit = this.addDays(referenceDate, this.DAYS_LOOKBACK_FOR_ACTIVITIES);
     const lowerLimit = this.addDays(referenceDate, -this.DAYS_OVERDUE_WINDOW);
 
+    // Optimized: Filter at database level for reminderAt and activityDate
+    // Also fetch fewer records since we only need 10 results
     const activities = await this.prisma.activity.findMany({
       where: {
         createdById: userId,
+        OR: [
+          // Activities with reminderAt in the date range
+          {
+            reminderAt: {
+              gte: lowerLimit,
+              lte: upperLimit,
+            },
+          },
+          // Activities with activityDate in the date range
+          {
+            activityDate: {
+              gte: lowerLimit,
+              lte: upperLimit,
+            },
+          },
+          // Activities without explicit dates (may have dates in metadata)
+          // Fetch recent ones that might have metadata dates
+          {
+            AND: [
+              { reminderAt: null },
+              { activityDate: null },
+              { createdAt: { gte: this.addDays(referenceDate, -30) } }, // Last 30 days
+            ],
+          },
+        ],
       },
       orderBy: {
-        createdAt: 'desc',
+        // Order by reminderAt first (nulls will be last), then fall back to activityDate/createdAt in post-processing
+        reminderAt: 'asc',
       },
-      take: 50,
+      take: 30, // Reduced from 50 since we only need 10, but fetch extra for metadata filtering
       select: {
         id: true,
         subject: true,
@@ -351,71 +400,33 @@ export class DashboardService {
             color: true,
           },
         },
+        // Include related entities directly in the query
+        customer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        lead: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        opportunity: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+        task: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
       },
     });
-
-    const customerIds = Array.from(
-      new Set(
-        activities
-          .map((activity) => activity.customerId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-    const leadIds = Array.from(
-      new Set(
-        activities
-          .map((activity) => activity.leadId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-    const opportunityIds = Array.from(
-      new Set(
-        activities
-          .map((activity) => activity.opportunityId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-    const taskIds = Array.from(
-      new Set(
-        activities
-          .map((activity) => activity.taskId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
-
-    const [customers, leads, opportunities, tasks] = await Promise.all([
-      customerIds.length
-        ? this.prisma.customer.findMany({
-            where: { id: { in: customerIds } },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-      leadIds.length
-        ? this.prisma.lead.findMany({
-            where: { id: { in: leadIds } },
-            select: { id: true, title: true },
-          })
-        : Promise.resolve([]),
-      opportunityIds.length
-        ? this.prisma.opportunity.findMany({
-            where: { id: { in: opportunityIds } },
-            select: { id: true, title: true },
-          })
-        : Promise.resolve([]),
-      taskIds.length
-        ? this.prisma.task.findMany({
-            where: { id: { in: taskIds } },
-            select: { id: true, title: true },
-          })
-        : Promise.resolve([]),
-    ]);
-
-    const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
-    const leadMap = new Map(leads.map((lead) => [lead.id, lead.title]));
-    const opportunityMap = new Map(
-      opportunities.map((opportunity) => [opportunity.id, opportunity.title]),
-    );
-    const taskMap = new Map(tasks.map((task) => [task.id, task.title]));
 
     const reminders: ActivityReminder[] = activities
       .map((activity) => {
@@ -476,34 +487,30 @@ export class DashboardService {
           },
           dueDate: dueDate.toISOString(),
           related: {
-            customer:
-              activity.customerId && customerMap.has(activity.customerId)
-                ? {
-                    id: activity.customerId,
-                    name: customerMap.get(activity.customerId)!,
-                  }
-                : null,
-            lead:
-              activity.leadId && leadMap.has(activity.leadId)
-                ? {
-                    id: activity.leadId,
-                    title: leadMap.get(activity.leadId)!,
-                  }
-                : null,
-            opportunity:
-              activity.opportunityId && opportunityMap.has(activity.opportunityId)
-                ? {
-                    id: activity.opportunityId,
-                    title: opportunityMap.get(activity.opportunityId)!,
-                  }
-                : null,
-            task:
-              activity.taskId && taskMap.has(activity.taskId)
-                ? {
-                    id: activity.taskId,
-                    title: taskMap.get(activity.taskId)!,
-                  }
-                : null,
+            customer: activity.customer
+              ? {
+                  id: activity.customer.id,
+                  name: activity.customer.name,
+                }
+              : null,
+            lead: activity.lead
+              ? {
+                  id: activity.lead.id,
+                  title: activity.lead.title,
+                }
+              : null,
+            opportunity: activity.opportunity
+              ? {
+                  id: activity.opportunity.id,
+                  title: activity.opportunity.title,
+                }
+              : null,
+            task: activity.task
+              ? {
+                  id: activity.task.id,
+                  title: activity.task.title,
+                }
+              : null,
           },
           metadata: normalizedMetadata,
         };

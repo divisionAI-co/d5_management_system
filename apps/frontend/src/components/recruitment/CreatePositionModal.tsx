@@ -51,6 +51,7 @@ export function CreatePositionModal({
         search: opportunitySearch || undefined,
         page: 1,
         pageSize: 50,
+        // Don't filter by isClosed - show all opportunities, user can choose
       }),
   });
 
@@ -63,7 +64,6 @@ export function CreatePositionModal({
     register,
     handleSubmit,
     reset,
-    setValue,
     watch,
     formState: { errors },
   } = useForm<FormValues>({
@@ -71,6 +71,7 @@ export function CreatePositionModal({
       title: position?.title ?? defaultOpportunity?.title ?? '',
       description: position?.description ?? '',
       requirements: position?.requirements ?? '',
+      // Default to empty string (no opportunity link) when creating new position
       opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
       status: position?.status ?? 'Open',
     },
@@ -87,22 +88,6 @@ export function CreatePositionModal({
       status: position?.status ?? 'Open',
     });
   }, [defaultOpportunity, position, reset]);
-
-  useEffect(() => {
-    if (defaultOpportunity || position) {
-      return;
-    }
-    if (opportunities.length === 0) {
-      return;
-    }
-    const first = opportunities[0];
-    const selectionExists = opportunities.some(
-      (opportunity) => opportunity.id === selectedOpportunityId,
-    );
-    if (!selectedOpportunityId || !selectionExists) {
-      setValue('opportunityId', first.id, { shouldDirty: true });
-    }
-  }, [defaultOpportunity, position, opportunities, selectedOpportunityId, setValue]);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreatePositionDto) => positionsApi.create(payload),
@@ -136,6 +121,8 @@ export function CreatePositionModal({
         description: values.description?.trim() || undefined,
         requirements: values.requirements?.trim() || undefined,
         status: values.status,
+        // Include opportunityId in update to allow changing the link
+        opportunityId: values.opportunityId || undefined,
       };
       updateMutation.mutate({ id: position.id, payload });
       return;
@@ -234,67 +221,72 @@ export function CreatePositionModal({
             </div>
             </div>
 
-          {!isEditMode && (
-            <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Opportunity Link</p>
-                  <p className="text-xs text-muted-foreground">
-                    Optional. Link to an opportunity when you want CRM context for this role.
-                  </p>
-                </div>
-                {defaultOpportunity ? (
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                    Locked from opportunity
-                  </span>
+          <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Opportunity Link</p>
+                <p className="text-xs text-muted-foreground">
+                  Optional. Link to an opportunity when you want CRM context for this role.
+                </p>
+              </div>
+              {defaultOpportunity ? (
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  Locked from opportunity
+                </span>
+              ) : null}
+            </div>
+
+            {defaultOpportunity ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                <p className="font-semibold">{defaultOpportunity.title}</p>
+                {defaultOpportunity.customerName ? (
+                  <p className="text-xs text-blue-700">{defaultOpportunity.customerName}</p>
                 ) : null}
               </div>
-
-              {defaultOpportunity ? (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                  <p className="font-semibold">{defaultOpportunity.title}</p>
-                  {defaultOpportunity.customerName ? (
-                    <p className="text-xs text-blue-700">{defaultOpportunity.customerName}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        value={opportunitySearch}
-                        onChange={(event) => setOpportunitySearch(event.target.value)}
-                        placeholder="Search opportunity by title or client"
-                        className="w-full rounded-lg border border-border px-9 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                      />
-                    </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <input
+                      type="text"
+                      value={opportunitySearch}
+                      onChange={(event) => setOpportunitySearch(event.target.value)}
+                      placeholder="Search opportunity by title or client"
+                      className="w-full rounded-lg border border-border px-9 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
                   </div>
+                </div>
 
-                  {opportunitiesQuery.isLoading ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Loading opportunities...
-                    </div>
-                  ) : (
-                    <select
-                      {...register('opportunityId')}
-                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    >
-                      <option value="">No opportunity link</option>
-                      {opportunities.map((opportunity) => (
-                        <option key={opportunity.id} value={opportunity.id}>
-                          {opportunity.title}
-                          {opportunity.customer ? ` — ${opportunity.customer.name}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                {opportunitiesQuery.isLoading ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading opportunities...
+                  </div>
+                ) : opportunities.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+                    {opportunitySearch
+                      ? 'No opportunities found matching your search.'
+                      : 'No opportunities available.'}
+                  </div>
+                ) : (
+                  <select
+                    {...register('opportunityId')}
+                    value={selectedOpportunityId || ''}
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option value="">No opportunity link</option>
+                    {opportunities.map((opportunity) => (
+                      <option key={opportunity.id} value={opportunity.id}>
+                        {opportunity.title}
+                        {opportunity.customer ? ` — ${opportunity.customer.name}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
+            )}
+          </div>
 
           <div className="flex flex-col gap-3 border-t border-border pt-4 md:flex-row md:justify-end">
             <button

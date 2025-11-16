@@ -121,6 +121,23 @@ export default function OpenPositionsPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: positionsApi.delete,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      if (selectedPositionId === result.id) {
+        setSelectedPositionId(null);
+      }
+      setFeedback(`Position deleted successfully.`);
+    },
+    onError: (error: any) => {
+      setFeedback(
+        error?.response?.data?.message ||
+          'Failed to delete position. Please ensure no candidates are linked to this position.',
+      );
+    },
+  });
+
   const positions = positionsQuery.data?.data ?? [];
   const selectedPosition = selectedPositionQuery.data ?? null;
 
@@ -264,6 +281,14 @@ export default function OpenPositionsPage() {
         onSelect={handleSelectPosition}
         onClosePosition={handleClosePosition}
         onEdit={handleEditPositionFromSummary}
+        onDelete={(position) => {
+          const confirmDelete = window.confirm(
+            `Are you sure you want to delete "${position.title}"? This action cannot be undone.\n\nNote: Positions with linked candidates cannot be deleted.`,
+          );
+          if (confirmDelete) {
+            deleteMutation.mutate(position.id);
+          }
+        }}
       />
 
       {selectedPositionId && (
@@ -274,6 +299,14 @@ export default function OpenPositionsPage() {
           onChangeStatus={handleStatusChange}
           statusUpdating={updateStatusMutation.isPending || closeMutation.isPending}
           onEdit={handleEditPositionFromDetail}
+          onDelete={(position) => {
+            const confirmDelete = window.confirm(
+              `Are you sure you want to delete "${position.title}"? This action cannot be undone.\n\nNote: Positions with linked candidates cannot be deleted.`,
+            );
+            if (confirmDelete) {
+              deleteMutation.mutate(position.id);
+            }
+          }}
         />
       )}
 
@@ -306,6 +339,7 @@ interface PositionDetailDrawerProps {
   onChangeStatus: (position: OpenPosition, status: PositionStatus) => void;
   statusUpdating?: boolean;
   onEdit?: (position: OpenPosition) => void;
+  onDelete?: (position: OpenPosition) => void;
 }
 
 function PositionDetailDrawer({
@@ -315,6 +349,7 @@ function PositionDetailDrawer({
   onChangeStatus,
   statusUpdating,
   onEdit,
+  onDelete,
 }: PositionDetailDrawerProps) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
@@ -326,14 +361,24 @@ function PositionDetailDrawer({
               Review role requirements and candidate pipeline health.
             </p>
           </div>
-          {position && onEdit && (
-            <button
-              onClick={() => onEdit(position)}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted"
-            >
-              Edit Position
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {position && onEdit && (
+              <button
+                onClick={() => onEdit(position)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted"
+              >
+                Edit Position
+              </button>
+            )}
+            {position && onDelete && (
+              <button
+                onClick={() => onDelete(position)}
+                className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+              >
+                Delete
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-muted-foreground"

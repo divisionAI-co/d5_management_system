@@ -16,6 +16,7 @@ interface OpenPositionsTableProps {
   onSelect?: (position: OpenPositionSummary) => void;
   onClosePosition?: (position: OpenPositionSummary) => void;
   onEdit?: (position: OpenPositionSummary) => void;
+  onDelete?: (position: OpenPositionSummary) => void;
 }
 
 export function OpenPositionsTable({
@@ -24,6 +25,7 @@ export function OpenPositionsTable({
   onSelect,
   onClosePosition,
   onEdit,
+  onDelete,
 }: OpenPositionsTableProps) {
   const totalCandidates = useMemo(
     () =>
@@ -189,6 +191,15 @@ export function OpenPositionsTable({
                           className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
                         >
                           Mark Filled
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          type="button"
+                          onClick={() => onDelete(position)}
+                          className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                        >
+                          Delete
                         </button>
                       )}
                     </div>

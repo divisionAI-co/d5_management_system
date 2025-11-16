@@ -73,6 +73,13 @@ export const positionsApi = {
     >(`/recruitment/positions/${id}/candidates`);
     return data;
   },
+
+  async delete(id: string) {
+    const { data } = await apiClient.delete<{ message: string; id: string }>(
+      `/recruitment/positions/${id}`,
+    );
+    return data;
+  },
 };
 
 

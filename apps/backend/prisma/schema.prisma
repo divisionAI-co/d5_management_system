@@ -69,6 +69,8 @@ model User {
   aiActionExecutions    AiActionExecution[]       @relation("AiActionExecutionsTriggeredBy")
   sessions              UserSession[]
   recruitedCandidates   Candidate[]               @relation("CandidateRecruiter")
+  failedLoginAttempts   FailedLoginAttempt[]
+  accountLockout        AccountLockout?
 
   @@map("users")
 }
@@ -1358,4 +1360,46 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ============================================
+// RATE LIMITING & ACCOUNT SECURITY
+// ============================================
+
+model RateLimitAttempt {
+  id         String   @id @default(uuid())
+  identifier String   // IP address or username/email
+  type       String   // "ip" or "username"
+  success    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier, type])
+  @@index([createdAt])
+  @@map("rate_limit_attempts")
+}
+
+model FailedLoginAttempt {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("failed_login_attempts")
+}
+
+model AccountLockout {
+  id         String    @id @default(uuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lockedUntil DateTime
+  reason     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([lockedUntil])
+  @@map("account_lockouts")
 }

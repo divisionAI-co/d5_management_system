@@ -11,6 +11,7 @@ import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { EmailService } from '../../common/email/email.service';
+import { EncryptionService } from '../../common/encryption/encryption.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +23,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private encryptionService: EncryptionService,
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
@@ -45,7 +47,13 @@ export class AuthService {
     return result;
   }
 
-  async login(loginDto: LoginDto) {
+  async login(
+    loginDto: LoginDto,
+    sessionMetadata?: {
+      userAgent?: string;
+      ipAddress?: string;
+    },
+  ) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     // Check if 2FA is enabled
@@ -69,7 +77,9 @@ export class AuthService {
       data: { lastLoginAt: new Date() },
     });
 
-    const tokens = await this.generateTokens(user);
+    const tokens = await this.generateTokens(user, {
+      sessionMetadata,
+    });
     
     return {
       user,
@@ -315,10 +325,11 @@ export class AuthService {
       length: 32,
     });
 
-    // Store the secret temporarily (will be confirmed later)
+    // Store the secret temporarily (will be confirmed later) - encrypted
+    const encryptedSecret = this.encryptionService.encrypt(secret.base32);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorSecret: secret.base32 },
+      data: { twoFactorSecret: encryptedSecret },
     });
 
     // Generate QR code
@@ -337,8 +348,14 @@ export class AuthService {
       throw new BadRequestException('2FA secret not generated');
     }
 
+    // Decrypt the secret before verification
+    const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
+    if (!decryptedSecret) {
+      throw new BadRequestException('2FA secret is invalid');
+    }
+
     const isValid = speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret: decryptedSecret,
       encoding: 'base32',
       token: code,
       window: 2,
@@ -381,8 +398,14 @@ export class AuthService {
       return false;
     }
 
+    // Decrypt the secret before verification
+    const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
+    if (!decryptedSecret) {
+      return false;
+    }
+
     return speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret: decryptedSecret,
       encoding: 'base32',
       token: code,
       window: 2,

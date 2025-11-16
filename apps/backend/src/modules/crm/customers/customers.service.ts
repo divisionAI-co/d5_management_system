@@ -15,6 +15,7 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { FilterCustomersDto } from './dto/filter-customers.dto';
 import { UpdateCustomerStatusDto } from './dto/update-customer-status.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
+import { EncryptionService } from '../../../common/encryption/encryption.service';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -28,13 +29,21 @@ export interface PaginatedResult<T> {
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
-  private static formatCustomer(customer: any) {
+  private formatCustomer(customer: any) {
     const formatted = {
       ...customer,
       monthlyValue: customer?.monthlyValue
         ? Number(customer.monthlyValue)
+        : null,
+      // Decrypt sensitive fields
+      taxId: customer?.taxId ? this.encryptionService.decrypt(customer.taxId) : null,
+      registrationId: customer?.registrationId
+        ? this.encryptionService.decrypt(customer.registrationId)
         : null,
     };
 
@@ -96,8 +105,8 @@ export class CustomersService {
       city: createCustomerDto.city,
       country: createCustomerDto.country,
       postalCode: createCustomerDto.postalCode,
-      taxId: createCustomerDto.taxId,
-      registrationId: createCustomerDto.registrationId,
+      taxId: this.encryptionService.encrypt(createCustomerDto.taxId),
+      registrationId: this.encryptionService.encrypt(createCustomerDto.registrationId),
       currency: createCustomerDto.currency ?? 'USD',
       notes: createCustomerDto.notes,
       tags: createCustomerDto.tags ?? [],
@@ -184,7 +193,7 @@ export class CustomersService {
     ]);
 
     return {
-      data: items.map(CustomersService.formatCustomer),
+      data: items.map((item) => this.formatCustomer(item)),
       meta: {
         page,
         pageSize,
@@ -255,7 +264,7 @@ export class CustomersService {
       },
     });
 
-    return CustomersService.formatCustomer({
+    return this.formatCustomer({
       ...customer,
       contacts,
     });
@@ -280,8 +289,14 @@ export class CustomersService {
       city: updateCustomerDto.city,
       country: updateCustomerDto.country,
       postalCode: updateCustomerDto.postalCode,
-      taxId: updateCustomerDto.taxId,
-      registrationId: updateCustomerDto.registrationId,
+      taxId:
+        updateCustomerDto.taxId !== undefined
+          ? this.encryptionService.encrypt(updateCustomerDto.taxId)
+          : undefined,
+      registrationId:
+        updateCustomerDto.registrationId !== undefined
+          ? this.encryptionService.encrypt(updateCustomerDto.registrationId)
+          : undefined,
       currency: updateCustomerDto.currency,
       notes: updateCustomerDto.notes,
       tags: updateCustomerDto.tags,

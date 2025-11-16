@@ -348,7 +348,40 @@ export class OpenPositionsService {
   }
 
   async update(id: string, updateDto: UpdatePositionDto) {
-    await this.ensurePositionExists(id);
+    const existingPosition = await this.ensurePositionExists(id);
+
+    // If updating opportunityId, validate the new opportunity
+    if (updateDto.opportunityId !== undefined) {
+      if (updateDto.opportunityId === null || updateDto.opportunityId === '') {
+        // Unlinking opportunity - check if current position has one
+        if (existingPosition.opportunityId) {
+          // Allow unlinking
+        }
+      } else {
+        // Linking to a new opportunity - validate it exists and isn't already linked
+        const opportunity = await this.prisma.opportunity.findUnique({
+          where: { id: updateDto.opportunityId },
+          include: {
+            openPosition: {
+              select: { id: true },
+            },
+          },
+        });
+
+        if (!opportunity) {
+          throw new NotFoundException(
+            `Opportunity with ID ${updateDto.opportunityId} not found`,
+          );
+        }
+
+        // If opportunity is already linked to a different position, prevent the update
+        if (opportunity.openPosition && opportunity.openPosition.id !== id) {
+          throw new BadRequestException(
+            'This opportunity is already linked to another job position.',
+          );
+        }
+      }
+    }
 
     const position = await this.prisma.openPosition.update({
       where: { id },
@@ -357,6 +390,10 @@ export class OpenPositionsService {
         description: updateDto.description,
         requirements: updateDto.requirements,
         status: updateDto.status,
+        // Handle opportunityId update (can be null to unlink)
+        ...(updateDto.opportunityId !== undefined
+          ? { opportunityId: updateDto.opportunityId || null }
+          : {}),
       },
       include: {
         opportunity: {
@@ -459,6 +496,27 @@ export class OpenPositionsService {
           }
         : null,
     }));
+  }
+
+  async remove(id: string) {
+    await this.ensurePositionExists(id);
+
+    // Check if position has linked candidates
+    const candidateCount = await this.prisma.candidatePosition.count({
+      where: { positionId: id },
+    });
+
+    if (candidateCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete position with ${candidateCount} linked candidate(s). Please unlink candidates first or archive the position by changing its status to "Cancelled".`,
+      );
+    }
+
+    await this.prisma.openPosition.delete({
+      where: { id },
+    });
+
+    return { message: 'Position deleted successfully', id };
   }
 }
 

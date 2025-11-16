@@ -178,6 +178,8 @@ export class OpportunitiesService {
 
     const where = this.buildWhereClause(filters);
 
+    console.log('where', where);
+
     const [total, opportunities] = await this.prisma.$transaction([
       this.prisma.opportunity.count({ where }),
       this.prisma.opportunity.findMany({

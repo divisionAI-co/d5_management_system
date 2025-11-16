@@ -47,14 +47,14 @@ export default function TwoFactorPage() {
         twoFactorCode: code,
       });
 
-      const { user, accessToken, refreshToken, requiresTwoFactor } = response.data;
+      const { user, accessToken, requiresTwoFactor } = response.data;
 
       if (requiresTwoFactor) {
         setError('The code you entered is not valid. Try again.');
         return;
       }
 
-      setAuth(user, accessToken, refreshToken);
+      setAuth(user, accessToken);
       navigate('/', { replace: true });
     } catch (err: any) {
       setError(

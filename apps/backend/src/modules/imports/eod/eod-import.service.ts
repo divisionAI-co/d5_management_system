@@ -7,9 +7,11 @@ import { ImportStatus, Prisma } from '@prisma/client';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
-import * as XLSX from 'xlsx';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
+import { validateFileUpload } from '../../../common/config/multer.config';
+import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
 import { EodMapImportDto, EodFieldMappingEntry, EodImportField } from './dto/eod-map-import.dto';
 import { ExecuteEodImportDto } from './dto/execute-eod-import.dto';
 import {
@@ -162,36 +164,6 @@ export class EodImportService {
     await fs.mkdir(this.uploadDir, { recursive: true });
   }
 
-  private parseSheet(buffer: Buffer): ParsedSheet {
-    const workbook = XLSX.read(buffer, { type: 'buffer', raw: false });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) {
-      throw new BadRequestException('Uploaded file does not contain any data.');
-    }
-
-    const sheet = workbook.Sheets[sheetName];
-    const headerRows = XLSX.utils.sheet_to_json<string[]>(sheet, {
-      header: 1,
-      raw: false,
-      defval: '',
-      blankrows: false,
-    }) as unknown as string[][];
-
-    const headers =
-      headerRows?.[0]?.map((header) =>
-        header !== undefined && header !== null
-          ? String(header).trim()
-          : '',
-      ) ?? [];
-
-    const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
-      raw: false,
-      defval: '',
-      blankrows: false,
-    });
-
-    return { headers, rows };
-  }
 
   private normalizeRowValues(
     row: Record<string, any>,
@@ -212,16 +184,28 @@ export class EodImportService {
   }
 
   async uploadEodImport(file: Express.Multer.File): Promise<EodUploadResult> {
-    if (!file) {
-      throw new BadRequestException('A spreadsheet file must be provided.');
+    // Validate file upload (size, type)
+    try {
+      validateFileUpload(file, 10); // 10MB limit
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid file upload.',
+      );
     }
 
-    const lower = file.originalname.toLowerCase();
-    if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls') && !lower.endsWith('.csv')) {
-      throw new BadRequestException('Only Excel or CSV files exported from Odoo are supported.');
+    // Parse spreadsheet
+    let parsed;
+    try {
+      parsed = await parseSpreadsheet(file.buffer);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(
+        'Failed to parse file. Please ensure it is a valid CSV or Excel file.',
+      );
     }
 
-    const parsed = this.parseSheet(file.buffer);
     if (!parsed.headers.length) {
       throw new BadRequestException(
         'The uploaded file does not contain a header row.',
@@ -234,14 +218,18 @@ export class EodImportService {
     const sampleRows = sanitizedRows.slice(0, 5);
 
     await this.ensureUploadDir();
-    const storageName = `${Date.now()}_${randomUUID()}.xlsx`;
+    
+    // Sanitize filename before storing
+    const sanitizedOriginalName = sanitizeFilename(file.originalname);
+    const fileExtension = path.extname(sanitizedOriginalName) || '.xlsx';
+    const storageName = `${Date.now()}_${randomUUID()}${fileExtension}`;
     const storagePath = path.join(this.uploadDir, storageName);
     await fs.writeFile(storagePath, file.buffer);
 
     const importRecord = await this.prisma.dataImport.create({
       data: {
         type: 'eod_reports',
-        fileName: file.originalname,
+        fileName: sanitizedOriginalName,
         fileUrl: storageName,
         status: ImportStatus.PENDING,
         totalRecords: sanitizedRows.length,
@@ -262,7 +250,7 @@ export class EodImportService {
     return {
       id: importRecord.id,
       type: 'eod_reports',
-      fileName: file.originalname,
+      fileName: sanitizedOriginalName,
       columns: parsed.headers,
       sampleRows,
       totalRows: sanitizedRows.length,
@@ -364,7 +352,7 @@ export class EodImportService {
     }
 
     const buffer = await this.readImportFile(importRecord);
-    const parsed = this.parseSheet(buffer);
+    const parsed = await parseSpreadsheet(buffer);
 
     const mapping = this.validateMapping(parsed.headers, dto.mappings);
 
@@ -430,7 +418,7 @@ export class EodImportService {
     }
 
     const buffer = await this.readImportFile(importRecord);
-    const parsed = this.parseSheet(buffer);
+    const parsed = await parseSpreadsheet(buffer);
     const rows = parsed.rows.map((row) => this.normalizeRowValues(row));
 
     const updateExisting = dto.updateExisting ?? true;

@@ -33,6 +33,13 @@ export class UpdatePositionDto {
   @IsString()
   @IsOptional()
   status?: PositionStatus;
+
+  @ApiPropertyOptional({
+    description: 'Opportunity ID to link this position to (set to null to unlink)',
+  })
+  @IsOptional()
+  @IsString()
+  opportunityId?: string | null;
 }
 
 
