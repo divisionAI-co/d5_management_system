@@ -51,7 +51,7 @@ export default function CustomerDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showStatusForm, setShowStatusForm] = useState(false);
   const [showActivitySidebar, setShowActivitySidebar] = useState(
-    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+    (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
   );
   const [feedback, setFeedback] = useState<string | null>(null);
 

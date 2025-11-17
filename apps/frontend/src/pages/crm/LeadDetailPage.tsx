@@ -48,7 +48,7 @@ export default function LeadDetailPage() {
   const [showConvert, setShowConvert] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showActivities, setShowActivities] = useState(
-    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+    (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
   );
   const [feedback, setFeedback] = useState<string | null>(null);
 

@@ -51,7 +51,7 @@ export default function OpportunityDetailPage() {
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showActivities, setShowActivities] = useState(
-    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+    (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
   );
   const [feedback, setFeedback] = useState<string | null>(null);
 

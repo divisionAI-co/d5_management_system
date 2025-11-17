@@ -28,7 +28,7 @@ export default function CandidateDetailPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showActivitySidebar, setShowActivitySidebar] = useState(
-    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+    (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
   );
 
   // Open activity sidebar if navigating from notification or email link

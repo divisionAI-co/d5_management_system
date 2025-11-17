@@ -90,7 +90,7 @@ export default function EmployeeDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showActivitySidebar, setShowActivitySidebar] = useState(
-    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+    (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
   );
 
   // Open activity sidebar if navigating from notification or email link
