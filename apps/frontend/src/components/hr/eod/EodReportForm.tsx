@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 interface EodReportFormProps {
   report?: EodReport;
@@ -112,6 +113,8 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
     setError,
     control,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: initialValues,
@@ -323,12 +326,13 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
           <div>
             <label className="mb-1 block text-sm font-medium text-muted-foreground">Summary *</label>
-            <textarea
+            <MentionInput
+              value={watch('summary') || ''}
+              onChange={(value) => setValue('summary', value)}
               rows={4}
-              {...register('summary', { required: 'Summary is required' })}
-              placeholder="What were the highlights of your day?"
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              disabled={isDisabled}
+              placeholder="What were the highlights of your day? Type @ to mention someone"
+              multiline={true}
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:bg-muted disabled:cursor-not-allowed"
             />
             {errors.summary && (
               <p className="mt-1 text-sm text-red-600">{errors.summary.message}</p>

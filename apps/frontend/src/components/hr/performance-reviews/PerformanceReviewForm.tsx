@@ -8,6 +8,7 @@ import type {
   UpdatePerformanceReviewDto,
 } from '@/types/hr';
 import { X } from 'lucide-react';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 interface PerformanceReviewFormProps {
   review?: PerformanceReview;
@@ -58,6 +59,7 @@ export function PerformanceReviewForm({
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: review
@@ -292,33 +294,39 @@ export function PerformanceReviewForm({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Strengths</label>
-              <textarea
+              <MentionInput
+                value={watch('strengths') || ''}
+                onChange={(value) => setValue('strengths', value)}
                 rows={4}
-                {...register('strengths')}
+                placeholder="Key strengths demonstrated during the review period... Type @ to mention someone"
+                multiline={true}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                placeholder="Key strengths demonstrated during the review period..."
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Areas for Improvement
               </label>
-              <textarea
+              <MentionInput
+                value={watch('improvements') || ''}
+                onChange={(value) => setValue('improvements', value)}
                 rows={4}
-                {...register('improvements')}
+                placeholder="Development opportunities and areas for growth... Type @ to mention someone"
+                multiline={true}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                placeholder="Development opportunities and areas for growth..."
               />
             </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Goals</label>
-            <textarea
+            <MentionInput
+              value={watch('goals') || ''}
+              onChange={(value) => setValue('goals', value)}
               rows={4}
-              {...register('goals')}
+              placeholder="Objectives and goals for the next review cycle... Type @ to mention someone"
+              multiline={true}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="Objectives and goals for the next review cycle..."
             />
           </div>
 

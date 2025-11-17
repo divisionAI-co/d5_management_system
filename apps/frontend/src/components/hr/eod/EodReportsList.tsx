@@ -47,28 +47,99 @@ export function EodReportsList({
     }
   }, [filterUserId]);
 
-  const { data: reports, isLoading } = useQuery({
-    queryKey: ['eod-reports', filterUserId, isPrivileged, user?.id],
+  const { data: reportsResponse, isLoading } = useQuery({
+    queryKey: [
+      'eod-reports',
+      filterUserId || selectedEmployee,
+      startDate,
+      endDate,
+      page,
+      pageSize,
+      isPrivileged,
+      user?.id,
+    ],
     queryFn: async () => {
-      if (isPrivileged) {
-        if (filterUserId) {
-          return eodReportsApi.getAll({ userId: filterUserId });
-        }
-        return eodReportsApi.getAll();
-      }
+      const filters = {
+        page,
+        pageSize,
+        startDate,
+        endDate,
+        userId: filterUserId || selectedEmployee || undefined,
+      };
 
-      // Non-privileged users can only view their own submissions.
-      return eodReportsApi.getMine();
+      console.log('EOD: Fetching with filters:', filters);
+
+      const result = isPrivileged
+        ? await eodReportsApi.getAll(filters)
+        : await eodReportsApi.getMine(filters);
+
+      console.log('EOD: Received response:', {
+        isArray: Array.isArray(result),
+        hasData: !Array.isArray(result) && !!result.data,
+        dataLength: Array.isArray(result) ? result.length : result.data?.length,
+        hasMeta: !Array.isArray(result) && !!result.meta,
+        meta: !Array.isArray(result) ? result.meta : undefined,
+      });
+
+      return result;
     },
   });
 
+  // Handle both old format (array) and new format (paginated object)
+  const reports = useMemo(() => {
+    if (!reportsResponse) {
+      return [];
+    }
+    // If it's an array (old format), return it directly
+    if (Array.isArray(reportsResponse)) {
+      console.warn('EOD: Received array format instead of paginated format. Backend may not be paginating correctly.');
+      return reportsResponse;
+    }
+    // If it's the new paginated format, return the data array
+    const data = reportsResponse.data ?? [];
+    console.log('EOD: Paginated response - data length:', data.length, 'meta:', reportsResponse.meta);
+    if (data.length > pageSize) {
+      console.warn(`EOD: Received ${data.length} items but pageSize is ${pageSize}. Backend pagination may not be working.`);
+    }
+    return data;
+  }, [reportsResponse, pageSize]);
+
+  const meta = useMemo(() => {
+    if (!reportsResponse || Array.isArray(reportsResponse)) {
+      return undefined;
+    }
+    return reportsResponse.meta;
+  }, [reportsResponse]);
+
+  // For employee dropdown, we need to fetch all unique employees
+  // This is a separate query that doesn't need pagination
+  const { data: allReportsForEmployees } = useQuery({
+    queryKey: ['eod-reports', 'employees-list', filterUserId || selectedEmployee, startDate, endDate],
+    queryFn: async () => {
+      const filters = {
+        page: 1,
+        pageSize: 100, // Get first 100 to extract employee list
+        startDate,
+        endDate,
+        userId: filterUserId || selectedEmployee || undefined,
+      };
+
+      if (isPrivileged) {
+        return eodReportsApi.getAll(filters);
+      }
+      return eodReportsApi.getMine(filters);
+    },
+    enabled: !filterUserId, // Only fetch if we need to show employee filter
+  });
+
   const employeeOptions = useMemo(() => {
-    if (!reports) {
+    const reportsForEmployees = allReportsForEmployees?.data ?? [];
+    if (reportsForEmployees.length === 0) {
       return [];
     }
 
     const map = new Map<string, { id: string; label: string }>();
-    reports.forEach((report) => {
+    reportsForEmployees.forEach((report) => {
       if (report.user) {
         const label = `${report.user.firstName ?? ''} ${report.user.lastName ?? ''}`.trim() || report.user.email;
         map.set(report.userId, { id: report.userId, label });
@@ -76,59 +147,7 @@ export function EodReportsList({
     });
 
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [reports]);
-
-
-  const filteredReports = useMemo(() => {
-    if (!reports || reports.length === 0) {
-      return [];
-    }
-
-    return reports.filter((report) => {
-      if (filterUserId && report.userId !== filterUserId) {
-        return false;
-      }
-
-      if (!filterUserId && selectedEmployee && report.userId !== selectedEmployee) {
-        return false;
-      }
-
-      if (startDate) {
-        const filterStart = new Date(startDate);
-        if (new Date(report.date) < filterStart) {
-          return false;
-        }
-      }
-
-      if (endDate) {
-        const filterEnd = new Date(endDate);
-        const reportDate = new Date(report.date);
-        if (reportDate > filterEnd) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [reports, filterUserId, selectedEmployee, startDate, endDate]);
-
-  const totalPages = useMemo(() => {
-    if (!filteredReports.length) {
-      return 1;
-    }
-    return Math.max(1, Math.ceil(filteredReports.length / pageSize));
-  }, [filteredReports, pageSize]);
-
-  const currentPage = Math.min(page, totalPages);
-
-  const paginatedReports = useMemo(() => {
-    if (!filteredReports.length) {
-      return [];
-    }
-
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredReports.slice(startIndex, startIndex + pageSize);
-  }, [filteredReports, currentPage, pageSize]);
+  }, [allReportsForEmployees]);
 
   const handleFilterChange = (updater: () => void) => {
     updater();
@@ -231,9 +250,9 @@ export function EodReportsList({
         <div className="flex items-center justify-center py-12">
           <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
         </div>
-      ) : paginatedReports && paginatedReports.length > 0 ? (
+      ) : reports && Array.isArray(reports) && reports.length > 0 ? (
         <div className="space-y-4">
-          {paginatedReports.map((report: EodReport) => {
+          {reports.map((report: EodReport) => {
             const now = new Date();
             const reportDate = new Date(report.date);
             const editDeadline = endOfDay(addDays(reportDate, 1));
@@ -392,41 +411,57 @@ export function EodReportsList({
             );
           })}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {(currentPage - 1) * pageSize + 1}-
-              {Math.min(currentPage * pageSize, filteredReports.length)} of {filteredReports.length} reports
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="inline-flex items-center rounded-md border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-sm font-medium text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="inline-flex items-center rounded-md border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Next
-              </button>
+          {(meta || (reports && reports.length > 0)) && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+              {meta ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(meta.page - 1) * meta.pageSize + 1}-
+                    {Math.min(meta.page * meta.pageSize, meta.total)} of {meta.total} reports
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                      disabled={meta.page === 1}
+                      className="inline-flex items-center rounded-md border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Page {meta.page} of {meta.pageCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage((prev) => Math.min(meta.pageCount, prev + 1))}
+                      disabled={meta.page === meta.pageCount}
+                      className="inline-flex items-center rounded-md border border-border px-3 py-1 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Showing {reports.length} report{reports.length !== 1 ? 's' : ''}
+                    {reports.length > pageSize && ` (backend pagination not working - showing all ${reports.length} results)`}
+                  </p>
+                  <div className="text-xs text-muted-foreground">
+                    Pagination controls unavailable - backend may not be returning paginated response
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
         </div>
-      ) : (
+      ) : reportsResponse && (!reports || reports.length === 0) ? (
         <div className="rounded-lg border border-dashed border-border bg-card p-12 text-center text-sm text-muted-foreground">
           {contextLabel
-            ? `No EOD reports recorded for ${contextLabel}.`
-            : 'No EOD reports submitted yet.'}
+            ? `No EOD reports recorded for ${contextLabel} in the selected date range.`
+            : 'No EOD reports found in the selected date range.'}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

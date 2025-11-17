@@ -322,6 +322,69 @@ export class UsersService {
     });
   }
 
+  /**
+   * Find users by mention identifiers (email, full name, or first name)
+   */
+  async findUsersByMentions(identifiers: string[]): Promise<string[]> {
+    if (!identifiers || identifiers.length === 0) {
+      return [];
+    }
+
+    const userIds = new Set<string>();
+
+    for (const identifier of identifiers) {
+      const trimmed = identifier.trim();
+      if (!trimmed) continue;
+
+      // Try to find by email
+      if (trimmed.includes('@')) {
+        const user = await this.prisma.user.findUnique({
+          where: { email: trimmed },
+          select: { id: true },
+        });
+        if (user) {
+          userIds.add(user.id);
+          continue;
+        }
+      }
+
+      // Try to find by full name (FirstName LastName)
+      const nameParts = trimmed.split(/\s+/);
+      if (nameParts.length >= 2) {
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ');
+        const users = await this.prisma.user.findMany({
+          where: {
+            firstName: { equals: firstName, mode: 'insensitive' },
+            lastName: { equals: lastName, mode: 'insensitive' },
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        users.forEach((user) => userIds.add(user.id));
+        continue;
+      }
+
+      // Try to find by first name only (if single word)
+      if (nameParts.length === 1) {
+        const firstName = nameParts[0];
+        const users = await this.prisma.user.findMany({
+          where: {
+            firstName: { equals: firstName, mode: 'insensitive' },
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        // Only add if exactly one match (to avoid ambiguity)
+        if (users.length === 1) {
+          userIds.add(users[0].id);
+        }
+      }
+    }
+
+    return Array.from(userIds);
+  }
+
   async findByIdWithSecret(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },

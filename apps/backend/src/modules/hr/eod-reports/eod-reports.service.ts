@@ -189,7 +189,30 @@ export class EodReportsService {
     }
   }
 
-  async findAll(filters?: { userId?: string; startDate?: string; endDate?: string }) {
+  async findAll(filters?: {
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const page = Math.max(filters?.page ?? 1, 1);
+    const rawPageSize = filters?.pageSize ?? 25;
+    const pageSize = Math.min(Math.max(rawPageSize, 1), 100);
+    const skip = (page - 1) * pageSize;
+
+    // Debug logging
+    console.log('EOD findAll called with filters:', {
+      page: filters?.page,
+      pageSize: filters?.pageSize,
+      computedPage: page,
+      computedPageSize: pageSize,
+      skip,
+      userId: filters?.userId,
+      startDate: filters?.startDate,
+      endDate: filters?.endDate,
+    });
+
     const where: Prisma.EodReportWhereInput = {};
 
     if (filters?.userId) {
@@ -203,7 +226,9 @@ export class EodReportsService {
       };
     }
 
-    return this.prisma.eodReport.findMany({
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.eodReport.count({ where }),
+      this.prisma.eodReport.findMany({
       where,
       include: {
         user: {
@@ -219,7 +244,28 @@ export class EodReportsService {
       orderBy: {
         date: 'desc',
       },
+        skip,
+        take: pageSize,
+      }),
+    ]);
+
+    const result = {
+      data: items,
+      meta: {
+        page,
+        pageSize,
+        total,
+        pageCount: Math.ceil(total / pageSize),
+      },
+    };
+
+    console.log('EOD findAll returning:', {
+      dataLength: result.data.length,
+      meta: result.meta,
+      isArray: Array.isArray(result),
     });
+
+    return result;
   }
 
   async findOne(id: string) {

@@ -9,18 +9,32 @@ interface EodReportFilters {
   userId?: string;
   startDate?: string;
   endDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+interface EodReportsListResponse {
+  data: EodReport[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    pageCount: number;
+  };
 }
 
 export const eodReportsApi = {
   getAll: async (filters?: EodReportFilters) => {
-    const { data } = await apiClient.get<EodReport[]>('/hr/eod-reports', {
+    const { data } = await apiClient.get<EodReportsListResponse>('/hr/eod-reports', {
       params: filters,
     });
     return data;
   },
 
-  getMine: async () => {
-    const { data } = await apiClient.get<EodReport[]>('/hr/eod-reports/my');
+  getMine: async (filters?: EodReportFilters) => {
+    const { data } = await apiClient.get<EodReportsListResponse>('/hr/eod-reports/my', {
+      params: filters,
+    });
     return data;
   },
 

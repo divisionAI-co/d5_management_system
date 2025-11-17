@@ -24,6 +24,8 @@ import type { Activity } from '@/types/activities';
 import { cn } from '@/lib/utils';
 import { GeminiActionsSection } from './GeminiActionsSection';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { MentionInput } from '@/components/shared/MentionInput';
+import { highlightMentions } from '@/lib/utils/mention-highlight';
 
 type EntityType =
   | 'customer'
@@ -96,52 +98,54 @@ function ActivityItem({
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase',
+                )}
+                style={getTypeStyles(activity)}
+              >
+                {activity.typeLabel ?? activity.activityType?.name ?? 'Activity'}
+              </span>
+              {activity.isPinned && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                  <Pin className="h-3.5 w-3.5" />
+                  Pinned
+                </span>
               )}
-              style={getTypeStyles(activity)}
-            >
-              {activity.typeLabel ?? activity.activityType?.name ?? 'Activity'}
-            </span>
-            {activity.isPinned && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                <Pin className="h-3.5 w-3.5" />
-                Pinned
-              </span>
-            )}
-            {activity.isCompleted && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                <CheckCircle className="h-3.5 w-3.5" />
-                Completed
-              </span>
+              {activity.isCompleted && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Completed
+                </span>
+              )}
+            </div>
+
+            {isAiActivity && (
+              <button
+                type="button"
+                onClick={handleToggle}
+                className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-expanded={isExpanded}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {isExpanded ? 'Hide AI output' : 'View AI output'}
+              </button>
             )}
           </div>
 
-          {isAiActivity && (
-            <button
-              type="button"
-              onClick={handleToggle}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              aria-expanded={isExpanded}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              {isExpanded ? 'Hide AI output' : 'View AI output'}
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold text-foreground">{activity.subject}</h3>
-          {isAiActivity && !isExpanded && (
-            <span className="text-xs text-muted-foreground">
-              {new Date(activity.createdAt).toLocaleString()}
-            </span>
-          )}
-        </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-base font-semibold text-foreground">
+              {highlightMentions(activity.subject)}
+            </h3>
+            {isAiActivity && !isExpanded && (
+              <span className="text-xs text-muted-foreground">
+                {new Date(activity.createdAt).toLocaleString()}
+              </span>
+            )}
+          </div>
 
         {(!isAiActivity || isExpanded) ? (
           <>
@@ -166,7 +170,7 @@ function ActivityItem({
 
             {activity.body && (
               <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                {activity.body}
+                {highlightMentions(activity.body)}
               </pre>
             )}
           </>
@@ -467,15 +471,14 @@ export function ActivityPanel({
               <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                 Subject
               </label>
-              <input
-                type="text"
+              <MentionInput
                 value={composerState.subject}
-                onChange={(event) =>
-                  setComposerState((prev) => ({ ...prev, subject: event.target.value }))
+                onChange={(value) =>
+                  setComposerState((prev) => ({ ...prev, subject: value }))
                 }
-                placeholder="e.g. Call recap or next steps"
+                placeholder="e.g. Call recap or next steps. Type @ to mention someone"
+                multiline={false}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                required
               />
             </div>
           </div>
@@ -484,13 +487,14 @@ export function ActivityPanel({
             <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
               Details
             </label>
-            <textarea
+            <MentionInput
               value={composerState.body}
-              onChange={(event) =>
-                setComposerState((prev) => ({ ...prev, body: event.target.value }))
+              onChange={(value) =>
+                setComposerState((prev) => ({ ...prev, body: value }))
               }
               rows={3}
-              placeholder="Add context, notes, or follow-up steps for your teammates."
+              placeholder="Add context, notes, or follow-up steps for your teammates. Type @ to mention someone"
+              multiline={true}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
           </div>

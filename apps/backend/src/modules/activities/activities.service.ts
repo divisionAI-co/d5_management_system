@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, ActivityVisibility } from '@prisma/client';
+import { Prisma, ActivityVisibility, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
@@ -7,10 +7,17 @@ import { FilterActivitiesDto } from './dto/filter-activities.dto';
 import { CreateActivityTypeDto } from './dto/create-activity-type.dto';
 import { UpdateActivityTypeDto } from './dto/update-activity-type.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from './activity.mapper';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UsersService } from '../users/users.service';
+import { extractMentionIdentifiers } from '../../common/utils/mention-parser';
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
+  ) {}
 
   async create(createActivityDto: CreateActivityDto, createdById: string) {
     const { activityTypeId, targets, metadata, isCompleted, notifyAssignee, ...rest } =
@@ -48,6 +55,9 @@ export class ActivitiesService {
       data,
       include: ACTIVITY_SUMMARY_INCLUDE,
     });
+
+    // Process @mentions and create notifications
+    await this.processMentions(activity.id, rest.subject, rest.body, createdById);
 
     // TODO: Queue reminder/notification jobs when background workers are available
     void notifyAssignee;
@@ -200,6 +210,13 @@ export class ActivitiesService {
       data,
       include: ACTIVITY_SUMMARY_INCLUDE,
     });
+
+    // Process @mentions if subject or body was updated
+    if (updateActivityDto.subject !== undefined || updateActivityDto.body !== undefined) {
+      const subject = updateActivityDto.subject ?? activity.subject;
+      const body = updateActivityDto.body ?? activity.body;
+      await this.processMentions(activity.id, subject, body, activity.createdById);
+    }
 
     return activity;
   }
@@ -418,6 +435,60 @@ export class ActivitiesService {
     }
 
     return where;
+  }
+
+  /**
+   * Process @mentions in activity text and create notifications
+   */
+  private async processMentions(
+    activityId: string,
+    subject: string | null | undefined,
+    body: string | null | undefined,
+    createdById: string,
+  ) {
+    // Combine subject and body to extract all mentions
+    const text = [subject, body].filter(Boolean).join(' ');
+    if (!text) {
+      return;
+    }
+
+    // Extract mention identifiers
+    const identifiers = extractMentionIdentifiers(text);
+    if (identifiers.length === 0) {
+      return;
+    }
+
+    // Find users by mentions
+    const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
+    
+    // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
+    const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
+    
+    if (userIdsToNotify.length === 0) {
+      return;
+    }
+
+    // Get creator info for notification message
+    const creator = await this.prisma.user.findUnique({
+      where: { id: createdById },
+      select: { firstName: true, lastName: true, email: true },
+    });
+
+    const creatorName = creator
+      ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email
+      : 'Someone';
+
+    // Create notifications for mentioned users
+    const subjectPreview = subject ? (subject.length > 50 ? subject.substring(0, 50) + '...' : subject) : 'an activity';
+    
+    await this.notificationsService.createNotificationsForUsers(
+      userIdsToNotify,
+      NotificationType.MENTIONED_IN_ACTIVITY,
+      `You were mentioned in an activity`,
+      `${creatorName} mentioned you in "${subjectPreview}"`,
+      'activity',
+      activityId,
+    );
   }
 }
 

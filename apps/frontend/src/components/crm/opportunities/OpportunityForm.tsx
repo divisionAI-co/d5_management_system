@@ -13,6 +13,7 @@ import type {
   CustomerType,
 } from '@/types/crm';
 import { Loader2, X } from 'lucide-react';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 interface OpportunityFormProps {
   opportunityId?: string;
@@ -270,6 +271,9 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
     defaultValues,
   });
 
+  const descriptionValue = watch('description') || '';
+  const positionDescriptionValue = watch('positionDescription') || '';
+
   const selectedType = watch('type');
   const selectedLeadId = watch('leadId');
   const selectedCustomerId = watch('customerId');
@@ -429,11 +433,13 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
             </div>
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-medium text-muted-foreground">Description</label>
-              <textarea
+              <MentionInput
+                value={descriptionValue}
+                onChange={(value) => setValue('description', value)}
                 rows={3}
-                {...register('description')}
+                placeholder="Add context, scope, stakeholders or next steps. Type @ to mention someone"
+                multiline={true}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                placeholder="Add context, scope, stakeholders or next steps."
               />
             </div>
             <div>
@@ -538,10 +544,12 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
                 </div>
                 <div className="md:col-span-2">
                   <label className="mb-1 block text-sm font-medium text-blue-900">Position Description</label>
-                  <textarea
+                  <MentionInput
+                    value={positionDescriptionValue}
+                    onChange={(value) => setValue('positionDescription', value)}
                     rows={3}
-                    {...register('positionDescription')}
-                    placeholder="Share detailed context for recruiters."
+                    placeholder="Share detailed context for recruiters. Type @ to mention someone"
+                    multiline={true}
                     className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

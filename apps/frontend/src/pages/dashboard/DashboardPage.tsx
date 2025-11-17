@@ -14,6 +14,7 @@ import {
 import { dashboardApi } from '@/lib/api/dashboard';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { DashboardResponse } from '@/types/dashboard';
+import { highlightMentions } from '@/lib/utils/mention-highlight';
 
 const formatDate = (value: string | null | undefined, fallback = '—') => {
   if (!value) return fallback;
@@ -293,13 +294,13 @@ export default function DashboardPage() {
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          {activity.subject || 'Untitled Reminder'}
+                          {highlightMentions(activity.subject || 'Untitled Reminder')}
                         </p>
                         <p className="text-xs uppercase text-muted-foreground">
                           {activity.type.name}
                         </p>
                         {activity.body && (
-                          <p className="text-xs text-muted-foreground">{activity.body}</p>
+                          <p className="text-xs text-muted-foreground">{highlightMentions(activity.body)}</p>
                         )}
                         <div className="mt-1 text-xs text-muted-foreground">
                           {activity.related.customer && (

@@ -88,6 +88,7 @@ model NotificationSettings {
   performanceReview Boolean @default(true)
   newCandidate      Boolean @default(true)
   newOpportunity    Boolean @default(true)
+  mentionedInActivity Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1162,6 +1163,7 @@ enum NotificationType {
   NEW_OPPORTUNITY
   INVOICE_OVERDUE
   MEETING_REMINDER
+  MENTIONED_IN_ACTIVITY
   SYSTEM
 }
 

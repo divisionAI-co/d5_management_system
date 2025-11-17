@@ -5,6 +5,7 @@ import { leadsApi } from '@/lib/api/crm';
 import { usersApi } from '@/lib/api/users';
 import type { CreateLeadPayload, Lead, LeadStatus, LeadContactPayload } from '@/types/crm';
 import { X } from 'lucide-react';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 interface LeadFormProps {
   lead?: Lead;
@@ -94,6 +95,8 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   } = useForm<FormValues>({
     defaultValues,
   });
+
+  const descriptionValue = watch('description') || '';
 
   const contactMode = watch('contactMode');
   const selectedContactId = watch('contactId');
@@ -311,11 +314,13 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
             </div>
             <div className="md:col-span-2">
               <label className="mb-1 block text-sm font-medium text-muted-foreground">Description</label>
-              <textarea
+              <MentionInput
+                value={descriptionValue}
+                onChange={(value) => setValue('description', value)}
                 rows={3}
-                {...register('description')}
+                placeholder="Add context, discovery notes or qualification criteria. Type @ to mention someone"
+                multiline={true}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                placeholder="Add context, discovery notes or qualification criteria"
               />
             </div>
             <div>

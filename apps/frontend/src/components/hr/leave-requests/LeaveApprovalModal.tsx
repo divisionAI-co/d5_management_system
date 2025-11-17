@@ -4,6 +4,7 @@ import { leaveRequestsApi } from '@/lib/api/hr';
 import type { LeaveRequest } from '@/types/hr';
 import { LeaveRequestStatus } from '@/types/hr';
 import { XCircle, CheckCircle, X } from 'lucide-react';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 interface LeaveApprovalModalProps {
   request: LeaveRequest;
@@ -84,13 +85,13 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
           {mode === 'reject' && (
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">Rejection Reason *</label>
-              <textarea
+              <MentionInput
                 value={reason}
-                onChange={(event) => setReason(event.target.value)}
+                onChange={(value) => setReason(value)}
                 rows={4}
-                required
+                placeholder="Explain the reason for rejection... Type @ to mention someone"
+                multiline={true}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-red-500"
-                placeholder="Explain the reason for rejection..."
               />
             </div>
           )}

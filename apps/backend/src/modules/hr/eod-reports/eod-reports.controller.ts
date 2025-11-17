@@ -20,6 +20,7 @@ import { EmployeesService } from '../employees/employees.service';
 import { EodReportsService } from './eod-reports.service';
 import { CreateEodReportDto } from './dto/create-eod-report.dto';
 import { UpdateEodReportDto } from './dto/update-eod-report.dto';
+import { FilterEodReportsDto } from './dto/filter-eod-reports.dto';
 
 @ApiTags('HR - EOD Reports')
 @ApiBearerAuth()
@@ -64,24 +65,20 @@ export class EodReportsController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.HR)
-  @ApiOperation({ summary: 'Get all EOD reports' })
-  @ApiQuery({ name: 'userId', required: false, type: String })
-  @ApiQuery({ name: 'startDate', required: false, type: String })
-  @ApiQuery({ name: 'endDate', required: false, type: String })
-  findAll(
-    @Query('userId') userId?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.eodReportsService.findAll({ userId, startDate, endDate });
+  @ApiOperation({ summary: 'Get all EOD reports (paginated)' })
+  findAll(@Query() filters: FilterEodReportsDto) {
+    return this.eodReportsService.findAll(filters);
   }
 
   @Get('my')
-  @ApiOperation({ summary: 'Get current user EOD reports' })
-  async findMine(@Request() req: any) {
+  @ApiOperation({ summary: 'Get current user EOD reports (paginated)' })
+  async findMine(
+    @Request() req: any,
+    @Query() filters: FilterEodReportsDto,
+  ) {
     const user = req.user;
     await this.employeesService.findByUserId(user.id);
-    return this.eodReportsService.findAll({ userId: user.id });
+    return this.eodReportsService.findAll({ ...filters, userId: user.id });
   }
 
   @Get(':id')

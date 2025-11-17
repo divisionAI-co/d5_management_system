@@ -11,6 +11,7 @@ import type {
   UpdateCustomerPayload,
 } from '@/types/crm';
 import { X } from 'lucide-react';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 const CUSTOMER_TYPES: { label: string; value: CustomerType }[] = [
   { label: 'Staff Augmentation', value: 'STAFF_AUGMENTATION' },
@@ -109,10 +110,14 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues,
   });
+
+  const notesValue = watch('notes') || '';
 
   useEffect(() => {
     reset(defaultValues);
@@ -396,11 +401,13 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
 
           <div>
             <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
-            <textarea
+            <MentionInput
+              value={notesValue}
+              onChange={(value) => setValue('notes', value)}
               rows={4}
-              {...register('notes')}
+              placeholder="Add any context or onboarding notes... Type @ to mention someone"
+              multiline={true}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="Add any context or onboarding notes..."
             />
           </div>
 

@@ -11,6 +11,7 @@ import type {
 } from '@/types/hr';
 import { LeaveType, LeaveRequestStatus } from '@/types/hr';
 import { X } from 'lucide-react';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 interface LeaveRequestFormProps {
   request?: LeaveRequest;
@@ -224,11 +225,13 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
 
           <div>
             <label className="mb-1 block text-sm font-medium text-muted-foreground">Reason</label>
-            <textarea
+            <MentionInput
+              value={watch('reason') || ''}
+              onChange={(value) => setValue('reason', value)}
               rows={3}
-              {...register('reason')}
+              placeholder="Brief explanation for the leave request. Type @ to mention someone"
+              multiline={true}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="Brief explanation for the leave request"
             />
           </div>
 

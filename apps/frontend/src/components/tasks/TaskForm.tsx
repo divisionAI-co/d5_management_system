@@ -18,6 +18,7 @@ import type {
   CustomerFilters,
   CustomerSummary,
 } from '@/types/crm';
+import { MentionInput } from '@/components/shared/MentionInput';
 
 const STATUS_OPTIONS: TaskStatus[] = [
   'TODO',
@@ -103,10 +104,14 @@ export function TaskForm({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues,
   });
+
+  const descriptionValue = watch('description') || '';
 
   useEffect(() => {
     reset(defaultValues);
@@ -370,11 +375,13 @@ export function TaskForm({
             <label className="mb-1 block text-sm font-medium text-muted-foreground">
               Description
             </label>
-            <textarea
+            <MentionInput
+              value={descriptionValue}
+              onChange={(value) => setValue('description', value)}
               rows={4}
-              {...register('description')}
+              placeholder="Provide context, goals and success criteria... Type @ to mention someone"
+              multiline={true}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              placeholder="Provide context, goals and success criteria..."
             />
           </div>
 
