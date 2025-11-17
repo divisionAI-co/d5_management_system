@@ -8,9 +8,10 @@ Welcome to the D5 Management System! This document will help you navigate all th
 
 **New to the project? Start here:**
 
-1. **[SUMMARY.md](SUMMARY.md)** - **START HERE!** High-level overview of what's been built and what needs to be done
+1. **[README.md](README.md)** - **START HERE!** Project overview, tech stack, and architecture
 2. **[QUICKSTART.md](QUICKSTART.md)** - Step-by-step setup instructions to get the app running
-3. **[README.md](README.md)** - Project overview, tech stack, and architecture
+3. **[INSTALLATION.md](INSTALLATION.md)** - Detailed installation guide
+4. **[DATABASE_SETUP.md](DATABASE_SETUP.md)** - Database configuration and setup
 
 ---
 
@@ -18,13 +19,7 @@ Welcome to the D5 Management System! This document will help you navigate all th
 
 ### For Developers
 
-- **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** - Detailed specifications for implementing all features (25+ pages)
-- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Current progress and what's completed vs. pending
-
-### For Project Management
-
-- **Requirements Specification** - See the original requirements in the user query (embedded in this project)
-- **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - Track implementation progress
+- **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** - Detailed specifications for implementing all features
 
 ---
 
@@ -44,13 +39,10 @@ cd ../.. && npm run dev
 ```
 
 #### Understand What's Built
-→ **[SUMMARY.md](SUMMARY.md)** - Section: "What Has Been Created"
+→ **[README.md](README.md)** - Section: "Module Overview"
 
 #### Implement a Feature
 → **[IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)** - Find your module and follow the detailed specs
-
-#### Check Progress
-→ **[PROJECT_STATUS.md](PROJECT_STATUS.md)** - See completion percentages and remaining work
 
 #### Understand the Architecture
 → **[README.md](README.md)** - Section: "Architecture" and "Tech Stack"
@@ -69,11 +61,11 @@ cd ../.. && npm run dev
 d5_management_system/
 │
 ├── 📄 INDEX.md                      ← You are here!
-├── 📄 SUMMARY.md                    ← Start here - Overview
-├── 📄 QUICKSTART.md                 ← Setup guide
-├── 📄 README.md                     ← Project overview
+├── 📄 README.md                     ← Start here - Project overview
+├── 📄 QUICKSTART.md                 ← Quick setup guide
+├── 📄 INSTALLATION.md               ← Detailed installation
+├── 📄 DATABASE_SETUP.md             ← Database setup
 ├── 📄 IMPLEMENTATION_GUIDE.md       ← Feature specifications
-├── 📄 PROJECT_STATUS.md             ← Progress tracking
 │
 ├── 📦 package.json                  ← Root package.json
 ├── 🔧 setup.sh                      ← Automated setup script
@@ -219,18 +211,18 @@ npm run build              # Build for production
 
 ### Finding Answers
 
-1. **Setup Issues** → [QUICKSTART.md](QUICKSTART.md) Troubleshooting section
+1. **Setup Issues** → [QUICKSTART.md](QUICKSTART.md) or [INSTALLATION.md](INSTALLATION.md) Troubleshooting section
 2. **Feature Specs** → [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)
 3. **Architecture Questions** → [README.md](README.md)
-4. **Progress Tracking** → [PROJECT_STATUS.md](PROJECT_STATUS.md)
+4. **Database Issues** → [DATABASE_SETUP.md](DATABASE_SETUP.md)
 
 ### Common Questions
 
 **Q: How do I start the application?**  
-A: See [QUICKSTART.md](QUICKSTART.md)
+A: See [QUICKSTART.md](QUICKSTART.md) or [INSTALLATION.md](INSTALLATION.md)
 
 **Q: What's been implemented so far?**  
-A: See [SUMMARY.md](SUMMARY.md) or [PROJECT_STATUS.md](PROJECT_STATUS.md)
+A: See [README.md](README.md) - Section: "Module Overview"
 
 **Q: How do I implement feature X?**  
 A: See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md), find your feature, follow the detailed specifications
@@ -310,7 +302,7 @@ You now have:
 - ✅ Development environment setup
 - ✅ Comprehensive documentation
 
-**Next Step**: Read [SUMMARY.md](SUMMARY.md) for a complete overview, then start implementing features using [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)!
+**Next Step**: Read [README.md](README.md) for a complete overview, then start implementing features using [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md)!
 
 ---
 

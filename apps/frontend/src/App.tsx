@@ -56,6 +56,7 @@ import NotificationSettingsPage from '@/pages/settings/NotificationSettingsPage'
 import IntegrationsSettingsPage from '@/pages/settings/IntegrationsSettingsPage';
 import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
 import TemplatesPage from '@/pages/settings/TemplatesPage';
+import TemplateVariablesPage from '@/pages/settings/TemplateVariablesPage';
 import ActivityTypesPage from '@/pages/settings/ActivityTypesPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import GoogleOAuthCallbackPage from '@/pages/integrations/GoogleOAuthCallbackPage';
@@ -145,6 +146,7 @@ function App() {
             <Route path="integrations" element={<IntegrationsSettingsPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
             <Route path="templates" element={<TemplatesPage />} />
+            <Route path="template-variables" element={<TemplateVariablesPage />} />
             <Route path="activity-types" element={<ActivityTypesPage />} />
             <Route path="ai-actions" element={<AiActionsPage />} />
           </Route>

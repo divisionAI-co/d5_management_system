@@ -43,7 +43,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'HR',
+    label: 'Employee',
     items: [
       { name: 'Employees', href: '/employees', roles: ROLE_PERMISSIONS.EMPLOYEE_DIRECTORY },
       { name: 'EOD Reports', href: '/employees/eod-reports', roles: ROLE_PERMISSIONS.EOD_REPORTS },
@@ -76,6 +76,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'Activity Types', href: '/settings/activity-types', roles: ROLE_PERMISSIONS.ACTIVITY_TYPES },
       { name: 'Gemini Actions', href: '/settings/ai-actions', roles: ROLE_PERMISSIONS.AI_ACTIONS },
       { name: 'Templates', href: '/settings/templates', roles: ROLE_PERMISSIONS.TEMPLATES },
+      { name: 'Template Variables', href: '/settings/template-variables', roles: ROLE_PERMISSIONS.TEMPLATES },
     ],
   },
 ];

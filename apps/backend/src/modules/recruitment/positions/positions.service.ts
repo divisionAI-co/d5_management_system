@@ -137,6 +137,13 @@ export class OpenPositionsService {
   ): Prisma.OpenPositionWhereInput {
     const where: Prisma.OpenPositionWhereInput = {};
 
+    // Filter by archived status - default to non-archived if not specified
+    if (filters.isArchived !== undefined) {
+      where.isArchived = filters.isArchived;
+    } else {
+      where.isArchived = false;
+    }
+
     if (filters.search) {
       const searchTerm = filters.search.trim();
       where.OR = [
@@ -498,6 +505,102 @@ export class OpenPositionsService {
     }));
   }
 
+  async archive(id: string) {
+    const position = await this.ensurePositionExists(id);
+
+    if (position.isArchived) {
+      throw new BadRequestException('Position is already archived.');
+    }
+
+    const updated = await this.prisma.openPosition.update({
+      where: { id },
+      data: {
+        isArchived: true,
+      },
+      include: {
+        opportunity: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        candidates: {
+          take: 5,
+          orderBy: {
+            appliedAt: 'desc',
+          },
+          include: {
+            candidate: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                stage: true,
+                rating: true,
+                expectedSalary: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.formatPosition(updated);
+  }
+
+  async unarchive(id: string) {
+    const position = await this.ensurePositionExists(id);
+
+    if (!position.isArchived) {
+      throw new BadRequestException('Position is not archived.');
+    }
+
+    const updated = await this.prisma.openPosition.update({
+      where: { id },
+      data: {
+        isArchived: false,
+      },
+      include: {
+        opportunity: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        candidates: {
+          take: 5,
+          orderBy: {
+            appliedAt: 'desc',
+          },
+          include: {
+            candidate: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                stage: true,
+                rating: true,
+                expectedSalary: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.formatPosition(updated);
+  }
+
   async remove(id: string) {
     await this.ensurePositionExists(id);
 
@@ -508,7 +611,7 @@ export class OpenPositionsService {
 
     if (candidateCount > 0) {
       throw new BadRequestException(
-        `Cannot delete position with ${candidateCount} linked candidate(s). Please unlink candidates first or archive the position by changing its status to "Cancelled".`,
+        `Cannot delete position with ${candidateCount} linked candidate(s). Please unlink candidates first or archive the position.`,
       );
     }
 

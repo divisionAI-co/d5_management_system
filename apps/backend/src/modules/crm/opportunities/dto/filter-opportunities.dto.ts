@@ -108,7 +108,8 @@ export class FilterOpportunitiesDto {
     if (Number.isNaN(parsed)) {
       return 25;
     }
-    return Math.min(Math.max(parsed, 1), 100);
+    // Allow up to 1000 for board view
+    return Math.min(Math.max(parsed, 1), 1000);
   })
   pageSize?: number = 25;
 

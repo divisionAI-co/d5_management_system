@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { UploadCloud, ArrowLeft, Loader2 } from 'lucide-react';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { UploadCloud, ArrowLeft, Loader2, X } from 'lucide-react';
 
 import type {
   ImportSummaryBase,
@@ -9,8 +9,12 @@ import type {
   ExecutePayloadBase,
 } from '@/types/imports';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { usersApi } from '@/lib/api/users';
+import { customersApi } from '@/lib/api/crm/customers';
+import { positionsApi } from '@/lib/api/recruitment/positions';
+import { activitiesApi } from '@/lib/api/activities';
 
-type ImportStep = 'upload' | 'map' | 'execute' | 'result';
+type ImportStep = 'upload' | 'map' | 'match' | 'execute' | 'result';
 
 type FieldMapping = Record<string, string>;
 
@@ -38,9 +42,10 @@ interface ImportDialogProps<
   onClose: () => void;
   upload: (file: File) => Promise<TUpload>;
   saveMapping: (importId: string, payload: MapPayloadBase) => Promise<unknown>;
+  validate?: (importId: string) => Promise<Record<string, string[]>>;
   execute: (importId: string, payload: TExecute) => Promise<TSummary>;
   buildExecutePayload: (
-    args: { updateExisting: boolean; options: TOptions }
+    args: { updateExisting: boolean; options: TOptions; manualMatches?: Record<string, Record<string, string>> }
   ) => TExecute;
   initialOptions: () => TOptions;
   renderExecuteOptions?: (
@@ -63,6 +68,7 @@ export function ImportDialog<
   onClose,
   upload,
   saveMapping,
+  validate,
   execute,
   buildExecutePayload,
   initialOptions,
@@ -78,6 +84,8 @@ export function ImportDialog<
   const [updateExisting, setUpdateExisting] = useState(true);
   const [options, setOptions] = useState<TOptions>(() => initialOptions());
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [unmatchedValues, setUnmatchedValues] = useState<Record<string, string[]>>({});
+  const [manualMatches, setManualMatches] = useState<Record<string, Record<string, string>>>({});
 
   const resetState = () => {
     setStep('upload');
@@ -87,6 +95,8 @@ export function ImportDialog<
     setSummary(null);
     setUpdateExisting(true);
     setOptions(initialOptions());
+    setUnmatchedValues({});
+    setManualMatches({});
   };
 
   const closeDialog = () => {
@@ -123,7 +133,23 @@ export function ImportDialog<
 
       return saveMapping(payload.importId, { mappings: entries });
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
+      // If validate function is provided, check for unmatched values
+      if (validate) {
+        try {
+          const unmatched = await validate(variables.importId);
+          setUnmatchedValues(unmatched);
+          // Check if there are any unmatched values
+          const hasUnmatched = Object.values(unmatched).some((arr) => arr.length > 0);
+          if (hasUnmatched) {
+            setStep('match');
+            return;
+          }
+        } catch (error) {
+          // If validation fails, continue to execute step
+          console.error('Validation failed:', error);
+        }
+      }
       setStep('execute');
     },
   });
@@ -133,7 +159,7 @@ export function ImportDialog<
       if (!pending) {
         throw new Error('No import pending');
       }
-      const payload = buildExecutePayload({ updateExisting, options });
+      const payload = buildExecutePayload({ updateExisting, options, manualMatches });
       return execute(pending.importId, payload);
     },
     onSuccess: (result) => {
@@ -352,20 +378,32 @@ export function ImportDialog<
                       {field.description}
                     </td>
                     <td className="px-4 py-2">
-                      <select
-                        value={mapping[field.key] ?? ''}
-                        onChange={(event) =>
-                          handleMappingChange(field.key, event.target.value)
-                        }
-                        className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Not mapped</option>
-                        {availableColumns.map((column) => (
-                          <option key={column} value={column}>
-                            {column}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={mapping[field.key] ?? ''}
+                          onChange={(event) =>
+                            handleMappingChange(field.key, event.target.value)
+                          }
+                          className="flex-1 rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Not mapped</option>
+                          {availableColumns.map((column) => (
+                            <option key={column} value={column}>
+                              {column}
+                            </option>
+                          ))}
+                        </select>
+                        {mapping[field.key] && (
+                          <button
+                            type="button"
+                            onClick={() => handleMappingChange(field.key, '')}
+                            className="inline-flex items-center justify-center rounded-lg border border-border bg-muted p-2 text-muted-foreground transition hover:bg-red-50 hover:text-red-600 hover:border-red-300"
+                            title="Clear mapping"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -427,11 +465,124 @@ export function ImportDialog<
     );
   };
 
-  const renderExecuteStep = () => {
+  const handleManualMatch = (category: string, importedValue: string, matchedId: string) => {
+    setManualMatches((prev) => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [importedValue]: matchedId,
+      },
+    }));
+  };
+
+  // Fetch options for manual matching based on category
+  const categories = useMemo(() => Object.keys(unmatchedValues), [unmatchedValues]);
+  const hasUnmatchedValues = Object.keys(unmatchedValues).length > 0;
+  
+  const needsUsers = categories.some((cat) => 
+    ['unmatchedRecruiters', 'unmatchedOwners', 'unmatchedEmployees'].includes(cat)
+  );
+  const needsCustomers = categories.includes('unmatchedCustomers');
+  const needsPositions = categories.includes('unmatchedPositions');
+  const needsActivityTypes = categories.includes('unmatchedActivityTypes');
+  
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ['users', 'for-matching'],
+    queryFn: () => usersApi.list({ pageSize: 100 }),
+    enabled: hasUnmatchedValues && needsUsers,
+  });
+
+  const { data: customersData, isLoading: isLoadingCustomers } = useQuery({
+    queryKey: ['customers', 'for-matching'],
+    queryFn: () => customersApi.list({ pageSize: 100 }),
+    enabled: hasUnmatchedValues && needsCustomers,
+  });
+
+  const { data: positionsData, isLoading: isLoadingPositions } = useQuery({
+    queryKey: ['positions', 'for-matching'],
+    queryFn: () => positionsApi.list({ pageSize: 100 }),
+    enabled: hasUnmatchedValues && needsPositions,
+  });
+
+  const { data: activityTypesData, isLoading: isLoadingActivityTypes } = useQuery({
+    queryKey: ['activity-types', 'for-matching'],
+    queryFn: () => activitiesApi.listTypes(true),
+    enabled: hasUnmatchedValues && needsActivityTypes,
+  });
+
+  const getOptionsForCategory = (category: string): Array<{ id: string; label: string }> => {
+    try {
+      switch (category) {
+        case 'unmatchedRecruiters':
+        case 'unmatchedOwners':
+        case 'unmatchedEmployees':
+          if (!usersData?.data) {
+            if (import.meta.env.DEV) {
+              console.log('No users data available', { usersData, category });
+            }
+            return [];
+          }
+          return usersData.data.map((user) => ({
+            id: user.id,
+            label: `${user.firstName} ${user.lastName} (${user.email})`,
+          }));
+        case 'unmatchedCustomers':
+          if (!customersData?.data) {
+            if (import.meta.env.DEV) {
+              console.log('No customers data available', { customersData, category });
+            }
+            return [];
+          }
+          return customersData.data.map((customer) => ({
+            id: customer.id,
+            label: `${customer.name} (${customer.email})`,
+          }));
+        case 'unmatchedPositions':
+          if (!positionsData?.data) {
+            if (import.meta.env.DEV) {
+              console.log('No positions data available', { positionsData, category });
+            }
+            return [];
+          }
+          return positionsData.data.map((position) => ({
+            id: position.id,
+            label: position.title,
+          }));
+        case 'unmatchedActivityTypes':
+          if (!activityTypesData) {
+            if (import.meta.env.DEV) {
+              console.log('No activity types data available', { activityTypesData, category });
+            }
+            return [];
+          }
+          return activityTypesData.map((type) => ({
+            id: type.id,
+            label: type.name,
+          }));
+        default:
+          if (import.meta.env.DEV) {
+            console.log('Unknown category', category);
+          }
+          return [];
+      }
+    } catch (error) {
+      console.error('Error getting options for category', category, error);
+      return [];
+    }
+  };
+
+  const renderMatchStep = () => {
     if (!pending) return null;
 
+    const hasUnmatched = Object.values(unmatchedValues).some((arr) => arr.length > 0);
+    if (!hasUnmatched) {
+      // No unmatched values, skip to execute
+      setStep('execute');
+      return null;
+    }
+
     return (
-      <form onSubmit={handleExecute} className="space-y-6">
+      <div className="space-y-6">
         <button
           type="button"
           onClick={() => setStep('map')}
@@ -439,6 +590,113 @@ export function ImportDialog<
         >
           <ArrowLeft className="h-4 w-4" />
           Back to mapping
+        </button>
+
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <h3 className="text-lg font-semibold text-foreground">
+            Manual Matching Required
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Some values from your import file could not be automatically matched. Please manually select the correct matches below.
+          </p>
+
+          {/* Debug info - remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-2 rounded bg-yellow-50 p-2 text-xs text-yellow-800">
+              <div>Categories: {categories.join(', ')}</div>
+              <div>Has unmatched: {hasUnmatchedValues ? 'Yes' : 'No'}</div>
+              <div>Users loading: {isLoadingUsers ? 'Yes' : 'No'}, Data: {usersData ? 'Yes' : 'No'}, Count: {usersData?.data?.length || 0}</div>
+              <div>Customers loading: {isLoadingCustomers ? 'Yes' : 'No'}, Data: {customersData ? 'Yes' : 'No'}, Count: {customersData?.data?.length || 0}</div>
+              <div>Positions loading: {isLoadingPositions ? 'Yes' : 'No'}, Data: {positionsData ? 'Yes' : 'No'}, Count: {positionsData?.data?.length || 0}</div>
+              <div>Activity types loading: {isLoadingActivityTypes ? 'Yes' : 'No'}, Data: {activityTypesData ? 'Yes' : 'No'}, Count: {activityTypesData?.length || 0}</div>
+            </div>
+          )}
+
+          <div className="mt-4 space-y-6">
+            {Object.entries(unmatchedValues).map(([category, values]) => {
+              if (values.length === 0) return null;
+
+              return (
+                <div key={category} className="space-y-3">
+                  <h4 className="text-sm font-semibold text-foreground capitalize">
+                    {category.replace(/([A-Z])/g, ' $1').trim()}
+                  </h4>
+                  <div className="space-y-2">
+                    {values.map((value) => {
+                      const options = getOptionsForCategory(category);
+                      const isLoading = 
+                        (category === 'unmatchedRecruiters' || category === 'unmatchedOwners' || category === 'unmatchedEmployees') && isLoadingUsers ||
+                        category === 'unmatchedCustomers' && isLoadingCustomers ||
+                        category === 'unmatchedPositions' && isLoadingPositions ||
+                        category === 'unmatchedActivityTypes' && isLoadingActivityTypes;
+                      
+                      return (
+                        <div key={value} className="flex items-center gap-3">
+                          <span className="flex-1 text-sm text-muted-foreground">
+                            {value}
+                          </span>
+                          <select
+                            value={manualMatches[category]?.[value] || ''}
+                            onChange={(e) =>
+                              handleManualMatch(category, value, e.target.value)
+                            }
+                            disabled={isLoading}
+                            className="w-64 rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <option value="">
+                              {isLoading ? 'Loading...' : 'Select match...'}
+                            </option>
+                            {options.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={closeDialog}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => setStep('execute')}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderExecuteStep = () => {
+    if (!pending) return null;
+
+    return (
+      <form onSubmit={handleExecute} className="space-y-6">
+        <button
+          type="button"
+          onClick={() => {
+            const hasUnmatched = Object.values(unmatchedValues).some((arr) => arr.length > 0);
+            setStep(hasUnmatched ? 'match' : 'map');
+          }}
+          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
         </button>
 
         <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -611,12 +869,13 @@ export function ImportDialog<
             {[
               { id: 'upload', label: 'Upload' },
               { id: 'map', label: 'Map Fields' },
+              { id: 'match', label: 'Match Values' },
               { id: 'execute', label: 'Run Import' },
               { id: 'result', label: 'Summary' },
             ].map((item) => {
               const active = step === item.id;
               const completed =
-                ['map', 'execute', 'result'].includes(step) &&
+                ['map', 'match', 'execute', 'result'].includes(step) &&
                 item.id !== step &&
                 step !== 'upload';
               return (
@@ -640,6 +899,7 @@ export function ImportDialog<
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {step === 'upload' && renderUploadStep()}
           {step === 'map' && renderMappingStep()}
+          {step === 'match' && renderMatchStep()}
           {step === 'execute' && renderExecuteStep()}
           {step === 'result' && renderResultStep()}
         </div>

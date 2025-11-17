@@ -45,7 +45,7 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'division5-auth-storage',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage), // Changed from sessionStorage to localStorage for persistence
     }
   )
 );

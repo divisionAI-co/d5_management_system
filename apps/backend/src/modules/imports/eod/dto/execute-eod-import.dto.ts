@@ -1,5 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class ManualMatchesDto {
+  @ApiPropertyOptional({
+    description: 'Manual matches for employees: { "importedEmail": "userId" }',
+    example: { 'john.doe@example.com': 'uuid-here' },
+  })
+  @IsOptional()
+  @IsObject()
+  employees?: Record<string, string>;
+}
 
 export class ExecuteEodImportDto {
   @ApiPropertyOptional({
@@ -35,4 +46,13 @@ export class ExecuteEodImportDto {
   @IsOptional()
   @IsBoolean()
   useLegacyFormat?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Manual matches for values that could not be automatically matched.',
+    type: ManualMatchesDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ManualMatchesDto)
+  manualMatches?: ManualMatchesDto;
 }

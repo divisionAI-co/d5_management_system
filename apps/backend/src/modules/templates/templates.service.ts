@@ -89,6 +89,21 @@ export class TemplatesService {
     });
   }
 
+  async remove(id: string) {
+    const template = await this.findOne(id);
+
+    // Prevent deletion of default templates
+    if (template.isDefault) {
+      throw new BadRequestException('Cannot delete a default template. Please set another template as default first.');
+    }
+
+    await this.prisma.template.delete({
+      where: { id },
+    });
+
+    return { message: 'Template deleted successfully' };
+  }
+
   async update(id: string, dto: UpdateTemplateDto) {
     const existing = await this.findOne(id);
     const nextType = dto.type ?? existing.type;

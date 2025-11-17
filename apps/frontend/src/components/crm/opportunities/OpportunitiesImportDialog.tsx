@@ -48,17 +48,22 @@ export function OpportunitiesImportDialog({
       onClose={onClose}
       upload={opportunitiesImportsApi.upload}
       saveMapping={opportunitiesImportsApi.saveMapping}
+      validate={opportunitiesImportsApi.validate}
       execute={opportunitiesImportsApi.execute}
       initialOptions={() => ({
         defaultOwnerEmail: '',
         defaultCustomerId: '',
         defaultStage: 'Qualification',
       })}
-      buildExecutePayload={({ updateExisting, options }) => ({
+      buildExecutePayload={({ updateExisting, options, manualMatches }) => ({
         updateExisting,
         defaultOwnerEmail: options.defaultOwnerEmail || undefined,
         defaultCustomerId: options.defaultCustomerId || undefined,
         defaultStage: options.defaultStage || undefined,
+        manualMatches: manualMatches ? {
+          customers: manualMatches.unmatchedCustomers,
+          owners: manualMatches.unmatchedOwners,
+        } : undefined,
       })}
       invalidateQueries={['opportunities']}
       renderExecuteOptions={({ options, setOptions }) => (

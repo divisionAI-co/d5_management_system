@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DropResult } from '@hello-pangea/dnd';
 import { Columns, Kanban, MoveRight, Plus, UploadCloud } from 'lucide-react';
-import { candidatesApi } from '@/lib/api/recruitment';
 import type {
   Candidate,
   CandidateFilters,
@@ -19,15 +18,18 @@ import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandida
 import { CandidateConvertToEmployeeModal } from '@/components/recruitment/CandidateConvertToEmployeeModal';
 import { CandidateImportDialog } from '@/components/recruitment/CandidateImportDialog';
 import { MarkInactiveModal } from '@/components/recruitment/MarkInactiveModal';
+import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { candidatesApi } from '@/lib/api/recruitment/candidates';
 
 interface LocalFilters {
   search?: string;
   stage?: CandidateStage | 'ALL';
   hasOpenPosition?: 'linked' | 'unlinked' | 'all';
   recruiterId?: string;
+  isActive?: 'active' | 'inactive' | 'all';
 }
 
 export default function CandidatesPage() {
@@ -39,6 +41,7 @@ export default function CandidatesPage() {
     stage: 'ALL',
     hasOpenPosition: 'linked',
     recruiterId: undefined,
+    isActive: 'active',
   });
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
@@ -64,6 +67,7 @@ export default function CandidatesPage() {
   const [linkCandidate, setLinkCandidate] = useState<Candidate | null>(null);
   const [convertCandidate, setConvertCandidate] = useState<Candidate | null>(null);
   const [markInactiveCandidate, setMarkInactiveCandidate] = useState<Candidate | null>(null);
+  const [emailModalCandidate, setEmailModalCandidate] = useState<Candidate | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const { user } = useAuthStore();
@@ -104,12 +108,20 @@ export default function CandidatesPage() {
       payload.recruiterId = filters.recruiterId;
     }
 
+    if (filters.isActive === 'active') {
+      payload.isActive = true;
+    } else if (filters.isActive === 'inactive') {
+      payload.isActive = false;
+    }
+    // If 'all', don't set isActive filter (shows both)
+
     return payload;
   }, [
     filters.search,
     filters.stage,
     filters.hasOpenPosition,
     filters.recruiterId,
+      filters.isActive,
     page,
     pageSize,
     viewMode,
@@ -128,7 +140,7 @@ export default function CandidatesPage() {
         return initial;
       });
     }
-  }, [filters.search, filters.stage, filters.hasOpenPosition, filters.recruiterId, viewMode]);
+  }, [filters.search, filters.stage, filters.hasOpenPosition, filters.recruiterId, filters.isActive, viewMode]);
 
   // Create a stable queryKey that always reflects filter state
   const queryKey = useMemo(
@@ -139,6 +151,7 @@ export default function CandidatesPage() {
       filters.stage || 'ALL',
       filters.hasOpenPosition ?? 'linked',
       filters.recruiterId || 'all',
+      filters.isActive ?? 'active',
       viewMode === 'board' ? 1 : page,
       viewMode === 'board' ? 1000 : pageSize,
       'createdAt',
@@ -150,6 +163,7 @@ export default function CandidatesPage() {
       filters.stage,
       filters.hasOpenPosition,
       filters.recruiterId,
+      filters.isActive,
       page,
       pageSize,
     ],
@@ -164,10 +178,6 @@ export default function CandidatesPage() {
     refetchOnWindowFocus: false, // Don't refetch on window focus (already disabled globally)
   });
 
-  // Debug: Log queryKey changes
-  useEffect(() => {
-    console.log('QueryKey changed:', queryKey);
-  }, [queryKey]);
 
   const stageMutation = useMutation({
     mutationFn: ({
@@ -254,9 +264,13 @@ export default function CandidatesPage() {
     setMarkInactiveCandidate(candidate);
   };
 
+  const handleSendEmail = (candidate: Candidate) => {
+    setEmailModalCandidate(candidate);
+  };
+
   const handleMarkInactiveSuccess = (updated: Candidate) => {
     setMarkInactiveCandidate(null);
-    setFeedback(`${updated.firstName} ${updated.lastName} has been unlinked from their positions.`);
+    setFeedback(`${updated.firstName} ${updated.lastName} has been marked as inactive. Position links are preserved.`);
   };
 
   const handleConversionSuccess = (result: ConvertCandidateToEmployeeResponse) => {
@@ -326,39 +340,42 @@ export default function CandidatesPage() {
         return acc;
       }, {} as Record<string, number>);
       
-      console.log('=== Candidate Board Debug ===');
-      console.log('Total candidates fetched:', candidates.length);
-      console.log('Total candidates in database:', meta?.total ?? 'unknown');
-      console.log('Page size requested:', sanitizedFilters.pageSize);
-      if (meta && meta.total > candidates.length) {
-        console.warn(`⚠️ Only fetched ${candidates.length} of ${meta.total} total candidates! Some stages may be missing.`);
-      }
-      console.log('All candidate stages found:', stageCounts);
-      console.log('Expected stages:', CANDIDATE_STAGE_ORDER);
-      console.log('Column limits:', columnLimits);
-      
-      const unmatchedStages = Object.keys(stageCounts).filter(
-        (s) => !CANDIDATE_STAGE_ORDER.includes(s as CandidateStage)
-      );
-      if (unmatchedStages.length > 0) {
-        console.warn('Candidates with unmatched stages:', unmatchedStages, stageCounts);
-      }
-      
-      // Check which stages have candidates but no column limit
-      Object.keys(stageCounts).forEach((stage) => {
-        if (CANDIDATE_STAGE_ORDER.includes(stage as CandidateStage) && !columnLimits[stage as CandidateStage]) {
-          console.warn(`Stage "${stage}" has ${stageCounts[stage]} candidates but no column limit!`);
+      // Debug logs only in development
+      if (import.meta.env.DEV) {
+        console.log('=== Candidate Board Debug ===');
+        console.log('Total candidates fetched:', candidates.length);
+        console.log('Total candidates in database:', meta?.total ?? 'unknown');
+        console.log('Page size requested:', sanitizedFilters.pageSize);
+        if (meta && meta.total > candidates.length) {
+          console.warn(`⚠️ Only fetched ${candidates.length} of ${meta.total} total candidates! Some stages may be missing.`);
         }
-      });
-      
-      // Check which expected stages have no candidates
-      const missingStages = CANDIDATE_STAGE_ORDER.filter(
-        (stage) => !Object.keys(stageCounts).includes(stage)
-      );
-      if (missingStages.length > 0) {
-        console.log('Expected stages with no candidates in current fetch:', missingStages);
+        console.log('All candidate stages found:', stageCounts);
+        console.log('Expected stages:', CANDIDATE_STAGE_ORDER);
+        console.log('Column limits:', columnLimits);
+        
+        const unmatchedStages = Object.keys(stageCounts).filter(
+          (s) => !CANDIDATE_STAGE_ORDER.includes(s as CandidateStage)
+        );
+        if (unmatchedStages.length > 0) {
+          console.warn('Candidates with unmatched stages:', unmatchedStages, stageCounts);
+        }
+        
+        // Check which stages have candidates but no column limit
+        Object.keys(stageCounts).forEach((stage) => {
+          if (CANDIDATE_STAGE_ORDER.includes(stage as CandidateStage) && !columnLimits[stage as CandidateStage]) {
+            console.warn(`Stage "${stage}" has ${stageCounts[stage]} candidates but no column limit!`);
+          }
+        });
+        
+        // Check which expected stages have no candidates
+        const missingStages = CANDIDATE_STAGE_ORDER.filter(
+          (stage) => !Object.keys(stageCounts).includes(stage)
+        );
+        if (missingStages.length > 0) {
+          console.log('Expected stages with no candidates in current fetch:', missingStages);
+        }
+        console.log('=== End Debug ===');
       }
-      console.log('=== End Debug ===');
     }
   }, [candidates, viewMode, columnLimits, meta, sanitizedFilters.pageSize]);
 
@@ -384,7 +401,9 @@ export default function CandidatesPage() {
       
       // If stage is not in our known stages, show it (fallback)
       if (!CANDIDATE_STAGE_ORDER.includes(stage)) {
-        console.warn(`Candidate ${candidate.id} has unknown stage: "${stage}"`);
+        if (import.meta.env.DEV) {
+          console.warn(`Candidate ${candidate.id} has unknown stage: "${stage}"`);
+        }
         return true;
       }
       
@@ -419,7 +438,7 @@ export default function CandidatesPage() {
   return (
     <div className="py-8 space-y-6">
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-5 md:items-end">
+        <div className="grid gap-4 md:grid-cols-6 md:items-end">
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Search
@@ -504,6 +523,26 @@ export default function CandidatesPage() {
               <option value="linked">Linked candidates</option>
               <option value="unlinked">Not linked</option>
               <option value="all">All candidates</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Status
+            </label>
+            <select
+              value={filters.isActive ?? 'active'}
+              onChange={(event) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  isActive: event.target.value as 'active' | 'inactive' | 'all',
+                }))
+              }
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="all">All</option>
             </select>
           </div>
         </div>
@@ -594,6 +633,7 @@ export default function CandidatesPage() {
           onView={handleViewCandidate}
           onEdit={handleEditCandidate}
           onLinkPosition={handleLinkPosition}
+          onSendEmail={handleSendEmail}
           onMoveStage={handleMoveStage}
           onCandidateMove={handleCandidateMoveOptimistic}
           onConvertToEmployee={handleConvertCandidate}
@@ -613,6 +653,7 @@ export default function CandidatesPage() {
           onEdit={handleEditCandidate}
           onMoveStage={handleMoveStage}
           onLinkPosition={handleLinkPosition}
+          onSendEmail={handleSendEmail}
           onConvertToEmployee={handleConvertCandidate}
           onArchive={handleArchiveCandidate}
           onDelete={canDelete ? handleDeleteCandidate : undefined}
@@ -713,6 +754,19 @@ export default function CandidatesPage() {
       {canImport && importOpen && (
         <CandidateImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       )}
+
+      {emailModalCandidate ? (
+        <SendEmailModal
+          title={`Send Email - ${emailModalCandidate.firstName} ${emailModalCandidate.lastName}`}
+          defaultTo={emailModalCandidate.email || ''}
+          defaultSubject={`Update on Your Application - ${emailModalCandidate.firstName} ${emailModalCandidate.lastName}`}
+          onClose={() => setEmailModalCandidate(null)}
+          onSend={async (payload) => {
+            await candidatesApi.sendEmail(emailModalCandidate.id, payload);
+            setFeedback(`Email sent successfully to ${payload.to}`);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

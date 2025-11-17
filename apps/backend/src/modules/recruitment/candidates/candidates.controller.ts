@@ -18,6 +18,7 @@ import { UpdateCandidateStageDto } from './dto/update-candidate-stage.dto';
 import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
 import { MarkInactiveDto } from './dto/mark-inactive.dto';
+import { SendCandidateEmailDto } from './dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -152,6 +153,17 @@ export class CandidatesController {
   })
   markInactive(@Param('id') id: string, @Body() dto: MarkInactiveDto) {
     return this.candidatesService.markInactive(id, dto);
+  }
+
+  @Post(':id/send-email')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Send an email to a candidate',
+    description:
+      'Send an email using a template or custom content. Either templateId or htmlContent must be provided.',
+  })
+  sendEmail(@Param('id') id: string, @Body() dto: SendCandidateEmailDto) {
+    return this.candidatesService.sendEmail(id, dto);
   }
 
   @Delete(':id')

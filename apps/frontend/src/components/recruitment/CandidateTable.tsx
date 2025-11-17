@@ -9,6 +9,7 @@ interface CandidateTableProps {
   onEdit?: (candidate: Candidate) => void;
   onMoveStage?: (candidate: Candidate, stage: CandidateStage) => void;
   onLinkPosition?: (candidate: Candidate) => void;
+  onSendEmail?: (candidate: Candidate) => void;
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
   onDelete?: (candidate: Candidate) => void;
@@ -22,6 +23,7 @@ export function CandidateTable({
   onEdit,
   onMoveStage,
   onLinkPosition: _onLinkPosition,
+  onSendEmail,
   onConvertToEmployee: _onConvertToEmployee,
   onArchive,
   onDelete,
@@ -200,6 +202,16 @@ export function CandidateTable({
                       title="Edit candidate"
                     >
                       <Edit2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  {onSendEmail && (
+                    <button
+                      onClick={() => onSendEmail(candidate)}
+                      className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                      aria-label="Send email"
+                      title="Send email"
+                    >
+                      <Mail className="h-4 w-4" />
                     </button>
                   )}
                   {onArchive && (

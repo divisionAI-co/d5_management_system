@@ -17,6 +17,8 @@ interface OpenPositionsTableProps {
   onClosePosition?: (position: OpenPositionSummary) => void;
   onEdit?: (position: OpenPositionSummary) => void;
   onDelete?: (position: OpenPositionSummary) => void;
+  onArchive?: (position: OpenPositionSummary) => void;
+  onUnarchive?: (position: OpenPositionSummary) => void;
 }
 
 export function OpenPositionsTable({
@@ -26,6 +28,8 @@ export function OpenPositionsTable({
   onClosePosition,
   onEdit,
   onDelete,
+  onArchive,
+  onUnarchive,
 }: OpenPositionsTableProps) {
   const totalCandidates = useMemo(
     () =>
@@ -191,6 +195,24 @@ export function OpenPositionsTable({
                           className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-100"
                         >
                           Mark Filled
+                        </button>
+                      )}
+                      {onArchive && !position.isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => onArchive(position)}
+                          className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                        >
+                          Archive
+                        </button>
+                      )}
+                      {onUnarchive && position.isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => onUnarchive(position)}
+                          className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-600 hover:bg-amber-50"
+                        >
+                          Unarchive
                         </button>
                       )}
                       {onDelete && (

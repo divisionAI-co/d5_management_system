@@ -28,17 +28,21 @@ export function EodImportDialog({ open, onClose }: EodImportDialogProps) {
       onClose={onClose}
       upload={eodImportsApi.upload}
       saveMapping={eodImportsApi.saveMapping}
+      validate={eodImportsApi.validate}
       execute={eodImportsApi.execute}
       initialOptions={() => ({
         markMissingAsSubmitted: false,
         defaultIsLate: false,
         useLegacyFormat: false,
       })}
-      buildExecutePayload={({ updateExisting, options }) => ({
+      buildExecutePayload={({ updateExisting, options, manualMatches }) => ({
         updateExisting,
         markMissingAsSubmitted: options.markMissingAsSubmitted,
         defaultIsLate: options.defaultIsLate,
         useLegacyFormat: options.useLegacyFormat,
+        manualMatches: manualMatches ? {
+          employees: manualMatches.unmatchedEmployees,
+        } : undefined,
       })}
       invalidateQueries={['eod-reports']}
       renderExecuteOptions={({ options, setOptions }) => (

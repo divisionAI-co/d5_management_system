@@ -4,7 +4,28 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsObject,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class ManualMatchesDto {
+  @ApiPropertyOptional({
+    description: 'Manual matches for customers: { "importedValue": "customerId" }',
+    example: { 'Acme Corp': 'uuid-here' },
+  })
+  @IsOptional()
+  @IsObject()
+  customers?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    description: 'Manual matches for owners: { "importedValue": "userId" }',
+    example: { 'owner@example.com': 'uuid-here' },
+  })
+  @IsOptional()
+  @IsObject()
+  owners?: Record<string, string>;
+}
 
 export class ExecuteOpportunityImportDto {
   @ApiPropertyOptional({
@@ -38,6 +59,15 @@ export class ExecuteOpportunityImportDto {
   @IsOptional()
   @IsString()
   defaultStage?: string;
+
+  @ApiPropertyOptional({
+    description: 'Manual matches for values that could not be automatically matched.',
+    type: ManualMatchesDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ManualMatchesDto)
+  manualMatches?: ManualMatchesDto;
 }
 
 

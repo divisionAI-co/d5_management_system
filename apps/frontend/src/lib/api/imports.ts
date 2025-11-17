@@ -101,6 +101,14 @@ export const opportunitiesImportsApi = {
     return data;
   },
 
+  validate: async (importId: string) => {
+    const { data } = await apiClient.get<{
+      unmatchedCustomers: string[];
+      unmatchedOwners: string[];
+    }>(`/imports/opportunities/${importId}/validate`);
+    return data;
+  },
+
   execute: async (
     importId: string,
     payload: ExecuteOpportunityImportPayload,
@@ -146,6 +154,13 @@ export const eodImportsApi = {
     return data;
   },
 
+  validate: async (importId: string) => {
+    const { data } = await apiClient.get<{
+      unmatchedEmployees: string[];
+    }>(`/imports/eod/${importId}/validate`);
+    return data;
+  },
+
   execute: async (importId: string, payload: ExecuteEodImportPayload) => {
     const { data } = await apiClient.post<EodImportSummary>(
       `/imports/eod/${importId}/execute`,
@@ -182,6 +197,15 @@ export const candidatesImportsApi = {
       `/imports/candidates/${importId}/map`,
       payload,
     );
+    return data;
+  },
+
+  validate: async (importId: string) => {
+    const { data } = await apiClient.get<{
+      unmatchedRecruiters: string[];
+      unmatchedPositions: string[];
+      unmatchedActivityTypes: string[];
+    }>(`/imports/candidates/${importId}/validate`);
     return data;
   },
 

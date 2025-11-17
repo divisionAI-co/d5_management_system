@@ -19,6 +19,7 @@ import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { CloseOpportunityDto } from './dto/close-opportunity.dto';
+import { SendOpportunityEmailDto } from './dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -82,6 +83,21 @@ export class OpportunitiesController {
   })
   close(@Param('id') id: string, @Body() closeDto: CloseOpportunityDto) {
     return this.opportunitiesService.close(id, closeDto);
+  }
+
+  @Post(':id/send-email')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.SALESPERSON,
+    UserRole.ACCOUNT_MANAGER,
+  )
+  @ApiOperation({
+    summary: 'Send an email related to an opportunity',
+    description:
+      'Send an email using a template or custom content. Either templateId or htmlContent must be provided.',
+  })
+  sendEmail(@Param('id') id: string, @Body() dto: SendOpportunityEmailDto) {
+    return this.opportunitiesService.sendEmail(id, dto);
   }
 
   @Delete(':id')

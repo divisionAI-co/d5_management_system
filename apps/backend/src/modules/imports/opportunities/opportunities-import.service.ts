@@ -417,6 +417,7 @@ export class OpportunitiesImportService {
   private async resolveCustomerByName(
     name: string,
     cache: Map<string, string | null>,
+    manualMatches?: Record<string, string>,
   ): Promise<string | null> {
     const normalized = name.trim().toLowerCase();
     if (!normalized) {
@@ -425,6 +426,22 @@ export class OpportunitiesImportService {
 
     if (cache.has(normalized)) {
       return cache.get(normalized) ?? null;
+    }
+
+    // Check manual matches first
+    if (manualMatches) {
+      const manualMatch = manualMatches[name] || manualMatches[normalized];
+      if (manualMatch) {
+        // Verify the manual match exists
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: manualMatch },
+          select: { id: true },
+        });
+        if (customer) {
+          cache.set(normalized, customer.id);
+          return customer.id;
+        }
+      }
     }
 
     const customer = await this.prisma.customer.findFirst({
@@ -444,6 +461,7 @@ export class OpportunitiesImportService {
   private async resolveCustomerByEmail(
     email: string,
     cache: Map<string, string | null>,
+    manualMatches?: Record<string, string>,
   ): Promise<string | null> {
     const normalized = email.trim().toLowerCase();
     if (!normalized) {
@@ -452,6 +470,22 @@ export class OpportunitiesImportService {
 
     if (cache.has(normalized)) {
       return cache.get(normalized) ?? null;
+    }
+
+    // Check manual matches first
+    if (manualMatches) {
+      const manualMatch = manualMatches[email] || manualMatches[normalized];
+      if (manualMatch) {
+        // Verify the manual match exists
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: manualMatch },
+          select: { id: true },
+        });
+        if (customer) {
+          cache.set(normalized, customer.id);
+          return customer.id;
+        }
+      }
     }
 
     const customer = await this.prisma.customer.findUnique({
@@ -476,7 +510,26 @@ export class OpportunitiesImportService {
     }
   }
 
-  private async resolveOwnerByEmail(email: string) {
+  private async resolveOwnerByEmail(
+    email: string,
+    manualMatches?: Record<string, string>,
+  ) {
+    // Check manual matches first
+    if (manualMatches) {
+      const normalized = email.trim().toLowerCase();
+      const manualMatch = manualMatches[email] || manualMatches[normalized];
+      if (manualMatch) {
+        // Verify the manual match exists
+        const user = await this.prisma.user.findUnique({
+          where: { id: manualMatch },
+          select: { id: true },
+        });
+        if (user) {
+          return user.id;
+        }
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() },
       select: { id: true },
@@ -764,13 +817,113 @@ export class OpportunitiesImportService {
     return createdContact.id;
   }
 
-  private async ensureDefaultOwner(defaultOwnerEmail: string) {
-    const owner = await this.resolveOwnerByEmail(defaultOwnerEmail);
+  private async ensureDefaultOwner(
+    defaultOwnerEmail: string,
+    manualMatches?: Record<string, string>,
+  ) {
+    const owner = await this.resolveOwnerByEmail(defaultOwnerEmail, manualMatches);
     if (!owner) {
       throw new BadRequestException(
         'Default owner email provided does not match an existing user.',
       );
     }
+  }
+
+  async validateOpportunitiesImport(
+    id: string,
+  ): Promise<{
+    unmatchedCustomers: string[];
+    unmatchedOwners: string[];
+  }> {
+    const importRecord = await this.prisma.dataImport.findUnique({
+      where: { id },
+    });
+
+    if (!importRecord || importRecord.type !== 'opportunities') {
+      throw new NotFoundException('Import not found');
+    }
+
+    const mappingPayload = importRecord.fieldMapping as
+      | {
+          fields?: OpportunityFieldMapping;
+          ignoredColumns?: string[];
+        }
+      | null;
+
+    if (!mappingPayload?.fields) {
+      throw new BadRequestException(
+        'Field mappings must be configured before validating the import.',
+      );
+    }
+
+    const buffer = await this.readImportFile(importRecord);
+    const parsed = await parseSpreadsheet(buffer);
+    const rows = parsed.rows.map((row) => this.normalizeRowValues(row));
+
+    const unmatchedCustomers = new Set<string>();
+    const unmatchedOwners = new Set<string>();
+
+    const customerNameCache = new Map<string, string | null>();
+    const customerEmailCache = new Map<string, string | null>();
+    const ownerCache = new Map<string, string | null>();
+
+    for (const row of rows) {
+      const nonEmpty = Object.values(row).some(
+        (value) => value && value.trim().length > 0,
+      );
+      if (!nonEmpty) continue;
+
+      const customerEmail = this.extractValue(
+        row,
+        mappingPayload.fields!,
+        OpportunityImportField.CUSTOMER_EMAIL,
+      );
+      if (customerEmail) {
+        const resolved = await this.resolveCustomerByEmail(
+          customerEmail,
+          customerEmailCache,
+        );
+        if (!resolved) {
+          unmatchedCustomers.add(customerEmail);
+        }
+      }
+
+      const customerName = this.extractValue(
+        row,
+        mappingPayload.fields!,
+        OpportunityImportField.CUSTOMER_NAME,
+      );
+      if (customerName && !customerEmail) {
+        const resolved = await this.resolveCustomerByName(
+          customerName,
+          customerNameCache,
+        );
+        if (!resolved) {
+          unmatchedCustomers.add(customerName);
+        }
+      }
+
+      const ownerEmail = this.extractValue(
+        row,
+        mappingPayload.fields!,
+        OpportunityImportField.OWNER_EMAIL,
+      );
+      if (ownerEmail) {
+        const normalized = ownerEmail.trim().toLowerCase();
+        if (!ownerCache.has(normalized)) {
+          const resolved = await this.resolveOwnerByEmail(normalized);
+          ownerCache.set(normalized, resolved);
+          if (!resolved) {
+            unmatchedOwners.add(ownerEmail);
+          }
+        }
+      }
+    }
+
+    return {
+      unmatchedCustomers: Array.from(unmatchedCustomers).sort(),
+      unmatchedOwners: Array.from(unmatchedOwners).sort(),
+    };
   }
 
   async executeOpportunitiesImport(
@@ -803,7 +956,7 @@ export class OpportunitiesImportService {
     }
 
     if (dto.defaultOwnerEmail) {
-      await this.ensureDefaultOwner(dto.defaultOwnerEmail);
+      await this.ensureDefaultOwner(dto.defaultOwnerEmail, dto.manualMatches?.owners);
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -893,6 +1046,7 @@ export class OpportunitiesImportService {
           customerId = await this.resolveCustomerByEmail(
             customerEmail,
             customerEmailCache,
+            dto.manualMatches?.customers,
           );
           if (!customerId) {
             throw new BadRequestException(
@@ -911,6 +1065,7 @@ export class OpportunitiesImportService {
             customerId = await this.resolveCustomerByName(
               customerName,
               customerNameCache,
+              dto.manualMatches?.customers,
             );
             if (!customerId) {
               throw new BadRequestException(
@@ -937,7 +1092,7 @@ export class OpportunitiesImportService {
           if (ownerCache.has(normalized)) {
             ownerId = ownerCache.get(normalized) ?? null;
           } else {
-            ownerId = await this.resolveOwnerByEmail(normalized);
+            ownerId = await this.resolveOwnerByEmail(normalized, dto.manualMatches?.owners);
             ownerCache.set(normalized, ownerId);
           }
 

@@ -29,7 +29,7 @@ export const configValidationSchema = Joi.object({
     'any.required': 'JWT_REFRESH_SECRET is required (minimum 32 characters)',
     'string.min': 'JWT_REFRESH_SECRET must be at least 32 characters long',
   }),
-  JWT_EXPIRES_IN: Joi.string().default('15m'),
+  JWT_EXPIRES_IN: Joi.string().default('24h'), // Increased from 15m for better UX
   JWT_REFRESH_EXPIRES_IN: Joi.string().default('30d'),
 
   // Encryption - REQUIRED
@@ -72,9 +72,13 @@ export const configValidationSchema = Joi.object({
   // 2FA
   TWO_FACTOR_AUTHENTICATION_APP_NAME: Joi.string().default('division5'),
 
-  // Rate Limiting
+  // Rate Limiting - more lenient defaults
   THROTTLE_TTL: Joi.number().default(60000),
-  THROTTLE_LIMIT: Joi.number().default(100),
+  THROTTLE_LIMIT: Joi.number().default(1000),
+  RATE_LIMIT_WINDOW_MS: Joi.number().default(15 * 60 * 1000), // 15 minutes
+  RATE_LIMIT_MAX_ATTEMPTS: Joi.number().default(10), // Increased from 5
+  MAX_FAILED_LOGIN_ATTEMPTS: Joi.number().default(10), // Increased from 5
+  ACCOUNT_LOCKOUT_DURATION_MS: Joi.number().default(15 * 60 * 1000), // 15 minutes (reduced from 30)
 
   // Redis Cache (optional)
   REDIS_ENABLED: Joi.string().valid('true', 'false').default('false'),

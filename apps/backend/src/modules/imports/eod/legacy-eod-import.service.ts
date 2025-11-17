@@ -48,8 +48,9 @@ export class LegacyEodImportService {
     mapping: EodFieldMapping;
     options: BuildEodPayloadOptions;
     updateExisting: boolean;
+    manualMatches?: Record<string, string>;
   }): Promise<EodImportSummary> {
-    const { importId, rows, mapping, options, updateExisting } = params;
+    const { importId, rows, mapping, options, updateExisting, manualMatches } = params;
 
     const summary: EodImportSummary = {
       importId,
@@ -160,6 +161,7 @@ export class LegacyEodImportService {
           group.email,
           emailIndex,
           resolvedCache,
+          manualMatches,
         );
 
         const existingReport = await this.prisma.eodReport.findUnique({
@@ -320,11 +322,36 @@ export class LegacyEodImportService {
     email: string,
     index: Map<string, EmailIndexEntry | null>,
     cache: Map<string, EmailIndexEntry>,
+    manualMatches?: Record<string, string>,
   ): Promise<EmailIndexEntry> {
     const normalized = email.trim().toLowerCase();
     const cached = cache.get(normalized);
     if (cached) {
       return cached;
+    }
+
+    // Check manual matches first
+    if (manualMatches) {
+      const manualMatch = manualMatches[email] || manualMatches[normalized];
+      if (manualMatch) {
+        // Verify the manual match exists and has an employee
+        const user = await this.prisma.user.findUnique({
+          where: { id: manualMatch },
+          select: {
+            id: true,
+            email: true,
+            employee: { select: { id: true } },
+          },
+        });
+        if (user && user.employee) {
+          const entry: EmailIndexEntry = {
+            userId: user.id,
+            email: user.email,
+          };
+          cache.set(normalized, entry);
+          return entry;
+        }
+      }
     }
 
     const keysToCheck = this.buildEmailKeys(email);

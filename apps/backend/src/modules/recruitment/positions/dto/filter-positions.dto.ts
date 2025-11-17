@@ -70,6 +70,31 @@ export class FilterPositionsDto {
   keywords?: string[];
 
   @ApiPropertyOptional({
+    description: 'Filter by archived status. If not provided, defaults to false (only non-archived positions). Set to true to show archived positions, or null to show all.',
+  })
+  @IsOptional()
+  @Transform(({ value, obj, key }) => {
+    const raw = obj?.[key] ?? value;
+    if (raw === undefined || raw === null || raw === '') {
+      return undefined;
+    }
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+    if (typeof raw === 'string') {
+      const normalized = raw.trim().toLowerCase();
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+    }
+    return undefined;
+  })
+  isArchived?: boolean;
+
+  @ApiPropertyOptional({
     description: 'Page number for pagination',
     default: 1,
   })

@@ -341,6 +341,13 @@ export interface OpportunityLead {
   id: string;
   title: string;
   status?: LeadStatus;
+  contact?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string | null;
+  } | null;
 }
 
 export interface OpportunityOpenPosition {

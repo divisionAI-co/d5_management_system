@@ -10,10 +10,13 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { EmailService } from '../../../common/email/email.service';
+import { TemplatesService } from '../../templates/templates.service';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
 import { CloseOpportunityDto } from './dto/close-opportunity.dto';
+import { SendOpportunityEmailDto } from './dto/send-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 export interface PaginatedResult<T> {
@@ -28,7 +31,11 @@ export interface PaginatedResult<T> {
 
 @Injectable()
 export class OpportunitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+    private readonly templatesService: TemplatesService,
+  ) {}
 
   private formatOpportunity(opportunity: any) {
     if (!opportunity) {
@@ -178,8 +185,6 @@ export class OpportunitiesService {
 
     const where = this.buildWhereClause(filters);
 
-    console.log('where', where);
-
     const [total, opportunities] = await this.prisma.$transaction([
       this.prisma.opportunity.count({ where }),
       this.prisma.opportunity.findMany({
@@ -205,10 +210,16 @@ export class OpportunitiesService {
             },
           },
           lead: {
+            include: {
+              contact: {
             select: {
               id: true,
-              title: true,
-              status: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
             },
           },
           openPosition: {
@@ -258,10 +269,16 @@ export class OpportunitiesService {
           },
         },
         lead: {
+          include: {
+            contact: {
           select: {
             id: true,
-            title: true,
-            status: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
           },
         },
         openPosition: true,
@@ -495,10 +512,16 @@ export class OpportunitiesService {
             },
           },
           lead: {
+            include: {
+              contact: {
             select: {
               id: true,
-              title: true,
-              status: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
             },
           },
           openPosition: true,
@@ -678,10 +701,16 @@ export class OpportunitiesService {
             },
           },
           lead: {
+            include: {
+              contact: {
             select: {
               id: true,
-              title: true,
-              status: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
             },
           },
           openPosition: true,
@@ -747,9 +776,16 @@ export class OpportunitiesService {
             },
           },
           lead: {
+            include: {
+              contact: {
             select: {
               id: true,
-              title: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
             },
           },
           openPosition: true,
@@ -758,6 +794,156 @@ export class OpportunitiesService {
 
       return this.formatOpportunity(result);
     });
+  }
+
+  async sendEmail(id: string, dto: SendOpportunityEmailDto) {
+    const opportunity = await this.prisma.opportunity.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            city: true,
+            country: true,
+            postalCode: true,
+          },
+        },
+        lead: {
+          include: {
+            contact: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                role: true,
+                companyName: true,
+              },
+            },
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        openPosition: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            requirements: true,
+          },
+        },
+      },
+    });
+
+    if (!opportunity) {
+      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+    }
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with opportunity data
+    if (dto.templateId) {
+      const templateData = {
+        opportunity: {
+          id: opportunity.id,
+          title: opportunity.title,
+          description: opportunity.description,
+          type: opportunity.type,
+          value: opportunity.value ? Number(opportunity.value) : null,
+          stage: opportunity.stage,
+          isClosed: opportunity.isClosed,
+          isWon: opportunity.isWon,
+          createdAt: opportunity.createdAt,
+          updatedAt: opportunity.updatedAt,
+          closedAt: opportunity.closedAt,
+          jobDescriptionUrl: opportunity.jobDescriptionUrl,
+        },
+        customer: opportunity.customer
+          ? {
+              id: opportunity.customer.id,
+              name: opportunity.customer.name,
+              email: opportunity.customer.email,
+              phone: opportunity.customer.phone,
+              address: opportunity.customer.address,
+              city: opportunity.customer.city,
+              country: opportunity.customer.country,
+              postalCode: opportunity.customer.postalCode,
+            }
+          : null,
+        lead: opportunity.lead
+          ? {
+              id: opportunity.lead.id,
+              title: opportunity.lead.title,
+              contact: opportunity.lead.contact
+                ? {
+                    firstName: opportunity.lead.contact.firstName,
+                    lastName: opportunity.lead.contact.lastName,
+                    email: opportunity.lead.contact.email,
+                    phone: opportunity.lead.contact.phone,
+                    role: opportunity.lead.contact.role,
+                    companyName: opportunity.lead.contact.companyName,
+                  }
+                : null,
+            }
+          : null,
+        assignedTo: opportunity.assignedTo
+          ? {
+              firstName: opportunity.assignedTo.firstName,
+              lastName: opportunity.assignedTo.lastName,
+              email: opportunity.assignedTo.email,
+            }
+          : null,
+        position: opportunity.openPosition
+          ? {
+              title: opportunity.openPosition.title,
+              description: opportunity.openPosition.description,
+              requirements: opportunity.openPosition.requirements,
+            }
+          : null,
+      };
+
+      htmlContent = await this.templatesService.render(dto.templateId, templateData);
+    } else if (!htmlContent) {
+      throw new BadRequestException(
+        'Either templateId or htmlContent must be provided',
+      );
+    }
+
+    // Parse CC and BCC
+    const cc = dto.cc ? dto.cc.split(',').map((email) => email.trim()) : undefined;
+    const bcc = dto.bcc ? dto.bcc.split(',').map((email) => email.trim()) : undefined;
+
+    const success = await this.emailService.sendEmail({
+      to: dto.to,
+      subject: dto.subject,
+      html: htmlContent,
+      text: textContent,
+      cc,
+      bcc,
+    });
+
+    if (!success) {
+      throw new BadRequestException('Failed to send email');
+    }
+
+    return {
+      success: true,
+      message: 'Email sent successfully',
+      to: dto.to,
+      subject: dto.subject,
+    };
   }
 
   async remove(id: string) {

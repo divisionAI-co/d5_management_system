@@ -47,17 +47,23 @@ export function CandidateImportDialog({ open, onClose }: CandidateImportDialogPr
       onClose={onClose}
       upload={candidatesImportsApi.upload}
       saveMapping={candidatesImportsApi.saveMapping}
+      validate={candidatesImportsApi.validate}
       execute={candidatesImportsApi.execute}
       initialOptions={() => ({
         defaultStage: '',
         defaultSalaryCurrency: 'USD',
         isOdooImport: false,
       })}
-      buildExecutePayload={({ updateExisting, options }) => ({
+      buildExecutePayload={({ updateExisting, options, manualMatches }) => ({
         updateExisting,
         defaultStage: options.defaultStage || undefined,
         defaultSalaryCurrency: options.defaultSalaryCurrency || undefined,
         isOdooImport: options.isOdooImport,
+        manualMatches: manualMatches ? {
+          recruiters: manualMatches.unmatchedRecruiters,
+          positions: manualMatches.unmatchedPositions,
+          activityTypes: manualMatches.unmatchedActivityTypes,
+        } : undefined,
       })}
       invalidateQueries={['candidates']}
       renderExecuteOptions={({ options, setOptions }) => (

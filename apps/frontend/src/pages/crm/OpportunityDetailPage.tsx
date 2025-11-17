@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Layers,
   Link as LinkIcon,
+  Mail,
   PenSquare,
   Target,
   Trash2,
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react';
 import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm';
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
+import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
@@ -45,6 +47,7 @@ export default function OpportunityDetailPage() {
 
   const [showEdit, setShowEdit] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [showActivities, setShowActivities] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -201,6 +204,12 @@ export default function OpportunityDetailPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <PenSquare className="h-4 w-4" /> Activities
+          </button>
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Mail className="h-4 w-4" /> Send Email
           </button>
           <button
             onClick={() => setShowCloseDialog(true)}
@@ -435,6 +444,20 @@ export default function OpportunityDetailPage() {
         title="Opportunity Activities"
         emptyState="No activities yet. Log calls, emails, notes, and reminders to keep the deal moving."
       />
+
+      {showEmailModal ? (
+        <SendEmailModal
+          title={`Send Email - ${opportunity.title}`}
+          defaultTo={opportunity.lead?.contact?.email || opportunity.customer?.email || ''}
+          defaultSubject={`Update on ${opportunity.title}`}
+          onClose={() => setShowEmailModal(false)}
+          onSend={async (payload) => {
+            await opportunitiesApi.sendEmail(opportunity.id, payload);
+            setFeedback(`Email sent successfully to ${payload.to}`);
+            setShowEmailModal(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

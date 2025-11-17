@@ -48,35 +48,57 @@ async function bootstrap() {
   // Compression
   app.use(compression());
 
-  // CORS - Strict configuration for production
+  // CORS - Flexible configuration with better matching
   const corsOriginsRaw = configService.get<string>('CORS_ORIGINS', '');
   const corsOrigins = corsOriginsRaw
-    ? corsOriginsRaw.split(',').map((origin) => origin.trim()).filter(Boolean)
+    ? corsOriginsRaw.split(',').map((origin) => origin.trim().toLowerCase().replace(/\/$/, '')).filter(Boolean)
     : [];
 
   if (isProduction && corsOrigins.length === 0) {
     console.warn(
-      '⚠️  WARNING: CORS_ORIGINS is not set in production. This is a security risk!',
+      '⚠️  WARNING: CORS_ORIGINS is not set in production. Allowing all origins (less secure).',
     );
+  } else if (corsOrigins.length > 0 && process.env.NODE_ENV === 'development') {
+    console.log(`🌐 CORS: Configured ${corsOrigins.length} origin(s): ${corsOrigins.join(', ')}`);
   }
 
   app.enableCors({
     origin:
       corsOrigins.length > 0
         ? (origin, callback) => {
-            // Allow requests with no origin (mobile apps, Postman, etc.) in development
-            if (!origin && !isProduction) {
+            // Allow requests with no origin (mobile apps, Postman, etc.)
+            if (!origin) {
               return callback(null, true);
             }
-            if (origin && corsOrigins.includes(origin)) {
+            
+            // Normalize origin for comparison (lowercase, remove trailing slash)
+            const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+            
+            // Check if origin matches any configured origin
+            const isAllowed = corsOrigins.some((allowed) => {
+              // Exact match
+              if (normalizedOrigin === allowed) {
+                return true;
+              }
+              // Subdomain wildcard match (e.g., *.example.com)
+              if (allowed.startsWith('*.')) {
+                const domain = allowed.substring(2);
+                return normalizedOrigin.endsWith('.' + domain) || normalizedOrigin === domain;
+              }
+              return false;
+            });
+            
+            if (isAllowed) {
               callback(null, true);
             } else {
+              // Log blocked origin for debugging (only in development or if DEBUG env is set)
+              if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+                console.warn(`🚫 CORS blocked: ${origin} (normalized: ${normalizedOrigin}). Allowed: ${corsOrigins.join(', ')}`);
+              }
               callback(new Error('Not allowed by CORS'));
             }
           }
-        : isProduction
-          ? false // Block all in production if not configured
-          : true, // Allow all in development if not configured
+        : true, // Allow all if not configured (more lenient)
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

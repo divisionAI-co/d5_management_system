@@ -162,6 +162,7 @@ export interface OpenPositionSummary {
   description?: string | null;
   requirements?: string | null;
   status: PositionStatus;
+  isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
   filledAt?: string | null;
@@ -195,6 +196,7 @@ export interface PositionFilters {
   opportunityId?: string;
   candidateId?: string;
   keywords?: string[];
+  isArchived?: boolean;
   page?: number;
   pageSize?: number;
   sortBy?: string;

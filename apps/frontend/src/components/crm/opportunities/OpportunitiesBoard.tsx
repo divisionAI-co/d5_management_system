@@ -18,6 +18,7 @@ import {
   Edit,
   Loader2,
   Lock,
+  Mail,
   Plus,
   Trash2,
   Trophy,
@@ -35,6 +36,7 @@ interface OpportunitiesBoardProps {
   onOpportunityMove?: (result: DropResult, opportunity: Opportunity) => void;
   onView?: (opportunity: Opportunity) => void;
   onCreatePosition?: (opportunity: Opportunity) => void;
+  onSendEmail?: (opportunity: Opportunity) => void;
   onAddStage?: (stage: string) => void;
   onRemoveStage?: (stage: string) => void;
   onMoveStageLeft?: (stage: string) => void;
@@ -67,6 +69,7 @@ export function OpportunitiesBoard({
   onOpportunityMove,
   onView,
   onCreatePosition,
+  onSendEmail,
   onAddStage,
   onRemoveStage,
   onMoveStageLeft,
@@ -414,6 +417,18 @@ export function OpportunitiesBoard({
                                           >
                                             <Plus className="h-3.5 w-3.5" />
                                             Job Position
+                                          </button>
+                                        ) : null}
+                                        {onSendEmail ? (
+                                          <button
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              onSendEmail(opportunity);
+                                            }}
+                                            className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                                          >
+                                            <Mail className="h-3.5 w-3.5" />
+                                            Email
                                           </button>
                                         ) : null}
                                       </div>

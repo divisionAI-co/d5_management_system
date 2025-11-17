@@ -32,12 +32,12 @@ export class RateLimitingService {
       this.configService.get<number>('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000) || // 15 minutes
       15 * 60 * 1000;
     this.defaultMaxAttempts =
-      this.configService.get<number>('RATE_LIMIT_MAX_ATTEMPTS', 5) || 5;
+      this.configService.get<number>('RATE_LIMIT_MAX_ATTEMPTS', 10) || 10; // Increased from 5 to 10
     this.lockoutDurationMs =
-      this.configService.get<number>('ACCOUNT_LOCKOUT_DURATION_MS', 30 * 60 * 1000) || // 30 minutes
-      30 * 60 * 1000;
+      this.configService.get<number>('ACCOUNT_LOCKOUT_DURATION_MS', 15 * 60 * 1000) || // 15 minutes (reduced from 30)
+      15 * 60 * 1000;
     this.maxFailedAttempts =
-      this.configService.get<number>('MAX_FAILED_LOGIN_ATTEMPTS', 5) || 5;
+      this.configService.get<number>('MAX_FAILED_LOGIN_ATTEMPTS', 10) || 10; // Increased from 5 to 10
   }
 
   /**

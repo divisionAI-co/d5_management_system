@@ -28,6 +28,7 @@ const STATUS_OPTIONS: Array<{ value: PositionStatus | 'ALL'; label: string }> = 
 interface LocalFilters {
   search?: string;
   status?: PositionStatus | 'ALL';
+  isArchived?: boolean;
 }
 
 export default function OpenPositionsPage() {
@@ -39,6 +40,7 @@ export default function OpenPositionsPage() {
   const [filters, setFilters] = useState<LocalFilters>({
     search: '',
     status: 'Open',
+    isArchived: false,
   });
   const [selectedPositionId, setSelectedPositionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -65,6 +67,10 @@ export default function OpenPositionsPage() {
 
     if (filters.status && filters.status !== 'ALL') {
       payload.status = filters.status;
+    }
+
+    if (filters.isArchived !== undefined) {
+      payload.isArchived = filters.isArchived;
     }
 
     return payload;
@@ -135,6 +141,24 @@ export default function OpenPositionsPage() {
         error?.response?.data?.message ||
           'Failed to delete position. Please ensure no candidates are linked to this position.',
       );
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: positionsApi.archive,
+    onSuccess: (archived) => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['position', archived.id] });
+      setFeedback(`Position "${archived.title}" archived successfully.`);
+    },
+  });
+
+  const unarchiveMutation = useMutation({
+    mutationFn: positionsApi.unarchive,
+    onSuccess: (unarchived) => {
+      queryClient.invalidateQueries({ queryKey: ['positions'] });
+      queryClient.invalidateQueries({ queryKey: ['position', unarchived.id] });
+      setFeedback(`Position "${unarchived.title}" unarchived successfully.`);
     },
   });
 
@@ -224,7 +248,7 @@ export default function OpenPositionsPage() {
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-4 md:items-end">
+        <div className="grid gap-4 md:grid-cols-5 md:items-end">
           <div className="md:col-span-2">
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Search
@@ -264,6 +288,25 @@ export default function OpenPositionsPage() {
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Archived
+            </label>
+            <select
+              value={filters.isArchived ? 'archived' : 'active'}
+              onChange={(event) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  isArchived: event.target.value === 'archived',
+                }))
+              }
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -281,6 +324,17 @@ export default function OpenPositionsPage() {
         onSelect={handleSelectPosition}
         onClosePosition={handleClosePosition}
         onEdit={handleEditPositionFromSummary}
+        onArchive={(position) => {
+          const confirmArchive = window.confirm(
+            `Archive "${position.title}"? Archived positions are hidden from the default view but can be restored later.`,
+          );
+          if (confirmArchive) {
+            archiveMutation.mutate(position.id);
+          }
+        }}
+        onUnarchive={(position) => {
+          unarchiveMutation.mutate(position.id);
+        }}
         onDelete={(position) => {
           const confirmDelete = window.confirm(
             `Are you sure you want to delete "${position.title}"? This action cannot be undone.\n\nNote: Positions with linked candidates cannot be deleted.`,
@@ -299,6 +353,13 @@ export default function OpenPositionsPage() {
           onChangeStatus={handleStatusChange}
           statusUpdating={updateStatusMutation.isPending || closeMutation.isPending}
           onEdit={handleEditPositionFromDetail}
+          onArchive={(position) => {
+            archiveMutation.mutate(position.id);
+          }}
+          onUnarchive={(position) => {
+            unarchiveMutation.mutate(position.id);
+          }}
+          isArchiving={archiveMutation.isPending || unarchiveMutation.isPending}
           onDelete={(position) => {
             const confirmDelete = window.confirm(
               `Are you sure you want to delete "${position.title}"? This action cannot be undone.\n\nNote: Positions with linked candidates cannot be deleted.`,
@@ -340,6 +401,9 @@ interface PositionDetailDrawerProps {
   statusUpdating?: boolean;
   onEdit?: (position: OpenPosition) => void;
   onDelete?: (position: OpenPosition) => void;
+  onArchive?: (position: OpenPosition) => void;
+  onUnarchive?: (position: OpenPosition) => void;
+  isArchiving?: boolean;
 }
 
 function PositionDetailDrawer({
@@ -350,6 +414,9 @@ function PositionDetailDrawer({
   statusUpdating,
   onEdit,
   onDelete,
+  onArchive,
+  onUnarchive,
+  isArchiving,
 }: PositionDetailDrawerProps) {
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
@@ -368,6 +435,31 @@ function PositionDetailDrawer({
                 className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted"
               >
                 Edit Position
+              </button>
+            )}
+            {position && onArchive && !position.isArchived && (
+              <button
+                onClick={() => {
+                  const confirmArchive = window.confirm(
+                    `Archive "${position.title}"? Archived positions are hidden from the default view but can be restored later.`,
+                  );
+                  if (confirmArchive && onArchive) {
+                    onArchive(position);
+                  }
+                }}
+                disabled={isArchiving}
+                className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
+              >
+                {isArchiving ? 'Archiving...' : 'Archive'}
+              </button>
+            )}
+            {position && onUnarchive && position.isArchived && (
+              <button
+                onClick={() => onUnarchive && onUnarchive(position)}
+                disabled={isArchiving}
+                className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
+              >
+                {isArchiving ? 'Unarchiving...' : 'Unarchive'}
               </button>
             )}
             {position && onDelete && (

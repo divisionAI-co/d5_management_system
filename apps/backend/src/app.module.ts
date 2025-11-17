@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { configValidationSchema } from './common/config/config.schema';
@@ -69,13 +69,17 @@ import { CacheModule } from './common/cache/cache.module';
     // Scheduling for cron jobs
     ScheduleModule.forRoot(),
 
-    // Rate limiting
-    ThrottlerModule.forRoot([
+    // Rate limiting - more lenient for normal usage, configurable via env
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => [
       {
-        ttl: 60000, // 60 seconds
-        limit: 100, // 100 requests
+          ttl: configService.get<number>('THROTTLE_TTL', 60000), // 60 seconds
+          limit: configService.get<number>('THROTTLE_LIMIT', 1000), // 1000 requests per minute
       },
-    ]),
+      ],
+    }),
 
     // Core
     PrismaModule,

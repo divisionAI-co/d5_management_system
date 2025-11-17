@@ -23,7 +23,9 @@ export default function GoogleOAuthCallbackPage() {
 
   // Debug logging
   useEffect(() => {
-    console.log('GoogleOAuthCallbackPage mounted', { code: !!code, error, state, integration });
+    if (import.meta.env.DEV) {
+      console.log('GoogleOAuthCallbackPage mounted', { code: !!code, error, state, integration });
+    }
   }, [code, error, state, integration]);
 
   const calendarMutation = useMutation({
@@ -80,43 +82,57 @@ export default function GoogleOAuthCallbackPage() {
   });
 
   useEffect(() => {
-    console.log('Processing OAuth callback', { code: !!code, error, state, integration, url: window.location.href });
+    if (import.meta.env.DEV) {
+      console.log('Processing OAuth callback', { code: !!code, error, state, integration, url: window.location.href });
+    }
     
     // Only process once
     if (!code && !error) {
-      console.log('No code or error yet, waiting...');
+      if (import.meta.env.DEV) {
+        console.log('No code or error yet, waiting...');
+      }
       return; // Wait for code or error
     }
 
     if (error) {
       const errorMessage = error === 'access_denied' ? 'Permission was not granted.' : error;
-      console.log('OAuth error:', errorMessage);
+      if (import.meta.env.DEV) {
+        console.log('OAuth error:', errorMessage);
+      }
       toast({
         title: 'Google sign-in was cancelled',
         description: errorMessage,
         variant: 'destructive',
       });
       const targetPath = integration === 'drive' ? '/settings/integrations' : '/calendar';
-      console.log('Navigating to:', targetPath);
+      if (import.meta.env.DEV) {
+        console.log('Navigating to:', targetPath);
+      }
       navigate(targetPath, { replace: true });
       return;
     }
 
     if (!code) {
-      console.log('No authorization code received');
+      if (import.meta.env.DEV) {
+        console.log('No authorization code received');
+      }
       toast({
         title: 'Missing authorization code',
         description: `We could not complete the Google ${integration === 'drive' ? 'Drive' : 'Calendar'} connection.`,
         variant: 'destructive',
       });
       const targetPath = integration === 'drive' ? '/settings/integrations' : '/calendar';
-      console.log('Navigating to:', targetPath);
+      if (import.meta.env.DEV) {
+        console.log('Navigating to:', targetPath);
+      }
       navigate(targetPath, { replace: true });
       return;
     }
 
     // Process the OAuth code
-    console.log('Processing OAuth code for:', integration);
+    if (import.meta.env.DEV) {
+      console.log('Processing OAuth code for:', integration);
+    }
     if (integration === 'drive') {
       driveMutation.mutate(code);
     } else {

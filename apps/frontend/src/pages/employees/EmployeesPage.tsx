@@ -71,7 +71,9 @@ export default function EmployeesPage() {
             setSelectedEmployee(undefined);
           }}
           onSuccess={() => {
-            console.log('Employee saved successfully');
+            if (import.meta.env.DEV) {
+              console.log('Employee saved successfully');
+            }
           }}
         />
       )}

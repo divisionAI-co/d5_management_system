@@ -198,9 +198,9 @@ const CANDIDATE_FIELD_DEFINITIONS: CandidateImportFieldMetadata[] = [
   },
   {
     key: CandidateImportField.IS_ACTIVE,
-    label: 'Linked to Position',
+    label: 'Active',
     description:
-      'Indicates whether the candidate is currently linked to an active position (true/false). Map Odoo’s "Active" column here to keep the board in sync.',
+      'Indicates whether the candidate is active (true/false). Active candidates are visible in the board by default. Inactive candidates are typically rejected or marked as inactive but retain their position links. Map Odoo\'s "Active" column here.',
     required: false,
   },
   {
@@ -634,10 +634,27 @@ export class CandidatesImportService {
   private async resolveRecruiterIdentifier(
     identifier: string,
     cache: Map<string, string | null>,
+    manualMatches?: Record<string, string>,
   ): Promise<string | null> {
     const cacheKey = identifier.trim().toLowerCase();
     if (cache.has(cacheKey)) {
       return cache.get(cacheKey) ?? null;
+    }
+
+    // Check manual matches first
+    if (manualMatches) {
+      const manualMatch = manualMatches[identifier] || manualMatches[cacheKey];
+      if (manualMatch) {
+        // Verify the manual match exists
+        const user = await this.prisma.user.findUnique({
+          where: { id: manualMatch },
+          select: { id: true },
+        });
+        if (user) {
+          cache.set(cacheKey, user.id);
+          return user.id;
+        }
+      }
     }
 
     let recruiter: { id: string } | null = null;
@@ -832,6 +849,7 @@ export class CandidatesImportService {
   private async resolveOpenPositionId(
     positionName: string,
     cache: Map<string, string | null>,
+    manualMatches?: Record<string, string>,
   ): Promise<string | null> {
     const normalized = positionName.trim().toLowerCase();
     if (!normalized) {
@@ -840,6 +858,22 @@ export class CandidatesImportService {
 
     if (cache.has(normalized)) {
       return cache.get(normalized) ?? null;
+    }
+
+    // Check manual matches first
+    if (manualMatches) {
+      const manualMatch = manualMatches[positionName] || manualMatches[normalized];
+      if (manualMatch) {
+        // Verify the manual match exists
+        const position = await this.prisma.openPosition.findUnique({
+          where: { id: manualMatch },
+          select: { id: true },
+        });
+        if (position) {
+          cache.set(normalized, position.id);
+          return position.id;
+        }
+      }
     }
 
     const variants = this.buildPositionNameVariants(positionName);
@@ -918,6 +952,7 @@ export class CandidatesImportService {
   private async resolveActivityType(
     keyOrName: string | undefined,
     cache: Map<string, string | null>,
+    manualMatches?: Record<string, string>,
   ): Promise<string | null> {
     if (!keyOrName) {
       return null;
@@ -926,6 +961,22 @@ export class CandidatesImportService {
     const normalized = keyOrName.trim().toUpperCase();
     if (cache.has(normalized)) {
       return cache.get(normalized) ?? null;
+    }
+
+    // Check manual matches first
+    if (manualMatches) {
+      const manualMatch = manualMatches[keyOrName] || manualMatches[normalized];
+      if (manualMatch) {
+        // Verify the manual match exists
+        const activityType = await this.prisma.activityType.findUnique({
+          where: { id: manualMatch },
+          select: { id: true },
+        });
+        if (activityType) {
+          cache.set(normalized, activityType.id);
+          return activityType.id;
+        }
+      }
     }
 
     const activityType = await this.prisma.activityType.findFirst({
@@ -1080,7 +1131,7 @@ export class CandidatesImportService {
       isOdooImport,
     );
 
-    const linkedToPosition =
+    const isActive =
       this.parseBoolean(
         this.extractValue(row, mapping, CandidateImportField.IS_ACTIVE, isOdooImport),
       ) ?? true; // Default to true if not provided
@@ -1157,13 +1208,107 @@ export class CandidatesImportService {
           this.extractValue(row, mapping, CandidateImportField.SALARY_CURRENCY, isOdooImport) ??
           options.defaultSalaryCurrency ??
           'USD',
-            isActive: linkedToPosition,
+        isActive,
         odooId: this.extractValue(row, mapping, CandidateImportField.ODOO_ID, isOdooImport),
         driveFolderId,
       },
       recruiterIdentifier,
       linkedPositionName,
       activities,
+    };
+  }
+
+  async validateCandidatesImport(
+    id: string,
+  ): Promise<{
+    unmatchedRecruiters: string[];
+    unmatchedPositions: string[];
+    unmatchedActivityTypes: string[];
+  }> {
+    const importRecord = await this.prisma.dataImport.findUnique({
+      where: { id },
+    });
+
+    if (!importRecord || importRecord.type !== 'candidates') {
+      throw new NotFoundException('Import not found');
+    }
+
+    const mappingPayload = importRecord.fieldMapping as
+      | {
+          fields?: CandidateFieldMapping;
+          ignoredColumns?: string[];
+        }
+      | null;
+
+    if (!mappingPayload?.fields) {
+      throw new BadRequestException(
+        'Field mappings must be configured before validating the import.',
+      );
+    }
+
+    const buffer = await this.readImportFile(importRecord);
+    const parsed = await parseSpreadsheet(buffer);
+    const rows = parsed.rows.map((row) => this.normalizeRowValues(row));
+
+    const unmatchedRecruiters = new Set<string>();
+    const unmatchedPositions = new Set<string>();
+    const unmatchedActivityTypes = new Set<string>();
+
+    const recruiterCache = new Map<string, string | null>();
+    const positionCache = new Map<string, string | null>();
+    const activityTypeCache = new Map<string, string | null>();
+
+    for (const row of rows) {
+      const mapping = mappingPayload.fields!;
+      const { recruiterIdentifier, linkedPositionName, activities } =
+        this.buildCandidatePayload(row, mapping, {
+          defaultStage: undefined,
+          defaultSalaryCurrency: undefined,
+          isOdooImport: false,
+        });
+
+      // Check recruiter
+      if (recruiterIdentifier) {
+        const resolved = await this.resolveRecruiterIdentifier(
+          recruiterIdentifier,
+          recruiterCache,
+        );
+        if (!resolved) {
+          unmatchedRecruiters.add(recruiterIdentifier);
+        }
+      }
+
+      // Check position
+      if (linkedPositionName) {
+        const resolved = await this.resolveOpenPositionId(
+          linkedPositionName,
+          positionCache,
+        );
+        if (!resolved) {
+          unmatchedPositions.add(linkedPositionName);
+        }
+      }
+
+      // Check activity types
+      for (const activity of activities) {
+        const typeIdentifier =
+          activity.activityTypeKey || activity.activityTypeName;
+        if (typeIdentifier) {
+          const resolved = await this.resolveActivityType(
+            typeIdentifier,
+            activityTypeCache,
+          );
+          if (!resolved) {
+            unmatchedActivityTypes.add(typeIdentifier);
+          }
+        }
+      }
+    }
+
+    return {
+      unmatchedRecruiters: Array.from(unmatchedRecruiters).sort(),
+      unmatchedPositions: Array.from(unmatchedPositions).sort(),
+      unmatchedActivityTypes: Array.from(unmatchedActivityTypes).sort(),
     };
   }
 
@@ -1257,6 +1402,7 @@ export class CandidatesImportService {
             const resolved = await this.resolveRecruiterIdentifier(
               recruiterIdentifier,
               recruiterCache,
+              dto.manualMatches?.recruiters,
             );
             if (!resolved) {
               throw new BadRequestException(
@@ -1402,16 +1548,24 @@ export class CandidatesImportService {
         }
 
         // Link candidate to position if requested
+        // For inactive candidates, skip linking if position doesn't match (no error)
+        // For active candidates, show error if position doesn't match
         if (hasPositionMapping && linkedPositionName) {
           const positionId = await this.resolveOpenPositionId(
             linkedPositionName,
             positionCache,
+            dto.manualMatches?.positions,
           );
           if (!positionId) {
-            summary.errors.push({
-              row: rowNumber,
-              message: `Job position "${linkedPositionName}" not found. Candidate was imported without linking.`,
-            });
+            // Only show error for active candidates
+            // Inactive candidates can be imported without position linking
+            if (candidateData.isActive !== false) {
+              summary.errors.push({
+                row: rowNumber,
+                message: `Job position "${linkedPositionName}" not found. Candidate was imported without linking.`,
+              });
+            }
+            // For inactive candidates, silently skip linking (no error)
           } else {
             await this.ensureCandidateLinkedToPosition(candidateId, positionId);
           }
@@ -1429,6 +1583,7 @@ export class CandidatesImportService {
             const activityTypeId = await this.resolveActivityType(
               activityData.activityTypeKey || activityData.activityTypeName,
               activityTypeCache,
+              dto.manualMatches?.activityTypes,
             );
 
             if (!activityTypeId) {

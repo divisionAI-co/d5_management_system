@@ -43,6 +43,11 @@ export const templatesApi = {
     const { data } = await apiClient.post<TemplateModel>(`/templates/${id}/duplicate`);
     return data;
   },
+
+  delete: async (id: string) => {
+    const { data } = await apiClient.delete<{ message: string }>(`/templates/${id}`);
+    return data;
+  },
 };
 
 

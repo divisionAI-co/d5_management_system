@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -66,6 +67,13 @@ export class TemplatesController {
   @ApiOperation({ summary: 'Duplicate a template' })
   duplicate(@Param('id') id: string) {
     return this.templatesService.duplicate(id);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete a template' })
+  remove(@Param('id') id: string) {
+    return this.templatesService.remove(id);
   }
 }
 

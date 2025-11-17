@@ -61,6 +61,7 @@ interface CandidateBoardProps {
   onEdit?: (candidate: Candidate) => void;
   onMoveStage?: (candidate: Candidate, stage: CandidateStage) => void;
   onLinkPosition?: (candidate: Candidate) => void;
+  onSendEmail?: (candidate: Candidate) => void;
   onCandidateMove?: (result: DropResult, candidate: Candidate) => void;
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
@@ -84,6 +85,7 @@ export function CandidateBoard({
   onEdit,
   onMoveStage,
   onLinkPosition,
+  onSendEmail,
   onCandidateMove,
   onConvertToEmployee,
   onArchive,
@@ -100,11 +102,13 @@ export function CandidateBoard({
     const map = new Map<CandidateStage, Candidate[]>();
     STAGE_ORDER.forEach((stage) => map.set(stage, []));
     
-    // Debug: Log all candidate stages
-    const stageValues = new Set(candidates.map(c => c.stage));
-    if (stageValues.size > 0) {
-      console.log('Candidate stages found:', Array.from(stageValues));
-      console.log('Expected stages:', STAGE_ORDER);
+    // Debug: Log all candidate stages (only in development)
+    if (import.meta.env.DEV) {
+      const stageValues = new Set(candidates.map(c => c.stage));
+      if (stageValues.size > 0) {
+        console.log('Candidate stages found:', Array.from(stageValues));
+        console.log('Expected stages:', STAGE_ORDER);
+      }
     }
     
     candidates.forEach((candidate) => {
@@ -128,16 +132,20 @@ export function CandidateBoard({
       }
       
       // If still no match, log and add to first stage as fallback
-      console.warn(`Unknown candidate stage: "${candidateStage}" (type: ${typeof candidateStage}) for candidate ${candidate.id} - ${candidate.firstName} ${candidate.lastName}`);
+      if (import.meta.env.DEV) {
+        console.warn(`Unknown candidate stage: "${candidateStage}" (type: ${typeof candidateStage}) for candidate ${candidate.id} - ${candidate.firstName} ${candidate.lastName}`);
+      }
       map.get(STAGE_ORDER[0])?.push(candidate);
     });
     
-    // Debug: Log grouped counts
-    const groupedCounts: Record<string, number> = {};
-    map.forEach((candidates, stage) => {
-      groupedCounts[stage] = candidates.length;
-    });
-    console.log('Grouped candidates by stage:', groupedCounts);
+    // Debug: Log grouped counts (only in development)
+    if (import.meta.env.DEV) {
+      const groupedCounts: Record<string, number> = {};
+      map.forEach((candidates, stage) => {
+        groupedCounts[stage] = candidates.length;
+      });
+      console.log('Grouped candidates by stage:', groupedCounts);
+    }
     
     return map;
   }, [candidates]);
@@ -233,6 +241,7 @@ export function CandidateBoard({
                                   onEdit={onEdit}
                                   onMoveStage={onMoveStage}
                                   onLinkPosition={onLinkPosition}
+                                  onSendEmail={onSendEmail}
                                   onConvertToEmployee={onConvertToEmployee}
                                   onArchive={onArchive}
                                   onDelete={onDelete}
@@ -280,6 +289,7 @@ interface CandidateCardProps {
   onEdit?: (candidate: Candidate) => void;
   onMoveStage?: (candidate: Candidate, stage: CandidateStage) => void;
   onLinkPosition?: (candidate: Candidate) => void;
+  onSendEmail?: (candidate: Candidate) => void;
   onConvertToEmployee?: (candidate: Candidate) => void;
   onArchive?: (candidate: Candidate) => void;
   onDelete?: (candidate: Candidate) => void;
@@ -293,6 +303,7 @@ function CandidateCard({
   onEdit,
   onMoveStage,
   onLinkPosition,
+  onSendEmail,
   onConvertToEmployee,
   onArchive,
   onDelete,
@@ -476,6 +487,19 @@ function CandidateCard({
                 Link to Position
               </button>
             )}
+            {onSendEmail && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSendEmail(candidate);
+                }}
+                className="w-full rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-100"
+              >
+                <Mail className="mr-2 inline h-4 w-4" />
+                Send Email
+              </button>
+            )}
 
             {onConvertToEmployee && (
               <button
@@ -522,7 +546,7 @@ function CandidateCard({
                 }}
                 className="w-full rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-600 transition hover:bg-orange-100"
               >
-                Unlink from Positions
+                Mark Inactive
               </button>
             )}
             {onUnlinkCandidate && (!candidate.positions || candidate.positions.length === 0) && (

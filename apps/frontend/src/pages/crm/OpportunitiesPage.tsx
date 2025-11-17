@@ -20,6 +20,7 @@ import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm'
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
 import { OpportunitiesBoard } from '@/components/crm/opportunities/OpportunitiesBoard';
 import { CreatePositionModal } from '@/components/recruitment/CreatePositionModal';
+import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOpportunityStagesStore } from '@/lib/stores/opportunity-stages-store';
 import { OPPORTUNITY_STAGES } from '@/constants/opportunities';
@@ -63,7 +64,7 @@ export default function OpportunitiesPage() {
   const removeStage = useOpportunityStagesStore((state) => state.removeStage);
   const moveStage = useOpportunityStagesStore((state) => state.moveStage);
 
-  const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'board'>('board');
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<CustomerType | undefined>(undefined);
   const [stageFilter, setStageFilter] = useState<string | undefined>(undefined);
@@ -81,6 +82,7 @@ export default function OpportunitiesPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [positionModalOpportunity, setPositionModalOpportunity] = useState<Opportunity | null>(null);
+  const [emailModalOpportunity, setEmailModalOpportunity] = useState<Opportunity | null>(null);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
 
@@ -233,7 +235,11 @@ export default function OpportunitiesPage() {
     },
   });
 
-  const users = (usersQuery.data?.data ?? []) as UserSummary[];
+  // Filter users to only show ADMIN and SALESPERSON roles for opportunity assignment
+  const users = useMemo(() => {
+    const allUsers = (usersQuery.data?.data ?? []) as UserSummary[];
+    return allUsers.filter((user) => user.role === 'ADMIN' || user.role === 'SALESPERSON');
+  }, [usersQuery.data?.data]);
   const customers = (customersQuery.data?.data ?? []) as CustomerSummary[];
   const opportunities = opportunitiesQuery.data?.data ?? [];
   useEffect(() => {
@@ -310,13 +316,33 @@ export default function OpportunitiesPage() {
       return opportunities;
     }
     // In board view, limit opportunities per column
-    return opportunities.filter((opportunity) => {
+    // Group by stage first, then apply limits
+    const opportunitiesByStage = opportunities.reduce<Record<string, Opportunity[]>>((acc, opportunity) => {
       const stage = opportunity.stage || 'Unspecified';
-      const stageOpportunities = opportunities.filter((o) => (o.stage || 'Unspecified') === stage);
-      const index = stageOpportunities.findIndex((o) => o.id === opportunity.id);
-      return index < (columnLimits[stage] || 10);
+      if (!acc[stage]) {
+        acc[stage] = [];
+      }
+      acc[stage].push(opportunity);
+      return acc;
+    }, {});
+
+    // Apply column limits and flatten back to array
+    // When searching, show all results (no limit) to ensure search results are visible
+    const hasSearch = Boolean(searchTerm.trim());
+    const visible: Opportunity[] = [];
+    Object.entries(opportunitiesByStage).forEach(([stage, stageOpportunities]) => {
+      if (hasSearch) {
+        // Show all results when searching
+        visible.push(...stageOpportunities);
+      } else {
+        // Apply column limits when not searching
+        const limit = columnLimits[stage] || 10;
+        visible.push(...stageOpportunities.slice(0, limit));
+      }
     });
-  }, [opportunities, viewMode, columnLimits]);
+
+    return visible;
+  }, [opportunities, viewMode, columnLimits, searchTerm]);
 
   const handleLoadMore = (stage: string) => {
     setIsLoadingMore((prev) => ({ ...prev, [stage]: true }));
@@ -339,18 +365,20 @@ export default function OpportunitiesPage() {
   }, [meta]);
 
   // Reset column limits when filters change in board view
+  // But don't reset when searchTerm changes - allow search to show all results
   useEffect(() => {
     if (viewMode === 'board') {
       setColumnLimits(() => {
         const initial: Record<string, number> = {};
         stages.forEach((stage) => {
+          // When filters change (not search), reset to 10
+          // This allows search to show all matching results
           initial[stage] = 10;
         });
         return initial;
       });
     }
   }, [
-    searchTerm,
     typeFilter,
     stageFilter,
     statusFilter,
@@ -358,6 +386,7 @@ export default function OpportunitiesPage() {
     assignedFilter,
     viewMode,
     stages,
+    // Note: searchTerm is intentionally excluded so search results aren't limited
   ]);
 
   const handleApplySearch = (event: React.FormEvent) => {
@@ -375,7 +404,7 @@ export default function OpportunitiesPage() {
     setSortBy('createdAt');
     setSortOrder('desc');
     setPage(1);
-    setViewMode('table');
+    setViewMode('board');
   };
 
   const handlePageChange = (newPage: number) => {
@@ -410,6 +439,10 @@ export default function OpportunitiesPage() {
 
   const handleCreatePositionFromOpportunity = (opportunity: Opportunity) => {
     setPositionModalOpportunity(opportunity);
+  };
+
+  const handleSendEmail = (opportunity: Opportunity) => {
+    setEmailModalOpportunity(opportunity);
   };
 
   const handleViewOpportunity = (opportunity: Opportunity) => {
@@ -769,6 +802,7 @@ export default function OpportunitiesPage() {
           onDelete={handleDelete}
           onView={handleViewOpportunity}
           onCreatePosition={handleCreatePositionFromOpportunity}
+          onSendEmail={handleSendEmail}
         />
       ) : (
         <OpportunitiesBoard
@@ -782,6 +816,7 @@ export default function OpportunitiesPage() {
           onOpportunityMove={handleOpportunityMoveOptimistic}
           onView={handleViewOpportunity}
           onCreatePosition={handleCreatePositionFromOpportunity}
+          onSendEmail={handleSendEmail}
           onAddStage={addStage}
           onRemoveStage={handleRemoveStage}
           onMoveStageLeft={(stage) => handleReorderStage(stage, 'left')}
@@ -835,6 +870,19 @@ export default function OpportunitiesPage() {
             setFeedback(`Job position "${position.title}" created from opportunity.`);
             queryClient.invalidateQueries({ queryKey: ['opportunities'] });
             queryClient.invalidateQueries({ queryKey: ['positions'] });
+          }}
+        />
+      ) : null}
+
+      {emailModalOpportunity ? (
+        <SendEmailModal
+          title={`Send Email - ${emailModalOpportunity.title}`}
+          defaultTo={emailModalOpportunity.lead?.contact?.email || emailModalOpportunity.customer?.email || ''}
+          defaultSubject={`Update on ${emailModalOpportunity.title}`}
+          onClose={() => setEmailModalOpportunity(null)}
+          onSend={async (payload) => {
+            await opportunitiesApi.sendEmail(emailModalOpportunity.id, payload);
+            setFeedback(`Email sent successfully to ${payload.to}`);
           }}
         />
       ) : null}

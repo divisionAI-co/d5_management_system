@@ -187,14 +187,24 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
   }, [baseLeads, opportunity]);
 
   const users = usersQuery.data?.data ?? [];
-  const eligibleUsers = useMemo(
-    () =>
-      users.filter(
+  const eligibleUsers = useMemo(() => {
+    // Filter to only ADMIN and SALESPERSON roles
+    const filtered = users.filter(
         (user) =>
           user.isActive && (user.role === 'ADMIN' || user.role === 'SALESPERSON'),
-      ),
-    [users],
-  );
+    );
+    
+    // If editing and current owner is not in the filtered list, include them
+    // This prevents accidentally unassigning when the owner's role changed
+    if (opportunity?.assignedToId) {
+      const currentOwner = users.find((user) => user.id === opportunity.assignedToId);
+      if (currentOwner && !filtered.some((user) => user.id === currentOwner.id)) {
+        return [...filtered, currentOwner];
+      }
+    }
+    
+    return filtered;
+  }, [users, opportunity?.assignedToId]);
   const stageOptions = useMemo(() => {
     if (
       opportunity?.stage &&

@@ -74,6 +74,17 @@ export class CandidatesImportController {
     return this.candidatesImportService.saveCandidatesMapping(id, dto);
   }
 
+  @Get(':id/validate')
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.RECRUITER)
+  @ApiOperation({
+    summary: 'Validate import and detect unmatched values',
+    description:
+      'Scans the import data to identify values that cannot be automatically matched (recruiters, positions, activity types). Returns a list of unmatched values that require manual matching.',
+  })
+  validate(@Param('id') id: string) {
+    return this.candidatesImportService.validateCandidatesImport(id);
+  }
+
   @Post(':id/execute')
   @Roles(UserRole.ADMIN, UserRole.HR, UserRole.RECRUITER)
   @ApiOperation({ summary: 'Execute the candidate import after mapping' })

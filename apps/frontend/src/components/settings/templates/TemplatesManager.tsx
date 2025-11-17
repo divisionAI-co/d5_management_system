@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, FileText, Loader2, Plus, RefreshCcw, Search, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Copy, FileText, Loader2, Plus, RefreshCcw, Search, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { templatesApi } from '@/lib/api/templates';
@@ -96,6 +96,31 @@ export function TemplatesManager() {
       setErrorMessage(message);
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => templatesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      setFeedbackMessage('Template deleted successfully.');
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message ?? 'Unable to delete template at this time.';
+      setErrorMessage(message);
+    },
+  });
+
+  const [templateToDelete, setTemplateToDelete] = useState<TemplateModel | null>(null);
+
+  const handleDeleteClick = (template: TemplateModel) => {
+    setTemplateToDelete(template);
+  };
+
+  const confirmDelete = () => {
+    if (templateToDelete) {
+      deleteMutation.mutate(templateToDelete.id);
+      setTemplateToDelete(null);
+    }
+  };
 
   const openCreate = () => {
     setSelectedTemplate(null);
@@ -332,6 +357,16 @@ export function TemplatesManager() {
                         >
                           Edit
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(template)}
+                          disabled={template.isDefault || deleteMutation.isPending}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          title={template.isDefault ? 'Cannot delete default template' : 'Delete template'}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -352,6 +387,40 @@ export function TemplatesManager() {
       />
 
       <TemplatePreviewModal open={Boolean(previewTemplate)} template={previewTemplate} onClose={() => setPreviewTemplate(null)} />
+
+      {/* Delete Confirmation Dialog */}
+      {templateToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-xl">
+            <h2 className="text-xl font-semibold text-foreground">Delete Template</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Are you sure you want to delete <strong>{templateToDelete.name}</strong>? This action cannot be undone.
+            </p>
+            {templateToDelete.isDefault && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <strong>Warning:</strong> This is a default template. You cannot delete default templates.
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTemplateToDelete(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={templateToDelete.isDefault || deleteMutation.isPending}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -373,8 +373,37 @@ export class EodImportService {
     };
   }
 
-  private async resolveUserIdByEmail(email: string): Promise<{ userId: string }> {
+  private async resolveUserIdByEmail(
+    email: string,
+    manualMatches?: Record<string, string>,
+  ): Promise<{ userId: string }> {
     const normalized = email.trim().toLowerCase();
+
+    // Check manual matches first
+    if (manualMatches) {
+      // Try exact match first, then normalized
+      const manualMatch = manualMatches[email] || manualMatches[normalized] || manualMatches[email.toLowerCase()];
+      if (manualMatch) {
+        // Verify the manual match exists and has an employee
+        const user = await this.prisma.user.findUnique({
+          where: { id: manualMatch },
+          select: {
+            id: true,
+            email: true,
+            employee: { select: { id: true } },
+          },
+        });
+        if (user && user.employee) {
+          return { userId: user.id };
+        }
+        if (user && !user.employee) {
+          throw new BadRequestException(
+            `The manually matched user "${user.email}" does not have an employee record. Please ensure the employee exists before importing EOD reports.`,
+          );
+        }
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email: normalized },
       select: {
@@ -390,6 +419,64 @@ export class EodImportService {
     }
 
     return { userId: user.id };
+  }
+
+  async validateEodImport(
+    id: string,
+  ): Promise<{
+    unmatchedEmployees: string[];
+  }> {
+    const importRecord = await this.prisma.dataImport.findUnique({
+      where: { id },
+    });
+
+    if (!importRecord || importRecord.type !== 'eod_reports') {
+      throw new NotFoundException('Import not found');
+    }
+
+    const mappingPayload = importRecord.fieldMapping as
+      | {
+          fields?: EodFieldMapping;
+          ignoredColumns?: string[];
+        }
+      | null;
+
+    if (!mappingPayload?.fields) {
+      throw new BadRequestException(
+        'Field mappings must be configured before validating the import.',
+      );
+    }
+
+    const buffer = await this.readImportFile(importRecord);
+    const parsed = await parseSpreadsheet(buffer);
+    const rows = parsed.rows.map((row) => this.normalizeRowValues(row));
+
+    const unmatchedEmployees = new Set<string>();
+    const emailCache = new Set<string>();
+
+    for (const row of rows) {
+      const email = buildEodPayload(row, mappingPayload.fields!, {
+        markMissingAsSubmitted: false,
+        defaultIsLate: false,
+      }).email;
+
+      if (!email || emailCache.has(email.toLowerCase())) {
+        continue;
+      }
+
+      emailCache.add(email.toLowerCase());
+
+      try {
+        await this.resolveUserIdByEmail(email);
+      } catch (error) {
+        // If resolution fails, it's unmatched
+        unmatchedEmployees.add(email);
+      }
+    }
+
+    return {
+      unmatchedEmployees: Array.from(unmatchedEmployees).sort(),
+    };
   }
 
   async executeEodImport(
@@ -449,6 +536,7 @@ export class EodImportService {
             mapping: mappingPayload.fields!,
             options,
             updateExisting,
+            manualMatches: dto.manualMatches?.employees,
           })
         : await this.processStandardImport({
             importId: id,
@@ -456,6 +544,7 @@ export class EodImportService {
             mapping: mappingPayload.fields!,
             options,
             updateExisting,
+            manualMatches: dto.manualMatches?.employees,
           });
 
       await this.prisma.dataImport.update({
@@ -492,8 +581,9 @@ export class EodImportService {
     mapping: EodFieldMapping;
     options: BuildEodPayloadOptions;
     updateExisting: boolean;
+    manualMatches?: Record<string, string>;
   }): Promise<EodImportSummary> {
-    const { importId, rows, mapping, options, updateExisting } = params;
+    const { importId, rows, mapping, options, updateExisting, manualMatches } = params;
 
     const summary: EodImportSummary = {
       importId,
@@ -583,7 +673,7 @@ export class EodImportService {
     const processGroup = async (group: GroupedEodRow) => {
       const rowNumber = group.rowNumbers[0];
       try {
-        const { userId } = await this.resolveUserIdByEmail(group.email);
+        const { userId } = await this.resolveUserIdByEmail(group.email, manualMatches);
 
         const existingReport = await this.prisma.eodReport.findUnique({
           where: {

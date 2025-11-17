@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Search, X } from 'lucide-react';
@@ -41,30 +41,16 @@ export function CreatePositionModal({
 }: CreatePositionModalProps) {
   const queryClient = useQueryClient();
   const [opportunitySearch, setOpportunitySearch] = useState('');
+  const [isOpportunityDropdownOpen, setIsOpportunityDropdownOpen] = useState(false);
+  const opportunityDropdownRef = useRef<HTMLDivElement>(null);
   const isEditMode = Boolean(position);
-
-  const opportunitiesQuery = useQuery({
-    queryKey: ['opportunities', 'position-select', opportunitySearch],
-    enabled: !defaultOpportunity,
-    queryFn: () =>
-      opportunitiesApi.list({
-        search: opportunitySearch || undefined,
-        page: 1,
-        pageSize: 50,
-        // Don't filter by isClosed - show all opportunities, user can choose
-      }),
-  });
-
-  const opportunities = useMemo<Opportunity[]>(
-    () => opportunitiesQuery.data?.data ?? [],
-    [opportunitiesQuery.data],
-  );
 
   const {
     register,
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues: {
@@ -79,6 +65,53 @@ export function CreatePositionModal({
 
   const selectedOpportunityId = watch('opportunityId');
 
+  const opportunitiesQuery = useQuery({
+    queryKey: ['opportunities', 'position-select', opportunitySearch],
+    enabled:
+      !defaultOpportunity &&
+      (isOpportunityDropdownOpen || opportunitySearch.length > 0 || !!selectedOpportunityId),
+    queryFn: () =>
+      opportunitiesApi.list({
+        search: opportunitySearch || undefined,
+        page: 1,
+        pageSize: 50,
+        // Don't filter by isClosed - show all opportunities, user can choose
+      }),
+  });
+
+  const opportunities = useMemo<Opportunity[]>(
+    () => opportunitiesQuery.data?.data ?? [],
+    [opportunitiesQuery.data],
+  );
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        opportunityDropdownRef.current &&
+        !opportunityDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpportunityDropdownOpen(false);
+      }
+    };
+
+    if (isOpportunityDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpportunityDropdownOpen]);
+
+  // Update search field when opportunity is selected
+  useEffect(() => {
+    if (selectedOpportunityId && opportunities.length > 0) {
+      const selected = opportunities.find((o) => o.id === selectedOpportunityId);
+      if (selected && opportunitySearch !== selected.title) {
+        setOpportunitySearch(selected.title);
+      }
+    }
+    // Don't auto-clear search field - let user control it or let the button handler clear it
+  }, [selectedOpportunityId, opportunities, opportunitySearch]);
+
   useEffect(() => {
     reset({
       title: position?.title ?? defaultOpportunity?.title ?? '',
@@ -87,6 +120,10 @@ export function CreatePositionModal({
       opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
       status: position?.status ?? 'Open',
     });
+    // Set initial search value if opportunity is pre-selected
+    if (position?.opportunity || defaultOpportunity) {
+      setOpportunitySearch(position?.opportunity?.title ?? defaultOpportunity?.title ?? '');
+    }
   }, [defaultOpportunity, position, reset]);
 
   const createMutation = useMutation({
@@ -122,7 +159,8 @@ export function CreatePositionModal({
         requirements: values.requirements?.trim() || undefined,
         status: values.status,
         // Include opportunityId in update to allow changing the link
-        opportunityId: values.opportunityId || undefined,
+        // Send null explicitly to unlink, or the opportunity ID to link
+        opportunityId: values.opportunityId ? values.opportunityId : null,
       };
       updateMutation.mutate({ id: position.id, payload });
       return;
@@ -244,47 +282,107 @@ export function CreatePositionModal({
                 ) : null}
               </div>
             ) : (
-              <>
+              <div className="relative" ref={opportunityDropdownRef}>
+                {selectedOpportunityId && !isOpportunityDropdownOpen && (
+                  <div className="mb-2 flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-blue-900">
+                        {opportunities.find((o) => o.id === selectedOpportunityId)?.title ||
+                          'Linked opportunity'}
+                      </p>
+                      {opportunities.find((o) => o.id === selectedOpportunityId)?.customer && (
+                        <p className="text-xs text-blue-700">
+                          {opportunities.find((o) => o.id === selectedOpportunityId)?.customer?.name}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setValue('opportunityId', '', { shouldValidate: true });
+                        setOpportunitySearch('');
+                      }}
+                      className="ml-2 rounded px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <input
                       type="text"
                       value={opportunitySearch}
-                      onChange={(event) => setOpportunitySearch(event.target.value)}
-                      placeholder="Search opportunity by title or client"
+                      onChange={(event) => {
+                        setOpportunitySearch(event.target.value);
+                        setIsOpportunityDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsOpportunityDropdownOpen(true)}
+                      placeholder={
+                        selectedOpportunityId
+                          ? 'Search to change opportunity...'
+                          : 'Search opportunity by title or client'
+                      }
                       className="w-full rounded-lg border border-border px-9 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     />
                   </div>
                 </div>
 
-                {opportunitiesQuery.isLoading ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading opportunities...
+                {isOpportunityDropdownOpen && (
+                  <div className="absolute z-10 mt-2 w-full rounded-lg border border-border bg-card shadow-lg max-h-60 overflow-y-auto">
+                    {opportunitiesQuery.isLoading ? (
+                      <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading opportunities...
+                      </div>
+                    ) : opportunities.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                        {opportunitySearch
+                          ? 'No opportunities found matching your search.'
+                          : 'Start typing to search opportunities...'}
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setValue('opportunityId', '', { shouldValidate: true });
+                            setIsOpportunityDropdownOpen(false);
+                            setOpportunitySearch('');
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-muted ${
+                            !selectedOpportunityId ? 'bg-blue-50 font-semibold' : ''
+                          }`}
+                        >
+                          No opportunity link
+                        </button>
+                        {opportunities.map((opportunity) => (
+                          <button
+                            key={opportunity.id}
+                            type="button"
+                            onClick={() => {
+                              setValue('opportunityId', opportunity.id);
+                              setIsOpportunityDropdownOpen(false);
+                              setOpportunitySearch(opportunity.title);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-muted ${
+                              selectedOpportunityId === opportunity.id ? 'bg-blue-50 font-semibold' : ''
+                            }`}
+                          >
+                            <div className="font-medium">{opportunity.title}</div>
+                            {opportunity.customer && (
+                              <div className="text-xs text-muted-foreground">
+                                {opportunity.customer.name}
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </>
+                    )}
                   </div>
-                ) : opportunities.length === 0 ? (
-                  <div className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
-                    {opportunitySearch
-                      ? 'No opportunities found matching your search.'
-                      : 'No opportunities available.'}
-                  </div>
-                ) : (
-                  <select
-                    {...register('opportunityId')}
-                    value={selectedOpportunityId || ''}
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  >
-                    <option value="">No opportunity link</option>
-                    {opportunities.map((opportunity) => (
-                      <option key={opportunity.id} value={opportunity.id}>
-                        {opportunity.title}
-                        {opportunity.customer ? ` — ${opportunity.customer.name}` : ''}
-                      </option>
-                    ))}
-                  </select>
                 )}
-              </>
+              </div>
             )}
           </div>
 

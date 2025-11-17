@@ -121,6 +121,22 @@ export const candidatesApi = {
     );
     return data;
   },
+
+  async sendEmail(id: string, payload: {
+    to: string;
+    subject: string;
+    templateId?: string;
+    htmlContent?: string;
+    textContent?: string;
+    cc?: string;
+    bcc?: string;
+  }) {
+    const { data } = await apiClient.post<{ success: boolean; message: string; to: string; subject: string }>(
+      `/recruitment/candidates/${id}/send-email`,
+      payload,
+    );
+    return data;
+  },
 };
 
 

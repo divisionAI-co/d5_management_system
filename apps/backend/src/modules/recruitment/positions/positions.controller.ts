@@ -73,6 +73,26 @@ export class OpenPositionsController {
     return this.positionsService.close(id, closeDto);
   }
 
+  @Patch(':id/archive')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Archive a job position',
+    description: 'Archives a position by setting isArchived to true. Archived positions are excluded from normal queries by default.',
+  })
+  archive(@Param('id') id: string) {
+    return this.positionsService.archive(id);
+  }
+
+  @Patch(':id/unarchive')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Unarchive a job position',
+    description: 'Restores an archived position by setting isArchived to false.',
+  })
+  unarchive(@Param('id') id: string) {
+    return this.positionsService.unarchive(id);
+  }
+
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
   @ApiOperation({ summary: 'Delete a job position' })

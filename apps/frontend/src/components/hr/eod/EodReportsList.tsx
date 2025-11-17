@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { eodReportsApi } from '@/lib/api/hr';
 import type { EodReport } from '@/types/hr';
-import { addDays, endOfDay, format } from 'date-fns';
+import { addDays, endOfDay, format, startOfMonth } from 'date-fns';
 import { ChevronDown, ChevronRight, ClipboardList, Edit3, Plus, UploadCloud } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
@@ -27,10 +27,14 @@ export function EodReportsList({
   const { user } = useAuthStore();
   const isPrivileged =
     user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  
+  // Default dates: beginning of current month to today
+  const getDefaultStartDate = () => format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const getDefaultEndDate = () => format(new Date(), 'yyyy-MM-dd');
+  
+  const [startDate, setStartDate] = useState<string>(getDefaultStartDate());
+  const [endDate, setEndDate] = useState<string>(getDefaultEndDate());
   const [selectedEmployee, setSelectedEmployee] = useState<string>(filterUserId ?? '');
-  const [selectedProject, setSelectedProject] = useState<string>('');
   const [page, setPage] = useState(1);
   const [expandedReports, setExpandedReports] = useState<Set<string>>(new Set());
   const pageSize = 10;
@@ -74,30 +78,6 @@ export function EodReportsList({
     return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [reports]);
 
-  const projectOptions = useMemo(() => {
-    if (!reports) {
-      return [];
-    }
-
-    const set = new Set<string>();
-
-    reports.forEach((report) => {
-      if (Array.isArray(report.tasksWorkedOn)) {
-        report.tasksWorkedOn.forEach((task) => {
-          if (typeof task === 'string') {
-            set.add(task);
-          } else if (task && typeof task === 'object' && 'clientDetails' in task) {
-            const clientDetails = String(task.clientDetails || '').trim();
-            if (clientDetails) {
-              set.add(clientDetails);
-            }
-          }
-        });
-      }
-    });
-
-    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
-  }, [reports]);
 
   const filteredReports = useMemo(() => {
     if (!reports || reports.length === 0) {
@@ -128,30 +108,9 @@ export function EodReportsList({
         }
       }
 
-      if (selectedProject) {
-        const matchProject =
-          Array.isArray(report.tasksWorkedOn) &&
-          report.tasksWorkedOn.some((task) => {
-            if (typeof task === 'string') {
-              return task.toLowerCase().includes(selectedProject.toLowerCase());
-            }
-
-            if (task && typeof task === 'object' && 'clientDetails' in task) {
-              const clientDetails = String(task.clientDetails || '').toLowerCase();
-              return clientDetails.includes(selectedProject.toLowerCase());
-            }
-
-            return false;
-          });
-
-        if (!matchProject) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [reports, filterUserId, selectedEmployee, startDate, endDate, selectedProject]);
+  }, [reports, filterUserId, selectedEmployee, startDate, endDate]);
 
   const totalPages = useMemo(() => {
     if (!filteredReports.length) {
@@ -260,24 +219,6 @@ export function EodReportsList({
                 {employeeOptions.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          {isPrivileged && (
-            <label className="flex flex-col gap-1 text-sm font-medium text-muted-foreground">
-              Project
-              <select
-                value={selectedProject}
-                onChange={(event) => handleFilterChange(() => setSelectedProject(event.target.value))}
-                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">All projects</option>
-                {projectOptions.map((project) => (
-                  <option key={project} value={project}>
-                    {project}
                   </option>
                 ))}
               </select>

@@ -22,12 +22,12 @@ export class LoginRateLimitGuard implements CanActivate {
     const body = request.body || {};
     const email = body.email?.toLowerCase();
 
-    // Check IP-based rate limiting (5 attempts per 15 minutes)
+    // Check IP-based rate limiting (10 attempts per 15 minutes - more lenient)
     const ipLimit = await this.rateLimitingService.checkRateLimit({
       identifier: ip,
       type: 'ip',
       windowMs: 15 * 60 * 1000, // 15 minutes
-      maxAttempts: 5,
+      maxAttempts: 10, // Increased from 5 to 10
     });
 
     if (!ipLimit.allowed) {
@@ -41,13 +41,13 @@ export class LoginRateLimitGuard implements CanActivate {
       );
     }
 
-    // Check username-based rate limiting if email is provided (5 attempts per 15 minutes)
+    // Check username-based rate limiting if email is provided (10 attempts per 15 minutes - more lenient)
     if (email) {
       const usernameLimit = await this.rateLimitingService.checkRateLimit({
         identifier: email,
         type: 'username',
         windowMs: 15 * 60 * 1000, // 15 minutes
-        maxAttempts: 5,
+        maxAttempts: 10, // Increased from 5 to 10
       });
 
       if (!usernameLimit.allowed) {

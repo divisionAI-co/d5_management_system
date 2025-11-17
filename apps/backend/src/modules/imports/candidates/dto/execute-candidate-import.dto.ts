@@ -1,7 +1,34 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsEnum, IsOptional, IsString, IsUUID, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 import { CandidateStage } from '@prisma/client';
+
+class ManualMatchesDto {
+  @ApiPropertyOptional({
+    description: 'Manual matches for recruiters: { "importedValue": "userId" }',
+    example: { 'john.doe@example.com': 'uuid-here' },
+  })
+  @IsOptional()
+  @IsObject()
+  recruiters?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    description: 'Manual matches for job positions: { "importedValue": "positionId" }',
+    example: { 'Senior Developer': 'uuid-here' },
+  })
+  @IsOptional()
+  @IsObject()
+  positions?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    description: 'Manual matches for activity types: { "importedValue": "activityTypeId" }',
+    example: { 'Phone Call': 'uuid-here' },
+  })
+  @IsOptional()
+  @IsObject()
+  activityTypes?: Record<string, string>;
+}
 
 export class ExecuteCandidateImportDto {
   @ApiPropertyOptional({
@@ -44,4 +71,13 @@ export class ExecuteCandidateImportDto {
   @IsOptional()
   @IsBoolean()
   isOdooImport?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Manual matches for values that could not be automatically matched.',
+    type: ManualMatchesDto,
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ManualMatchesDto)
+  manualMatches?: ManualMatchesDto;
 }

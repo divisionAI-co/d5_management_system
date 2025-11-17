@@ -77,6 +77,17 @@ export class EodImportController {
     return this.eodImportService.saveEodMapping(id, dto);
   }
 
+  @Get(':id/validate')
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({
+    summary: 'Validate import and detect unmatched values',
+    description:
+      'Scans the import data to identify employee emails that cannot be automatically matched. Returns a list of unmatched emails that require manual matching.',
+  })
+  validate(@Param('id') id: string) {
+    return this.eodImportService.validateEodImport(id);
+  }
+
   @Post(':id/execute')
   @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Execute the EOD import after mappings are configured' })

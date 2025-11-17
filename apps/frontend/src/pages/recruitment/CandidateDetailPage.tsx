@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Folder, Link2, MapPin, PenSquare, Pencil, Star, Trash2, UserRound } from 'lucide-react';
-import { candidatesApi } from '@/lib/api/recruitment';
+import { ArrowLeft, FileText, Folder, Link2, Mail, MapPin, PenSquare, Pencil, Star, Trash2, UserRound } from 'lucide-react';
+import { candidatesApi } from '@/lib/api/recruitment/candidates';
 import type { CandidateStage, CandidatePositionsResponse } from '@/types/recruitment';
 import {
   CANDIDATE_STAGE_COLORS,
@@ -11,6 +11,7 @@ import {
 } from '@/components/recruitment/CandidateBoard';
 import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
+import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { CandidateDrivePreview } from '@/components/recruitment/CandidateDrivePreview';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
@@ -22,6 +23,7 @@ export default function CandidateDetailPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showActivitySidebar, setShowActivitySidebar] = useState(false);
 
@@ -189,6 +191,13 @@ export default function CandidateDetailPage() {
           >
             <Link2 className="h-4 w-4" />
             Link Position
+          </button>
+          <button
+            onClick={() => setShowEmailModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground/70"
+          >
+            <Mail className="h-4 w-4" />
+            Send Email
           </button>
           <button
             onClick={() => setShowActivitySidebar(true)}
@@ -518,6 +527,20 @@ export default function CandidateDetailPage() {
         entityType="candidate"
         title="Activity Timeline"
       />
+
+      {showEmailModal && candidate ? (
+        <SendEmailModal
+          title={`Send Email - ${candidate.firstName} ${candidate.lastName}`}
+          defaultTo={candidate.email || ''}
+          defaultSubject={`Update on Your Application - ${candidate.firstName} ${candidate.lastName}`}
+          onClose={() => setShowEmailModal(false)}
+          onSend={async (payload) => {
+            await candidatesApi.sendEmail(candidate.id, payload);
+            setFeedback(`Email sent successfully to ${payload.to}`);
+            setShowEmailModal(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

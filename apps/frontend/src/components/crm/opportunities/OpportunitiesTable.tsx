@@ -1,5 +1,5 @@
 import type { Opportunity } from '@/types/crm';
-import { Edit, Loader2, Lock, Plus, Trash2, Trophy } from 'lucide-react';
+import { Edit, Loader2, Lock, Mail, Plus, Trash2, Trophy } from 'lucide-react';
 
 interface OpportunitiesTableProps {
   opportunities?: Opportunity[];
@@ -9,6 +9,7 @@ interface OpportunitiesTableProps {
   onDelete: (opportunity: Opportunity) => void;
   onView?: (opportunity: Opportunity) => void;
   onCreatePosition?: (opportunity: Opportunity) => void;
+  onSendEmail?: (opportunity: Opportunity) => void;
 }
 
 const TYPE_LABELS: Record<Opportunity['type'], string> = {
@@ -31,6 +32,7 @@ export function OpportunitiesTable({
   onDelete,
   onView,
   onCreatePosition,
+  onSendEmail,
 }: OpportunitiesTableProps) {
   const rows = opportunities ?? [];
 
@@ -219,6 +221,18 @@ export function OpportunitiesTable({
                           >
                             <Plus className="h-3.5 w-3.5" />
                             Job Position
+                          </button>
+                        ) : null}
+                        {onSendEmail ? (
+                          <button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onSendEmail(opportunity);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 transition hover:bg-blue-50"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                            Email
                           </button>
                         ) : null}
                       </div>

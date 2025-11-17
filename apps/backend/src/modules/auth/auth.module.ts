@@ -27,8 +27,8 @@ import { RateLimitingModule } from '../../common/rate-limiting/rate-limiting.mod
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {
-          // Short-lived access tokens by default; can be overridden via env
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '15m'),
+          // Longer-lived access tokens for better UX; can be overridden via env
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '24h'),
         },
       }),
       inject: [ConfigService],

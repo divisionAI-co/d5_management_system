@@ -17,6 +17,7 @@ import { UpdateCandidateStageDto } from './dto/update-candidate-stage.dto';
 import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
 import { MarkInactiveDto } from './dto/mark-inactive.dto';
+import { SendCandidateEmailDto } from './dto/send-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 const RECRUITER_SELECT = {
@@ -208,7 +209,6 @@ export class CandidatesService {
       deletedAt: null,
     };
 
-    console.log('filters.isActive', filters.isActive);
     // Only filter by isActive if explicitly provided
     // If not provided, show all candidates (both active and inactive)
     if (filters.isActive !== undefined) {
@@ -531,6 +531,11 @@ export class CandidatesService {
     const data: Prisma.CandidateUpdateInput = {
       stage: updateDto.stage,
     };
+
+    // When a candidate is rejected, mark them as inactive but keep position links
+    if (updateDto.stage === CandidateStage.REJECTED) {
+      data.isActive = false;
+    }
 
     if (updateDto.note) {
       data.notes = candidate.notes
@@ -900,33 +905,21 @@ export class CandidatesService {
   async markInactive(id: string, dto: MarkInactiveDto) {
     const candidate = await this.ensureCandidateExists(id);
 
-    if (!candidate.positions || candidate.positions.length === 0) {
-      throw new BadRequestException('Candidate is not linked to any positions.');
-    }
+    const updateData: Prisma.CandidateUpdateInput = {
+      isActive: false,
+    };
 
-    const updateData: Prisma.CandidateUpdateInput = {};
     if (dto.reason) {
       updateData.notes = candidate.notes
-        ? `${candidate.notes}\n\n[Unlinked ${new Date().toISOString()}]\n${dto.reason}`
+        ? `${candidate.notes}\n\n[Marked Inactive ${new Date().toISOString()}]\n${dto.reason}`
         : dto.reason;
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (Object.keys(updateData).length > 0) {
-        await tx.candidate.update({
+    // Mark as inactive but keep position links
+    const updated = await this.prisma.candidate.update({
           where: { id },
           data: updateData,
-        });
-      }
-
-      await tx.candidatePosition.deleteMany({
-        where: { candidateId: id },
-      });
-
-      return tx.candidate.findUnique({
-        where: { id },
         include: this.candidateInclude(),
-      });
     });
 
     if (!updated) {
@@ -1009,6 +1002,99 @@ export class CandidatesService {
     });
 
     return { success: true, message: 'Candidate deleted successfully.' };
+  }
+
+  async sendEmail(id: string, dto: SendCandidateEmailDto) {
+    const candidateRaw = await this.prisma.candidate.findUnique({
+      where: { id },
+      include: this.candidateInclude(),
+    });
+
+    if (!candidateRaw) {
+      throw new NotFoundException(`Candidate with ID ${id} not found`);
+    }
+
+    const candidate = this.formatCandidate(candidateRaw);
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with candidate data
+    if (dto.templateId) {
+      const templateData = {
+        candidate: {
+          id: candidate.id,
+          firstName: candidate.firstName,
+          lastName: candidate.lastName,
+          fullName: `${candidate.firstName} ${candidate.lastName}`,
+          email: candidate.email,
+          phone: candidate.phone,
+          currentTitle: candidate.currentTitle,
+          yearsOfExperience: candidate.yearsOfExperience,
+          skills: candidate.skills,
+          stage: candidate.stage,
+          rating: candidate.rating,
+          notes: candidate.notes,
+          city: candidate.city,
+          country: candidate.country,
+          availableFrom: candidate.availableFrom,
+          expectedSalary: candidate.expectedSalary ? Number(candidate.expectedSalary) : null,
+          salaryCurrency: candidate.salaryCurrency,
+          createdAt: candidate.createdAt,
+          updatedAt: candidate.updatedAt,
+        },
+        recruiter: candidate.recruiter
+          ? {
+              firstName: candidate.recruiter.firstName,
+              lastName: candidate.recruiter.lastName,
+              email: candidate.recruiter.email,
+            }
+          : null,
+        positions: candidate.positions?.map((cp: any) => ({
+          title: cp.position?.title,
+          description: cp.position?.description,
+          requirements: cp.position?.requirements,
+          status: cp.status,
+          appliedAt: cp.appliedAt,
+          customer: cp.position?.opportunity?.customer
+            ? {
+                name: cp.position.opportunity.customer.name,
+                email: cp.position.opportunity.customer.email || null,
+              }
+            : null,
+        })),
+      };
+
+      htmlContent = await this.templatesService.render(dto.templateId, templateData);
+    } else if (!htmlContent) {
+      throw new BadRequestException(
+        'Either templateId or htmlContent must be provided',
+      );
+    }
+
+    // Parse CC and BCC
+    const cc = dto.cc ? dto.cc.split(',').map((email) => email.trim()) : undefined;
+    const bcc = dto.bcc ? dto.bcc.split(',').map((email) => email.trim()) : undefined;
+
+    const success = await this.emailService.sendEmail({
+      to: dto.to,
+      subject: dto.subject,
+      html: htmlContent,
+      text: textContent,
+      cc,
+      bcc,
+    });
+
+    if (!success) {
+      throw new BadRequestException('Failed to send email');
+    }
+
+    return {
+      success: true,
+      message: 'Email sent successfully',
+      to: dto.to,
+      subject: dto.subject,
+    };
   }
 
   async listRecruiters() {

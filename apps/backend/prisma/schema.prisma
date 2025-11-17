@@ -528,6 +528,7 @@ model OpenPosition {
   requirements String? @db.Text
 
   status String @default("Open") // Open, Filled, Cancelled
+  isArchived Boolean @default(false)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -537,6 +538,7 @@ model OpenPosition {
   candidates CandidatePosition[]
 
   @@index([status])
+  @@index([isArchived])
   @@map("open_positions")
 }
 

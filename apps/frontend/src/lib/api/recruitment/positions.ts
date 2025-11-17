@@ -80,6 +80,20 @@ export const positionsApi = {
     );
     return data;
   },
+
+  async archive(id: string) {
+    const { data } = await apiClient.patch<OpenPosition>(
+      `/recruitment/positions/${id}/archive`,
+    );
+    return data;
+  },
+
+  async unarchive(id: string) {
+    const { data } = await apiClient.patch<OpenPosition>(
+      `/recruitment/positions/${id}/unarchive`,
+    );
+    return data;
+  },
 };
 
 

@@ -77,6 +77,17 @@ export class OpportunitiesImportController {
     return this.opportunitiesImportService.saveOpportunitiesMapping(id, dto);
   }
 
+  @Get(':id/validate')
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @ApiOperation({
+    summary: 'Validate import and detect unmatched values',
+    description:
+      'Scans the import data to identify values that cannot be automatically matched (customers, owners). Returns a list of unmatched values that require manual matching.',
+  })
+  validate(@Param('id') id: string) {
+    return this.opportunitiesImportService.validateOpportunitiesImport(id);
+  }
+
   @Post(':id/execute')
   @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
   @ApiOperation({
