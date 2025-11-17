@@ -106,23 +106,42 @@ export class InvoicesService {
     };
   }
 
-  private async generateInvoiceNumber(): Promise<string> {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = `${now.getMonth() + 1}`.padStart(2, '0');
-    const prefix = `INV-${year}${month}`;
+  private async generateInvoiceNumber(year?: number): Promise<string> {
+    const targetYear = year ?? new Date().getFullYear();
+    const prefix = `INV/${targetYear}/`;
 
-    const existingCount = await this.prisma.invoice.count({
+    // Find all invoices for this year to determine the next sequence
+    const existingInvoices = await this.prisma.invoice.findMany({
       where: {
         invoiceNumber: {
           startsWith: prefix,
         },
       },
+      select: {
+        invoiceNumber: true,
+      },
     });
 
-    const sequence = (existingCount + 1).toString().padStart(4, '0');
+    let maxSequence = 0;
 
-    return `${prefix}-${sequence}`;
+    // Extract sequence numbers from all matching invoices
+    for (const invoice of existingInvoices) {
+      const match = invoice.invoiceNumber.match(/^INV\/\d{4}\/(\d+)$/);
+      if (match) {
+        const sequence = parseInt(match[1], 10);
+        if (sequence > maxSequence) {
+          maxSequence = sequence;
+        }
+      }
+    }
+
+    // Next sequence is max + 1, or 1 if no invoices found
+    const nextSequence = maxSequence + 1;
+
+    // Format as 5-digit zero-padded number
+    const sequence = nextSequence.toString().padStart(5, '0');
+
+    return `${prefix}${sequence}`;
   }
 
   private buildInvoiceWhere(filters: FilterInvoicesDto): Prisma.InvoiceWhereInput {
@@ -296,8 +315,10 @@ export class InvoicesService {
     const issueDate = createDto.issueDate ? new Date(createDto.issueDate) : new Date();
     const dueDate = this.getDueDate(issueDate, createDto.dueDate);
 
+    // Use the issue date year for invoice number generation
+    const issueYear = issueDate.getFullYear();
     const invoiceNumber =
-      createDto.invoiceNumber ?? (await this.generateInvoiceNumber());
+      createDto.invoiceNumber ?? (await this.generateInvoiceNumber(issueYear));
 
     try {
       const invoice = await this.prisma.invoice.create({
@@ -1230,9 +1251,10 @@ export class InvoicesService {
       );
 
       try {
+        const issueYear = issueDate.getFullYear();
         await this.prisma.invoice.create({
           data: {
-            invoiceNumber: await this.generateInvoiceNumber(),
+            invoiceNumber: await this.generateInvoiceNumber(issueYear),
             customerId: invoice.customerId,
             subtotal,
             taxRate: new Prisma.Decimal(taxRate),
