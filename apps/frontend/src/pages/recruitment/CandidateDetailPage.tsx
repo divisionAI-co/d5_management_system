@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FileText, Folder, Link2, Mail, MapPin, PenSquare, Pencil, Star, Trash2, UserRound } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment/candidates';
@@ -21,11 +21,29 @@ export default function CandidateDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const location = useLocation();
   const [showForm, setShowForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [showActivitySidebar, setShowActivitySidebar] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showActivitySidebar, setShowActivitySidebar] = useState(
+    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+  );
+
+  // Open activity sidebar if navigating from notification or email link
+  useEffect(() => {
+    if ((location.state as any)?.openActivitySidebar) {
+      setShowActivitySidebar(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    } else if (searchParams.get('openActivitySidebar') === 'true') {
+      setShowActivitySidebar(true);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('openActivitySidebar');
+      newSearchParams.delete('activityId');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [location.state, searchParams, navigate, location.pathname, setSearchParams]);
 
   const candidateQuery = useQuery({
     queryKey: ['candidate', id],

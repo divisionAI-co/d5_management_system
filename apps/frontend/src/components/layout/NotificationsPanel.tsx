@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { Bell, Check, Loader2, RotateCcw } from 'lucide-react';
 
 import { notificationsApi } from '@/lib/api/notifications';
+import { activitiesApi } from '@/lib/api/activities';
 import type { Notification } from '@/types/notifications';
 
 const NOTIFICATIONS_QUERY_KEY = ['notifications'];
@@ -17,6 +19,7 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const {
     data: notifications,
@@ -26,7 +29,9 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
   } = useQuery({
     queryKey: NOTIFICATIONS_QUERY_KEY,
     queryFn: () => notificationsApi.list({ limit: 20 }),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnMount: true, // Refetch when component mounts
+    staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   const unreadCount = useMemo(
@@ -88,6 +93,83 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
     refetch();
   };
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read if not already read
+    if (!notification.isRead) {
+      markAsReadMutation.mutate(notification.id);
+    }
+
+    // Close the panel
+    closePanel();
+
+    // Handle navigation based on notification type
+    if (notification.type === 'MENTIONED_IN_ACTIVITY') {
+      if (!notification.entityId) {
+        console.warn('Notification is missing entityId:', notification);
+        // For old notifications without entityId, we can't navigate
+        // Just mark as read and return
+        return;
+      }
+
+      try {
+        // Get the activity to find which entity it belongs to
+        const activity = await activitiesApi.getById(notification.entityId);
+
+        // Determine the navigation path based on which entity the activity is linked to
+        let path = '';
+        let entityType: 'customer' | 'lead' | 'opportunity' | 'candidate' | 'employee' | 'contact' | 'task' | null = null;
+        let entityId: string | null = null;
+
+        if (activity.customerId) {
+          path = `/crm/customers/${activity.customerId}`;
+          entityType = 'customer';
+          entityId = activity.customerId;
+        } else if (activity.leadId) {
+          path = `/crm/leads/${activity.leadId}`;
+          entityType = 'lead';
+          entityId = activity.leadId;
+        } else if (activity.opportunityId) {
+          path = `/crm/opportunities/${activity.opportunityId}`;
+          entityType = 'opportunity';
+          entityId = activity.opportunityId;
+        } else if (activity.candidateId) {
+          path = `/recruitment/candidates/${activity.candidateId}`;
+          entityType = 'candidate';
+          entityId = activity.candidateId;
+        } else if (activity.employeeId) {
+          path = `/employees/${activity.employeeId}`;
+          entityType = 'employee';
+          entityId = activity.employeeId;
+        } else if (activity.contactId) {
+          // Contacts don't have a detail page, navigate to customer if available
+          // For now, just navigate to contacts list
+          path = '/crm/contacts';
+        } else if (activity.taskId) {
+          path = '/tasks';
+          entityType = 'task';
+          entityId = activity.taskId;
+        }
+
+        if (path) {
+          navigate(path, {
+            state: {
+              openActivitySidebar: true,
+              activityId: notification.entityId,
+              entityType,
+              entityId,
+            },
+          });
+        } else {
+          console.warn('Activity does not belong to any navigable entity:', activity);
+        }
+      } catch (error) {
+        console.error('Failed to navigate to activity:', error);
+        // Show user-friendly error message
+        alert('Unable to navigate to activity. The activity may have been deleted or you may not have access.');
+      }
+    }
+  };
+
   return (
     <div className={`relative ${className ?? ''}`}>
       <button
@@ -141,12 +223,23 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
                 return (
                   <li
                     key={notification.id}
-                    className={`px-4 py-3 text-sm ${
-                      notification.isRead ? 'bg-card' : 'bg-blue-50/70 dark:bg-blue-500/10'
+                    className={`px-4 py-3 text-sm transition ${
+                      notification.isRead
+                        ? 'bg-card'
+                        : 'bg-blue-50/70 dark:bg-blue-500/10'
+                    } ${
+                      notification.type === 'MENTIONED_IN_ACTIVITY' && notification.entityId
+                        ? 'cursor-pointer hover:bg-muted'
+                        : ''
                     }`}
+                    onClick={() => {
+                      if (notification.type === 'MENTIONED_IN_ACTIVITY' && notification.entityId) {
+                        handleNotificationClick(notification);
+                      }
+                    }}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-semibold text-foreground">{notification.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(notification.createdAt), {
@@ -157,7 +250,10 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
                       {!notification.isRead && (
                         <button
                           type="button"
-                          onClick={() => handleMarkAsRead(notification)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkAsRead(notification);
+                          }}
                           className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[0.7rem] font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
                           disabled={markAsReadMutation.isPending}
                         >
@@ -174,6 +270,15 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
                     <p className="mt-2 text-sm text-muted-foreground whitespace-pre-line">
                       {notification.message}
                     </p>
+                    {notification.type === 'MENTIONED_IN_ACTIVITY' && (
+                      <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                        {notification.entityId ? (
+                          <>Click to view activity →</>
+                        ) : (
+                          <>This notification cannot be opened (missing activity link)</>
+                        )}
+                      </p>
+                    )}
                   </li>
                 );
               })}

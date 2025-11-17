@@ -57,7 +57,10 @@ export class ActivitiesService {
     });
 
     // Process @mentions and create notifications
-    await this.processMentions(activity.id, rest.subject, rest.body, createdById);
+    // Don't await - let it run in background to not slow down activity creation
+    this.processMentions(activity.id, rest.subject, rest.body, createdById).catch((error) => {
+      console.error(`[Mentions] Failed to process mentions for activity ${activity.id}:`, error);
+    });
 
     // TODO: Queue reminder/notification jobs when background workers are available
     void notifyAssignee;
@@ -215,7 +218,10 @@ export class ActivitiesService {
     if (updateActivityDto.subject !== undefined || updateActivityDto.body !== undefined) {
       const subject = updateActivityDto.subject ?? activity.subject;
       const body = updateActivityDto.body ?? activity.body;
-      await this.processMentions(activity.id, subject, body, activity.createdById);
+      // Don't await - let it run in background to not slow down activity update
+      this.processMentions(activity.id, subject, body, activity.createdById).catch((error) => {
+        console.error(`[Mentions] Failed to process mentions for activity ${activity.id}:`, error);
+      });
     }
 
     return activity;
@@ -446,49 +452,64 @@ export class ActivitiesService {
     body: string | null | undefined,
     createdById: string,
   ) {
-    // Combine subject and body to extract all mentions
-    const text = [subject, body].filter(Boolean).join(' ');
-    if (!text) {
-      return;
+    try {
+      // Combine subject and body to extract all mentions
+      const text = [subject, body].filter(Boolean).join(' ');
+      if (!text) {
+        return;
+      }
+
+      // Extract mention identifiers
+      const identifiers = extractMentionIdentifiers(text);
+      if (identifiers.length === 0) {
+        return;
+      }
+
+      console.log(`[Mentions] Processing mentions for activity ${activityId}:`, {
+        identifiers,
+        textPreview: text.substring(0, 100),
+      });
+
+      // Find users by mentions
+      const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
+      
+      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      
+      // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
+      const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
+      
+      if (userIdsToNotify.length === 0) {
+        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        return;
+      }
+
+      // Get creator info for notification message
+      const creator = await this.prisma.user.findUnique({
+        where: { id: createdById },
+        select: { firstName: true, lastName: true, email: true },
+      });
+
+      const creatorName = creator
+        ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email
+        : 'Someone';
+
+      // Create notifications for mentioned users
+      const subjectPreview = subject ? (subject.length > 50 ? subject.substring(0, 50) + '...' : subject) : 'an activity';
+      
+      const notifications = await this.notificationsService.createNotificationsForUsers(
+        userIdsToNotify,
+        NotificationType.MENTIONED_IN_ACTIVITY,
+        `You were mentioned in an activity`,
+        `${creatorName} mentioned you in "${subjectPreview}"`,
+        'activity',
+        activityId,
+      );
+
+      console.log(`[Mentions] Created ${notifications.length} notifications for activity ${activityId}`);
+    } catch (error) {
+      // Log error but don't fail the activity creation/update
+      console.error(`[Mentions] Error processing mentions for activity ${activityId}:`, error);
     }
-
-    // Extract mention identifiers
-    const identifiers = extractMentionIdentifiers(text);
-    if (identifiers.length === 0) {
-      return;
-    }
-
-    // Find users by mentions
-    const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
-    
-    // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
-    const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
-    
-    if (userIdsToNotify.length === 0) {
-      return;
-    }
-
-    // Get creator info for notification message
-    const creator = await this.prisma.user.findUnique({
-      where: { id: createdById },
-      select: { firstName: true, lastName: true, email: true },
-    });
-
-    const creatorName = creator
-      ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email
-      : 'Someone';
-
-    // Create notifications for mentioned users
-    const subjectPreview = subject ? (subject.length > 50 ? subject.substring(0, 50) + '...' : subject) : 'an activity';
-    
-    await this.notificationsService.createNotificationsForUsers(
-      userIdsToNotify,
-      NotificationType.MENTIONED_IN_ACTIVITY,
-      `You were mentioned in an activity`,
-      `${creatorName} mentioned you in "${subjectPreview}"`,
-      'activity',
-      activityId,
-    );
   }
 }
 

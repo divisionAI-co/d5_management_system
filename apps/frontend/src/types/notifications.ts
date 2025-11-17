@@ -9,6 +9,7 @@ export type NotificationType =
   | 'NEW_OPPORTUNITY'
   | 'INVOICE_OVERDUE'
   | 'MEETING_REMINDER'
+  | 'MENTIONED_IN_ACTIVITY'
   | 'SYSTEM';
 
 export interface Notification {

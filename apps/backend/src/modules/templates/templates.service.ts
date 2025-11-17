@@ -223,17 +223,25 @@ export class TemplatesService {
   }
 
   private injectCss(html: string, cssContent?: string | null) {
-    if (!cssContent) {
+    if (!cssContent || !cssContent.trim()) {
       return html;
     }
 
-    const styleTag = `<style>${cssContent}</style>`;
+    const styleTag = `<style>\n${cssContent.trim()}\n</style>`;
+    
+    // First, try to inject before </head> tag (most common case)
+    if (html.includes('</head>')) {
+      return html.replace('</head>', `${styleTag}\n</head>`);
+    }
+    
+    // If no </head>, try to inject after <head> tag
     const headTagRegex = /<head([^>]*)>/i;
-
     if (headTagRegex.test(html)) {
       return html.replace(headTagRegex, (match) => `${match}\n${styleTag}`);
     }
-
+    
+    // If no <head> tag at all, wrap in a basic HTML structure or prepend
+    // For email templates, we'll prepend the style tag
     return `${styleTag}\n${html}`;
   }
 

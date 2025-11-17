@@ -49,6 +49,16 @@ export const mapActivitySummary = (activity: ActivityWithRelations) => {
     isCompleted: activity.isCompleted,
     visibility: activity.visibility,
     metadata,
+    // Include entity IDs for navigation
+    customerId: activity.customerId ?? null,
+    leadId: activity.leadId ?? null,
+    opportunityId: activity.opportunityId ?? null,
+    candidateId: activity.candidateId ?? null,
+    employeeId: activity.employeeId ?? null,
+    contactId: activity.contactId ?? null,
+    taskId: activity.taskId ?? null,
+    assignedToId: activity.assignedToId ?? null,
+    createdById: activity.createdById,
     createdAt: activity.createdAt.toISOString(),
     updatedAt: activity.updatedAt.toISOString(),
     createdBy: {
@@ -67,6 +77,21 @@ export const mapActivitySummary = (activity: ActivityWithRelations) => {
           avatar: activity.assignedTo.avatar ?? null,
         }
       : null,
+    activityType: activity.activityType
+      ? {
+          id: activity.activityType.id,
+          key: activity.activityType.key,
+          name: activity.activityType.name,
+          description: activity.activityType.description,
+          color: activity.activityType.color,
+          icon: activity.activityType.icon,
+          isActive: activity.activityType.isActive,
+          isSystem: activity.activityType.isSystem,
+          order: activity.activityType.order,
+          createdAt: activity.activityType.createdAt.toISOString(),
+          updatedAt: activity.activityType.updatedAt.toISOString(),
+        }
+      : undefined,
   };
 };
 

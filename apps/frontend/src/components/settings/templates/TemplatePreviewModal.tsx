@@ -3,7 +3,6 @@ import { Loader2, RefreshCcw, X } from 'lucide-react';
 
 import { templatesApi } from '@/lib/api/templates';
 import type { TemplateModel } from '@/types/templates';
-import { SafeHtml } from '@/components/ui/SafeHtml';
 
 type PreviewState =
   | { status: 'idle'; html: string | null; error: string | null }
@@ -129,8 +128,13 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
 
     if (state.status === 'success' && state.html) {
       return (
-        <div className="h-full min-h-0 overflow-y-auto rounded-lg border border-border bg-card p-4">
-          <SafeHtml html={state.html} className="preview-content" />
+        <div className="h-full min-h-0 overflow-hidden rounded-lg border border-border bg-card">
+          <iframe
+            title="Template preview"
+            className="h-full w-full border-0"
+            srcDoc={state.html}
+            sandbox="allow-same-origin"
+          />
         </div>
       );
     }

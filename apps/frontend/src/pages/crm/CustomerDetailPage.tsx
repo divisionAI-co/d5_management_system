@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/crm';
 import type { CustomerOpportunity } from '@/types/crm';
@@ -46,10 +46,28 @@ export default function CustomerDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showEdit, setShowEdit] = useState(false);
   const [showStatusForm, setShowStatusForm] = useState(false);
-  const [showActivitySidebar, setShowActivitySidebar] = useState(false);
+  const [showActivitySidebar, setShowActivitySidebar] = useState(
+    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // Open activity sidebar if navigating from notification or email link
+  useEffect(() => {
+    if ((location.state as any)?.openActivitySidebar) {
+      setShowActivitySidebar(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    } else if (searchParams.get('openActivitySidebar') === 'true') {
+      setShowActivitySidebar(true);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('openActivitySidebar');
+      newSearchParams.delete('activityId');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [location.state, searchParams, navigate, location.pathname, setSearchParams]);
 
   const customerQuery = useQuery({
     queryKey: ['customer', id],

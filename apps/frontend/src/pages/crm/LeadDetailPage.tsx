@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { leadsApi } from '@/lib/api/crm/leads';
@@ -42,11 +42,29 @@ export default function LeadDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const location = useLocation();
   const [showEdit, setShowEdit] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
-  const [showActivities, setShowActivities] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [showActivities, setShowActivities] = useState(
+    (location.state as any)?.openActivitySidebar ?? searchParams.get('openActivitySidebar') === 'true' ?? false,
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // Open activity sidebar if navigating from notification or email link
+  useEffect(() => {
+    if ((location.state as any)?.openActivitySidebar) {
+      setShowActivities(true);
+      navigate(location.pathname, { replace: true, state: {} });
+    } else if (searchParams.get('openActivitySidebar') === 'true') {
+      setShowActivities(true);
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('openActivitySidebar');
+      newSearchParams.delete('activityId');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [location.state, searchParams, navigate, location.pathname, setSearchParams]);
 
   const leadQuery = useQuery({
     queryKey: ['lead', id],

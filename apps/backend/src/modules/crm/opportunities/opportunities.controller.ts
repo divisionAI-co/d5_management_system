@@ -23,6 +23,7 @@ import { SendOpportunityEmailDto } from './dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('CRM - Opportunities')
@@ -62,8 +63,11 @@ export class OpportunitiesController {
     summary:
       'Create a new opportunity. Staff augmentation opportunities will automatically create an open position.',
   })
-  create(@Body() createDto: CreateOpportunityDto) {
-    return this.opportunitiesService.create(createDto);
+  create(
+    @Body() createDto: CreateOpportunityDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.opportunitiesService.create(createDto, userId);
   }
 
   @Patch(':id')
@@ -72,8 +76,9 @@ export class OpportunitiesController {
   update(
     @Param('id') id: string,
     @Body() updateDto: UpdateOpportunityDto,
+    @CurrentUser('id') userId: string,
   ) {
-    return this.opportunitiesService.update(id, updateDto);
+    return this.opportunitiesService.update(id, updateDto, userId);
   }
 
   @Post(':id/close')

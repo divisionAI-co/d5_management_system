@@ -12,6 +12,9 @@ import {
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { UsersService } from '../../users/users.service';
+import { extractMentionIdentifiers } from '../../../common/utils/mention-parser';
 import { CreateOpportunityDto } from './dto/create-opportunity.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
@@ -35,6 +38,8 @@ export class OpportunitiesService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
+    private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
   ) {}
 
   private formatOpportunity(opportunity: any) {
@@ -412,7 +417,7 @@ export class OpportunitiesService {
     });
   }
 
-  async create(createDto: CreateOpportunityDto) {
+  async create(createDto: CreateOpportunityDto, createdById: string) {
     const lead = await this.findLeadContext(createDto.leadId);
 
     let resolvedCustomerId = createDto.customerId ?? undefined;
@@ -529,10 +534,19 @@ export class OpportunitiesService {
       });
 
       return this.formatOpportunity(created);
+    }).then((formatted) => {
+      // Process @mentions in title and description if provided
+      // Do this outside the transaction to avoid scoping issues
+      if (createDto.title || createDto.description) {
+        this.processMentions(formatted.id, createDto.title, createDto.description, createdById).catch((error) => {
+          console.error(`[Mentions] Failed to process mentions for opportunity ${formatted.id}:`, error);
+        });
+      }
+      return formatted;
     });
   }
 
-  async update(id: string, updateDto: UpdateOpportunityDto) {
+  async update(id: string, updateDto: UpdateOpportunityDto, updatedById: string) {
     const existing = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
@@ -717,7 +731,21 @@ export class OpportunitiesService {
         },
       });
 
+      if (!result) {
+        throw new NotFoundException(`Opportunity with ID ${id} not found after update`);
+      }
+
       return this.formatOpportunity(result);
+    }).then((formatted) => {
+      // Process mentions after transaction completes
+      if (updateDto.title !== undefined || updateDto.description !== undefined) {
+        const title = updateDto.title ?? formatted.title;
+        const description = updateDto.description ?? formatted.description;
+        this.processMentions(id, title, description, updatedById).catch((error) => {
+          console.error(`[Mentions] Failed to process mentions for opportunity ${id}:`, error);
+        });
+      }
+      return formatted;
     });
   }
 
@@ -949,6 +977,75 @@ export class OpportunitiesService {
   async remove(id: string) {
     await this.prisma.opportunity.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  /**
+   * Process @mentions in opportunity description and create notifications
+   */
+  private async processMentions(
+    opportunityId: string,
+    title: string | null | undefined,
+    description: string | null | undefined,
+    createdById: string,
+  ) {
+    try {
+      // Combine title and description to extract all mentions
+      const text = [title, description].filter(Boolean).join(' ');
+      if (!text) {
+        return;
+      }
+
+      // Extract mention identifiers
+      const identifiers = extractMentionIdentifiers(text);
+      if (identifiers.length === 0) {
+        return;
+      }
+
+      console.log(`[Mentions] Processing mentions for opportunity ${opportunityId}:`, {
+        identifiers,
+        textPreview: text.substring(0, 100),
+      });
+
+      // Find users by mentions
+      const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
+      
+      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      
+      // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
+      const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
+      
+      if (userIdsToNotify.length === 0) {
+        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        return;
+      }
+
+      // Get creator info for notification message
+      const creator = await this.prisma.user.findUnique({
+        where: { id: createdById },
+        select: { firstName: true, lastName: true, email: true },
+      });
+
+      const creatorName = creator
+        ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email
+        : 'Someone';
+
+      // Create notifications for mentioned users
+      const titlePreview = title ? (title.length > 50 ? title.substring(0, 50) + '...' : title) : 'an opportunity';
+      
+      const notifications = await this.notificationsService.createNotificationsForUsers(
+        userIdsToNotify,
+        NotificationType.MENTIONED_IN_ACTIVITY,
+        `You were mentioned in an opportunity`,
+        `${creatorName} mentioned you in opportunity "${titlePreview}"`,
+        'opportunity',
+        opportunityId,
+      );
+
+      console.log(`[Mentions] Created ${notifications.length} notifications for opportunity ${opportunityId}`);
+    } catch (error) {
+      // Log error but don't fail the opportunity creation/update
+      console.error(`[Mentions] Error processing mentions for opportunity ${opportunityId}:`, error);
+    }
   }
 }
 

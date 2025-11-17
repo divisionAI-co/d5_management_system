@@ -3,7 +3,6 @@ import { RefreshCw, X } from 'lucide-react';
 import { templatesApi } from '@/lib/api/templates';
 import type { TemplateModel } from '@/types/templates';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
-import { sanitizeHtml } from '@/lib/utils/sanitize';
 
 interface TemplatePreviewDialogProps {
   template: TemplateModel;
@@ -67,9 +66,9 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
       const response = await templatesApi.preview(template.id, {
         data: parsedData,
       });
-      // Sanitize HTML before rendering in iframe (defense in depth)
-      // Note: iframe provides isolation, but sanitization adds extra protection
-      setRenderedHtml(sanitizeHtml(response.renderedHtml));
+      // Use iframe srcDoc to render HTML - iframe provides isolation
+      // No sanitization needed as iframe sandbox prevents script execution
+      setRenderedHtml(response.renderedHtml);
     } catch (apiError) {
       setError(
         apiError instanceof Error

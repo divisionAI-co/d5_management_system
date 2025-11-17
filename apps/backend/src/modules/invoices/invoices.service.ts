@@ -638,19 +638,21 @@ export class InvoicesService {
       return html;
     }
 
+    const styleTag = `<style>\n${css.trim()}\n</style>`;
+    
+    // First, try to inject before </head> tag (most common case)
     if (html.includes('</head>')) {
-      return html.replace(
-        '</head>',
-        `<style>
-${css}
-</style></head>`,
-      );
+      return html.replace('</head>', `${styleTag}\n</head>`);
     }
-
-    return `<style>
-${css}
-</style>
-${html}`;
+    
+    // If no </head>, try to inject after <head> tag
+    const headTagRegex = /<head([^>]*)>/i;
+    if (headTagRegex.test(html)) {
+      return html.replace(headTagRegex, (match) => `${match}\n${styleTag}`);
+    }
+    
+    // If no <head> tag at all, prepend the style tag
+    return `${styleTag}\n${html}`;
   }
 
   private buildInvoiceTemplateData(
