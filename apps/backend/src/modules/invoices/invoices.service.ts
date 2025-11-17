@@ -826,6 +826,39 @@ export class InvoicesService {
     `;
   }
 
+  async previewInvoice(
+    id: string,
+    templateId?: string,
+    templateData?: Record<string, any>,
+  ) {
+    const invoice = await this.findOne(id);
+    const template = await this.getInvoiceTemplate(templateId);
+
+    let renderedHtml: string;
+    let usedTemplateId: string | null = null;
+
+    if (template) {
+      usedTemplateId = template.id;
+      const htmlTemplate = this.mergeTemplateHtmlAndCss(
+        template.htmlContent,
+        template.cssContent,
+      );
+      const data = this.buildInvoiceTemplateData(invoice, templateData);
+      const handlebars = require('handlebars');
+      const compiledTemplate = handlebars.compile(htmlTemplate);
+      renderedHtml = compiledTemplate(data);
+    } else {
+      renderedHtml = this.buildInvoiceHtml(invoice);
+    }
+
+    return {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      templateId: usedTemplateId,
+      renderedHtml,
+    };
+  }
+
   async generateInvoicePdf(
     id: string,
     templateId?: string,

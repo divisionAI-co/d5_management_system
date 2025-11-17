@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Send, Loader2 } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
 import type { InvoiceDetail, SendInvoicePayload } from '@/types/invoices';
+import { formatCurrency } from '@/lib/utils/currency';
 
 type FormValues = {
   to: string;
@@ -21,10 +22,7 @@ interface InvoiceSendDialogProps {
 const defaultMessage = (invoice: InvoiceDetail) => {
   const customerName = invoice.customer?.name ?? 'customer';
   const dueDate = new Date(invoice.dueDate).toLocaleDateString();
-  const totalFormatted = invoice.total.toLocaleString(undefined, {
-    style: 'currency',
-    currency: invoice.currency ?? 'USD',
-  });
+  const totalFormatted = formatCurrency(invoice.total, invoice.currency);
 
   return `Hi ${customerName},
 

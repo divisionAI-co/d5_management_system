@@ -12,6 +12,7 @@ import { PrismaService } from '../../../common/prisma/prisma.service';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
+import { generateInitialMappings } from '../utils/field-mapping.util';
 import {
   InvoiceMapImportDto,
   InvoiceFieldMappingEntry,
@@ -27,6 +28,7 @@ export interface InvoiceUploadResult {
   sampleRows: Record<string, string>[];
   totalRows: number;
   availableFields: InvoiceImportFieldMetadata[];
+  suggestedMappings?: Array<{ sourceColumn: string; targetField: string }>;
 }
 
 export interface InvoiceImportSummary {
@@ -135,8 +137,50 @@ const INVOICE_FIELD_DEFINITIONS: InvoiceImportFieldMetadata[] = [
   },
   {
     key: InvoiceImportField.ITEMS,
-    label: 'Items',
-    description: 'Invoice line items as JSON array or newline separated text.',
+    label: 'Items (Combined)',
+    description: 'Invoice line items in combined format. Formats supported: JSON array, newline-separated text, or semicolon-separated (Product;Account;Quantity;UoM;Price;Taxes;Amount). Alternative: use separate item fields below.',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_DESCRIPTION,
+    label: 'Item Description/Product',
+    description: 'Line item description or product name (separate field for each row/line item).',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_QUANTITY,
+    label: 'Item Quantity',
+    description: 'Line item quantity (separate field for each row/line item).',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_UNIT_PRICE,
+    label: 'Item Unit Price',
+    description: 'Line item unit price (separate field for each row/line item).',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_UOM,
+    label: 'Item Unit of Measure',
+    description: 'Line item unit of measure (e.g., hours, pieces) (separate field for each row/line item).',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_ACCOUNT,
+    label: 'Item Account',
+    description: 'Line item account code or reference (separate field for each row/line item).',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_TAXES,
+    label: 'Item Taxes',
+    description: 'Line item tax information (separate field for each row/line item).',
+    required: false,
+  },
+  {
+    key: InvoiceImportField.ITEM_AMOUNT,
+    label: 'Item Total Amount',
+    description: 'Line item total amount (quantity × price) (separate field for each row/line item).',
     required: false,
   },
   {
@@ -258,6 +302,12 @@ export class InvoicesImportService {
       select: { id: true },
     });
 
+    const suggestedMappings = generateInitialMappings(
+      parsed.headers,
+      INVOICE_FIELD_DEFINITIONS,
+      0.3, // Minimum confidence threshold
+    );
+
     return {
       id: importRecord.id,
       type: 'invoices',
@@ -266,6 +316,7 @@ export class InvoicesImportService {
       sampleRows,
       totalRows: sanitizedRows.length,
       availableFields: INVOICE_FIELD_DEFINITIONS,
+      suggestedMappings,
     };
   }
 
@@ -415,7 +466,7 @@ export class InvoicesImportService {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
       throw new BadRequestException(
-        `Value "${value}" is not a valid date (expected YYYY-MM-DD).`,
+        `Invalid date format: "${value}". Expected format: YYYY-MM-DD or ISO date string.`,
       );
     }
     return parsed;
@@ -472,7 +523,7 @@ export class InvoicesImportService {
     const parsed = Number(normalized);
     if (Number.isNaN(parsed)) {
       throw new BadRequestException(
-        `Value "${value}" is not a valid number.`,
+        `Invalid number format: "${value}". Expected a numeric value.`,
       );
     }
     return new Prisma.Decimal(parsed);
@@ -482,19 +533,141 @@ export class InvoicesImportService {
     if (!value) {
       return [];
     }
+    
+    // Try parsing as JSON array first
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
         return parsed as Prisma.JsonArray;
       }
     } catch (error) {
-      // fallback to newline separated list
+      // Continue to other parsing methods
     }
+
+    // Try parsing as semicolon-separated structured format
+    // Format: Product;Account;Quantity;UoM;Price;Taxes;Amount
+    // Can be single line or multiple lines (newline-separated)
     const lines = value
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
-    return lines as Prisma.JsonArray;
+
+    const parsedItems: any[] = [];
+
+    for (const line of lines) {
+      // Check if line contains semicolons (structured format)
+      if (line.includes(';')) {
+        const parts = line.split(';').map((part) => part.trim());
+        
+        // Expected format: Product;Account;Quantity;UoM;Price;Taxes;Amount
+        if (parts.length >= 3) {
+          const product = parts[0] || '';
+          const account = parts[1] || '';
+          const quantityStr = parts[2] || '';
+          const uom = parts[3] || '';
+          const priceStr = parts[4] || '';
+          const taxes = parts[5] || '';
+          const amountStr = parts[6] || '';
+
+          // Helper function to safely parse decimal values
+          const safeParseDecimal = (str: string): number => {
+            if (!str || !str.trim()) {
+              return 0;
+            }
+            const trimmed = str.trim();
+            
+            // Try using the existing parseDecimal method first
+            try {
+              const decimal = this.parseDecimal(trimmed);
+              if (decimal) {
+                return Number(decimal);
+              }
+            } catch (error) {
+              // Continue to fallback parsing
+            }
+            
+            // Fallback: extract number from string (handles currency symbols, units, etc.)
+            // Remove all non-numeric characters except decimal point, comma, and minus sign
+            const normalized = trimmed
+              .replace(/[^\d.,-]/g, '') // Remove all non-numeric except .,- 
+              .replace(/,/g, '.'); // Replace comma with dot for decimal
+            
+            // Handle multiple decimal points (take the last one as decimal separator)
+            const parts = normalized.split('.');
+            let finalNumber = normalized;
+            if (parts.length > 2) {
+              // Multiple dots - likely thousands separators
+              finalNumber = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+            }
+            
+            const parsed = Number(finalNumber);
+            if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
+              return 0;
+            }
+            return parsed;
+          };
+
+          // Parse quantity and price
+          const quantity = safeParseDecimal(quantityStr);
+          
+          // Try to parse price, fallback to calculating from amount/quantity if price is missing
+          let unitPrice = safeParseDecimal(priceStr);
+          
+          // If price is missing but amount and quantity are available, calculate unit price
+          if (unitPrice === 0 && quantity > 0) {
+            const amount = safeParseDecimal(amountStr);
+            if (amount > 0) {
+              unitPrice = amount / quantity;
+            }
+          }
+
+          // Build description from product and UoM
+          let description = product;
+          if (uom) {
+            description = `${product} (${uom})`.trim();
+          }
+
+          // Ensure quantity and unitPrice are numbers, not strings
+          const item: any = {
+            description: description || 'Item',
+            quantity: typeof quantity === 'number' ? quantity : Number(quantity) || 0,
+            unitPrice: typeof unitPrice === 'number' ? unitPrice : Number(unitPrice) || 0,
+          };
+
+          // Add additional fields to metadata
+          const metadata: Record<string, any> = {};
+          if (account) metadata.account = account;
+          if (uom) metadata.uom = uom;
+          if (taxes) metadata.taxes = taxes;
+          const amount = safeParseDecimal(amountStr);
+          if (amount > 0) {
+            metadata.amount = amount;
+          }
+
+          if (Object.keys(metadata).length > 0) {
+            item.metadata = metadata;
+          }
+
+          parsedItems.push(item);
+        } else {
+          // If not enough parts, treat as simple description
+          parsedItems.push({
+            description: line,
+            quantity: 1,
+            unitPrice: 0,
+          });
+        }
+      } else {
+        // Simple text line (no semicolons) - treat as description
+        parsedItems.push({
+          description: line,
+          quantity: 1,
+          unitPrice: 0,
+        });
+      }
+    }
+
+    return parsedItems.length > 0 ? (parsedItems as Prisma.JsonArray) : [];
   }
 
   private parseStatus(value: string | undefined, fallback?: InvoiceStatus): InvoiceStatus | undefined {
@@ -537,12 +710,199 @@ export class InvoicesImportService {
     }
 
     if (!customer) {
+      const attemptedValues: string[] = [];
+      if (email?.trim()) {
+        attemptedValues.push(`email: "${email.trim()}"`);
+      }
+      if (name?.trim()) {
+        attemptedValues.push(`name: "${name.trim()}"`);
+      }
+      if (defaults.email?.trim()) {
+        attemptedValues.push(`default email: "${defaults.email.trim()}"`);
+      }
+      if (defaults.name?.trim()) {
+        attemptedValues.push(`default name: "${defaults.name.trim()}"`);
+      }
+
+      const attemptedStr = attemptedValues.length > 0
+        ? ` Attempted values: ${attemptedValues.join(', ')}.`
+        : '';
+
       throw new BadRequestException(
-        'Customer could not be resolved. Provide a valid customer email or name, or configure defaults.',
+        `Customer could not be resolved.${attemptedStr} Please provide a valid customer email or name, or configure defaults.`,
       );
     }
 
     return customer.id;
+  }
+
+  /**
+   * Groups Odoo invoice rows where:
+   * - First row with invoice number = invoice header (has all fields)
+   * - Following rows = line items (may have empty invoice number, but have items)
+   * - Empty rows separate different invoices
+   */
+  private groupOdooInvoiceRows(
+    rows: Record<string, string>[],
+    mapping: InvoiceFieldMapping,
+  ): Record<string, string>[][] {
+    const invoiceGroups: Record<string, string>[][] = [];
+    let currentGroup: Record<string, string>[] = [];
+    let currentInvoiceNumber: string | undefined;
+
+    for (const row of rows) {
+      // Check if row is empty (all values are empty or whitespace)
+      const isEmptyRow = Object.values(row).every(
+        (val) => !val || val.trim().length === 0,
+      );
+
+      if (isEmptyRow) {
+        // Empty row - end current invoice group
+        if (currentGroup.length > 0) {
+          invoiceGroups.push(currentGroup);
+          currentGroup = [];
+          currentInvoiceNumber = undefined;
+        }
+        continue;
+      }
+
+      // Get invoice number from current row
+      const invoiceNumColumn = mapping[InvoiceImportField.INVOICE_NUMBER];
+      const rowInvoiceNumber = invoiceNumColumn
+        ? row[invoiceNumColumn]?.trim()
+        : undefined;
+
+      if (rowInvoiceNumber && rowInvoiceNumber.length > 0) {
+        // This row has an invoice number
+        if (currentInvoiceNumber && rowInvoiceNumber !== currentInvoiceNumber) {
+          // Different invoice number - save current group and start new one
+          if (currentGroup.length > 0) {
+            invoiceGroups.push(currentGroup);
+          }
+          currentGroup = [row];
+          currentInvoiceNumber = rowInvoiceNumber;
+        } else {
+          // First row or same invoice number
+          currentGroup.push(row);
+          currentInvoiceNumber = rowInvoiceNumber;
+        }
+      } else {
+        // No invoice number - this is a line item row for current invoice
+        if (currentGroup.length > 0) {
+          currentGroup.push(row);
+        } else {
+          // Orphaned line item row - skip or handle as error
+          // For now, skip it
+        }
+      }
+    }
+
+    // Add last group if exists
+    if (currentGroup.length > 0) {
+      invoiceGroups.push(currentGroup);
+    }
+
+    return invoiceGroups;
+  }
+
+  /**
+   * Merges multiple rows for the same invoice (Odoo format)
+   * First row = invoice header, subsequent rows = line items
+   */
+  private mergeOdooInvoiceGroup(
+    group: Record<string, string>[],
+    mapping: InvoiceFieldMapping,
+  ): Record<string, string> {
+    if (group.length === 0) {
+      throw new BadRequestException('Empty invoice group');
+    }
+
+    // First row has the invoice header data
+    const headerRow = { ...group[0] };
+
+    // Check if using individual item fields or combined items field
+    const hasIndividualItemFields = 
+      mapping[InvoiceImportField.ITEM_DESCRIPTION] ||
+      mapping[InvoiceImportField.ITEM_QUANTITY] ||
+      mapping[InvoiceImportField.ITEM_UNIT_PRICE];
+
+    if (hasIndividualItemFields) {
+      // Build items from individual field columns
+      const allItemLines: string[] = [];
+
+      for (const row of group) {
+        const description = mapping[InvoiceImportField.ITEM_DESCRIPTION]
+          ? row[mapping[InvoiceImportField.ITEM_DESCRIPTION]]?.trim() || ''
+          : '';
+        const account = mapping[InvoiceImportField.ITEM_ACCOUNT]
+          ? row[mapping[InvoiceImportField.ITEM_ACCOUNT]]?.trim() || ''
+          : '';
+        const quantity = mapping[InvoiceImportField.ITEM_QUANTITY]
+          ? row[mapping[InvoiceImportField.ITEM_QUANTITY]]?.trim() || ''
+          : '';
+        const uom = mapping[InvoiceImportField.ITEM_UOM]
+          ? row[mapping[InvoiceImportField.ITEM_UOM]]?.trim() || ''
+          : '';
+        const unitPrice = mapping[InvoiceImportField.ITEM_UNIT_PRICE]
+          ? row[mapping[InvoiceImportField.ITEM_UNIT_PRICE]]?.trim() || ''
+          : '';
+        const taxes = mapping[InvoiceImportField.ITEM_TAXES]
+          ? row[mapping[InvoiceImportField.ITEM_TAXES]]?.trim() || ''
+          : '';
+        const amount = mapping[InvoiceImportField.ITEM_AMOUNT]
+          ? row[mapping[InvoiceImportField.ITEM_AMOUNT]]?.trim() || ''
+          : '';
+
+        // Only add if at least description or quantity exists
+        if (description || quantity) {
+          // Build semicolon-separated line: Product;Account;Quantity;UoM;Price;Taxes;Amount
+          const itemLine = [
+            description,
+            account,
+            quantity,
+            uom,
+            unitPrice,
+            taxes,
+            amount,
+          ].join(';');
+          allItemLines.push(itemLine);
+        }
+      }
+
+      // Store combined items in the ITEMS field (create a virtual column if needed)
+      if (allItemLines.length > 0) {
+        const itemsColumn = mapping[InvoiceImportField.ITEMS];
+        if (itemsColumn) {
+          headerRow[itemsColumn] = allItemLines.join('\n');
+        } else {
+          // Create a temporary column for items if not mapped
+          headerRow['__items__'] = allItemLines.join('\n');
+          // Update mapping temporarily to point to this field
+          mapping[InvoiceImportField.ITEMS] = '__items__';
+        }
+      }
+    } else {
+      // Use combined items field (existing logic)
+      const itemsColumn = mapping[InvoiceImportField.ITEMS];
+      if (itemsColumn && group.length > 1) {
+        const allItems: string[] = [];
+
+        // Get items from each row (header row + subsequent item rows)
+        for (const row of group) {
+          const itemValue = row[itemsColumn];
+          if (itemValue && itemValue.trim().length > 0) {
+            allItems.push(itemValue.trim());
+          }
+        }
+
+        // Combine all items with newline separator
+        if (allItems.length > 0) {
+          headerRow[itemsColumn] = allItems.join('\n');
+        }
+      }
+    }
+
+    return headerRow;
   }
 
   private async resolveCreatedBy(email: string | undefined, fallback?: string): Promise<string> {
@@ -559,8 +919,20 @@ export class InvoicesImportService {
     });
 
     if (!user) {
+      const attemptedValues: string[] = [];
+      if (email?.trim()) {
+        attemptedValues.push(`"${email.trim()}"`);
+      }
+      if (fallback?.trim()) {
+        attemptedValues.push(`default: "${fallback.trim()}"`);
+      }
+
+      const attemptedStr = attemptedValues.length > 0
+        ? ` Attempted email${attemptedValues.length > 1 ? 's' : ''}: ${attemptedValues.join(', ')}.`
+        : '';
+
       throw new BadRequestException(
-        `No user found with email "${lookupEmail}" to assign as invoice creator.`,
+        `No user found with the provided email to assign as invoice creator.${attemptedStr}`,
       );
     }
 
@@ -586,18 +958,22 @@ export class InvoicesImportService {
     const issueDateStr = this.extractValue(row, mapping, InvoiceImportField.ISSUE_DATE);
     const issueDate = this.parseDate(issueDateStr);
     if (!issueDate) {
-      throw new BadRequestException('Issue date is required for each row.');
+      const valueStr = issueDateStr ? ` (value: "${issueDateStr}")` : '';
+      throw new BadRequestException(`Issue date is required for each row.${valueStr}`);
     }
 
     const dueDateStr = this.extractValue(row, mapping, InvoiceImportField.DUE_DATE);
     const dueDate = this.parseDate(dueDateStr);
     if (!dueDate) {
-      throw new BadRequestException('Due date is required for each row.');
+      const valueStr = dueDateStr ? ` (value: "${dueDateStr}")` : '';
+      throw new BadRequestException(`Due date is required for each row.${valueStr}`);
     }
 
-    const total = this.parseDecimal(this.extractValue(row, mapping, InvoiceImportField.TOTAL));
+    const totalStr = this.extractValue(row, mapping, InvoiceImportField.TOTAL);
+    const total = this.parseDecimal(totalStr);
     if (!total) {
-      throw new BadRequestException('Total amount is required for each row.');
+      const valueStr = totalStr ? ` (value: "${totalStr}")` : '';
+      throw new BadRequestException(`Total amount is required for each row.${valueStr}`);
     }
 
     const subtotal = this.parseDecimal(
@@ -708,6 +1084,18 @@ export class InvoicesImportService {
     };
 
     const updateExisting = dto.updateExisting ?? true;
+    const isOdooImport = dto.isOdooImport ?? false;
+
+    // If Odoo import, group rows by invoice first
+    let rowsToProcess: Record<string, string>[];
+    if (isOdooImport) {
+      const invoiceGroups = this.groupOdooInvoiceRows(rows, mappingPayload.fields!);
+      rowsToProcess = invoiceGroups.map((group) =>
+        this.mergeOdooInvoiceGroup(group, mappingPayload.fields!),
+      );
+    } else {
+      rowsToProcess = rows;
+    }
 
     await this.prisma.dataImport.update({
       where: { id },
@@ -721,7 +1109,7 @@ export class InvoicesImportService {
 
     const summary: InvoiceImportSummary = {
       importId: id,
-      totalRows: rows.length,
+      totalRows: isOdooImport ? rowsToProcess.length : rows.length,
       processedRows: 0,
       createdCount: 0,
       updatedCount: 0,
@@ -827,9 +1215,9 @@ export class InvoicesImportService {
     };
 
     try {
-      for (let index = 0; index < rows.length; index += 1) {
+      for (let index = 0; index < rowsToProcess.length; index += 1) {
         // eslint-disable-next-line no-await-in-loop
-        await processRow(rows[index], index);
+        await processRow(rowsToProcess[index], index);
       }
 
       await this.prisma.dataImport.update({
@@ -838,7 +1226,7 @@ export class InvoicesImportService {
           status: ImportStatus.COMPLETED,
           successCount: summary.createdCount + summary.updatedCount,
           failureCount: summary.failedCount,
-          totalRecords: rows.length,
+          totalRecords: rowsToProcess.length,
           errors: summary.errors,
           completedAt: new Date(),
         },
@@ -850,7 +1238,7 @@ export class InvoicesImportService {
           status: ImportStatus.FAILED,
           errors: summary.errors,
           failureCount: summary.failedCount,
-          totalRecords: rows.length,
+          totalRecords: rowsToProcess.length,
           completedAt: new Date(),
         },
       });

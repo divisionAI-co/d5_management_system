@@ -1,6 +1,7 @@
 import { Eye, Pencil, Send, CheckCircle, Trash2 } from 'lucide-react';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import type { InvoiceSummary } from '@/types/invoices';
+import { formatCurrency } from '@/lib/utils/currency';
 
 interface InvoicesTableProps {
   invoices: InvoiceSummary[];
@@ -11,12 +12,6 @@ interface InvoicesTableProps {
   onMarkPaid: (invoice: InvoiceSummary) => void;
   onDelete: (invoice: InvoiceSummary) => void;
 }
-
-const formatCurrency = (amount: number, currency: string) =>
-  amount.toLocaleString(undefined, {
-    style: 'currency',
-    currency: currency ?? 'USD',
-  });
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString();
 

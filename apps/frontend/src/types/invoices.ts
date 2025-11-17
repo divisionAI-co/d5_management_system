@@ -120,4 +120,16 @@ export interface MarkInvoicePaidPayload {
   note?: string;
 }
 
+export interface PreviewInvoicePayload {
+  templateId?: string;
+  templateData?: Record<string, unknown>;
+}
+
+export interface PreviewInvoiceResponse {
+  invoiceId: string;
+  invoiceNumber: string;
+  templateId: string | null;
+  renderedHtml: string;
+}
+
 

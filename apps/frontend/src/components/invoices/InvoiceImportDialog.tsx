@@ -17,6 +17,7 @@ interface InvoiceExecuteOptions {
   defaultCustomerEmail: string;
   defaultCustomerName: string;
   defaultCreatedByEmail: string;
+  isOdooImport: boolean;
 }
 
 const INVOICE_STATUSES = [
@@ -51,6 +52,7 @@ export function InvoiceImportDialog({ open, onClose }: InvoiceImportDialogProps)
         defaultCustomerEmail: '',
         defaultCustomerName: '',
         defaultCreatedByEmail: '',
+        isOdooImport: false,
       })}
       buildExecutePayload={({ updateExisting, options }) => ({
         updateExisting,
@@ -59,6 +61,7 @@ export function InvoiceImportDialog({ open, onClose }: InvoiceImportDialogProps)
         defaultCustomerEmail: options.defaultCustomerEmail || undefined,
         defaultCustomerName: options.defaultCustomerName || undefined,
         defaultCreatedByEmail: options.defaultCreatedByEmail || undefined,
+        isOdooImport: options.isOdooImport || undefined,
       })}
       invalidateQueries={['invoices']}
       renderExecuteOptions={({ options, setOptions }) => (
@@ -174,6 +177,27 @@ export function InvoiceImportDialog({ open, onClose }: InvoiceImportDialogProps)
             <p className="mt-1 text-xs text-muted-foreground">
               Required when the spreadsheet does not specify the invoice creator.
             </p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="isOdooImport"
+              checked={options.isOdooImport}
+              onChange={(event) =>
+                setOptions((prev) => ({
+                  ...prev,
+                  isOdooImport: event.target.checked,
+                }))
+              }
+              className="h-4 w-4 rounded border-border focus:ring-2 focus:ring-blue-500"
+            />
+            <label
+              htmlFor="isOdooImport"
+              className="text-sm font-medium text-muted-foreground cursor-pointer"
+            >
+              Odoo format (multiple invoices with line items separated by empty rows)
+            </label>
           </div>
         </div>
       )}

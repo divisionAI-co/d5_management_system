@@ -22,6 +22,7 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { FilterInvoicesDto } from './dto/filter-invoices.dto';
 import { SendInvoiceDto } from './dto/send-invoice.dto';
 import { MarkInvoicePaidDto } from './dto/mark-invoice-paid.dto';
+import { PreviewInvoiceDto } from './dto/preview-invoice.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -105,6 +106,20 @@ export class InvoicesController {
       id,
       userId,
       sendInvoiceDto,
+    );
+  }
+
+  @Post(':id/preview')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON)
+  @ApiOperation({ summary: 'Preview invoice HTML based on template' })
+  previewInvoice(
+    @Param('id') id: string,
+    @Body() previewDto: PreviewInvoiceDto,
+  ) {
+    return this.invoicesService.previewInvoice(
+      id,
+      previewDto.templateId,
+      previewDto.templateData,
     );
   }
 

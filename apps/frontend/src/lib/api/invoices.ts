@@ -5,6 +5,8 @@ import type {
   InvoiceFilters,
   InvoicesListResponse,
   MarkInvoicePaidPayload,
+  PreviewInvoicePayload,
+  PreviewInvoiceResponse,
   SendInvoicePayload,
   UpdateInvoicePayload,
 } from '@/types/invoices';
@@ -47,6 +49,14 @@ export const invoicesApi = {
 
   send: async (id: string, payload: SendInvoicePayload) => {
     const { data } = await apiClient.post<InvoiceDetail>(`/invoices/${id}/send`, payload);
+    return data;
+  },
+
+  preview: async (id: string, payload: PreviewInvoicePayload = {}) => {
+    const { data } = await apiClient.post<PreviewInvoiceResponse>(
+      `/invoices/${id}/preview`,
+      payload,
+    );
     return data;
   },
 

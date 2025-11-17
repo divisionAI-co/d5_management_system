@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, CheckCircle, Loader2 } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
 import type { InvoiceDetail, MarkInvoicePaidPayload } from '@/types/invoices';
+import { formatCurrency } from '@/lib/utils/currency';
 
 type FormValues = {
   paidDate: string;
@@ -65,10 +66,7 @@ export function InvoiceMarkPaidDialog({
     });
   };
 
-  const amountFormatted = invoice.total.toLocaleString(undefined, {
-    style: 'currency',
-    currency: invoice.currency ?? 'USD',
-  });
+  const amountFormatted = formatCurrency(invoice.total, invoice.currency);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

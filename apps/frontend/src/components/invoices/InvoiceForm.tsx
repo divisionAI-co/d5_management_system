@@ -5,6 +5,7 @@ import { X, Plus, Trash2, CalendarIcon } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
 import { customersApi } from '@/lib/api/crm';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { formatCurrency } from '@/lib/utils/currency';
 import type {
   CreateInvoicePayload,
   InvoiceDetail,
@@ -497,28 +498,19 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
                   <div className="flex items-center justify-between">
                     <dt>Subtotal</dt>
                     <dd className="font-medium">
-                      {subtotal.toLocaleString(undefined, {
-                        style: 'currency',
-                        currency: (watch('currency') || 'USD') ?? 'USD',
-                      })}
+                      {formatCurrency(subtotal, watch('currency') || 'USD')}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>Tax ({watchedTaxRate || 0}%)</dt>
                     <dd className="font-medium">
-                      {taxAmount.toLocaleString(undefined, {
-                        style: 'currency',
-                        currency: (watch('currency') || 'USD') ?? 'USD',
-                      })}
+                      {formatCurrency(taxAmount, watch('currency') || 'USD')}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between border-t border-border pt-2 text-base">
                     <dt>Total</dt>
                     <dd className="font-semibold">
-                      {total.toLocaleString(undefined, {
-                        style: 'currency',
-                        currency: (watch('currency') || 'USD') ?? 'USD',
-                      })}
+                      {formatCurrency(total, watch('currency') || 'USD')}
                     </dd>
                   </div>
                 </dl>

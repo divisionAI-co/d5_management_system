@@ -48,4 +48,13 @@ export class ExecuteInvoiceImportDto {
   @IsOptional()
   @IsString()
   defaultCreatedByEmail?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Enable Odoo-specific processing: handle multiple invoices in one file where each invoice has multiple rows (header + line items), separated by empty rows.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isOdooImport?: boolean;
 }

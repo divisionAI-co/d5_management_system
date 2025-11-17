@@ -93,6 +93,7 @@ export interface ExecuteInvoiceImportPayload extends ExecutePayloadBase {
   defaultCustomerEmail?: string;
   defaultCustomerName?: string;
   defaultCreatedByEmail?: string;
+  isOdooImport?: boolean;
 }
 
 export type UploadCandidatesResult = UploadBaseResult;

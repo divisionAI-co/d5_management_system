@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -80,10 +81,17 @@ export class CreateInvoiceDto {
   @IsDateString()
   dueDate!: string;
 
-  @ApiPropertyOptional({ description: 'Currency code', default: 'USD' })
+  @ApiPropertyOptional({
+    description: 'ISO 4217 currency code (e.g., USD, EUR)',
+    example: 'USD',
+    default: 'USD',
+  })
   @IsString()
   @IsOptional()
   @MaxLength(10)
+  @Matches(/^[A-Z]{3}$/, {
+    message: 'currency must be a valid ISO 4217 currency code (3 uppercase letters)',
+  })
   currency?: string;
 
   @ApiPropertyOptional({

@@ -8,20 +8,17 @@ import {
   Send,
   CheckCircle,
   RefreshCw,
+  Eye,
 } from 'lucide-react';
 import { invoicesApi } from '@/lib/api/invoices';
 import { InvoiceStatusBadge } from '@/components/invoices/InvoiceStatusBadge';
 import { InvoiceForm } from '@/components/invoices/InvoiceForm';
 import { InvoiceSendDialog } from '@/components/invoices/InvoiceSendDialog';
 import { InvoiceMarkPaidDialog } from '@/components/invoices/InvoiceMarkPaidDialog';
+import { InvoicePreviewDialog } from '@/components/invoices/InvoicePreviewDialog';
 import type { InvoiceDetail } from '@/types/invoices';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
-
-const formatCurrency = (amount: number, currency: string) =>
-  amount.toLocaleString(undefined, {
-    style: 'currency',
-    currency: currency ?? 'USD',
-  });
+import { formatCurrency } from '@/lib/utils/currency';
 
 const formatDate = (isoDate?: string | null) => {
   if (!isoDate) return '—';
@@ -38,6 +35,7 @@ export default function InvoiceDetailPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSendOpen, setIsSendOpen] = useState(false);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -158,6 +156,13 @@ export default function InvoiceDetailPage() {
           >
             <Pencil className="h-4 w-4" />
             Edit
+          </button>
+          <button
+            onClick={() => setIsPreviewOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Eye className="h-4 w-4" />
+            Preview
           </button>
           <button
             onClick={() => setIsSendOpen(true)}
@@ -393,6 +398,12 @@ export default function InvoiceDetailPage() {
             </h2>
             <div className="mt-4 space-y-2 text-sm text-muted-foreground">
               <button
+                onClick={() => setIsPreviewOpen(true)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-left transition hover:bg-muted"
+              >
+                Preview invoice template
+              </button>
+              <button
                 onClick={() => setIsSendOpen(true)}
                 className="w-full rounded-lg border border-border px-3 py-2 text-left transition hover:bg-muted"
               >
@@ -454,6 +465,13 @@ export default function InvoiceDetailPage() {
             queryClient.invalidateQueries({ queryKey: ['invoice', id] });
             queryClient.invalidateQueries({ queryKey: ['invoices'] });
           }}
+        />
+      )}
+
+      {isPreviewOpen && (
+        <InvoicePreviewDialog
+          invoice={invoice}
+          onClose={() => setIsPreviewOpen(false)}
         />
       )}
     </div>

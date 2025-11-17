@@ -24,6 +24,15 @@ export enum InvoiceImportField {
   CURRENCY = 'currency',
   NOTES = 'notes',
   ITEMS = 'items',
+  // Individual line item fields
+  ITEM_DESCRIPTION = 'itemDescription',
+  ITEM_QUANTITY = 'itemQuantity',
+  ITEM_UNIT_PRICE = 'itemUnitPrice',
+  ITEM_UOM = 'itemUom',
+  ITEM_ACCOUNT = 'itemAccount',
+  ITEM_TAXES = 'itemTaxes',
+  ITEM_AMOUNT = 'itemAmount',
+  // Other fields
   IS_RECURRING = 'isRecurring',
   RECURRING_DAY = 'recurringDay',
   CREATED_BY_EMAIL = 'createdByEmail',
