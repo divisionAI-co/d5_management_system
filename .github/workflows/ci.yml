@@ -12,13 +12,12 @@ on:
 
 env:
   NODE_VERSION: '20'
+  PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
 
 jobs:
   lint-and-typecheck:
     name: Lint and Type Check
     runs-on: ubuntu-latest
-    env:
-      PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
     
     steps:
       - name: Checkout code
