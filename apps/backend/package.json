@@ -18,7 +18,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "fix:leave-days": "ts-node prisma/migrations/fix-leave-days.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.7.0",

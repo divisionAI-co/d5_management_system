@@ -65,6 +65,8 @@ model User {
   passwordResetTokens   PasswordResetToken[]
   createdActivityTypes  ActivityType[]            @relation("ActivityTypeCreatedBy")
   aiActions             AiAction[]                @relation("AiActionsCreatedBy")
+  feedbackReportsAsHR   FeedbackReport[]          @relation("FeedbackReportHRUpdater")
+  feedbackReportsAsAM   FeedbackReport[]          @relation("FeedbackReportAMUpdater")
   aiActionAttachments   AiActionAttachment[]      @relation("AiActionAttachmentsByUser")
   aiActionExecutions    AiActionExecution[]       @relation("AiActionExecutionsTriggeredBy")
   sessions              UserSession[]
@@ -636,6 +638,7 @@ model Employee {
   leaveRequests      LeaveRequest[]
   remoteWorkLogs     RemoteWorkLog[]
   activities         Activity[]
+  feedbackReports    FeedbackReport[]
 
   @@map("employees")
 }
@@ -668,6 +671,67 @@ model PerformanceReview {
 
   @@index([employeeId])
   @@map("performance_reviews")
+}
+
+enum FeedbackReportStatus {
+  DRAFT
+  SUBMITTED
+  SENT
+}
+
+model FeedbackReport {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // Reporting period
+  month Int // 1-12
+  year  Int
+
+  // Auto-compiled data (can be overridden by HR)
+  tasksCount            Int?
+  totalDaysOffTaken     Int?
+  totalRemainingDaysOff Int?
+  bankHolidays          Json? // Array of holiday objects for next month
+
+  // HR Section
+  hrFeedback              String? @db.Text
+  hrActionDescription     String? @db.Text
+  hrUpdatedAt             DateTime?
+  hrUpdatedBy             String?
+  hrUpdatedByUser         User?   @relation("FeedbackReportHRUpdater", fields: [hrUpdatedBy], references: [id], onDelete: SetNull)
+
+  // Account Manager Section
+  amFeedback              String? @db.Text
+  amUpdatedAt             DateTime?
+  amUpdatedBy             String?
+  amUpdatedByUser         User?   @relation("FeedbackReportAMUpdater", fields: [amUpdatedBy], references: [id], onDelete: SetNull)
+
+  // Employee Section (Ratings 1-5)
+  communicationRating Int? // 1-5
+  collaborationRating Int? // 1-5
+  taskEstimationRating Int? // 1-5
+  timelinessRating Int? // 1-5
+  employeeSummary String? @db.Text
+  employeeUpdatedAt DateTime?
+
+  // Status and submission
+  status FeedbackReportStatus @default(DRAFT)
+  submittedAt DateTime?
+  sentAt DateTime?
+  sentTo String? // Customer email
+
+  // PDF Export
+  pdfUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([status])
+  @@index([month, year])
+  @@map("feedback_reports")
 }
 
 enum LeaveRequestStatus {

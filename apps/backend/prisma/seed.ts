@@ -521,7 +521,46 @@ async function main() {
   console.log('  ✅ Activity types seeded and 3 activities created');
 
   // ============================================
-  // 10. CREATE DEFAULT TEMPLATES
+  // 10. CREATE SAMPLE FEEDBACK REPORT
+  // ============================================
+  console.log('\n📊 Creating sample feedback report...');
+  
+  // Create a feedback report for last month
+  const now = new Date();
+  const lastMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+  const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  
+  const feedbackReport = await prisma.feedbackReport.create({
+    data: {
+      employeeId: employeeRecord.id,
+      month: lastMonth,
+      year: lastMonthYear,
+      tasksCount: 12,
+      totalDaysOffTaken: 1,
+      totalRemainingDaysOff: 19,
+      bankHolidays: [
+        { name: "New Year's Day", date: '2025-01-01' },
+      ],
+      hrFeedback: 'Excellent performance this month. The employee has shown great initiative and delivered high-quality work.',
+      hrActionDescription: 'Provided additional training on advanced TypeScript patterns and code review best practices.',
+      hrUpdatedAt: new Date(),
+      hrUpdatedBy: hr.id,
+      amFeedback: 'Outstanding collaboration with the client. The employee has been very responsive and proactive in addressing client needs.',
+      amUpdatedAt: new Date(),
+      amUpdatedBy: accountManager.id,
+      communicationRating: 4,
+      collaborationRating: 5,
+      taskEstimationRating: 4,
+      timelinessRating: 5,
+      employeeSummary: 'I feel like this month has been very productive and work has been going well. The timeline has been mostly set up correctly and the communication has been going great.',
+      employeeUpdatedAt: new Date(),
+      status: 'DRAFT',
+    },
+  });
+  console.log('  ✅ Feedback report created for', employee.firstName, employee.lastName);
+
+  // ============================================
+  // 11. CREATE DEFAULT TEMPLATES
   // ============================================
   console.log('\n📄 Creating default templates...');
   
@@ -707,6 +746,7 @@ async function main() {
   console.log('  • 1 Employee');
   console.log('  • 3 Tasks');
   console.log('  • 3 Activities');
+  console.log('  • 1 Feedback Report (Draft)');
   console.log('  • 13 Albanian National Holidays (2025)');
   console.log('  • 2 Default Templates (Invoice & Report)');
   console.log('');
