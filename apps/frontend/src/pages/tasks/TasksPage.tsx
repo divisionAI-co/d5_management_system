@@ -577,7 +577,6 @@ export default function TasksPage() {
             onDeleteTask={canDeleteTasks ? handleDeleteTask : undefined}
             statusOptions={STATUS_ORDER}
             disableStatusChange={statusMutation.isPending}
-            canDeleteTasks={canDeleteTasks}
             onTaskMove={handleTaskMoveOptimistic}
             onAddTaskToEod={handleAddToEod}
             addingTaskId={addingTaskId}
