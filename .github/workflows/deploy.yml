@@ -30,6 +30,8 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     if: github.event.inputs.skip_tests != 'true'
+    env:
+      PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
     
     steps:
       - name: Checkout code
