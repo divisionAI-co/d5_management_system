@@ -4,8 +4,9 @@
   "description": "division5 - NestJS Backend API",
   "private": true,
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "nest start --watch",
-    "build": "prisma generate && nest build",
+    "build": "nest build",
     "start": "node dist/main",
     "start:prod": "node dist/main",
     "typecheck": "tsc --noEmit",

@@ -20,6 +20,7 @@ interface TaskBoardProps {
   onDeleteTask?: (task: Task) => void;
   statusOptions: TaskStatus[];
   disableStatusChange?: boolean;
+  canDeleteTasks?: boolean;
   onTaskMove?: (result: DropResult, task: Task) => void;
   onAddTaskToEod?: (task: Task) => void;
   addingTaskId?: string | null;
@@ -54,6 +55,7 @@ export function TaskBoard({
   onDeleteTask,
   statusOptions,
   disableStatusChange,
+  canDeleteTasks = false,
   onTaskMove,
   onAddTaskToEod,
   addingTaskId,
