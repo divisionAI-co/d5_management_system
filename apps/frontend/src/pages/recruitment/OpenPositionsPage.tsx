@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calendar, UserRound, X } from 'lucide-react';
 import { positionsApi } from '@/lib/api/recruitment';
@@ -418,6 +418,7 @@ function PositionDetailDrawer({
   onUnarchive,
   isArchiving,
 }: PositionDetailDrawerProps) {
+  const navigate = useNavigate();
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
@@ -527,6 +528,11 @@ function PositionDetailDrawer({
                     {position.opportunity.value !== undefined && position.opportunity.value !== null && (
                       <span>Value: ${Number(position.opportunity.value).toLocaleString()}</span>
                     )}
+                    {position.opportunity.lead?.leadType && (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        {position.opportunity.lead.leadType === 'END_CUSTOMER' ? 'End Customer' : 'Intermediary'}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -559,7 +565,8 @@ function PositionDetailDrawer({
                   position.candidates.map((link) => (
                     <div
                       key={link.id}
-                      className="rounded-xl border border-border bg-muted p-4 shadow-sm"
+                      className="rounded-xl border border-border bg-muted p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md cursor-pointer"
+                      onClick={() => navigate(`/recruitment/candidates/${link.candidate.id}`)}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>

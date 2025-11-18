@@ -45,7 +45,7 @@ export class PerformanceReviewsController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.EMPLOYEE)
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.RECRUITER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get performance reviews' })
   @ApiQuery({ name: 'employeeId', required: false, type: String })
   async findAll(@Request() req: any, @Query('employeeId') employeeId?: string) {
@@ -74,7 +74,7 @@ export class PerformanceReviewsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.EMPLOYEE)
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.RECRUITER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Get performance review by ID' })
   async findOne(@Request() req: any, @Param('id') id: string) {
     const review = await this.reviewsService.findOne(id);
@@ -93,7 +93,7 @@ export class PerformanceReviewsController {
   }
 
   @Get(':id/pdf')
-  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.EMPLOYEE)
+  @Roles(UserRole.ADMIN, UserRole.HR, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.RECRUITER, UserRole.EMPLOYEE)
   @ApiOperation({ summary: 'Download performance review as PDF' })
   async downloadPdf(
     @Request() req: any,

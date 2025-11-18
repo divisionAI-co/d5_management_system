@@ -28,28 +28,28 @@ export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Create a new contact' })
   create(@Body() createContactDto: CreateContactDto) {
     return this.contactsService.create(createContactDto);
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'List contacts with filtering and pagination' })
   findAll(@Query() filters: FilterContactsDto) {
     return this.contactsService.findAll(filters);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Get contact details' })
   findOne(@Param('id') id: string) {
     return this.contactsService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Update contact details' })
   update(@Param('id') id: string, @Body() updateContactDto: UpdateContactDto) {
     return this.contactsService.update(id, updateContactDto);
@@ -63,7 +63,7 @@ export class ContactsController {
   }
 
   @Post(':id/convert-to-lead')
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Convert contact into a lead' })
   convertToLead(
     @Param('id') id: string,

@@ -82,7 +82,8 @@ export class OpenPositionsService {
       description: createDto.description ?? 'TBD',
       requirements: createDto.requirements,
       status: createDto.status ?? 'Open',
-      opportunityId: createDto.opportunityId ?? null,
+      ...(createDto.recruitmentStatus !== undefined && { recruitmentStatus: createDto.recruitmentStatus }),
+      ...(createDto.opportunityId !== undefined && { opportunityId: createDto.opportunityId || null }),
     };
 
     const position = await this.prisma.openPosition.create({
@@ -94,6 +95,13 @@ export class OpenPositionsService {
               select: {
                 id: true,
                 name: true,
+              },
+            },
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                leadType: true,
               },
             },
           },
@@ -235,6 +243,13 @@ export class OpenPositionsService {
                 name: true,
               },
             },
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                leadType: true,
+              },
+            },
           },
         },
       },
@@ -276,6 +291,13 @@ export class OpenPositionsService {
                 select: {
                   id: true,
                   name: true,
+                },
+              },
+              lead: {
+                select: {
+                  id: true,
+                  title: true,
+                  leadType: true,
                 },
               },
             },
@@ -330,6 +352,7 @@ export class OpenPositionsService {
               select: {
                 id: true,
                 title: true,
+                leadType: true,
               },
             },
           },
@@ -401,6 +424,10 @@ export class OpenPositionsService {
         ...(updateDto.opportunityId !== undefined
           ? { opportunityId: updateDto.opportunityId || null }
           : {}),
+        // Handle recruitmentStatus update
+        ...(updateDto.recruitmentStatus !== undefined
+          ? { recruitmentStatus: updateDto.recruitmentStatus || null }
+          : {}),
       },
       include: {
         opportunity: {
@@ -409,6 +436,13 @@ export class OpenPositionsService {
               select: {
                 id: true,
                 name: true,
+              },
+            },
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                leadType: true,
               },
             },
           },
@@ -453,6 +487,13 @@ export class OpenPositionsService {
               select: {
                 id: true,
                 name: true,
+              },
+            },
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                leadType: true,
               },
             },
           },
@@ -526,6 +567,13 @@ export class OpenPositionsService {
                 name: true,
               },
             },
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                leadType: true,
+              },
+            },
           },
         },
         candidates: {
@@ -572,6 +620,13 @@ export class OpenPositionsService {
               select: {
                 id: true,
                 name: true,
+              },
+            },
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                leadType: true,
               },
             },
           },

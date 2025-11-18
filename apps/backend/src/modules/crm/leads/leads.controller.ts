@@ -36,14 +36,14 @@ export class LeadsController {
   }
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'List leads with filtering and pagination' })
   findAll(@Query() filters: FilterLeadsDto) {
     return this.leadsService.findAll(filters);
   }
 
   @Get('lookup/contacts')
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Lookup contacts that can be associated with a lead' })
   @ApiQuery({ name: 'search', required: false, type: String })
   listContacts(@Query('search') search?: string) {
@@ -51,7 +51,7 @@ export class LeadsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Get lead details' })
   findOne(@Param('id') id: string) {
     return this.leadsService.findOne(id);
@@ -65,7 +65,7 @@ export class LeadsController {
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Update lead status/probability' })
   updateStatus(@Param('id') id: string, @Body() statusDto: UpdateLeadStatusDto) {
     return this.leadsService.updateStatus(id, statusDto);

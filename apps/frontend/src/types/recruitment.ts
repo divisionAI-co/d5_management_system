@@ -145,6 +145,7 @@ export interface CandidatePositionsResponse {
 }
 
 export type PositionStatus = 'Open' | 'Filled' | 'Cancelled';
+export type RecruitmentStatus = 'HEADHUNTING' | 'STANDARD';
 
 export interface OpportunitySummary {
   id: string;
@@ -154,6 +155,11 @@ export interface OpportunitySummary {
     id: string;
     name: string;
   };
+  lead?: {
+    id: string;
+    title: string;
+    leadType?: 'END_CUSTOMER' | 'INTERMEDIARY' | null;
+  } | null;
 }
 
 export interface OpenPositionSummary {
@@ -162,6 +168,7 @@ export interface OpenPositionSummary {
   description?: string | null;
   requirements?: string | null;
   status: PositionStatus;
+  recruitmentStatus?: RecruitmentStatus | null;
   isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -208,6 +215,7 @@ export interface CreatePositionDto {
   description?: string;
   requirements?: string;
   status?: PositionStatus;
+  recruitmentStatus?: RecruitmentStatus;
   opportunityId?: string;
 }
 
@@ -216,6 +224,7 @@ export interface UpdatePositionDto {
   description?: string;
   requirements?: string;
   status?: PositionStatus;
+  recruitmentStatus?: RecruitmentStatus;
   opportunityId?: string | null;
 }
 

@@ -28,49 +28,49 @@ export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'List available templates' })
   findAll(@Query() query: ListTemplatesDto) {
     return this.templatesService.findAll(query);
   }
 
   @Post()
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Create a new template' })
   create(@Body() createTemplateDto: CreateTemplateDto) {
     return this.templatesService.create(createTemplateDto);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Get template details by ID' })
   findOne(@Param('id') id: string) {
     return this.templatesService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Update a template' })
   update(@Param('id') id: string, @Body() updateTemplateDto: UpdateTemplateDto) {
     return this.templatesService.update(id, updateTemplateDto);
   }
 
   @Post(':id/preview')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Render a template using sample data' })
   preview(@Param('id') id: string, @Body() previewTemplateDto: PreviewTemplateDto) {
     return this.templatesService.preview(id, previewTemplateDto);
   }
 
   @Post(':id/duplicate')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Duplicate a template' })
   duplicate(@Param('id') id: string) {
     return this.templatesService.duplicate(id);
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.HR)
   @ApiOperation({ summary: 'Delete a template' })
   remove(@Param('id') id: string) {
     return this.templatesService.remove(id);

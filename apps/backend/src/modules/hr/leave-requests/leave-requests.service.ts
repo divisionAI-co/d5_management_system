@@ -4,17 +4,69 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { LeaveType } from '@prisma/client';
+import { LeaveType, LeaveRequestStatus, NotificationType, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { HolidaysService } from '../holidays/holidays.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
 import { ApproveLeaveDto } from './dto/approve-leave.dto';
 
 @Injectable()
 export class LeaveRequestsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+    private holidaysService: HolidaysService,
+  ) {}
 
   private readonly FALLBACK_ANNUAL_LEAVE_ALLOWANCE = 20;
+
+  /**
+   * Calculate working days between two dates, excluding weekends and holidays
+   */
+  private async calculateWorkingDays(startDate: Date, endDate: Date): Promise<number> {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    if (start > end) {
+      return 0;
+    }
+
+    // Get all holidays in the date range
+    const holidays = await this.holidaysService.getHolidaysBetween(start, end);
+    const holidayDates = new Set(
+      holidays.map((h) => {
+        const d = new Date(h.date);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      }),
+    );
+
+    let workingDays = 0;
+    const current = new Date(start);
+
+    while (current <= end) {
+      const dayOfWeek = current.getDay();
+      const currentTime = current.getTime();
+
+      // Check if it's not a weekend (Saturday = 6, Sunday = 0)
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      // Check if it's not a holiday
+      const isHoliday = holidayDates.has(currentTime);
+
+      if (!isWeekend && !isHoliday) {
+        workingDays++;
+      }
+
+      // Move to next day
+      current.setDate(current.getDate() + 1);
+    }
+
+    return workingDays;
+  }
 
   private async getAnnualLeaveAllowance(): Promise<number> {
     const settings = await this.prisma.companySettings.findFirst({
@@ -91,9 +143,17 @@ export class LeaveRequestsService {
       throw new BadRequestException('Leave requests must start today or later.');
     }
 
-    if (createLeaveDto.totalDays <= 0) {
-      throw new BadRequestException('Requested leave days must be greater than zero.');
+    // Calculate actual working days (excluding weekends and holidays)
+    const calculatedWorkingDays = await this.calculateWorkingDays(startDate, endDate);
+
+    if (calculatedWorkingDays <= 0) {
+      throw new BadRequestException(
+        'The selected date range contains only weekends and/or holidays. Please select dates that include working days.',
+      );
     }
+
+    // Use calculated working days instead of the provided totalDays
+    const actualTotalDays = calculatedWorkingDays;
 
     // Check for overlapping leave requests
     const overlapping = await this.prisma.leaveRequest.findFirst({
@@ -128,21 +188,21 @@ export class LeaveRequestsService {
 
       const remainingAllowance = Math.max(annualAllowance - committedDays, 0);
 
-      if (createLeaveDto.totalDays > remainingAllowance) {
+      if (actualTotalDays > remainingAllowance) {
         throw new BadRequestException(
           `Requested leave exceeds the remaining PTO balance of ${remainingAllowance} day(s).`,
         );
       }
     }
 
-    return this.prisma.leaveRequest.create({
+    const leaveRequest = await this.prisma.leaveRequest.create({
       data: {
         userId,
         employeeId,
         type: createLeaveDto.type,
         startDate,
         endDate,
-        totalDays: createLeaveDto.totalDays,
+        totalDays: actualTotalDays,
         reason: createLeaveDto.reason,
         status: createLeaveDto.status || 'PENDING',
       },
@@ -169,6 +229,51 @@ export class LeaveRequestsService {
         },
       },
     });
+
+    // Notify HR when a leave request is created
+    this.notifyHrOfLeaveRequest(leaveRequest).catch((error) => {
+      console.error('[LeaveRequests] Failed to notify HR:', error);
+    });
+
+    return leaveRequest;
+  }
+
+  private async notifyHrOfLeaveRequest(leaveRequest: any) {
+    // Get all HR users
+    const hrUsers = await this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: {
+          in: [UserRole.ADMIN, UserRole.HR],
+        },
+      },
+      select: { id: true },
+    });
+
+    if (hrUsers.length === 0) {
+      return;
+    }
+
+    const employeeName = leaveRequest.employee?.user
+      ? `${leaveRequest.employee.user.firstName} ${leaveRequest.employee.user.lastName}`.trim() || leaveRequest.employee.user.email
+      : 'An employee';
+    
+    const startDateStr = leaveRequest.startDate.toISOString().split('T')[0];
+    const endDateStr = leaveRequest.endDate.toISOString().split('T')[0];
+    const dateRange = startDateStr === endDateStr 
+      ? startDateStr 
+      : `${startDateStr} to ${endDateStr}`;
+
+    const userIds = hrUsers.map((user) => user.id);
+    
+    await this.notificationsService.createNotificationsForUsers(
+      userIds,
+      NotificationType.LEAVE_REQUEST,
+      'New Leave Request',
+      `${employeeName} has submitted a leave request for ${dateRange} (${leaveRequest.totalDays} day${leaveRequest.totalDays !== 1 ? 's' : ''}).`,
+      'leave_request',
+      leaveRequest.id,
+    );
   }
 
   async findAll(filters?: { employeeId?: string; status?: string; startDate?: string; endDate?: string }) {
@@ -283,10 +388,6 @@ export class LeaveRequestsService {
       data.type = updateLeaveDto.type;
     }
 
-    if (updateLeaveDto.totalDays !== undefined) {
-      data.totalDays = updateLeaveDto.totalDays;
-    }
-
     if (updateLeaveDto.reason !== undefined) {
       data.reason = updateLeaveDto.reason;
     }
@@ -294,7 +395,6 @@ export class LeaveRequestsService {
     const nextStartDate = data.startDate ?? leaveRequest.startDate;
     const nextEndDate = data.endDate ?? leaveRequest.endDate;
     const nextType = data.type ?? leaveRequest.type;
-    const nextTotalDays = data.totalDays ?? leaveRequest.totalDays;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -302,6 +402,19 @@ export class LeaveRequestsService {
     if (nextStartDate > nextEndDate) {
       throw new BadRequestException('Start date must be before end date');
     }
+
+    // Recalculate working days if dates changed (excluding weekends and holidays)
+    const calculatedWorkingDays = await this.calculateWorkingDays(nextStartDate, nextEndDate);
+
+    if (calculatedWorkingDays <= 0) {
+      throw new BadRequestException(
+        'The selected date range contains only weekends and/or holidays. Please select dates that include working days.',
+      );
+    }
+
+    // Always use calculated working days, ignore totalDays from DTO
+    const nextTotalDays = calculatedWorkingDays;
+    data.totalDays = nextTotalDays;
 
     if (nextStartDate < today) {
       throw new BadRequestException('Leave requests must start today or later.');
@@ -402,7 +515,7 @@ export class LeaveRequestsService {
       }
     }
 
-    return this.prisma.leaveRequest.update({
+    const updatedRequest = await this.prisma.leaveRequest.update({
       where: { id },
       data: {
         status: approveDto.status,
@@ -433,6 +546,51 @@ export class LeaveRequestsService {
         },
       },
     });
+
+    // Notify the employee about the approval/rejection
+    this.notifyEmployeeOfLeaveDecision(updatedRequest, approveDto.status).catch((error) => {
+      console.error('[LeaveRequests] Failed to notify employee:', error);
+    });
+
+    return updatedRequest;
+  }
+
+  private async notifyEmployeeOfLeaveDecision(leaveRequest: any, status: LeaveRequestStatus) {
+    const employeeUserId = leaveRequest.userId;
+    
+    if (!employeeUserId) {
+      return;
+    }
+
+    const startDateStr = leaveRequest.startDate.toISOString().split('T')[0];
+    const endDateStr = leaveRequest.endDate.toISOString().split('T')[0];
+    const dateRange = startDateStr === endDateStr 
+      ? startDateStr 
+      : `${startDateStr} to ${endDateStr}`;
+
+    if (status === LeaveRequestStatus.APPROVED) {
+      await this.notificationsService.createNotification(
+        employeeUserId,
+        NotificationType.LEAVE_APPROVED,
+        'Leave Request Approved',
+        `Your leave request for ${dateRange} (${leaveRequest.totalDays} day${leaveRequest.totalDays !== 1 ? 's' : ''}) has been approved.`,
+        'leave_request',
+        leaveRequest.id,
+      );
+    } else if (status === LeaveRequestStatus.REJECTED) {
+      const rejectionReason = leaveRequest.rejectionReason 
+        ? ` Reason: ${leaveRequest.rejectionReason}`
+        : '';
+      
+      await this.notificationsService.createNotification(
+        employeeUserId,
+        NotificationType.LEAVE_REJECTED,
+        'Leave Request Rejected',
+        `Your leave request for ${dateRange} (${leaveRequest.totalDays} day${leaveRequest.totalDays !== 1 ? 's' : ''}) has been rejected.${rejectionReason}`,
+        'leave_request',
+        leaveRequest.id,
+      );
+    }
   }
 
   async cancel(id: string, employeeId: string) {

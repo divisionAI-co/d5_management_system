@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, X, FileText, ChevronLeft, ExternalLink } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
 import { googleDriveApi } from '@/lib/api/google-drive';
+import { MentionInput } from '@/components/shared/MentionInput';
 import type {
   Candidate,
   CandidateRecruiter,
@@ -507,7 +508,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
         <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl max-h-[calc(100vh-3rem)] sm:max-h-[calc(100vh-4rem)]">
-          <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex items-center justify-between border-b border-border px-6 py-4 flex-shrink-0">
             <div>
               <h2 className="text-2xl font-bold text-foreground">
                 {isEdit ? 'Edit Candidate' : 'Add New Candidate'}
@@ -524,8 +525,8 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
             </button>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col">
-            <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-2">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-1 flex-col min-h-0">
+            <div className="grid flex-1 grid-cols-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-2 min-h-0">
               <section className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-muted-foreground">
@@ -653,11 +654,12 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                   <label className="mb-1 block text-sm font-medium text-muted-foreground">
                     Notes
                   </label>
-                  <textarea
+                  <MentionInput
+                    value={watch('notes') || ''}
+                    onChange={(value) => setValue('notes', value)}
                     rows={4}
-                    {...register('notes')}
                     className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    placeholder="Relevant interview notes, expectations, etc."
+                    placeholder="Relevant interview notes, expectations, etc. Type @ to mention someone"
                   />
                 </div>
               </section>
@@ -882,10 +884,10 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                 </div>
               </section>
             </div>
-            <div className="border-t border-border bg-muted/40 px-4 py-4 sm:px-6">
+            <div className="border-t border-border bg-muted/40 px-4 py-4 sm:px-6 flex-shrink-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-muted-foreground">
-                  Fields marked with * are required. Use the skills input to record the candidate’s core capabilities.
+                  Fields marked with * are required. Use the skills input to record the candidate's core capabilities.
                 </p>
                 <div className="flex gap-3">
                   <button

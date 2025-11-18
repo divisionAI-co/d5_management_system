@@ -37,8 +37,8 @@ export class OpportunitiesController {
   @Roles(
     UserRole.ADMIN,
     UserRole.SALESPERSON,
-    UserRole.ACCOUNT_MANAGER,
     UserRole.RECRUITER,
+    UserRole.HR,
   )
   @ApiOperation({ summary: 'List opportunities with filtering and pagination' })
   findAll(@Query() filters: FilterOpportunitiesDto) {
@@ -49,8 +49,8 @@ export class OpportunitiesController {
   @Roles(
     UserRole.ADMIN,
     UserRole.SALESPERSON,
-    UserRole.ACCOUNT_MANAGER,
     UserRole.RECRUITER,
+    UserRole.HR,
   )
   @ApiOperation({ summary: 'Get opportunity details' })
   findOne(@Param('id') id: string) {
@@ -58,7 +58,7 @@ export class OpportunitiesController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({
     summary:
       'Create a new opportunity. Staff augmentation opportunities will automatically create an open position.',
@@ -71,7 +71,7 @@ export class OpportunitiesController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Update an existing opportunity' })
   update(
     @Param('id') id: string,
@@ -82,7 +82,7 @@ export class OpportunitiesController {
   }
 
   @Post(':id/close')
-  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON)
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON)
   @ApiOperation({
     summary: 'Close an opportunity as won or lost',
   })
@@ -94,7 +94,6 @@ export class OpportunitiesController {
   @Roles(
     UserRole.ADMIN,
     UserRole.SALESPERSON,
-    UserRole.ACCOUNT_MANAGER,
   )
   @ApiOperation({
     summary: 'Send an email related to an opportunity',

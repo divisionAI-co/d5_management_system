@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { leadsApi } from '@/lib/api/crm';
 import { usersApi } from '@/lib/api/users';
-import type { CreateLeadPayload, Lead, LeadStatus, LeadContactPayload } from '@/types/crm';
+import type { CreateLeadPayload, Lead, LeadStatus, LeadType, LeadContactPayload } from '@/types/crm';
 import { X } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
 
@@ -28,20 +28,17 @@ type FormValues = {
   prospectCompanyName?: string;
   prospectWebsite?: string;
   prospectIndustry?: string;
+  leadType?: LeadType | null;
 };
 
 const LEAD_STATUSES: LeadStatus[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'WON', 'LOST'];
+const LEAD_TYPES: LeadType[] = ['END_CUSTOMER', 'INTERMEDIARY'];
 
 export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(lead);
 
   const [contactSearch, setContactSearch] = useState('');
-
-  const contactsQuery = useQuery({
-    queryKey: ['lead-contacts', contactSearch],
-    queryFn: () => leadsApi.listContacts(contactSearch),
-  });
 
   const usersQuery = useQuery({
     queryKey: ['users', 'lead-select'],
@@ -72,6 +69,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       prospectCompanyName: lead.prospectCompanyName ?? '',
       prospectWebsite: lead.prospectWebsite ?? '',
       prospectIndustry: lead.prospectIndustry ?? '',
+      leadType: lead.leadType ?? undefined,
       contact: lead.contact
         ? {
             firstName: lead.contact.firstName,
@@ -97,15 +95,85 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   });
 
   const descriptionValue = watch('description') || '';
-
   const contactMode = watch('contactMode');
   const selectedContactId = watch('contactId');
+
+  const contactsQuery = useQuery({
+    queryKey: ['lead-contacts', contactSearch],
+    queryFn: () => leadsApi.listContacts(contactSearch || undefined),
+  });
+
+  // Get the selected contact to ensure it's always in the options
+  const selectedContact = useMemo(() => {
+    if (!selectedContactId) return null;
+    // First check if it's in the current query results
+    const inResults = contactsQuery.data?.find((c) => c.id === selectedContactId);
+    if (inResults) return inResults;
+    // If not in results but we have the lead's contact, use that
+    if (lead?.contact?.id === selectedContactId) {
+      return {
+        id: lead.contact.id,
+        firstName: lead.contact.firstName,
+        lastName: lead.contact.lastName,
+        email: lead.contact.email,
+        phone: lead.contact.phone ?? null,
+        role: lead.contact.role ?? null,
+        companyName: lead.contact.companyName ?? null,
+        customerId: lead.contact.customerId ?? null,
+        createdAt: '',
+        updatedAt: '',
+      };
+    }
+    return null;
+  }, [selectedContactId, contactsQuery.data, lead?.contact]);
+
+  // Build the list of contacts to show in dropdown
+  // Only include selected contact if it matches the search or if search is empty
+  const contactOptions = useMemo(() => {
+    const results = contactsQuery.data ?? [];
+    
+    // If there's a selected contact and it's not in the filtered results
+    // Only add it if search is empty (showing all) or if it matches the search
+    if (selectedContact && !results.some((c) => c.id === selectedContact.id)) {
+      // Only include selected contact if search is empty or if it would match the search
+      const searchLower = contactSearch.toLowerCase();
+      const matchesSearch = !contactSearch || 
+        selectedContact.firstName.toLowerCase().includes(searchLower) ||
+        selectedContact.lastName.toLowerCase().includes(searchLower) ||
+        selectedContact.email.toLowerCase().includes(searchLower) ||
+        (selectedContact.companyName?.toLowerCase().includes(searchLower) ?? false);
+      
+      if (matchesSearch) {
+        return [selectedContact, ...results];
+      }
+    }
+    return results;
+  }, [contactsQuery.data, selectedContact, contactSearch]);
 
   useEffect(() => {
     if (!isEdit) {
       setValue('status', 'NEW');
     }
   }, [isEdit, setValue]);
+
+  // Initialize contact search and selection when editing
+  useEffect(() => {
+    if (lead?.contact && isEdit && contactMode === 'existing' && !selectedContactId) {
+      setValue('contactId', lead.contact.id, { shouldValidate: false });
+      // Don't set search initially - let user search freely
+    }
+  }, [lead?.contact, isEdit, contactMode, selectedContactId, setValue]);
+
+  // Auto-select first filtered result when searching
+  useEffect(() => {
+    if (contactMode === 'existing' && contactSearch && contactOptions.length > 0) {
+      // Only auto-select if no contact is currently selected, or if the selected contact is not in the filtered results
+      const selectedInOptions = contactOptions.some((c) => c.id === selectedContactId);
+      if (!selectedContactId || !selectedInOptions) {
+        setValue('contactId', contactOptions[0].id, { shouldValidate: false });
+      }
+    }
+  }, [contactSearch, contactOptions, contactMode, selectedContactId, setValue]);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateLeadPayload) => leadsApi.create(payload),
@@ -137,6 +205,7 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       prospectCompanyName: values.prospectCompanyName || undefined,
       prospectWebsite: values.prospectWebsite || undefined,
       prospectIndustry: values.prospectIndustry || undefined,
+      leadType: values.leadType || undefined,
     };
 
     if (values.contactMode === 'existing') {
@@ -218,7 +287,15 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                   type="text"
                   placeholder="Search contacts by name, email, or company"
                   value={contactSearch}
-                  onChange={(event) => setContactSearch(event.target.value)}
+                  onChange={(event) => {
+                    const newSearch = event.target.value;
+                    setContactSearch(newSearch);
+                    // Clear selection if user is actively searching and there are multiple results
+                    // This allows auto-selection of first result when there's only one match
+                    if (newSearch && contactOptions.length > 1 && selectedContactId) {
+                      // Don't clear - let user keep their selection unless they want to change it
+                    }
+                  }}
                   className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                 />
                 <select
@@ -226,15 +303,23 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                     required: contactMode === 'existing' ? 'Please select a contact' : false,
                   })}
                   className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                  defaultValue={selectedContactId || ''}
+                  value={selectedContactId || ''}
+                  onChange={(e) => {
+                    setValue('contactId', e.target.value, { shouldValidate: true });
+                  }}
                 >
                   <option value="">Select a contact</option>
-                  {contactsQuery.data?.map((contact) => (
+                  {contactOptions.map((contact) => (
                     <option key={contact.id} value={contact.id}>
                       {contact.firstName} {contact.lastName} — {contact.email}
                     </option>
                   ))}
                 </select>
+                {selectedContact && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                    <span className="font-semibold">Selected:</span> {selectedContact.firstName} {selectedContact.lastName} — {selectedContact.email}
+                  </div>
+                )}
                 {errors.contactId && (
                   <p className="text-sm text-red-600">{errors.contactId.message}</p>
                 )}
@@ -410,6 +495,20 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
                 {...register('prospectIndustry')}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Lead Type</label>
+              <select
+                {...register('leadType')}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select type</option>
+                {LEAD_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type === 'END_CUSTOMER' ? 'End Customer' : 'Intermediary'}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
