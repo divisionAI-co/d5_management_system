@@ -588,11 +588,10 @@ function EditReportModal({
     tasksCount: report.tasksCount?.toString() || '',
     totalDaysOffTaken: report.totalDaysOffTaken?.toString() || '',
     totalRemainingDaysOff: report.totalRemainingDaysOff?.toString() || '',
-    hrFeedback: report.hrFeedback || '',
-    hrActionDescription: report.hrActionDescription || '',
   });
   const [amData, setAmData] = useState({
     amFeedback: report.amFeedback || '',
+    amActionDescription: report.amActionDescription || '',
   });
   const [employeeData, setEmployeeData] = useState({
     communicationRating: report.communicationRating?.toString() || '',
@@ -720,24 +719,6 @@ function EditReportModal({
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">HR Feedback</label>
-                <textarea
-                  value={hrData.hrFeedback}
-                  onChange={(e) => setHrData({ ...hrData, hrFeedback: e.target.value })}
-                  rows={4}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Action Description</label>
-                <textarea
-                  value={hrData.hrActionDescription}
-                  onChange={(e) => setHrData({ ...hrData, hrActionDescription: e.target.value })}
-                  rows={3}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
               <div className="flex justify-end gap-2 pt-4">
                 <button
                   type="button"
@@ -766,6 +747,15 @@ function EditReportModal({
                   value={amData.amFeedback}
                   onChange={(e) => setAmData({ ...amData, amFeedback: e.target.value })}
                   rows={6}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Action Description</label>
+                <textarea
+                  value={amData.amActionDescription}
+                  onChange={(e) => setAmData({ ...amData, amActionDescription: e.target.value })}
+                  rows={3}
                   className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

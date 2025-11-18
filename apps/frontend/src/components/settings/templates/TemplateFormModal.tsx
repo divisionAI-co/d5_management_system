@@ -8,6 +8,7 @@ import { FeedbackToast } from '@/components/ui/feedback-toast';
 import {
   createRawHtmlBlock,
   extractBlocksFromHtml,
+  extractPageWidthFromHtml,
   getDefaultTemplateBlocks,
   injectBlockMetadata,
   renderBlocksToHtml,
@@ -113,6 +114,9 @@ const INPUT_BASE_CLASS =
 const INPUT_DENSE_CLASS =
   'w-full rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
 
+const SELECT_BASE_CLASS =
+  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer';
+
 const TEXTAREA_MONO_CLASS =
   'w-full rounded-lg border border-border bg-muted/20 px-3 py-2 font-mono text-xs leading-5 text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
 
@@ -188,7 +192,17 @@ const DATA_CONTEXT_HELP: Record<
   FEEDBACK_REPORT: {
     heading: 'Feedback report context',
     description:
-      'Feedback reports include report details, employee information, and feedback data. Reference fields like {{report.date}}, {{employee.firstName}}, and {{feedback.content}}.',
+      'Feedback reports include report details, employee information, and feedback data. Reference fields like {{report.date}}, {{employee.firstName}}, and {{feedback.content}}. Use {{#if bankHolidays}}...{{/if}} and {{#each bankHolidays}}...{{/each}} to display arrays.',
+    groups: [
+      {
+        title: 'Report & Employee',
+        items: ['{{report.date}}', '{{employee.firstName}}', '{{employee.lastName}}', '{{feedback.content}}'],
+      },
+      {
+        title: 'Bank Holidays (array) - Use {{#if bankHolidays}}...{{/if}} and {{#each bankHolidays}}...{{/each}}',
+        items: ['{{this.name}}', '{{this.date}}'],
+      },
+    ],
   },
   EOD_REPORT_SUBMITTED: {
     heading: 'EOD Report data context',
@@ -288,6 +302,7 @@ export function TemplateFormModal({
 
   const [variables, setVariables] = useState<TemplateVariableForm[]>(() => [newVariable()]);
   const [blocks, setBlocks] = useState<TemplateBlock[]>(() => getDefaultTemplateBlocks());
+  const [pageWidth, setPageWidth] = useState<number>(640);
   const [editingMode, setEditingMode] = useState<'visual' | 'html'>('visual');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -298,6 +313,7 @@ export function TemplateFormModal({
 
     if (template) {
       const { blocks: storedBlocks, htmlWithoutMeta } = extractBlocksFromHtml(template.htmlContent);
+      const extractedPageWidth = extractPageWidthFromHtml(template.htmlContent);
 
       setFormValues({
         name: template.name,
@@ -312,6 +328,7 @@ export function TemplateFormModal({
         ? template.variables.map((item) => toFormVariable(item))
         : [newVariable()];
       setVariables(vars);
+      setPageWidth(extractedPageWidth);
 
       if (storedBlocks && storedBlocks.length) {
         setBlocks(storedBlocks);
@@ -325,13 +342,14 @@ export function TemplateFormModal({
       setFormValues({
         name: '',
         type: 'EMAIL',
-        htmlContent: renderBlocksToHtml(defaultBlocks),
+        htmlContent: renderBlocksToHtml(defaultBlocks, 640),
         cssContent: '',
         isDefault: false,
         isActive: true,
       });
       setVariables([newVariable()]);
       setBlocks(defaultBlocks);
+      setPageWidth(640);
       setEditingMode('visual');
     }
     setErrorMessage(null);
@@ -342,18 +360,13 @@ export function TemplateFormModal({
       return;
     }
 
-    const generated = renderBlocksToHtml(blocks);
-    setFormValues((prev) => {
-      if (prev.htmlContent === generated) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        htmlContent: generated,
-      };
-    });
-  }, [blocks, editingMode]);
+    const generated = renderBlocksToHtml(blocks, pageWidth);
+    // Always update to ensure page width changes are reflected
+    setFormValues((prev) => ({
+      ...prev,
+      htmlContent: generated,
+    }));
+  }, [blocks, pageWidth, editingMode]);
 
   const dialogTitle = useMemo(
     () => (mode === 'create' ? 'Create Template' : `Edit ${template?.name ?? 'Template'}`),
@@ -425,7 +438,7 @@ export function TemplateFormModal({
     let htmlContent = formValues.htmlContent;
 
     if (editingMode === 'visual') {
-      const htmlFromBlocks = renderBlocksToHtml(blocks);
+      const htmlFromBlocks = renderBlocksToHtml(blocks, pageWidth);
       htmlContent = injectBlockMetadata(htmlFromBlocks, blocks);
     }
 
@@ -481,7 +494,8 @@ export function TemplateFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-6">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="grid gap-6 lg:grid-cols-[2fr,3fr]">
             <div className="space-y-6">
               <div className="space-y-2">
@@ -500,32 +514,65 @@ export function TemplateFormModal({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Template Type</label>
-                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-                  {TEMPLATE_TYPE_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${
-                        formValues.type === option.value
-                          ? 'border-blue-500 bg-blue-500/20 shadow-sm'
-                          : 'border-transparent bg-muted/10 hover:border-border'
-                      }`}
+                <div className="relative">
+                  <select
+                    value={formValues.type}
+                    onChange={(event) =>
+                      setFormValues((prev) => ({ ...prev, type: event.target.value as TemplateType }))
+                    }
+                    className={SELECT_BASE_CLASS}
+                    required
+                  >
+                    {TEMPLATE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg
+                      className="h-5 w-5 text-muted-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <input
-                        type="radio"
-                        name="template-type"
-                        value={option.value}
-                        checked={formValues.type === option.value}
-                        onChange={() => setFormValues((prev) => ({ ...prev, type: option.value }))}
-                        className="mt-1 h-4 w-4 border-border text-blue-500 focus:ring-blue-500"
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
                       />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                        <p className="text-xs text-muted-foreground">{option.description}</p>
-                      </div>
-                    </label>
-                  ))}
+                    </svg>
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {TEMPLATE_TYPE_OPTIONS.find((opt) => opt.value === formValues.type)?.description}
+                </p>
               </div>
+
+              {editingMode === 'visual' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Page Width (px)</label>
+                  <input
+                    type="number"
+                    min="320"
+                    max="1200"
+                    step="10"
+                    value={pageWidth}
+                    onChange={(event) => {
+                      const newWidth = parseInt(event.target.value, 10);
+                      if (!isNaN(newWidth) && newWidth >= 320 && newWidth <= 1200) {
+                        setPageWidth(newWidth);
+                      }
+                    }}
+                    className={INPUT_BASE_CLASS}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Set the width of the email template content area (320-1200px). Default is 640px.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">CSS Styles (optional)</label>
@@ -784,8 +831,9 @@ export function TemplateFormModal({
               )}
             </div>
           </div>
+          </div>
 
-          <div className="mt-8 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border bg-card-elevated px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
               onClick={onClose}

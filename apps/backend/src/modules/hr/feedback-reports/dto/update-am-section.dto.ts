@@ -6,5 +6,10 @@ export class UpdateAmSectionDto {
   @IsOptional()
   @IsString()
   amFeedback?: string;
+
+  @ApiProperty({ description: 'Description of action taken by Account Manager', required: false })
+  @IsOptional()
+  @IsString()
+  amActionDescription?: string;
 }
 

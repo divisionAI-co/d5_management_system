@@ -66,9 +66,16 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
       const response = await templatesApi.preview(template.id, {
         data: parsedData,
       });
+      // Convert relative API URLs to absolute for iframe compatibility
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      // API_URL already includes /api/v1, so remove it from the path
+      const processedHtml = response.renderedHtml.replace(
+        /src=["'](\/api\/v1\/[^"']+)["']/gi,
+        (match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+      );
       // Use iframe srcDoc to render HTML - iframe provides isolation
       // No sanitization needed as iframe sandbox prevents script execution
-      setRenderedHtml(response.renderedHtml);
+      setRenderedHtml(processedHtml);
     } catch (apiError) {
       setError(
         apiError instanceof Error
@@ -133,11 +140,21 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
           </div>
 
           <div className="flex-1 overflow-hidden bg-muted/70">
-            <iframe
-              title="Template preview"
-              className="h-full w-full border-0 bg-card"
-              srcDoc={renderedHtml || '<div style="padding:24px;font-family:Arial,sans-serif;color:#6b7280;">Rendering preview...</div>'}
-            />
+            {(() => {
+              // Add CSP meta tag to iframe content to allow loading images from localhost
+              const htmlContent = renderedHtml || '<div style="padding:24px;font-family:Arial,sans-serif;color:#6b7280;">Rendering preview...</div>';
+              const htmlWithCsp = `<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"></head><body>${htmlContent}</body></html>`;
+              
+              return (
+                <iframe
+                  title="Template preview"
+                  className="h-full w-full border-0 bg-card"
+                  srcDoc={htmlWithCsp}
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                  referrerPolicy="no-referrer"
+                />
+              );
+            })()}
           </div>
         </div>
       </div>
