@@ -13,6 +13,8 @@ on:
 env:
   NODE_VERSION: '20'
   PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+  PRISMA_SKIP_POSTINSTALL_GENERATE: 1
+  PRISMA_GENERATE_SKIP_AUTOINSTALL: 1
 
 jobs:
   lint-and-typecheck:
@@ -29,8 +31,28 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
       
+      - name: Cache Prisma engines
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.prisma
+            node_modules/@prisma/engines
+          key: ${{ runner.os }}-prisma-${{ hashFiles('apps/backend/prisma/schema.prisma') }}
+          restore-keys: |
+            ${{ runner.os }}-prisma-
+      
       - name: Install dependencies
+        env:
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+          PRISMA_SKIP_POSTINSTALL_GENERATE: 1
         run: npm install
+      
+      - name: Generate Prisma Client
+        working-directory: apps/backend
+        env:
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+          PRISMA_GENERATE_SKIP_AUTOINSTALL: 1
+        run: npx prisma generate
       
       - name: Lint backend
         run: npm run lint --workspace=apps/backend
@@ -44,6 +66,9 @@ jobs:
         run: npm run typecheck --workspace=apps/frontend
       
       - name: Build backend
+        env:
+          PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+          PRISMA_GENERATE_SKIP_AUTOINSTALL: 1
         run: npm run build --workspace=apps/backend
       
       - name: Build frontend
