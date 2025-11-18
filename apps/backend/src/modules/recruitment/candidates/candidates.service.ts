@@ -4,15 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CandidateStage, EmploymentStatus, NotificationType, Prisma, UserRole } from '@prisma/client';
+import { CandidateStage, EmploymentStatus, Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { UsersService } from '../../users/users.service';
-import { extractMentionIdentifiers } from '../../../common/utils/mention-parser';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { FilterCandidatesDto } from './dto/filter-candidates.dto';
@@ -47,8 +44,6 @@ export class CandidatesService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
-    private readonly notificationsService: NotificationsService,
-    private readonly usersService: UsersService,
   ) {}
 
   private candidateInclude() {
@@ -320,7 +315,7 @@ export class CandidatesService {
     return candidate;
   }
 
-  async create(createDto: CreateCandidateDto, userId: string) {
+  async create(createDto: CreateCandidateDto) {
     const existing = await this.prisma.candidate.findUnique({
       where: { email: createDto.email },
     });
@@ -380,13 +375,6 @@ export class CandidatesService {
       },
       include: this.candidateInclude(),
     });
-
-    // Process @mentions in notes and create notifications
-    if (createDto.notes) {
-      this.processMentions(candidate.id, createDto.notes, userId).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for candidate ${candidate.id}:`, error);
-      });
-    }
 
     return this.formatCandidate(candidate);
   }
@@ -449,7 +437,7 @@ export class CandidatesService {
     return this.formatCandidate(candidate);
   }
 
-  async update(id: string, updateDto: UpdateCandidateDto, userId: string) {
+  async update(id: string, updateDto: UpdateCandidateDto) {
     await this.ensureCandidateExists(id);
 
     let driveFolderIdUpdate: string | null | undefined = undefined;
@@ -525,13 +513,6 @@ export class CandidatesService {
         },
         include: this.candidateInclude(),
       });
-
-      // Process @mentions if notes were updated
-      if (updateDto.notes !== undefined) {
-        this.processMentions(id, updateDto.notes, userId).catch((error) => {
-          console.error(`[Mentions] Failed to process mentions for candidate ${id}:`, error);
-        });
-      }
 
       return this.formatCandidate(candidate);
     } catch (error: any) {
@@ -1135,80 +1116,6 @@ export class CandidatesService {
         firstName: 'asc',
       },
     });
-  }
-
-  /**
-   * Process @mentions in candidate notes and create notifications
-   */
-  private async processMentions(
-    candidateId: string,
-    notes: string | null | undefined,
-    createdById: string,
-  ) {
-    try {
-      if (!notes) {
-        return;
-      }
-
-      // Extract mention identifiers
-      const identifiers = extractMentionIdentifiers(notes);
-      if (identifiers.length === 0) {
-        return;
-      }
-
-      console.log(`[Mentions] Processing mentions for candidate ${candidateId}:`, {
-        identifiers,
-        textPreview: notes.substring(0, 100),
-      });
-
-      // Find users by mentions
-      const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
-      
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
-      
-      // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
-      const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
-      
-      if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
-        return;
-      }
-
-      // Get creator info for notification message
-      const creator = await this.prisma.user.findUnique({
-        where: { id: createdById },
-        select: { firstName: true, lastName: true, email: true },
-      });
-
-      const creatorName = creator
-        ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email
-        : 'Someone';
-
-      // Get candidate info for notification message
-      const candidate = await this.prisma.candidate.findUnique({
-        where: { id: candidateId },
-        select: { firstName: true, lastName: true },
-      });
-
-      const candidateName = candidate
-        ? `${candidate.firstName} ${candidate.lastName}`.trim()
-        : 'a candidate';
-
-      // Create notifications for mentioned users
-      const notifications = await this.notificationsService.createNotificationsForUsers(
-        userIdsToNotify,
-        'MENTIONED_IN_ACTIVITY' as any,
-        `You were mentioned in a candidate`,
-        `${creatorName} mentioned you in candidate "${candidateName}"`,
-        'candidate',
-        candidateId,
-      );
-
-      console.log(`[Mentions] Created ${notifications.length} notifications for candidate ${candidateId}`);
-    } catch (error) {
-      // Log error but don't fail the candidate creation/update
-      console.error(`[Mentions] Error processing mentions for candidate ${candidateId}:`, error);
-    }
   }
 }
 

@@ -652,12 +652,11 @@ export default function ProfilePage() {
 
                 {twoFactorSetup && (
                   <div className="flex flex-col gap-4 rounded-lg border border-border bg-background p-4 sm:flex-row sm:items-center">
-                    <div className="mx-auto flex items-center justify-center rounded-lg bg-card p-2 sm:mx-0">
+                    <div className="mx-auto flex h-48 w-48 items-center justify-center rounded-lg bg-card sm:mx-0">
                       <img
                         src={twoFactorSetup.qrCode}
                         alt="Two-factor authenticator QR code"
-                        className="aspect-square max-w-full object-contain"
-                        style={{ maxWidth: 'min(256px, 100%)', width: 'auto', height: 'auto' }}
+                        className="h-44 w-44"
                       />
                     </div>
                     <div className="space-y-2 text-sm text-muted-foreground">

@@ -111,46 +111,6 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
         return;
       }
 
-      // If entityType is provided, navigate directly to that entity
-      if (notification.entityType && notification.entityType !== 'activity') {
-        let path = '';
-        const entityType = notification.entityType;
-        const entityId = notification.entityId;
-
-        switch (entityType) {
-          case 'opportunity':
-            path = `/crm/opportunities/${entityId}`;
-            break;
-          case 'task':
-            path = `/tasks?taskId=${entityId}`;
-            break;
-          case 'customer':
-            path = `/crm/customers/${entityId}`;
-            break;
-          case 'lead':
-            path = `/crm/leads/${entityId}`;
-            break;
-          case 'candidate':
-            path = `/recruitment/candidates/${entityId}`;
-            break;
-          case 'employee':
-            path = `/employees/${entityId}`;
-            break;
-          case 'contact':
-            path = '/crm/contacts';
-            break;
-          default:
-            console.warn('Unknown entity type:', entityType);
-            return;
-        }
-
-        if (path) {
-          navigate(path);
-          return;
-        }
-      }
-
-      // For activities, get the activity to find which entity it belongs to
       try {
         // Get the activity to find which entity it belongs to
         const activity = await activitiesApi.getById(notification.entityId);
@@ -185,7 +145,7 @@ export function NotificationsPanel({ className }: NotificationsPanelProps) {
           // For now, just navigate to contacts list
           path = '/crm/contacts';
         } else if (activity.taskId) {
-          path = `/tasks?taskId=${activity.taskId}`;
+          path = '/tasks';
           entityType = 'task';
           entityId = activity.taskId;
         }

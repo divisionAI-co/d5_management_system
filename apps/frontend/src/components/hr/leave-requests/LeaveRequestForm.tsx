@@ -1,9 +1,8 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { parseISO, isValid, isWeekend, format } from 'date-fns';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { differenceInCalendarDays, parseISO, isValid } from 'date-fns';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveRequestsApi } from '@/lib/api/hr';
-import { holidaysApi } from '@/lib/api/hr/holidays';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   LeaveRequest,
@@ -71,74 +70,18 @@ export function LeaveRequestForm({ request, onClose, onSuccess, employeeId }: Le
   const startDate = watch('startDate');
   const endDate = watch('endDate');
 
-  // Fetch holidays for the year(s) that might be in the date range
-  const startYear = startDate ? new Date(startDate).getFullYear() : new Date().getFullYear();
-  const endYear = endDate ? new Date(endDate).getFullYear() : new Date().getFullYear();
-  const yearsToFetch = useMemo(() => {
-    const years = new Set<number>();
-    for (let year = startYear; year <= endYear; year++) {
-      years.add(year);
-    }
-    return Array.from(years);
-  }, [startYear, endYear]);
-
-  const holidaysQueries = useQuery({
-    queryKey: ['holidays', yearsToFetch],
-    queryFn: async () => {
-      const allHolidays = await Promise.all(
-        yearsToFetch.map((year) => holidaysApi.getAll(year)),
-      );
-      return allHolidays.flat();
-    },
-    enabled: yearsToFetch.length > 0,
-  });
-
-  const holidays = holidaysQueries.data ?? [];
-
-  // Calculate working days (excluding weekends and holidays)
-  const calculateWorkingDays = useMemo(() => {
-    return (start: Date, end: Date): number => {
-      if (start > end) {
-        return 0;
-      }
-
-      const holidayDates = new Set(
-        holidays.map((h) => format(new Date(h.date), 'yyyy-MM-dd')),
-      );
-
-      let workingDays = 0;
-      const current = new Date(start);
-
-      while (current <= end) {
-        const dateKey = format(current, 'yyyy-MM-dd');
-        const isWeekendDay = isWeekend(current);
-        const isHoliday = holidayDates.has(dateKey);
-
-        if (!isWeekendDay && !isHoliday) {
-          workingDays++;
-        }
-
-        current.setDate(current.getDate() + 1);
-      }
-
-      return workingDays;
-    };
-  }, [holidays]);
-
   useEffect(() => {
     if (startDate && endDate) {
       const start = parseISO(startDate);
       const end = parseISO(endDate);
 
       if (isValid(start) && isValid(end)) {
-        // Only calculate if holidays are loaded (or if there are no holidays to load)
-        if (holidaysQueries.isSuccess || holidaysQueries.isError || yearsToFetch.length === 0) {
-          const workingDays = calculateWorkingDays(start, end);
-          setValue('totalDays', workingDays > 0 ? workingDays : 1, { shouldValidate: true });
-        }
+        const diff = differenceInCalendarDays(end, start);
+        const days = diff >= 0 ? diff + 1 : 1;
+        setValue('totalDays', days, { shouldValidate: true });
       }
     }
-  }, [startDate, endDate, setValue, calculateWorkingDays, holidaysQueries.isSuccess, holidaysQueries.isError, yearsToFetch.length]);
+  }, [startDate, endDate, setValue]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateLeaveRequestDto) => leaveRequestsApi.create(data),

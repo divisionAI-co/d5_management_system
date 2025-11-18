@@ -30,7 +30,7 @@ export function MentionInput({
   // Fetch users for autocomplete
   const { data: usersResponse, isLoading: isUsersLoading } = useQuery({
     queryKey: ['users', 'mentions'],
-    queryFn: () => usersApi.getOptions({ page: 1, pageSize: 100, isActive: true }),
+    queryFn: () => usersApi.list({ page: 1, pageSize: 100, isActive: true }),
   });
 
   const users = useMemo(() => usersResponse?.data ?? [], [usersResponse]);

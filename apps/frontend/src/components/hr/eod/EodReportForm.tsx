@@ -244,34 +244,9 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
   const isSubmitting = isEdit ? updateMutation.isPending : createMutation.isPending;
   const isSubmitted = Boolean(report?.submittedAt);
-
-  // Note: We don't need company settings for grace period calculation
-  // Grace period is simply 1 day after the report date
-
-  // Calculate if editing is allowed within grace period
-  // Grace period is 1 day after the report date (due date)
-  // For a report due on Tuesday, it can be edited until Wednesday
-  const canEditWithinGracePeriod = useMemo(() => {
-    if (!report || !report.submittedAt || isPrivileged) {
-      return true; // Not submitted or user is privileged
-    }
-
-    const reportDate = new Date(report.date);
-    
-    // Calculate the grace period end (1 day after the report date)
-    const gracePeriodEnd = new Date(reportDate);
-    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 1);
-    gracePeriodEnd.setHours(23, 59, 59, 999); // End of the grace period day
-
-    const now = new Date();
-    return now <= gracePeriodEnd;
-  }, [report, isPrivileged]);
   
-  // Disable editing if submitted AND user is not privileged AND grace period has expired
-  const isDisabled = isSubmitted && !isPrivileged && !canEditWithinGracePeriod;
-  
-  // If report can be edited within grace period, treat it as draft for UI purposes
-  const isEffectivelyDraft = isSubmitted && !isPrivileged && canEditWithinGracePeriod;
+  // Disable editing only if submitted AND user is not privileged
+  const isDisabled = isSubmitted && !isPrivileged;
 
   const handleSave = handleSubmit((data) => onSubmit(data, false));
   const handleSubmitFinal = handleSubmit((data) => onSubmit(data, true));
@@ -300,10 +275,10 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
             </p>
             <span
               className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                isSubmitted && !isEffectivelyDraft ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'
+                isSubmitted ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'
               }`}
             >
-              {isSubmitted && !isEffectivelyDraft
+              {isSubmitted
                 ? `Submitted ${report?.submittedAt ? format(new Date(report.submittedAt), 'MMM dd, yyyy HH:mm') : ''}`
                 : 'Draft'}
             </span>
@@ -537,7 +512,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
               disabled={isSubmitting || isDisabled}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitted && !isEffectivelyDraft ? 'Submitted' : isSubmitting ? 'Submitting...' : 'Submit Report'}
+              {isSubmitted ? 'Submitted' : isSubmitting ? 'Submitting...' : 'Submit Report'}
             </button>
           </div>
         </form>

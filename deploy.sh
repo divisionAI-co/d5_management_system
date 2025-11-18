@@ -1055,9 +1055,9 @@ configure_backend() {
     local GOOGLE_DRIVE_SCOPES="${DEPLOY_GOOGLE_DRIVE_SCOPES:-}"
     local GOOGLE_DRIVE_IMPERSONATE_USER="${DEPLOY_GOOGLE_DRIVE_IMPERSONATE_USER:-}"
     
-    local GOOGLE_CLIENT_ID="${DEPLOY_GOOGLE_CLIENT_ID:-${DEPLOY_GOOGLE_CALENDAR_CLIENT_ID:-}}"
-    local GOOGLE_CLIENT_SECRET="${DEPLOY_GOOGLE_CLIENT_SECRET:-${DEPLOY_GOOGLE_CALENDAR_CLIENT_SECRET:-}}"
-    local GOOGLE_REDIRECT_URI="${DEPLOY_GOOGLE_REDIRECT_URI:-${DEPLOY_GOOGLE_CALENDAR_REDIRECT_URI:-}}"
+    local GOOGLE_CALENDAR_CLIENT_ID="${DEPLOY_GOOGLE_CALENDAR_CLIENT_ID:-}"
+    local GOOGLE_CALENDAR_CLIENT_SECRET="${DEPLOY_GOOGLE_CALENDAR_CLIENT_SECRET:-}"
+    local GOOGLE_CALENDAR_REDIRECT_URI="${DEPLOY_GOOGLE_CALENDAR_REDIRECT_URI:-}"
     
     local GEMINI_API_KEY="${DEPLOY_GEMINI_API_KEY:-}"
     local GEMINI_MODEL_ID="${DEPLOY_GEMINI_MODEL_ID:-gemini-1.5-pro-latest}"
@@ -1099,13 +1099,9 @@ configure_backend() {
         [ -z "$GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL" ] && GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL=$(grep "^GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
         [ -z "$GOOGLE_DRIVE_PRIVATE_KEY" ] && GOOGLE_DRIVE_PRIVATE_KEY=$(grep "^GOOGLE_DRIVE_PRIVATE_KEY=" .env 2>/dev/null | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo "")
         [ -z "$GOOGLE_DRIVE_SHARED_DRIVE_ID" ] && GOOGLE_DRIVE_SHARED_DRIVE_ID=$(grep "^GOOGLE_DRIVE_SHARED_DRIVE_ID=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
-        # Check for both new and old variable names (for backward compatibility)
-        [ -z "$GOOGLE_CLIENT_ID" ] && GOOGLE_CLIENT_ID=$(grep "^GOOGLE_CLIENT_ID=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
-        [ -z "$GOOGLE_CLIENT_ID" ] && GOOGLE_CLIENT_ID=$(grep "^GOOGLE_CALENDAR_CLIENT_ID=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
-        [ -z "$GOOGLE_CLIENT_SECRET" ] && GOOGLE_CLIENT_SECRET=$(grep "^GOOGLE_CLIENT_SECRET=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
-        [ -z "$GOOGLE_CLIENT_SECRET" ] && GOOGLE_CLIENT_SECRET=$(grep "^GOOGLE_CALENDAR_CLIENT_SECRET=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
-        [ -z "$GOOGLE_REDIRECT_URI" ] && GOOGLE_REDIRECT_URI=$(grep "^GOOGLE_REDIRECT_URI=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
-        [ -z "$GOOGLE_REDIRECT_URI" ] && GOOGLE_REDIRECT_URI=$(grep "^GOOGLE_CALENDAR_REDIRECT_URI=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+        [ -z "$GOOGLE_CALENDAR_CLIENT_ID" ] && GOOGLE_CALENDAR_CLIENT_ID=$(grep "^GOOGLE_CALENDAR_CLIENT_ID=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+        [ -z "$GOOGLE_CALENDAR_CLIENT_SECRET" ] && GOOGLE_CALENDAR_CLIENT_SECRET=$(grep "^GOOGLE_CALENDAR_CLIENT_SECRET=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+        [ -z "$GOOGLE_CALENDAR_REDIRECT_URI" ] && GOOGLE_CALENDAR_REDIRECT_URI=$(grep "^GOOGLE_CALENDAR_REDIRECT_URI=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
         [ -z "$GEMINI_API_KEY" ] && GEMINI_API_KEY=$(grep "^GEMINI_API_KEY=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
         [ -z "$FRONTEND_URL" ] && FRONTEND_URL=$(grep "^FRONTEND_URL=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
         [ -z "$ENCRYPTION_KEY" ] && ENCRYPTION_KEY=$(grep "^ENCRYPTION_KEY=" .env 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
@@ -1180,11 +1176,11 @@ GOOGLE_DRIVE_SCOPES=${GOOGLE_DRIVE_SCOPES:-https://www.googleapis.com/auth/drive
 GOOGLE_DRIVE_IMPERSONATE_USER=${GOOGLE_DRIVE_IMPERSONATE_USER:-}
 
 # ============================================
-# GOOGLE OAUTH (for Calendar and other integrations)
+# GOOGLE CALENDAR INTEGRATION
 # ============================================
-GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-}
+GOOGLE_CALENDAR_CLIENT_ID=${GOOGLE_CALENDAR_CLIENT_ID:-}
+GOOGLE_CALENDAR_CLIENT_SECRET=${GOOGLE_CALENDAR_CLIENT_SECRET:-}
+GOOGLE_CALENDAR_REDIRECT_URI=${GOOGLE_CALENDAR_REDIRECT_URI:-}
 
 # ============================================
 # GEMINI AI API

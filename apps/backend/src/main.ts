@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -16,7 +15,6 @@ async function bootstrap() {
   const isProduction = configService.get<string>('NODE_ENV') === 'production';
   app.use(
     helmet({
-      // Content-Security-Policy: Prevents XSS attacks by controlling which resources can be loaded
       contentSecurityPolicy: isProduction
         ? {
             directives: {
@@ -32,7 +30,8 @@ async function bootstrap() {
             },
           }
         : false, // Disable in development for easier debugging
-      // Strict-Transport-Security: Forces HTTPS connections
+      crossOriginEmbedderPolicy: false, // Disable for Swagger compatibility
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
       hsts: isProduction
         ? {
             maxAge: 31536000, // 1 year
@@ -40,51 +39,8 @@ async function bootstrap() {
             preload: true,
           }
         : false,
-      // Referrer-Policy: Controls how much referrer information is sent with requests
-      referrerPolicy: {
-        policy: 'strict-origin-when-cross-origin',
-      },
-      crossOriginEmbedderPolicy: false, // Disable for Swagger compatibility
-      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
-
-  // Permissions-Policy: Restricts browser features and APIs
-  // Note: This is set via custom middleware as Helmet v7 removed built-in support
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    res.setHeader(
-      'Permissions-Policy',
-      [
-        'accelerometer=()',
-        'ambient-light-sensor=()',
-        'autoplay=(self)',
-        'battery=()',
-        'camera=()',
-        'cross-origin-isolated=()',
-        'display-capture=()',
-        'document-domain=()',
-        'encrypted-media=(self)',
-        'execution-while-not-rendered=()',
-        'execution-while-out-of-viewport=()',
-        'fullscreen=(self)',
-        'geolocation=()',
-        'gyroscope=()',
-        'magnetometer=()',
-        'microphone=()',
-        'midi=()',
-        'navigation-override=()',
-        'payment=()',
-        'picture-in-picture=()',
-        'publickey-credentials-get=(self)',
-        'screen-wake-lock=()',
-        'sync-xhr=()',
-        'usb=()',
-        'web-share=(self)',
-        'xr-spatial-tracking=()',
-      ].join(', '),
-    );
-    next();
-  });
 
   // Cookie parsing (required for HttpOnly refresh tokens)
   app.use(cookieParser());

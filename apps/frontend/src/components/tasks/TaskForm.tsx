@@ -47,7 +47,6 @@ type FormValues = {
 interface TaskFormProps {
   task?: Task | null;
   currentUserId: string;
-  currentUserRole?: string;
   defaultStatus?: TaskStatus;
   onClose: () => void;
   onSuccess: (task: Task) => void;
@@ -56,7 +55,6 @@ interface TaskFormProps {
 export function TaskForm({
   task,
   currentUserId,
-  currentUserRole,
   defaultStatus,
   onClose,
   onSuccess,
@@ -71,7 +69,7 @@ export function TaskForm({
         description: '',
         status: defaultStatus ?? 'TODO',
         priority: 'MEDIUM',
-        assignedToId: currentUserId, // Default to current user when creating
+        assignedToId: undefined,
         customerId: undefined,
         dueDate: undefined,
         startDate: undefined,
@@ -100,7 +98,7 @@ export function TaskForm({
           ? String(task.actualHours)
           : '',
     };
-  }, [task, defaultStatus, currentUserId]);
+  }, [task, defaultStatus]);
 
   const {
     register,
@@ -120,13 +118,9 @@ export function TaskForm({
   }, [defaultValues, reset]);
 
   const usersQuery = useQuery<UsersListResponse>({
-    queryKey: ['users', 'options', 'task-assignment'],
-    queryFn: () => {
-      console.log('[TaskForm] Fetching users for assignment...');
-      return usersApi.getOptions({ page: 1, pageSize: 100, sortBy: 'firstName', sortOrder: 'asc' });
-    },
-    staleTime: 0, // Always fetch fresh data
-    gcTime: 0, // Don't cache (renamed from cacheTime in React Query v5)
+    queryKey: ['users', 'options'],
+    queryFn: () =>
+      usersApi.list({ page: 1, pageSize: 100, sortBy: 'firstName', sortOrder: 'asc' }),
   });
 
   const customersQuery = useQuery<CustomersListResponse>({
@@ -208,29 +202,6 @@ export function TaskForm({
   const users = usersQuery.data?.data ?? [];
   const customers = customersQuery.data?.data ?? [];
 
-  // Ensure current user is selected by default when creating a task
-  useEffect(() => {
-    if (!task && currentUserId && users.length > 0) {
-      const currentUserInList = users.find((u: UserSummary) => u.id === currentUserId);
-      if (currentUserInList) {
-        setValue('assignedToId', currentUserId);
-      }
-    }
-  }, [task, currentUserId, users, setValue]);
-
-  // Debug: Log users to see if employees are included
-  useEffect(() => {
-    if (users.length > 0) {
-      console.log('[TaskForm] Users loaded:', users.length);
-      const employees = users.filter((u: UserSummary) => u.role === 'EMPLOYEE');
-      if (employees.length > 0) {
-        console.error('[TaskForm] ERROR: Found', employees.length, 'EMPLOYEE users in dropdown:', employees.map((e: UserSummary) => `${e.firstName} ${e.lastName}`));
-      } else {
-        console.log('[TaskForm] No EMPLOYEE users found (correct)');
-      }
-    }
-  }, [users]);
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-card shadow-xl">
@@ -311,8 +282,7 @@ export function TaskForm({
               </label>
               <select
                 {...register('assignedToId')}
-                disabled={currentUserRole === 'EMPLOYEE' && !task}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Unassigned</option>
                 {users.map((user: UserSummary) => (
@@ -321,11 +291,6 @@ export function TaskForm({
                   </option>
                 ))}
               </select>
-              {currentUserRole === 'EMPLOYEE' && !task && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Tasks are assigned to you by default
-                </p>
-              )}
             </div>
 
             <div>
@@ -386,7 +351,7 @@ export function TaskForm({
               </label>
               <input
                 type="number"
-                step="0.01"
+                step="0.25"
                 min="0"
                 {...register('actualHours')}
                 className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"

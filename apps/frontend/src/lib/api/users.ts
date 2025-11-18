@@ -19,13 +19,6 @@ export const usersApi = {
     return data;
   },
 
-  getOptions: async (filters: UserListFilters = {}) => {
-    const { data } = await apiClient.get<UsersListResponse>('/users/options', {
-      params: filters,
-    });
-    return data;
-  },
-
   getById: async (id: string) => {
     const { data } = await apiClient.get<UserDetail>(`/users/${id}`);
     return data;

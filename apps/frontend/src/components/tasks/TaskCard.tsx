@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react';
-import { Calendar, ChevronDown, ClipboardList, Clock, Edit2, PenSquare, Trash2, User, Play, Square } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Calendar, ChevronDown, ClipboardList, Clock, Edit2, PenSquare, Trash2, User } from 'lucide-react';
 import type { Task, TaskPriority, TaskStatus } from '@/types/tasks';
 
 const PRIORITY_STYLES: Record<
@@ -30,10 +30,6 @@ interface TaskCardProps {
   onAddToEod?: (task: Task) => void;
   disableAddToEod?: boolean;
   onOpenActivity?: (task: Task) => void;
-  runningTimer?: { taskId: string; startTime: number } | null;
-  onStartTimer?: (task: Task) => void;
-  onStopTimer?: (taskId: string) => void;
-  currentUserId?: string;
 }
 
 export function TaskCard({
@@ -46,10 +42,6 @@ export function TaskCard({
   onAddToEod,
   disableAddToEod,
   onOpenActivity,
-  runningTimer,
-  onStartTimer,
-  onStopTimer,
-  currentUserId,
 }: TaskCardProps) {
   const priorityVariant = PRIORITY_STYLES[task.priority];
 
@@ -72,36 +64,6 @@ export function TaskCard({
   }, [task.dueDate, task.status]);
 
   const [isExpanded, setIsExpanded] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
-
-  const isTimerRunning = runningTimer?.taskId === task.id;
-  const isMyTask = currentUserId && task.assignedToId === currentUserId;
-
-  useEffect(() => {
-    if (!isTimerRunning) {
-      setElapsedTime(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - runningTimer.startTime;
-      setElapsedTime(elapsed);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isTimerRunning, runningTimer]);
-
-  const formatElapsedTime = (ms: number): string => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   const toggleExpanded = () => {
     setIsExpanded((prev) => !prev);
@@ -123,86 +85,32 @@ export function TaskCard({
       onKeyDown={handleCardKeyDown}
     >
       <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
             <span
               className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${priorityVariant.bg} ${priorityVariant.text}`}
             >
               {priorityVariant.label}
             </span>
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {STATUS_LABELS[task.status]}
+            </span>
+          </div>
+          <h3 className="mt-2 text-lg font-semibold text-foreground">
+            {task.title}
+          </h3>
+        </div>
         <div className="flex items-center gap-1">
-          {onStartTimer && onStopTimer && isMyTask && (
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                if (isTimerRunning) {
-                  onStopTimer(task.id);
-                } else {
-                  onStartTimer(task);
-                }
-              }}
-              className={`rounded-lg p-2 transition ${
-                isTimerRunning
-                  ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground/70 hover:text-emerald-600'
-              }`}
-              aria-label={isTimerRunning ? 'Stop timer' : 'Start timer'}
-              title={isTimerRunning ? 'Stop timer' : 'Start timer'}
-            >
-              {isTimerRunning ? (
-                <Square className="h-4 w-4 fill-current" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-            </button>
-          )}
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(task);
-            }}
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-blue-600"
-            aria-label="Edit task"
-            title="Edit task"
-          >
-            <Edit2 className="h-4 w-4" />
-          </button>
-          {onAddToEod && (
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                onAddToEod(task);
-              }}
-              disabled={disableAddToEod}
-              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label="Add task to EOD report"
-              title="Add to EOD"
-            >
-              <ClipboardList className="h-4 w-4" />
-            </button>
-          )}
           {onOpenActivity && (
             <button
               onClick={(event) => {
                 event.stopPropagation();
                 onOpenActivity(task);
               }}
-              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-purple-600"
+              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-blue-600"
               aria-label="View task activities"
-              title="View activities"
             >
               <PenSquare className="h-4 w-4" />
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                onDelete(task);
-              }}
-              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-red-600"
-              aria-label="Delete task"
-              title="Delete task"
-            >
-              <Trash2 className="h-4 w-4" />
             </button>
           )}
           <button
@@ -212,30 +120,14 @@ export function TaskCard({
             }}
             className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted"
             aria-label={isExpanded ? 'Collapse task details' : 'Expand task details'}
-            title={isExpanded ? 'Collapse' : 'Expand'}
           >
             <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
       </div>
 
-      <div className="mt-3">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {STATUS_LABELS[task.status]}
-        </span>
-        <h3 className="mt-1 text-lg font-semibold text-foreground">
-          {task.title}
-        </h3>
-      </div>
-
       {!isExpanded && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {isTimerRunning && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 font-semibold text-red-700">
-              <Clock className="h-3.5 w-3.5 animate-pulse" />
-              {formatElapsedTime(elapsedTime)}
-            </span>
-          )}
           {task.assignedTo && (
             <span className="inline-flex items-center gap-1">
               <User className="h-4 w-4" />
@@ -298,7 +190,7 @@ export function TaskCard({
               task.actualHours !== null &&
               task.actualHours > 0 && (
                 <span className="inline-flex items-center gap-1 text-muted-foreground">
-                  Logged {Number(task.actualHours).toFixed(2)}h
+                  Logged {task.actualHours}h
                 </span>
               )}
           </div>
@@ -315,6 +207,44 @@ export function TaskCard({
               ))}
             </div>
           )}
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit(task);
+              }}
+              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-blue-600"
+              aria-label="Edit task"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+            {onAddToEod && (
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAddToEod(task);
+                }}
+                disabled={disableAddToEod}
+                className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Add task to EOD report"
+              >
+                <ClipboardList className="h-4 w-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDelete(task);
+                }}
+                className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-red-600"
+                aria-label="Delete task"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </div>
 
           <div>
             <label className="text-xs font-semibold uppercase text-muted-foreground">

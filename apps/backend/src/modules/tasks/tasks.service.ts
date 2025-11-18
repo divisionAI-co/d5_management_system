@@ -4,24 +4,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, NotificationType, TaskPriority, TaskStatus, UserRole } from '@prisma/client';
+import { Prisma, TaskPriority, TaskStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
-import { LogTimeDto } from './dto/log-time.dto';
-import { NotificationsService } from '../notifications/notifications.service';
-import { UsersService } from '../users/users.service';
-import { extractMentionIdentifiers } from '../../common/utils/mention-parser';
 
 @Injectable()
 export class TasksService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService,
-    private readonly usersService: UsersService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   private readonly taskInclude = {
     assignedTo: {
@@ -191,12 +183,6 @@ export class TasksService {
       include: this.taskInclude,
     });
 
-    // Process @mentions in title and description and create notifications
-    // Don't await - let it run in background to not slow down task creation
-    this.processMentions(task.id, createTaskDto.title, createTaskDto.description, createTaskDto.createdById).catch((error) => {
-      console.error(`[Mentions] Failed to process mentions for task ${task.id}:`, error);
-    });
-
     return TasksService.formatTask(task);
   }
 
@@ -245,7 +231,7 @@ export class TasksService {
     return TasksService.formatTask(task);
   }
 
-  async update(id: string, updateTaskDto: UpdateTaskDto, userId: string) {
+  async update(id: string, updateTaskDto: UpdateTaskDto) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException(`Task with ID ${id} not found`);
@@ -330,57 +316,6 @@ export class TasksService {
       data,
       include: this.taskInclude,
     });
-
-    // Process @mentions if title or description was updated
-    const title = updateTaskDto.title ?? existing.title;
-    const description = updateTaskDto.description ?? existing.description;
-    
-    if (updateTaskDto.title !== undefined || updateTaskDto.description !== undefined) {
-      // Use the current user (person updating) for mentions
-      this.processMentions(id, title, description, userId).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for task ${id}:`, error);
-      });
-    }
-
-    return TasksService.formatTask(task);
-  }
-
-  async logTime(id: string, logTimeDto: LogTimeDto, userId: string) {
-    const existing = await this.prisma.task.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
-    }
-
-    // Calculate new actual hours (add to existing)
-    const currentActualHours =
-      existing.actualHours !== null && existing.actualHours !== undefined
-        ? Number(existing.actualHours)
-        : 0;
-    const newActualHours = currentActualHours + logTimeDto.hours;
-
-    // Append to description
-    const timestamp = new Date().toLocaleString();
-    const timeEntry = `\n\n[${timestamp}] ${logTimeDto.hours}h - ${logTimeDto.description || 'No description provided'}`;
-    const newDescription = existing.description
-      ? existing.description + timeEntry
-      : timeEntry.trim();
-
-    const task = await this.prisma.task.update({
-      where: { id },
-      data: {
-        actualHours: new Prisma.Decimal(newActualHours),
-        description: newDescription,
-      },
-      include: this.taskInclude,
-    });
-
-    // Process @mentions in the new description if it contains mentions
-    // Use the current user's ID (person logging time) for mentions
-    if (logTimeDto.description) {
-      this.processMentions(id, existing.title, logTimeDto.description, userId).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for task ${id} in logTime:`, error);
-      });
-    }
 
     return TasksService.formatTask(task);
   }
@@ -497,29 +432,15 @@ export class TasksService {
           ? [...(currentReport.tasksWorkedOn as Prisma.JsonArray)]
           : [];
 
-        // Check if this specific task is already in the report
         const alreadyExists = currentTasks.some((item) => {
-          if (!item) {
-            return false;
-          }
-          
-          // Handle object format (new format with ticket field)
-          if (typeof item === 'object' && item !== null && 'ticket' in item) {
+          if (item && typeof item === 'object' && 'ticket' in item) {
             try {
               const parsed = item as Record<string, unknown>;
-              const ticketValue = parsed.ticket;
-              // Compare as strings to handle any type mismatches
-              return String(ticketValue) === String(task.id);
+              return parsed.ticket === task.id;
             } catch {
               return false;
             }
           }
-          
-          // Handle string format (legacy format - task ID as string)
-          if (typeof item === 'string') {
-            return String(item) === String(task.id);
-          }
-          
           return false;
         });
 
@@ -532,14 +453,12 @@ export class TasksService {
           };
         }
 
-        // Add the new task entry
         currentTasks.push(eodEntry);
 
-        // Update the report with optimistic locking to prevent concurrent update issues
         const updateResult = await this.prisma.eodReport.updateMany({
           where: {
             id: currentReport.id,
-            updatedAt: currentReport.updatedAt, // Optimistic locking
+            updatedAt: currentReport.updatedAt,
           },
           data: {
             tasksWorkedOn: currentTasks as Prisma.InputJsonValue,
@@ -554,8 +473,6 @@ export class TasksService {
             message: `Task "${task.title}" added to your ${reportDateString} EOD report.`,
           };
         }
-
-        // If update failed (likely due to concurrent modification), refresh and retry
 
         const refreshedReport = await this.prisma.eodReport.findUnique({
           where: { id: currentReport.id },
@@ -615,75 +532,6 @@ export class TasksService {
     });
 
     return { deleted: true };
-  }
-
-  /**
-   * Process @mentions in task title and description and create notifications
-   */
-  private async processMentions(
-    taskId: string,
-    title: string | null | undefined,
-    description: string | null | undefined,
-    createdById: string,
-  ) {
-    try {
-      // Combine title and description to extract all mentions
-      const text = [title, description].filter(Boolean).join(' ');
-      if (!text) {
-        return;
-      }
-
-      // Extract mention identifiers
-      const identifiers = extractMentionIdentifiers(text);
-      if (identifiers.length === 0) {
-        return;
-      }
-
-      console.log(`[Mentions] Processing mentions for task ${taskId}:`, {
-        identifiers,
-        textPreview: text.substring(0, 100),
-      });
-
-      // Find users by mentions
-      const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
-      
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
-      
-      // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
-      const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
-      
-      if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
-        return;
-      }
-
-      // Get creator info for notification message
-      const creator = await this.prisma.user.findUnique({
-        where: { id: createdById },
-        select: { firstName: true, lastName: true, email: true },
-      });
-
-      const creatorName = creator
-        ? `${creator.firstName} ${creator.lastName}`.trim() || creator.email
-        : 'Someone';
-
-      // Create notifications for mentioned users
-      const titlePreview = title ? (title.length > 50 ? title.substring(0, 50) + '...' : title) : 'a task';
-      
-      const notifications = await this.notificationsService.createNotificationsForUsers(
-        userIdsToNotify,
-        NotificationType.MENTIONED_IN_ACTIVITY,
-        `You were mentioned in a task`,
-        `${creatorName} mentioned you in task "${titlePreview}"`,
-        'task',
-        taskId,
-      );
-
-      console.log(`[Mentions] Created ${notifications.length} notifications for task ${taskId}`);
-    } catch (error) {
-      // Log error but don't fail the task creation/update
-      console.error(`[Mentions] Error processing mentions for task ${taskId}:`, error);
-    }
   }
 }
 

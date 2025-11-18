@@ -155,25 +155,6 @@ export function InvoiceForm({ invoice, onClose, onSuccess }: InvoiceFormProps) {
     reset(defaultValues);
   }, [defaultValues, reset]);
 
-  // Set customerId after customers query loads (fixes race condition)
-  // This ensures the customer is selected even if the query loads after form initialization
-  useEffect(() => {
-    if (
-      invoice?.customerId &&
-      customersQuery.isSuccess &&
-      customers.length > 0 &&
-      !customersQuery.isLoading
-    ) {
-      const customerExists = customers.some((c) => c.id === invoice.customerId);
-      if (customerExists) {
-        // Use setTimeout to ensure this runs after the reset
-        setTimeout(() => {
-          setValue('customerId', invoice.customerId, { shouldValidate: false });
-        }, 0);
-      }
-    }
-  }, [invoice?.customerId, customersQuery.isSuccess, customersQuery.isLoading, customersQuery.data?.data, setValue]);
-
   const watchedItems = watch('items');
   const watchedTaxRate = Number(watch('taxRate') || '0');
 

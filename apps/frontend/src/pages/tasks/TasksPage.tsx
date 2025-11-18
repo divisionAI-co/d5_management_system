@@ -10,8 +10,6 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { TaskBoard } from '@/components/tasks/TaskBoard';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
-import { TimerStopModal } from '@/components/tasks/TimerStopModal';
-import { ROLE_PERMISSIONS } from '@/constants/permissions';
 import type {
   Task,
   TaskEodLinkResponse,
@@ -50,13 +48,6 @@ export default function TasksPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Redirect employees who don't have permission
-  useEffect(() => {
-    if (user && !ROLE_PERMISSIONS.TASKS.includes(user.role as typeof ROLE_PERMISSIONS.TASKS[number])) {
-      navigate('/', { replace: true });
-    }
-  }, [user, navigate]);
-
   const [filters, setFilters] = useState<LocalFilters>({
     status: undefined,
     priority: undefined,
@@ -76,17 +67,6 @@ export default function TasksPage() {
   const [eodPrompt, setEodPrompt] = useState<TaskEodLinkResponse | null>(null);
   const [showActivitySidebar, setShowActivitySidebar] = useState(false);
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
-  
-  // Timer state
-  const [runningTimer, setRunningTimer] = useState<{
-    taskId: string;
-    startTime: number;
-  } | null>(null);
-  const [timerStopModal, setTimerStopModal] = useState<{
-    taskId: string;
-    taskTitle: string;
-    timeSpent: number;
-  } | null>(null);
 
   const sanitizedFilters = useMemo(() => {
     const payload: TaskFilters = {};
@@ -145,19 +125,6 @@ export default function TasksPage() {
     mutationFn: (taskId: string) => tasksApi.addToEod(taskId),
   });
 
-  const logTimeMutation = useMutation({
-    mutationFn: ({ taskId, hours, description }: { taskId: string; hours: number; description?: string }) =>
-      tasksApi.logTime(taskId, hours, description),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      setFeedback('Time logged successfully.');
-      setTimerStopModal(null);
-    },
-    onError: () => {
-      setTaskError('Failed to log time. Please try again.');
-    },
-  });
-
   const handleOpenCreate = (status?: TaskStatus) => {
     setEditingTask(null);
     setDefaultStatus(status);
@@ -167,54 +134,6 @@ export default function TasksPage() {
   const handleOpenActivities = (task: Task) => {
     setActivityTaskId(task.id);
     setShowActivitySidebar(true);
-  };
-
-  const handleStartTimer = (task: Task) => {
-    // Stop any running timer first
-    if (runningTimer) {
-      handleStopTimer(runningTimer.taskId);
-    }
-    setRunningTimer({
-      taskId: task.id,
-      startTime: Date.now(),
-    });
-  };
-
-  const handleStopTimer = (taskId: string) => {
-    if (!runningTimer || runningTimer.taskId !== taskId) {
-      return;
-    }
-
-    const timeSpentMs = Date.now() - runningTimer.startTime;
-    const timeSpentHours = Math.round((timeSpentMs / (1000 * 60 * 60)) * 100) / 100; // Convert to hours, round to 2 decimals
-
-    // Find the task to get its title from query data
-    let task: Task | undefined;
-    const queryColumns = tasksQuery.data?.columns ?? [];
-    for (const column of queryColumns) {
-      task = column.tasks.find((t) => t.id === taskId);
-      if (task) break;
-    }
-
-    if (task) {
-      setTimerStopModal({
-        taskId: task.id,
-        taskTitle: task.title,
-        timeSpent: timeSpentHours,
-      });
-    }
-
-    setRunningTimer(null);
-  };
-
-  const handleLogTime = (description: string) => {
-    if (!timerStopModal) return;
-    
-    logTimeMutation.mutate({
-      taskId: timerStopModal.taskId,
-      hours: timerStopModal.timeSpent,
-      description: description || undefined,
-    });
   };
 
   const handleAddToEod = (task: Task) => {
@@ -582,10 +501,6 @@ export default function TasksPage() {
             onAddTaskToEod={handleAddToEod}
             addingTaskId={addingTaskId}
             onOpenActivity={handleOpenActivities}
-            runningTimer={runningTimer}
-            onStartTimer={handleStartTimer}
-            onStopTimer={handleStopTimer}
-            currentUserId={user?.id}
           />
         ) : (
           <TaskTable
@@ -627,7 +542,6 @@ export default function TasksPage() {
         <TaskForm
           task={editingTask}
           currentUserId={user.id}
-          currentUserRole={user.role}
           defaultStatus={defaultStatus}
           onClose={() => {
             setShowForm(false);
@@ -665,17 +579,6 @@ export default function TasksPage() {
           entityId={activityTaskId}
           entityType="task"
           title="Task Activities"
-        />
-      )}
-
-      {timerStopModal && (
-        <TimerStopModal
-          open={!!timerStopModal}
-          timeSpent={timerStopModal.timeSpent}
-          taskTitle={timerStopModal.taskTitle}
-          onClose={() => setTimerStopModal(null)}
-          onSubmit={handleLogTime}
-          isSubmitting={logTimeMutation.isPending}
         />
       )}
     </div>

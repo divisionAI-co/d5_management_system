@@ -303,25 +303,9 @@ export class EodReportsService {
       throw new ForbiddenException('You can only update your own EOD reports');
     }
 
-    // Regular users can edit submitted reports within 1 day after the report date (due date)
-    // ADMIN/HR can always edit
+    // Regular users cannot edit submitted reports, but ADMIN/HR can
     if (!canManageOthers && report.submittedAt) {
-      const reportDate = report.date instanceof Date ? report.date : new Date(report.date);
-      
-      // Calculate the grace period end (1 day after the report date)
-      // For a report due on Tuesday, it can be edited until Wednesday
-      const gracePeriodEnd = new Date(reportDate);
-      gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 1);
-      gracePeriodEnd.setHours(23, 59, 59, 999); // End of the grace period day
-      
-      const now = new Date();
-      
-      // Check if we're still within the grace period
-      if (now > gracePeriodEnd) {
-        throw new BadRequestException(
-          `This EOD report can only be edited within 1 day after its due date. The grace period ended on ${gracePeriodEnd.toLocaleDateString()}.`
-        );
-      }
+      throw new BadRequestException('This EOD report has already been submitted and cannot be edited.');
     }
 
     const { submit, submittedAt, ...rest } = updateDto;

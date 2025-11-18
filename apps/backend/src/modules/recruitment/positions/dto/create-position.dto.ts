@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { RecruitmentStatus } from '@prisma/client';
 
 export class CreatePositionDto {
   @ApiProperty({
@@ -40,14 +39,6 @@ export class CreatePositionDto {
   @IsOptional()
   @IsString()
   opportunityId?: string;
-
-  @ApiPropertyOptional({
-    description: 'Recruitment status (Headhunting or Standard)',
-    enum: RecruitmentStatus,
-  })
-  @IsOptional()
-  @IsEnum(RecruitmentStatus)
-  recruitmentStatus?: RecruitmentStatus;
 }
 
 

@@ -5,7 +5,6 @@ import { format } from 'date-fns';
 
 import { templatesApi } from '@/lib/api/templates';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { ROLE_PERMISSIONS } from '@/constants/permissions';
 import type { CreateTemplatePayload, TemplateFilters, TemplateModel, TemplateType } from '@/types/templates';
 import { TemplateFormModal } from './TemplateFormModal';
 import { TemplatePreviewModal } from './TemplatePreviewModal';
@@ -154,14 +153,14 @@ export function TemplatesManager() {
         <div>
           <h1 className="text-xl font-semibold">Restricted Access</h1>
           <p className="text-sm text-amber-700">
-            Only administrators and HR can manage email and document templates.
+            Only administrators can manage email and document templates.
           </p>
         </div>
       </div>
     </div>
   );
 
-  if (!user || !ROLE_PERMISSIONS.TEMPLATES.includes(user.role as typeof ROLE_PERMISSIONS.TEMPLATES[number])) {
+  if (user?.role !== 'ADMIN') {
     return renderAccessWarning();
   }
 

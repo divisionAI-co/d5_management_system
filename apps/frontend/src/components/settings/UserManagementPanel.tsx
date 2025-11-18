@@ -14,7 +14,6 @@ import {
 
 import { usersApi } from '@/lib/api/users';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { ROLE_PERMISSIONS } from '@/constants/permissions';
 import type {
   CreateUserPayload,
   UserDetail,
@@ -153,14 +152,14 @@ export function UserManagementPanel() {
     },
   });
 
-  if (!user || !ROLE_PERMISSIONS.USER_MANAGEMENT.includes(user.role as typeof ROLE_PERMISSIONS.USER_MANAGEMENT[number])) {
+  if (user?.role !== 'ADMIN') {
     return (
       <div className="mx-auto max-w-3xl space-y-6 rounded-lg bg-card p-8 shadow-sm">
         <div className="flex items-center gap-3 text-amber-600">
           <ShieldAlert className="h-8 w-8" />
           <div>
             <h1 className="text-xl font-semibold">Restricted Access</h1>
-            <p className="text-sm text-amber-700">Only administrators and HR can manage user accounts.</p>
+            <p className="text-sm text-amber-700">Only administrators can manage user accounts.</p>
           </div>
         </div>
       </div>

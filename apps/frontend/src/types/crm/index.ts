@@ -5,7 +5,6 @@ export type CustomerStatus = 'ONBOARDING' | 'ACTIVE' | 'AT_RISK' | 'PAUSED' | 'C
 export type CustomerSentiment = 'HAPPY' | 'NEUTRAL' | 'UNHAPPY';
 
 export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'WON' | 'LOST';
-export type LeadType = 'END_CUSTOMER' | 'INTERMEDIARY';
 
 export interface CustomerCounts {
   contacts: number;
@@ -241,7 +240,6 @@ export interface Lead {
   prospectCompanyName?: string | null;
   prospectWebsite?: string | null;
   prospectIndustry?: string | null;
-  leadType?: LeadType | null;
   convertedCustomerId?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -305,7 +303,6 @@ export interface CreateLeadPayload {
   prospectCompanyName?: string;
   prospectWebsite?: string;
   prospectIndustry?: string;
-  leadType?: LeadType;
 }
 
 export interface UpdateLeadPayload extends Partial<CreateLeadPayload> {}

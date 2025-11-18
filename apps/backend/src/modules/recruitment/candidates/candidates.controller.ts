@@ -22,7 +22,6 @@ import { SendCandidateEmailDto } from './dto/send-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 
 @ApiTags('Recruitment - Candidates')
@@ -35,11 +34,8 @@ export class CandidatesController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
   @ApiOperation({ summary: 'Create a new candidate profile' })
-  create(
-    @Body() createDto: CreateCandidateDto,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.candidatesService.create(createDto, userId);
+  create(@Body() createDto: CreateCandidateDto) {
+    return this.candidatesService.create(createDto);
   }
 
   @Get()
@@ -70,12 +66,8 @@ export class CandidatesController {
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
   @ApiOperation({ summary: 'Update a candidate profile' })
-  update(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateCandidateDto,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.candidatesService.update(id, updateDto, userId);
+  update(@Param('id') id: string, @Body() updateDto: UpdateCandidateDto) {
+    return this.candidatesService.update(id, updateDto);
   }
 
   @Patch(':id/stage')

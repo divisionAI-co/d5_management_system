@@ -25,10 +25,6 @@ interface TaskBoardProps {
   onAddTaskToEod?: (task: Task) => void;
   addingTaskId?: string | null;
   onOpenActivity?: (task: Task) => void;
-  runningTimer?: { taskId: string; startTime: number } | null;
-  onStartTimer?: (task: Task) => void;
-  onStopTimer?: (taskId: string) => void;
-  currentUserId?: string;
 }
 
 const STATUS_TITLES: Record<TaskStatus, string> = {
@@ -60,10 +56,6 @@ export function TaskBoard({
   onAddTaskToEod,
   addingTaskId,
   onOpenActivity,
-  runningTimer,
-  onStartTimer,
-  onStopTimer,
-  currentUserId,
 }: TaskBoardProps) {
   const tasksMap = new Map<string, Task>();
   columns.forEach((column) => {
@@ -104,15 +96,14 @@ export function TaskBoard({
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="overflow-x-auto pb-4">
-        <div className="inline-flex min-w-full gap-4">
+      <div className="grid w-full gap-4 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
         {columns.map((column) => (
           <Droppable droppableId={column.status} key={column.status}>
             {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                  className={`flex min-h-[400px] min-w-[320px] max-w-[320px] flex-col rounded-2xl border border-border bg-muted transition ${
+                className={`flex min-h-[400px] flex-1 flex-col rounded-2xl border border-border bg-muted transition ${
                   snapshot.isDraggingOver ? 'border-blue-300 bg-blue-50/60' : ''
                 }`}
               >
@@ -137,7 +128,7 @@ export function TaskBoard({
                   </button>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+                <div className="flex flex-1 flex-col gap-3 p-4">
                   {column.tasks.length === 0 && (
                     <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/80 px-4 py-8 text-center text-sm text-muted-foreground">
                       <p>No tasks in this stage yet.</p>
@@ -175,15 +166,11 @@ export function TaskBoard({
                             statusOptions={statusOptions}
                             onEdit={onEditTask}
                             onStatusChange={onStatusChange}
-                            onDelete={onDeleteTask}
+                            onDelete={canDeleteTasks ? onDeleteTask : undefined}
                             disableStatusChange={disableStatusChange}
                             onAddToEod={onAddTaskToEod}
                             disableAddToEod={addingTaskId === task.id}
                             onOpenActivity={onOpenActivity}
-                            runningTimer={runningTimer}
-                            onStartTimer={onStartTimer}
-                            onStopTimer={onStopTimer}
-                            currentUserId={currentUserId}
                           />
                         </div>
                       )}
@@ -195,7 +182,6 @@ export function TaskBoard({
             )}
           </Droppable>
         ))}
-        </div>
       </div>
     </DragDropContext>
   );

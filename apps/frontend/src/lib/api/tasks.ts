@@ -53,14 +53,6 @@ export const tasksApi = {
     );
     return data;
   },
-
-  logTime: async (id: string, hours: number, description?: string) => {
-    const { data } = await apiClient.post<Task>(`/tasks/${id}/log-time`, {
-      hours,
-      description,
-    });
-    return data;
-  },
 };
 
 

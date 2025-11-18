@@ -8,7 +8,6 @@ import type { Opportunity } from '@/types/crm';
 import type {
   CreatePositionDto,
   PositionStatus,
-  RecruitmentStatus,
   OpenPosition,
   UpdatePositionDto,
 } from '@/types/recruitment';
@@ -31,7 +30,6 @@ interface FormValues {
   requirements?: string;
   opportunityId?: string;
   status: PositionStatus;
-  recruitmentStatus?: RecruitmentStatus | null;
 }
 
 export function CreatePositionModal({
@@ -62,7 +60,6 @@ export function CreatePositionModal({
       // Default to empty string (no opportunity link) when creating new position
       opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
       status: position?.status ?? 'Open',
-      recruitmentStatus: position?.recruitmentStatus ?? null,
     },
   });
 
@@ -122,7 +119,6 @@ export function CreatePositionModal({
       requirements: position?.requirements ?? '',
       opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
       status: position?.status ?? 'Open',
-      recruitmentStatus: position?.recruitmentStatus ?? null,
     });
     // Set initial search value if opportunity is pre-selected
     if (position?.opportunity || defaultOpportunity) {
@@ -162,7 +158,6 @@ export function CreatePositionModal({
         description: values.description?.trim() || undefined,
         requirements: values.requirements?.trim() || undefined,
         status: values.status,
-        recruitmentStatus: values.recruitmentStatus || undefined,
         // Include opportunityId in update to allow changing the link
         // Send null explicitly to unlink, or the opportunity ID to link
         opportunityId: values.opportunityId ? values.opportunityId : null,
@@ -176,7 +171,6 @@ export function CreatePositionModal({
       description: values.description?.trim() || undefined,
       requirements: values.requirements?.trim() || undefined,
       status: values.status,
-      recruitmentStatus: values.recruitmentStatus || undefined,
       opportunityId: defaultOpportunity
         ? defaultOpportunity.id
         : values.opportunityId || undefined,
@@ -236,19 +230,6 @@ export function CreatePositionModal({
                 <option value="Open">Open</option>
                 <option value="Cancelled">Cancelled</option>
                 <option value="Filled">Filled</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Recruitment Status
-              </label>
-              <select
-                {...register('recruitmentStatus')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              >
-                <option value="">Select status</option>
-                <option value="HEADHUNTING">Headhunting</option>
-                <option value="STANDARD">Standard</option>
               </select>
             </div>
             </div>

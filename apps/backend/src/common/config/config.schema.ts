@@ -58,9 +58,12 @@ export const configValidationSchema = Joi.object({
   AWS_SES_SECRET_ACCESS_KEY: Joi.string().optional(),
 
   // Google OAuth (optional)
-  GOOGLE_CLIENT_ID: Joi.string().optional(),
-  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
-  GOOGLE_REDIRECT_URI: Joi.string().uri().optional(),
+  GOOGLE_CALENDAR_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_CALENDAR_CLIENT_SECRET: Joi.string().optional(),
+  GOOGLE_CALENDAR_REDIRECT_URI: Joi.string().uri().optional(),
+  GOOGLE_DRIVE_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_DRIVE_CLIENT_SECRET: Joi.string().optional(),
+  GOOGLE_DRIVE_REDIRECT_URI: Joi.string().uri().optional(),
 
   // Password Reset
   PASSWORD_RESET_TOKEN_EXPIRY_HOURS: Joi.number().default(1),

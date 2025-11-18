@@ -1,6 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { RecruitmentStatus } from '@prisma/client';
+import { IsOptional, IsString } from 'class-validator';
 
 const STATUS_OPTIONS = ['Open', 'Filled', 'Cancelled'] as const;
 type PositionStatus = (typeof STATUS_OPTIONS)[number];
@@ -41,14 +40,6 @@ export class UpdatePositionDto {
   @IsOptional()
   @IsString()
   opportunityId?: string | null;
-
-  @ApiPropertyOptional({
-    description: 'Recruitment status (Headhunting or Standard)',
-    enum: RecruitmentStatus,
-  })
-  @IsOptional()
-  @IsEnum(RecruitmentStatus)
-  recruitmentStatus?: RecruitmentStatus;
 }
 
 

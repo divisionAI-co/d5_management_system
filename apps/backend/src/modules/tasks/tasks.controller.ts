@@ -21,7 +21,6 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
-import { LogTimeDto } from './dto/log-time.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -35,7 +34,7 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.HR, UserRole.RECRUITER)
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Create a new task' })
   create(@Body() createTaskDto: CreateTaskDto) {
     return this.tasksService.create(createTaskDto);
@@ -47,7 +46,6 @@ export class TasksController {
     UserRole.ACCOUNT_MANAGER,
     UserRole.SALESPERSON,
     UserRole.HR,
-    UserRole.RECRUITER,
     UserRole.EMPLOYEE,
   )
   @ApiOperation({ summary: 'Get tasks in Kanban format' })
@@ -67,7 +65,6 @@ export class TasksController {
     UserRole.ACCOUNT_MANAGER,
     UserRole.SALESPERSON,
     UserRole.HR,
-    UserRole.RECRUITER,
     UserRole.EMPLOYEE,
   )
   @ApiOperation({ summary: 'Get a task by ID' })
@@ -81,7 +78,6 @@ export class TasksController {
     UserRole.ACCOUNT_MANAGER,
     UserRole.SALESPERSON,
     UserRole.HR,
-    UserRole.RECRUITER,
     UserRole.EMPLOYEE,
   )
   @ApiOperation({ summary: 'Add task to current user EOD report' })
@@ -94,32 +90,10 @@ export class TasksController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.HR, UserRole.RECRUITER)
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON)
   @ApiOperation({ summary: 'Update a task' })
-  update(
-    @Param('id') id: string,
-    @Body() updateTaskDto: UpdateTaskDto,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.tasksService.update(id, updateTaskDto, userId);
-  }
-
-  @Post(':id/log-time')
-  @Roles(
-    UserRole.ADMIN,
-    UserRole.ACCOUNT_MANAGER,
-    UserRole.SALESPERSON,
-    UserRole.HR,
-    UserRole.RECRUITER,
-    UserRole.EMPLOYEE,
-  )
-  @ApiOperation({ summary: 'Log time spent on a task' })
-  logTime(
-    @Param('id') id: string,
-    @Body() logTimeDto: LogTimeDto,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.tasksService.logTime(id, logTimeDto, userId);
+  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
+    return this.tasksService.update(id, updateTaskDto);
   }
 
   @Patch(':id/status')
@@ -127,8 +101,6 @@ export class TasksController {
     UserRole.ADMIN,
     UserRole.ACCOUNT_MANAGER,
     UserRole.SALESPERSON,
-    UserRole.HR,
-    UserRole.RECRUITER,
     UserRole.EMPLOYEE,
   )
   @ApiOperation({ summary: 'Update task status' })

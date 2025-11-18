@@ -12,7 +12,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { LeadStatus, LeadType } from '@prisma/client';
+import { LeadStatus } from '@prisma/client';
 
 export class LeadContactInputDto {
   @ApiProperty({ description: 'Contact first name' })
@@ -118,12 +118,4 @@ export class CreateLeadDto {
   @IsString()
   @IsOptional()
   prospectIndustry?: string;
-
-  @ApiPropertyOptional({ 
-    description: 'Lead type (End-customer or Intermediary)',
-    enum: LeadType,
-  })
-  @IsEnum(LeadType)
-  @IsOptional()
-  leadType?: LeadType;
 }
