@@ -832,6 +832,15 @@ model CompanySettings {
   // Leave Policy
   annualLeaveAllowanceDays Int @default(20)
 
+  // Email Template Configuration
+  emailTemplateEodReportSubmittedId String?
+  emailTemplateLeaveRequestCreatedId String?
+  emailTemplateLeaveRequestApprovedId String?
+  emailTemplateLeaveRequestRejectedId String?
+  emailTemplateTaskAssignedId String?
+  emailTemplateMentionNotificationId String?
+  emailTemplateRemoteWorkWindowOpenedId String?
+
   updatedAt DateTime @updatedAt
 
   @@map("company_settings")
@@ -1293,7 +1302,15 @@ enum TemplateType {
   INVOICE
   CUSTOMER_REPORT
   PERFORMANCE_REVIEW
+  FEEDBACK_REPORT
   EMAIL
+  EOD_REPORT_SUBMITTED
+  LEAVE_REQUEST_CREATED
+  LEAVE_REQUEST_APPROVED
+  LEAVE_REQUEST_REJECTED
+  TASK_ASSIGNED
+  MENTION_NOTIFICATION
+  REMOTE_WORK_WINDOW_OPENED
 }
 
 model Template {

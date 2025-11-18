@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { FeedbackReportStatus, LeaveRequestStatus, TaskStatus, UserRole, Prisma } from '@prisma/client';
+import { FeedbackReportStatus, LeaveRequestStatus, TaskStatus, UserRole, Prisma, TemplateType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateFeedbackReportDto } from './dto/create-feedback-report.dto';
 import { UpdateHrSectionDto } from './dto/update-hr-section.dto';
@@ -14,6 +14,7 @@ import { FilterFeedbackReportsDto } from './dto/filter-feedback-reports.dto';
 import { SendReportDto } from './dto/send-report.dto';
 import { PdfService } from '../../../common/pdf/pdf.service';
 import { EmailService } from '../../../common/email/email.service';
+import { TemplatesService } from '../../templates/templates.service';
 
 @Injectable()
 export class FeedbackReportsService {
@@ -21,6 +22,7 @@ export class FeedbackReportsService {
     private prisma: PrismaService,
     private pdfService: PdfService,
     private emailService: EmailService,
+    private templatesService: TemplatesService,
   ) {}
 
   private readonly reportInclude = {
@@ -544,13 +546,78 @@ export class FeedbackReportsService {
   }
 
   /**
+   * Prepare template data from report
+   */
+  private prepareTemplateData(report: any) {
+    const monthName = new Date(report.year, report.month - 1).toLocaleString('default', {
+      month: 'long',
+    });
+    
+    let nextMonth = report.month + 1;
+    let nextYear = report.year;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear += 1;
+    }
+    const nextMonthName = new Date(nextYear, nextMonth - 1).toLocaleString('default', {
+      month: 'long',
+    });
+
+    const employeeName = `${report.employee.user.firstName} ${report.employee.user.lastName}`;
+    
+    const ratingLabels = ['', 'Unacceptable', 'Needs improvement', 'Meets expectations', 'Exceeds expectations', 'Outstanding'];
+    
+    const getRatingDisplay = (rating: number | null) => {
+      if (!rating) return 'Not rated';
+      return `<span class="rating rating-${rating}">${rating} - ${ratingLabels[rating]}</span>`;
+    };
+
+    return {
+      employeeName,
+      jobTitle: report.employee.jobTitle || 'N/A',
+      department: report.employee.department || 'N/A',
+      monthYear: `${monthName} ${report.year}`,
+      monthName,
+      nextMonthName,
+      nextMonthYear: nextYear.toString(),
+      tasksCount: report.tasksCount?.toString() || '0',
+      totalDaysOffTaken: report.totalDaysOffTaken?.toString() || '0',
+      totalRemainingDaysOff: report.totalRemainingDaysOff?.toString() || '0',
+      bankHolidays: report.bankHolidays && Array.isArray(report.bankHolidays) ? report.bankHolidays : [],
+      hrFeedback: report.hrFeedback || null,
+      hrActionDescription: report.hrActionDescription || null,
+      amFeedback: report.amFeedback || null,
+      communicationRating: report.communicationRating,
+      communicationRatingDisplay: getRatingDisplay(report.communicationRating),
+      collaborationRating: report.collaborationRating,
+      collaborationRatingDisplay: getRatingDisplay(report.collaborationRating),
+      taskEstimationRating: report.taskEstimationRating,
+      taskEstimationRatingDisplay: getRatingDisplay(report.taskEstimationRating),
+      timelinessRating: report.timelinessRating,
+      timelinessRatingDisplay: getRatingDisplay(report.timelinessRating),
+      employeeSummary: report.employeeSummary || null,
+    };
+  }
+
+  /**
    * Generate preview of the report
    */
   async preview(id: string, userId: string, userRole: UserRole) {
     const report = await this.findOne(id, userId, userRole);
-    const template = this.getDefaultTemplate();
-    const html = this.renderTemplate(template, report);
-    return { html };
+    const templateData = this.prepareTemplateData(report);
+    
+    try {
+      const { html } = await this.templatesService.renderDefault(
+        TemplateType.CUSTOMER_REPORT,
+        templateData
+      );
+      return { html };
+    } catch (error) {
+      // Fallback to default template if no template found
+      const fallbackTemplate = this.getDefaultTemplate();
+      const html = this.renderTemplate(fallbackTemplate, report);
+      return { html };
+    }
   }
 
   /**
@@ -558,10 +625,20 @@ export class FeedbackReportsService {
    */
   async generatePdf(id: string, userId: string, userRole: UserRole): Promise<Buffer> {
     const report = await this.findOne(id, userId, userRole);
-    const template = this.getDefaultTemplate();
-    const html = this.renderTemplate(template, report);
+    const templateData = this.prepareTemplateData(report);
     
-    return this.pdfService.generatePdfFromHtml(html);
+    try {
+      const { html } = await this.templatesService.renderDefault(
+        TemplateType.CUSTOMER_REPORT,
+        templateData
+      );
+      return this.pdfService.generatePdfFromHtml(html);
+    } catch (error) {
+      // Fallback to default template if no template found
+      const fallbackTemplate = this.getDefaultTemplate();
+      const html = this.renderTemplate(fallbackTemplate, report);
+      return this.pdfService.generatePdfFromHtml(html);
+    }
   }
 
   /**

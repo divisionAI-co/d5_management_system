@@ -942,7 +942,9 @@ export class OpportunitiesService {
           : null,
       };
 
-      htmlContent = await this.templatesService.render(dto.templateId, templateData);
+      const rendered = await this.templatesService.render(dto.templateId, templateData);
+      htmlContent = rendered.html;
+      textContent = rendered.text;
     } else if (!htmlContent) {
       throw new BadRequestException(
         'Either templateId or htmlContent must be provided',

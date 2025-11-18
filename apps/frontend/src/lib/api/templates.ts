@@ -48,6 +48,20 @@ export const templatesApi = {
     const { data } = await apiClient.delete<{ message: string }>(`/templates/${id}`);
     return data;
   },
+
+  // Email Template Configuration
+  getEmailConfig: async () => {
+    const { data } = await apiClient.get<Record<string, string | null>>('/templates/email-config');
+    return data;
+  },
+
+  setEmailTemplate: async (action: string, templateId: string | null) => {
+    const { data } = await apiClient.patch<{ success: boolean; message: string }>(
+      '/templates/email-config',
+      { action, templateId },
+    );
+    return data;
+  },
 };
 
 

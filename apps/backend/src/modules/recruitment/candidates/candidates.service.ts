@@ -970,8 +970,8 @@ export class CandidatesService {
             reason: dto.reason || 'No reason provided',
           };
 
-          const renderedHtml = await this.templatesService.render(dto.templateId, templateData);
-          emailBody = renderedHtml;
+          const rendered = await this.templatesService.render(dto.templateId, templateData);
+          emailBody = rendered.html;
           emailSubject = `Update on Your Application - ${updated.firstName} ${updated.lastName}`;
         } catch (error: any) {
           throw new BadRequestException(
@@ -1084,7 +1084,9 @@ export class CandidatesService {
         })),
       };
 
-      htmlContent = await this.templatesService.render(dto.templateId, templateData);
+      const rendered = await this.templatesService.render(dto.templateId, templateData);
+      htmlContent = rendered.html;
+      textContent = rendered.text;
     } else if (!htmlContent) {
       throw new BadRequestException(
         'Either templateId or htmlContent must be provided',

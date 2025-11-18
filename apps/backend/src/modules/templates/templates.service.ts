@@ -160,7 +160,17 @@ export class TemplatesService {
 
   async render(templateId: string, data: Record<string, any> = {}) {
     const template = await this.findOne(templateId);
-    return this.renderTemplate(template, data);
+    const html = this.renderTemplate(template, data);
+    // Generate plain text version by stripping HTML tags
+    const text = this.htmlToText(html);
+    return { html, text };
+  }
+
+  async renderTemplateById(templateId: string, data: Record<string, any> = {}) {
+    const template = await this.findOne(templateId);
+    const html = this.renderTemplate(template, data);
+    const text = this.htmlToText(html);
+    return { html, text };
   }
 
   async renderDefault(type: TemplateType, data: Record<string, any> = {}) {
@@ -179,7 +189,25 @@ export class TemplatesService {
       throw new NotFoundException(`Default template for type ${type} not found`);
     }
 
-    return this.renderTemplate(template, data);
+    const html = this.renderTemplate(template, data);
+    const text = this.htmlToText(html);
+    return { html, text };
+  }
+
+  private htmlToText(html: string): string {
+    // Simple HTML to text conversion
+    return html
+      .replace(/<style[^>]*>.*?<\/style>/gis, '')
+      .replace(/<script[^>]*>.*?<\/script>/gis, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private async ensureSingleDefault(type: TemplateType, isDefault: boolean, currentId?: string) {

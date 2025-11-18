@@ -8,10 +8,14 @@ import { Prisma, LeaveRequestStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateEodReportDto, EodReportTaskDto } from './dto/create-eod-report.dto';
 import { UpdateEodReportDto } from './dto/update-eod-report.dto';
+import { EmailTemplateConfigService } from '../../templates/email-template-config.service';
 
 @Injectable()
 export class EodReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailTemplateConfig: EmailTemplateConfigService,
+  ) {}
 
   private async getCompanySettings() {
     return this.prisma.companySettings.findFirst();
@@ -156,7 +160,7 @@ export class EodReportsService {
     try {
       const tasksJson = tasks.map((task) => ({ ...task })) as Prisma.InputJsonValue;
 
-      return await this.prisma.eodReport.create({
+      const report = await this.prisma.eodReport.create({
         data: {
           userId,
           date: new Date(rest.date),
@@ -181,12 +185,56 @@ export class EodReportsService {
           },
         },
       });
+
+      // Send email notification if report was submitted
+      if (submit && submittedAt && report.user?.email) {
+        this.sendEodReportEmail(report).catch((error) => {
+          console.error('[EodReports] Failed to send email notification:', error);
+        });
+      }
+
+      return report;
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new BadRequestException('An EOD report already exists for this date');
       }
       throw error;
     }
+  }
+
+  private async sendEodReportEmail(report: any) {
+    const tasks = Array.isArray(report.tasksWorkedOn) ? report.tasksWorkedOn : [];
+    const totalHours = tasks.reduce((sum: number, task: any) => {
+      return sum + (task.timeSpentOnTicket || 0);
+    }, 0);
+
+    await this.emailTemplateConfig.sendEmailWithTemplate(
+      'EOD_REPORT_SUBMITTED',
+      report.user.email,
+      {
+        report: {
+          id: report.id,
+          date: report.date,
+          summary: report.summary,
+          hoursWorked: report.hoursWorked ? Number(report.hoursWorked) : totalHours,
+          isLate: report.isLate,
+          submittedAt: report.submittedAt,
+          tasks: tasks.map((task: any) => ({
+            clientDetails: task.clientDetails,
+            ticket: task.ticket,
+            typeOfWorkDone: task.typeOfWorkDone,
+            timeSpent: task.timeSpentOnTicket,
+            taskLifecycle: task.taskLifecycle,
+            taskStatus: task.taskStatus,
+          })),
+        },
+        user: {
+          firstName: report.user.firstName,
+          lastName: report.user.lastName,
+          email: report.user.email,
+        },
+      },
+    );
   }
 
   async findAll(filters?: {
@@ -416,7 +464,7 @@ export class EodReportsService {
       }
     }
 
-    return this.prisma.eodReport.update({
+    const updatedReport = await this.prisma.eodReport.update({
       where: { id },
       data,
       include: {
@@ -431,6 +479,15 @@ export class EodReportsService {
         },
       },
     });
+
+    // Send email notification if report was just submitted (wasn't submitted before, but is now)
+    if (submit && !report.submittedAt && updatedReport.submittedAt && updatedReport.user?.email) {
+      this.sendEodReportEmail(updatedReport).catch((error) => {
+        console.error('[EodReports] Failed to send email notification:', error);
+      });
+    }
+
+    return updatedReport;
   }
 
   async remove(id: string) {

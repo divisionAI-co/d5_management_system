@@ -65,6 +65,46 @@ const TEMPLATE_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; descrip
     label: 'Performance Review',
     description: 'Documents for employee review exports or emails.',
   },
+  {
+    value: 'FEEDBACK_REPORT',
+    label: 'Feedback Report',
+    description: 'Templates for feedback report exports or emails.',
+  },
+  {
+    value: 'EOD_REPORT_SUBMITTED',
+    label: 'EOD Report Submitted',
+    description: 'Email sent to employees when they submit their End of Day report.',
+  },
+  {
+    value: 'LEAVE_REQUEST_CREATED',
+    label: 'Leave Request Created',
+    description: 'Email sent to HR when an employee creates a leave request.',
+  },
+  {
+    value: 'LEAVE_REQUEST_APPROVED',
+    label: 'Leave Request Approved',
+    description: 'Email sent to employees when their leave request is approved.',
+  },
+  {
+    value: 'LEAVE_REQUEST_REJECTED',
+    label: 'Leave Request Rejected',
+    description: 'Email sent to employees when their leave request is rejected.',
+  },
+  {
+    value: 'TASK_ASSIGNED',
+    label: 'Task Assigned',
+    description: 'Email sent to users when a task is assigned to them.',
+  },
+  {
+    value: 'MENTION_NOTIFICATION',
+    label: 'Mention Notification',
+    description: 'Email sent to users when they are mentioned in an activity.',
+  },
+  {
+    value: 'REMOTE_WORK_WINDOW_OPENED',
+    label: 'Remote Work Window Opened',
+    description: 'Email sent to all users when a remote work window is opened.',
+  },
 ];
 
 const INPUT_BASE_CLASS =
@@ -144,6 +184,61 @@ const DATA_CONTEXT_HELP: Record<
     heading: 'Performance review context',
     description:
       'Performance review exports include the review details (employee, period, overall rating, strengths, improvements). Match those keys with variables or reference nested objects like {{review.employee.firstName}}.',
+  },
+  FEEDBACK_REPORT: {
+    heading: 'Feedback report context',
+    description:
+      'Feedback reports include report details, employee information, and feedback data. Reference fields like {{report.date}}, {{employee.firstName}}, and {{feedback.content}}.',
+  },
+  EOD_REPORT_SUBMITTED: {
+    heading: 'EOD Report data context',
+    description:
+      'EOD report emails include report details and task information. Available fields: {{report.date}}, {{report.summary}}, {{report.hoursWorked}}, {{report.isLate}}, {{report.tasks}} (array), {{user.firstName}}, {{user.lastName}}, {{user.email}}.',
+    groups: [
+      {
+        title: 'Report',
+        items: ['{{report.date}}', '{{report.summary}}', '{{report.hoursWorked}}', '{{report.isLate}}', '{{report.submittedAt}}'],
+      },
+      {
+        title: 'User',
+        items: ['{{user.firstName}}', '{{user.lastName}}', '{{user.email}}'],
+      },
+      {
+        title: 'Tasks (loop with {{#each report.tasks}} ... {{/each}})',
+        items: ['{{clientDetails}}', '{{ticket}}', '{{typeOfWorkDone}}', '{{timeSpent}}', '{{taskLifecycle}}', '{{taskStatus}}'],
+      },
+    ],
+  },
+  LEAVE_REQUEST_CREATED: {
+    heading: 'Leave request data context',
+    description:
+      'Leave request emails include request details and employee information. Available fields: {{request.startDate}}, {{request.endDate}}, {{request.type}}, {{request.reason}}, {{employee.firstName}}, {{employee.lastName}}, {{employee.email}}.',
+  },
+  LEAVE_REQUEST_APPROVED: {
+    heading: 'Leave request approval data context',
+    description:
+      'Leave approval emails include request details and employee information. Available fields: {{request.startDate}}, {{request.endDate}}, {{request.type}}, {{request.reason}}, {{employee.firstName}}, {{employee.lastName}}, {{approvedBy.firstName}}.',
+  },
+  LEAVE_REQUEST_REJECTED: {
+    heading: 'Leave request rejection data context',
+    description:
+      'Leave rejection emails include request details and rejection reason. Available fields: {{request.startDate}}, {{request.endDate}}, {{request.type}}, {{request.reason}}, {{rejectionReason}}, {{employee.firstName}}, {{employee.lastName}}, {{rejectedBy.firstName}}.',
+  },
+  TASK_ASSIGNED: {
+    heading: 'Task assignment data context',
+    description:
+      'Task assignment emails include task details and assignee information. Available fields: {{task.title}}, {{task.description}}, {{task.dueDate}}, {{task.priority}}, {{task.status}}, {{assignedTo.firstName}}, {{assignedTo.lastName}}, {{assignedBy.firstName}}.',
+  },
+  MENTION_NOTIFICATION: {
+    heading: 'Mention notification data context',
+    description:
+      'Mention notification emails include activity details and entity information. Available fields: {{activity.content}}, {{activity.type}}, {{entityType}}, {{entityLink}}, {{mentionedBy.firstName}}, {{mentionedBy.lastName}}.',
+    note: 'The {{entityLink}} field contains a URL to navigate to the entity where the mention occurred.',
+  },
+  REMOTE_WORK_WINDOW_OPENED: {
+    heading: 'Remote work window data context',
+    description:
+      'Remote work window emails include window details. Available fields: {{window.startDate}}, {{window.endDate}}, {{window.limit}}, {{openedBy.firstName}}, {{openedBy.lastName}}.',
   },
 };
 

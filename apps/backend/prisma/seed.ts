@@ -521,7 +521,250 @@ async function main() {
   console.log('  ✅ Activity types seeded and 3 activities created');
 
   // ============================================
-  // 10. CREATE SAMPLE FEEDBACK REPORT
+  // 10. CREATE DEFAULT FEEDBACK REPORT TEMPLATE
+  // ============================================
+  console.log('\n📄 Creating default feedback report template...');
+  
+  await prisma.template.upsert({
+    where: { id: 'default-feedback-report' },
+    update: {},
+    create: {
+      id: 'default-feedback-report',
+      name: 'Default Feedback Report Template',
+      type: 'FEEDBACK_REPORT',
+      isDefault: true,
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 40px;
+      color: #333;
+    }
+    .header { 
+      text-align: center; 
+      margin-bottom: 40px;
+      border-bottom: 2px solid #2563EB;
+      padding-bottom: 20px;
+    }
+    .header h1 {
+      color: #2563EB;
+      margin: 0;
+    }
+    .header p {
+      color: #666;
+      margin: 10px 0 0 0;
+    }
+    .section { 
+      margin-bottom: 30px;
+      page-break-inside: avoid;
+    }
+    .section h2 {
+      color: #2563EB;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .section h3 {
+      color: #555;
+      margin-bottom: 10px;
+    }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+    td { 
+      padding: 10px; 
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    td.label { 
+      font-weight: bold;
+      width: 40%;
+      color: #555;
+    }
+    .rating {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .rating-5 { background-color: #10b981; color: white; }
+    .rating-4 { background-color: #3b82f6; color: white; }
+    .rating-3 { background-color: #f59e0b; color: white; }
+    .rating-2 { background-color: #f97316; color: white; }
+    .rating-1 { background-color: #ef4444; color: white; }
+    .feedback-text {
+      background-color: #f9fafb;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+    .holiday-list {
+      list-style: none;
+      padding: 0;
+    }
+    .holiday-list li {
+      padding: 8px;
+      margin: 4px 0;
+      background-color: #f3f4f6;
+      border-radius: 4px;
+    }
+    .note {
+      background-color: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 12px;
+      margin-top: 20px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Monthly Feedback Report</h1>
+    <p>{{employeeName}} - {{monthYear}}</p>
+  </div>
+
+  <div class="section">
+    <h2>Employee Information</h2>
+    <table>
+      <tr>
+        <td class="label">Employee Name:</td>
+        <td>{{employeeName}}</td>
+      </tr>
+      <tr>
+        <td class="label">Job Title:</td>
+        <td>{{jobTitle}}</td>
+      </tr>
+      <tr>
+        <td class="label">Department:</td>
+        <td>{{department}}</td>
+      </tr>
+      <tr>
+        <td class="label">Reporting Period:</td>
+        <td>{{monthYear}}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Work Summary</h2>
+    <table>
+      <tr>
+        <td class="label">Number of Tasks:</td>
+        <td>{{tasksCount}}</td>
+      </tr>
+      <tr>
+        <td class="label">Total Days Off Taken in {{monthName}}:</td>
+        <td>{{totalDaysOffTaken}}</td>
+      </tr>
+      <tr>
+        <td class="label">Total Remaining Days Off:</td>
+        <td>{{totalRemainingDaysOff}}</td>
+      </tr>
+    </table>
+  </div>
+
+  {{#if bankHolidays}}
+  {{#if bankHolidays.length}}
+  <div class="section">
+    <h2>Bank Holidays {{nextMonthName}} {{nextMonthYear}}</h2>
+    <ul class="holiday-list">
+      {{#each bankHolidays}}
+      <li><strong>{{this.name}}</strong> - {{this.date}}</li>
+      {{/each}}
+    </ul>
+    <div class="note">
+      * If the public holiday/holidays falls/fall on the day or days of the weekend (Saturday and/or Sunday), 
+      the holiday shall be observed on the following working day or days (Monday and Tuesday).
+    </div>
+  </div>
+  {{/if}}
+  {{/if}}
+
+  {{#if hrFeedback}}
+  <div class="section">
+    <h2>HR Feedback</h2>
+    <div class="feedback-text">{{hrFeedback}}</div>
+    {{#if hrActionDescription}}
+    <h3>Action Taken:</h3>
+    <div class="feedback-text">{{hrActionDescription}}</div>
+    {{/if}}
+  </div>
+  {{/if}}
+
+  {{#if amFeedback}}
+  <div class="section">
+    <h2>Account Manager Feedback</h2>
+    <div class="feedback-text">{{amFeedback}}</div>
+  </div>
+  {{/if}}
+
+  <div class="section">
+    <h2>Employee Self-Assessment</h2>
+    
+    <h3>Performance Ratings</h3>
+    <table>
+      <tr>
+        <td class="label">Communication Effectiveness:</td>
+        <td>{{communicationRatingDisplay}}</td>
+      </tr>
+      <tr>
+        <td class="label">Collaboration and Teamwork:</td>
+        <td>{{collaborationRatingDisplay}}</td>
+      </tr>
+      <tr>
+        <td class="label">Task Estimation:</td>
+        <td>{{taskEstimationRatingDisplay}}</td>
+      </tr>
+      <tr>
+        <td class="label">Timeliness and Meeting Deadlines:</td>
+        <td>{{timelinessRatingDisplay}}</td>
+      </tr>
+    </table>
+
+    <p style="font-size: 0.9em; color: #666; margin-top: 5px;">
+      <strong>Rating Scale:</strong> 5 – Outstanding | 4 – Exceeds expectations | 3 – Meets expectations | 2 – Needs improvement | 1 – Unacceptable
+    </p>
+
+    {{#if employeeSummary}}
+    <h3>Summary Feedback of the Month:</h3>
+    <div class="feedback-text">{{employeeSummary}}</div>
+    {{/if}}
+  </div>
+</body>
+</html>`,
+      variables: [
+        { name: 'employeeName', description: 'Employee full name' },
+        { name: 'jobTitle', description: 'Employee job title' },
+        { name: 'department', description: 'Employee department' },
+        { name: 'monthYear', description: 'Reporting period (e.g., January 2025)' },
+        { name: 'monthName', description: 'Month name' },
+        { name: 'nextMonthName', description: 'Next month name' },
+        { name: 'nextMonthYear', description: 'Next month year' },
+        { name: 'tasksCount', description: 'Number of tasks worked on' },
+        { name: 'totalDaysOffTaken', description: 'Days off taken in the month' },
+        { name: 'totalRemainingDaysOff', description: 'Remaining annual leave days' },
+        { name: 'bankHolidays', description: 'Array of bank holidays for next month' },
+        { name: 'hrFeedback', description: 'HR feedback text' },
+        { name: 'hrActionDescription', description: 'HR action description' },
+        { name: 'amFeedback', description: 'Account Manager feedback' },
+        { name: 'communicationRatingDisplay', description: 'Communication rating with badge' },
+        { name: 'collaborationRatingDisplay', description: 'Collaboration rating with badge' },
+        { name: 'taskEstimationRatingDisplay', description: 'Task estimation rating with badge' },
+        { name: 'timelinessRatingDisplay', description: 'Timeliness rating with badge' },
+        { name: 'employeeSummary', description: 'Employee summary feedback' },
+      ],
+    },
+  });
+  console.log('  ✅ Default feedback report template created');
+
+  // ============================================
+  // 11. CREATE SAMPLE FEEDBACK REPORT
   // ============================================
   console.log('\n📊 Creating sample feedback report...');
   
@@ -560,7 +803,7 @@ async function main() {
   console.log('  ✅ Feedback report created for', employee.firstName, employee.lastName);
 
   // ============================================
-  // 11. CREATE DEFAULT TEMPLATES
+  // 12. CREATE DEFAULT TEMPLATES (INVOICE & CUSTOMER REPORT)
   // ============================================
   console.log('\n📄 Creating default templates...');
   
@@ -748,7 +991,7 @@ async function main() {
   console.log('  • 3 Activities');
   console.log('  • 1 Feedback Report (Draft)');
   console.log('  • 13 Albanian National Holidays (2025)');
-  console.log('  • 2 Default Templates (Invoice & Report)');
+  console.log('  • 3 Default Templates (Invoice, Customer Report & Feedback Report)');
   console.log('');
   console.log('⚙️  Company Settings Configured');
   console.log('');

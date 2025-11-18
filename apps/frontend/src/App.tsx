@@ -42,6 +42,9 @@ import HolidaysPage from '@/pages/settings/HolidaysPage';
 // Tasks
 import TasksPage from '@/pages/tasks/TasksPage';
 
+// Reports
+import FeedbackReportsPage from '@/pages/reports/FeedbackReportsPage';
+
 // Invoices
 import InvoicesPage from '@/pages/invoices/InvoicesPage';
 import InvoiceDetailPage from '@/pages/invoices/InvoiceDetailPage';
@@ -56,11 +59,13 @@ import NotificationSettingsPage from '@/pages/settings/NotificationSettingsPage'
 import IntegrationsSettingsPage from '@/pages/settings/IntegrationsSettingsPage';
 import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
 import TemplatesPage from '@/pages/settings/TemplatesPage';
+import EmailTemplateConfigPage from '@/pages/settings/EmailTemplateConfigPage';
 import TemplateVariablesPage from '@/pages/settings/TemplateVariablesPage';
 import ActivityTypesPage from '@/pages/settings/ActivityTypesPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import GoogleOAuthCallbackPage from '@/pages/integrations/GoogleOAuthCallbackPage';
 import AiActionsPage from '@/pages/settings/AiActionsPage';
+import SystemExportPage from '@/pages/settings/SystemExportPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -128,6 +133,9 @@ function App() {
           {/* Tasks */}
           <Route path="tasks" element={<TasksPage />} />
 
+          {/* Reports */}
+          <Route path="reports/feedback-reports" element={<FeedbackReportsPage />} />
+
           {/* Documents */}
           <Route path="documents" element={<DocumentsPage />} />
 
@@ -146,9 +154,11 @@ function App() {
             <Route path="integrations" element={<IntegrationsSettingsPage />} />
             <Route path="holidays" element={<HolidaysPage />} />
             <Route path="templates" element={<TemplatesPage />} />
+            <Route path="email-template-config" element={<EmailTemplateConfigPage />} />
             <Route path="template-variables" element={<TemplateVariablesPage />} />
             <Route path="activity-types" element={<ActivityTypesPage />} />
             <Route path="ai-actions" element={<AiActionsPage />} />
+            <Route path="system-export" element={<SystemExportPage />} />
           </Route>
 
           {/* OAuth Callbacks - must be before catch-all routes */}

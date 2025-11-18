@@ -2,7 +2,15 @@ export type TemplateType =
   | 'INVOICE'
   | 'CUSTOMER_REPORT'
   | 'PERFORMANCE_REVIEW'
-  | 'EMAIL';
+  | 'FEEDBACK_REPORT'
+  | 'EMAIL'
+  | 'EOD_REPORT_SUBMITTED'
+  | 'LEAVE_REQUEST_CREATED'
+  | 'LEAVE_REQUEST_APPROVED'
+  | 'LEAVE_REQUEST_REJECTED'
+  | 'TASK_ASSIGNED'
+  | 'MENTION_NOTIFICATION'
+  | 'REMOTE_WORK_WINDOW_OPENED';
 
 export interface TemplateVariable {
   key: string;
