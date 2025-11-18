@@ -4,8 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, CompanySettings } from '@prisma/client';
+import { Prisma, CompanySettings, NotificationType, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { CreateRemoteWorkLogDto } from './dto/create-remote-work-log.dto';
 import {
   RemoteWorkFrequency,
@@ -28,7 +29,10 @@ type ExtendedCompanySettings = CompanySettings & {
 
 @Injectable()
 export class RemoteWorkService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private readonly MAX_REMOTE_DAYS_PER_WINDOW = 3;
   private readonly defaultWindowState = {
@@ -68,6 +72,32 @@ export class RemoteWorkService {
     const normalized = new Date(date);
     normalized.setHours(0, 0, 0, 0);
     return normalized;
+  }
+
+  /**
+   * Parses a date string (YYYY-MM-DD or ISO format) into a Date object at UTC midnight.
+   * This avoids timezone shifts that occur when using new Date() with date strings.
+   */
+  private parseDateString(dateString: string): Date {
+    // Extract date part from ISO string if needed (e.g., "2025-11-17T23:00:00.000Z" -> "2025-11-17")
+    let dateOnly = dateString;
+    if (dateString.includes('T')) {
+      dateOnly = dateString.split('T')[0];
+    }
+    
+    // Validate format (YYYY-MM-DD)
+    const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const match = dateOnly.match(dateRegex);
+    if (!match) {
+      throw new BadRequestException(`Invalid date format: ${dateString}. Expected YYYY-MM-DD or ISO date string.`);
+    }
+
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // Month is 0-indexed
+    const day = parseInt(match[3], 10);
+
+    // Create date at UTC midnight to avoid timezone shifts
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
   }
 
   private getPeriodBounds(
@@ -187,7 +217,8 @@ export class RemoteWorkService {
       );
     }
 
-    const targetDate = this.normalizeDate(new Date(createDto.date));
+    // Parse date string directly to avoid timezone shifts
+    const targetDate = this.parseDateString(createDto.date);
     const settings = await this.ensureCompanySettings();
     await this.validateRemoteWorkLimit(employeeId, targetDate, settings);
 
@@ -255,8 +286,8 @@ export class RemoteWorkService {
 
     if (filters?.startDate || filters?.endDate) {
       where.date = {
-        gte: filters.startDate ? this.normalizeDate(new Date(filters.startDate)) : undefined,
-        lte: filters.endDate ? this.normalizeDate(new Date(filters.endDate)) : undefined,
+        gte: filters.startDate ? this.parseDateString(filters.startDate) : undefined,
+        lte: filters.endDate ? this.parseDateString(filters.endDate) : undefined,
       };
     }
 
@@ -347,20 +378,23 @@ export class RemoteWorkService {
   }
 
   async openWindow(openDto: OpenRemoteWindowDto) {
-    const start = this.normalizeDate(new Date(openDto.startDate));
+    // Parse date strings directly to avoid timezone shifts
+    const start = this.parseDateString(openDto.startDate);
     if (Number.isNaN(start.getTime())) {
       throw new BadRequestException('Invalid start date provided.');
     }
 
     let end: Date;
     if (openDto.endDate) {
-      end = this.normalizeDate(new Date(openDto.endDate));
+      end = this.parseDateString(openDto.endDate);
       if (Number.isNaN(end.getTime())) {
         throw new BadRequestException('Invalid end date provided.');
       }
     } else {
       end = new Date(start);
       end.setDate(start.getDate() + 6);
+      // Ensure end is also at UTC midnight
+      end = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate(), 23, 59, 59, 999));
     }
 
     if (end < start) {
@@ -385,6 +419,11 @@ export class RemoteWorkService {
 
     const applied = this.withWindowDefaults(updated as CompanySettingsWithWindow);
 
+    // Notify all users that remote work window is open
+    this.notifyAllUsersRemoteWindowOpen(start, end).catch((error) => {
+      console.error('[RemoteWork] Failed to send notifications:', error);
+    });
+
     return {
       isOpen: applied.remoteWorkWindowOpen,
       startDate: applied.remoteWorkWindowStart ?? undefined,
@@ -394,6 +433,29 @@ export class RemoteWorkService {
         this.MAX_REMOTE_DAYS_PER_WINDOW,
       ),
     };
+  }
+
+  private async notifyAllUsersRemoteWindowOpen(startDate: Date, endDate: Date) {
+    // Get all active users
+    const users = await this.prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true },
+    });
+
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+    const dateRange = startDateStr === endDateStr 
+      ? startDateStr 
+      : `${startDateStr} to ${endDateStr}`;
+
+    const userIds = users.map((user) => user.id);
+    
+    await this.notificationsService.createNotificationsForUsers(
+      userIds,
+      NotificationType.SYSTEM,
+      'Remote Work Window Opened',
+      `The remote work submission window is now open for ${dateRange}. You can submit your remote work preferences.`,
+    );
   }
 
   async closeWindow() {
@@ -462,7 +524,8 @@ export class RemoteWorkService {
     }
 
     const normalizedDates = uniqueDates.map((date) => {
-      const parsed = this.normalizeDate(new Date(date));
+      // Parse date string directly to avoid timezone shifts
+      const parsed = this.parseDateString(date);
       if (Number.isNaN(parsed.getTime())) {
         throw new BadRequestException(`Invalid date provided: ${date}`);
       }

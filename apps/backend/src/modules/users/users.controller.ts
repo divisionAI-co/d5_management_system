@@ -32,10 +32,29 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Create a new user (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Create a new user' })
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
+  }
+
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user profile' })
+  getMe(@CurrentUser('id') userId: string) {
+    return this.usersService.findById(userId);
+  }
+
+  @Get('options')
+  @ApiOperation({ summary: 'Get list of users for assignment (available to all authenticated users, excludes EMPLOYEE role)' })
+  getOptions(@Query() filters: FilterUsersDto) {
+    console.log('[UsersController] getOptions called with filters:', filters);
+    // Ensure we only show active users and exclude EMPLOYEE role
+    const result = this.usersService.findAll(
+      { ...filters, isActive: filters.isActive ?? true },
+      [UserRole.EMPLOYEE],
+    );
+    console.log('[UsersController] getOptions returning result');
+    return result;
   }
 
   @Get()
@@ -43,12 +62,6 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users' })
   findAll(@Query() filters: FilterUsersDto) {
     return this.usersService.findAll(filters);
-  }
-
-  @Get('me')
-  @ApiOperation({ summary: 'Get current user profile' })
-  getMe(@CurrentUser('id') userId: string) {
-    return this.usersService.findById(userId);
   }
 
   @Patch('me')
@@ -80,36 +93,36 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update user (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Update user' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);
   }
 
   @Patch(':id/status')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Activate or deactivate a user (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Activate or deactivate a user' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateUserStatusDto) {
     return this.usersService.updateStatus(id, dto);
   }
 
   @Patch(':id/reset-password')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Reset a user password (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Reset a user password' })
   resetPassword(@Param('id') id: string, @Body() dto: ResetUserPasswordDto) {
     return this.usersService.resetPassword(id, dto);
   }
 
   @Post(':id/resend-password-reset')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Resend a password reset link to a user (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Resend a password reset link to a user' })
   resendPasswordReset(@Param('id') id: string) {
     return this.usersService.resendPasswordResetLink(id);
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Delete user (Admin only)' })
+  @Roles(UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({ summary: 'Delete user' })
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }

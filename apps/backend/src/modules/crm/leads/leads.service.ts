@@ -128,6 +128,7 @@ export class LeadsService {
         prospectCompanyName: createLeadDto.prospectCompanyName,
         prospectWebsite: createLeadDto.prospectWebsite,
         prospectIndustry: createLeadDto.prospectIndustry,
+        leadType: createLeadDto.leadType,
       },
     });
 
@@ -297,6 +298,7 @@ export class LeadsService {
         prospectCompanyName: updateDto.prospectCompanyName,
         prospectWebsite: updateDto.prospectWebsite,
         prospectIndustry: updateDto.prospectIndustry,
+        leadType: updateDto.leadType,
       },
     });
 

@@ -118,6 +118,13 @@ export function OpenPositionsTable({
                           <UserRound className="h-3.5 w-3.5" />
                           <span>{position.opportunity.customer?.name ?? '—'}</span>
                         </div>
+                        {position.opportunity.lead?.leadType && (
+                          <div className="mt-1 text-xs">
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
+                              {position.opportunity.lead.leadType === 'END_CUSTOMER' ? 'End Customer' : 'Intermediary'}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <span className="text-muted-foreground">Unlinked</span>

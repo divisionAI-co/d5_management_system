@@ -115,6 +115,11 @@ enum LeadStatus {
   LOST
 }
 
+enum LeadType {
+  END_CUSTOMER
+  INTERMEDIARY
+}
+
 enum CustomerStatus {
   ONBOARDING
   ACTIVE
@@ -226,6 +231,8 @@ model Lead {
   prospectCompanyName String?
   prospectWebsite     String?
   prospectIndustry    String?
+
+  leadType LeadType? // End-customer or intermediary
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -463,6 +470,11 @@ enum CandidateStage {
   REJECTED
 }
 
+enum RecruitmentStatus {
+  HEADHUNTING
+  STANDARD
+}
+
 model Candidate {
   id        String  @id @default(uuid())
   firstName String
@@ -529,6 +541,7 @@ model OpenPosition {
   requirements String? @db.Text
 
   status String @default("Open") // Open, Filled, Cancelled
+  recruitmentStatus RecruitmentStatus? // Headhunting or standard
   isArchived Boolean @default(false)
 
   createdAt DateTime  @default(now())

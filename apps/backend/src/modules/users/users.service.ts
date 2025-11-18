@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { addHours } from 'date-fns';
 import { randomBytes } from 'crypto';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -218,7 +218,7 @@ export class UsersService {
     });
   }
 
-  async findAll(filters: FilterUsersDto) {
+  async findAll(filters: FilterUsersDto, excludeRoles?: UserRole[]) {
     const {
       page = 1,
       pageSize = 25,
@@ -242,7 +242,14 @@ export class UsersService {
       }
     }
 
-    if (role) {
+    if (excludeRoles && excludeRoles.length > 0) {
+      // If excludeRoles is provided, use it (this takes precedence over role filter)
+      where.role = {
+        notIn: excludeRoles,
+      };
+      console.log('[UsersService] Excluding roles:', excludeRoles);
+    } else if (role) {
+      // Only use role filter if excludeRoles is not provided
       where.role = role;
     }
 
@@ -254,6 +261,8 @@ export class UsersService {
       [sortBy]: sortOrder,
     };
 
+    console.log('[UsersService] Query where clause:', JSON.stringify(where, null, 2));
+    
     const [items, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
         where,
@@ -291,6 +300,12 @@ export class UsersService {
       }),
       this.prisma.user.count({ where }),
     ]);
+
+    console.log('[UsersService] Found', items.length, 'users. Roles:', items.map(u => u.role));
+    const employeeCount = items.filter(u => u.role === 'EMPLOYEE').length;
+    if (employeeCount > 0) {
+      console.error('[UsersService] ERROR: Found', employeeCount, 'EMPLOYEE users when they should be excluded!');
+    }
 
     return {
       data: items,

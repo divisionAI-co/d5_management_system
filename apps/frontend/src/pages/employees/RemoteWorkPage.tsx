@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
 
@@ -26,6 +26,19 @@ const MAX_REMOTE_DAYS = 3;
 
 function normalizeDateInput(value?: string) {
   return value && value.trim().length > 0 ? value : undefined;
+}
+
+/**
+ * Normalizes a date string to YYYY-MM-DD format.
+ * Handles both ISO strings (2024-01-15T00:00:00.000Z) and date-only strings (2024-01-15).
+ */
+function normalizeDateString(dateStr: string): string {
+  // If it's already a date-only string (YYYY-MM-DD), return it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr;
+  }
+  // Otherwise, extract the date part from ISO string
+  return dateStr.slice(0, 10);
 }
 
 function isDateWithinWindow(date: string, window: RemoteWorkWindowState) {
@@ -131,20 +144,37 @@ export default function RemoteWorkPage() {
     };
   }, [employeeSearchTerm, isManager]);
 
+  // Sync selectedDates from logs only when window changes or on initial load
+  // Use a ref to track the last window we synced from to avoid unnecessary updates
+  const lastSyncedWindowRef = useRef<string | null>(null);
+  
   useEffect(() => {
     if (!activeWindow) {
       setSelectedDates([]);
+      lastSyncedWindowRef.current = null;
       return;
     }
 
-    if (!logsQuery.data) return;
+    // Create a unique key for this window
+    const windowKey = `${activeWindow.startDate || ''}-${activeWindow.endDate || ''}-${activeWindow.isOpen}`;
+    
+    // Only sync if this is a different window or if we haven't synced yet
+    if (lastSyncedWindowRef.current === windowKey) {
+      return;
+    }
+
+    if (!logsQuery.data || !logsQuery.isSuccess) return;
+
     const windowDates =
       logsQuery.data
         ?.filter((log) => isDateWithinWindow(log.date, activeWindow))
-        .map((log) => log.date.slice(0, 10)) ?? [];
+        .map((log) => normalizeDateString(log.date))
+        .filter((date, index, arr) => arr.indexOf(date) === index) // Remove duplicates
+        .sort() ?? [];
 
     setSelectedDates(windowDates);
-  }, [activeWindow, logsQuery.data]);
+    lastSyncedWindowRef.current = windowKey;
+  }, [activeWindow?.startDate, activeWindow?.endDate, activeWindow?.isOpen, logsQuery.isSuccess, logsQuery.data]);
 
   const openWindowMutation = useMutation({
     mutationFn: (payload: OpenRemoteWindowPayload) => remoteWorkApi.openWindow(payload),
@@ -181,8 +211,20 @@ export default function RemoteWorkPage() {
 
   const preferencesMutation = useMutation({
     mutationFn: (payload: SetRemotePreferencesPayload) => remoteWorkApi.setPreferences(payload),
-    onSuccess: () => {
+    onSuccess: (savedLogs) => {
       setFeedback('Remote work preferences saved.');
+      // Update selectedDates from the response to ensure consistency
+      if (savedLogs && activeWindow) {
+        const savedDates = savedLogs
+          .filter((log) => isDateWithinWindow(log.date, activeWindow))
+          .map((log) => normalizeDateString(log.date))
+          .filter((date, index, arr) => arr.indexOf(date) === index)
+          .sort();
+        setSelectedDates(savedDates);
+        // Update the ref to prevent the useEffect from overwriting this
+        const windowKey = `${activeWindow.startDate || ''}-${activeWindow.endDate || ''}-${activeWindow.isOpen}`;
+        lastSyncedWindowRef.current = windowKey;
+      }
       queryClient.invalidateQueries({ queryKey: ['remote-work', 'logs'] });
     },
     onError: (error: any) => {
