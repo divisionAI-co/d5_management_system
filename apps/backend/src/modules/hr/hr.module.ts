@@ -5,6 +5,7 @@ import { LeaveRequestsModule } from './leave-requests/leave-requests.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { EodReportsModule } from './eod-reports/eod-reports.module';
 import { RemoteWorkModule } from './remote-work/remote-work.module';
+import { FeedbackReportsModule } from './feedback-reports/feedback-reports.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RemoteWorkModule } from './remote-work/remote-work.module';
     HolidaysModule,
     EodReportsModule,
     RemoteWorkModule,
+    FeedbackReportsModule,
   ],
   exports: [
     EmployeesModule,
@@ -22,6 +24,7 @@ import { RemoteWorkModule } from './remote-work/remote-work.module';
     HolidaysModule,
     EodReportsModule,
     RemoteWorkModule,
+    FeedbackReportsModule,
   ],
 })
 export class HrModule {}

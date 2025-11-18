@@ -577,7 +577,6 @@ export default function TasksPage() {
             onDeleteTask={canDeleteTasks ? handleDeleteTask : undefined}
             statusOptions={STATUS_ORDER}
             disableStatusChange={statusMutation.isPending}
-            canDeleteTasks={canDeleteTasks}
             onTaskMove={handleTaskMoveOptimistic}
             onAddTaskToEod={handleAddToEod}
             addingTaskId={addingTaskId}
@@ -595,7 +594,6 @@ export default function TasksPage() {
             onStatusChange={handleStatusChange}
             onDeleteTask={canDeleteTasks ? handleDeleteTask : undefined}
             disableStatusChange={statusMutation.isPending}
-            canDeleteTasks={canDeleteTasks}
             onAddTaskToEod={handleAddToEod}
             addingTaskId={addingTaskId}
             onOpenActivity={handleOpenActivities}

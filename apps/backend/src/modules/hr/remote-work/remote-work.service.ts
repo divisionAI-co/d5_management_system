@@ -148,7 +148,9 @@ export class RemoteWorkService {
     }
 
     const start = this.normalizeDate(resolvedSettings.remoteWorkWindowStart);
-    const end = this.normalizeDate(resolvedSettings.remoteWorkWindowEnd);
+    // Set end date to end of day (23:59:59.999) to include the full last day
+    const end = new Date(resolvedSettings.remoteWorkWindowEnd);
+    end.setHours(23, 59, 59, 999);
 
     if (checkDate) {
       const normalized = this.normalizeDate(checkDate);
@@ -177,12 +179,16 @@ export class RemoteWorkService {
       settings,
     );
 
+    // Use end of day for counting logs to include the full last day
+    const endOfDay = new Date(end);
+    endOfDay.setHours(23, 59, 59, 999);
+
     const logsCount = await this.prisma.remoteWorkLog.count({
       where: {
         employeeId,
         date: {
           gte: start,
-          lte: end,
+          lte: endOfDay,
         },
       },
     });
@@ -390,10 +396,12 @@ export class RemoteWorkService {
       if (Number.isNaN(end.getTime())) {
         throw new BadRequestException('Invalid end date provided.');
       }
+      // Set end date to end of day (23:59:59.999) to include the full last day
+      end.setUTCHours(23, 59, 59, 999);
     } else {
       end = new Date(start);
       end.setDate(start.getDate() + 6);
-      // Ensure end is also at UTC midnight
+      // Ensure end is also at UTC end of day
       end = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate(), 23, 59, 59, 999));
     }
 
@@ -529,7 +537,11 @@ export class RemoteWorkService {
       if (Number.isNaN(parsed.getTime())) {
         throw new BadRequestException(`Invalid date provided: ${date}`);
       }
-      if (parsed < start || parsed > end) {
+      const normalized = this.normalizeDate(parsed);
+      // Set end to end of day for comparison
+      const endOfDay = new Date(end);
+      endOfDay.setHours(23, 59, 59, 999);
+      if (normalized < start || normalized > endOfDay) {
         throw new BadRequestException(
           `Date ${date} is outside the active remote work window (${start.toISOString().slice(0, 10)} - ${end
             .toISOString()

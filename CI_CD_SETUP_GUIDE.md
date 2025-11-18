@@ -170,7 +170,7 @@ Add the same secrets with `PRODUCTION_` prefix:
    - **Required reviewers**: Add yourself or team members
    - **Wait timer**: Optional (e.g., 5 minutes for rollback window)
 
-Repeat for `staging` environment (use `develop` branch).
+Repeat for `staging` environment (use `develop` branch). 
 
 ---
 

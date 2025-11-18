@@ -9,7 +9,6 @@ interface TaskTableProps {
   onStatusChange: (task: Task, status: TaskStatus) => void;
   onDeleteTask?: (task: Task) => void;
   disableStatusChange?: boolean;
-  canDeleteTasks?: boolean;
   onAddTaskToEod?: (task: Task) => void;
   addingTaskId?: string | null;
   onOpenActivity?: (task: Task) => void;
@@ -30,7 +29,6 @@ export function TaskTable({
   onStatusChange,
   onDeleteTask,
   disableStatusChange,
-  canDeleteTasks = false,
   onAddTaskToEod,
   addingTaskId,
   onOpenActivity,
@@ -133,7 +131,7 @@ export function TaskTable({
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
-                  {canDeleteTasks && onDeleteTask && (
+                  {onDeleteTask && (
                     <button
                       onClick={() => onDeleteTask(task)}
                       className="rounded-lg border border-border p-2 text-muted-foreground transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
