@@ -8,7 +8,8 @@ type EntityType =
   | 'candidate'
   | 'employee'
   | 'contact'
-  | 'task';
+  | 'task'
+  | 'quote';
 
 interface ActivitySidebarProps {
   open: boolean;

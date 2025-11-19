@@ -57,6 +57,7 @@ export const mapActivitySummary = (activity: ActivityWithRelations) => {
     employeeId: activity.employeeId ?? null,
     contactId: activity.contactId ?? null,
     taskId: activity.taskId ?? null,
+    quoteId: activity.quoteId ?? null,
     assignedToId: activity.assignedToId ?? null,
     createdById: activity.createdById,
     createdAt: activity.createdAt.toISOString(),

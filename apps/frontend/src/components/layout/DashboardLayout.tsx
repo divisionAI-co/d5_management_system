@@ -33,6 +33,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'Contacts', href: '/crm/contacts', roles: ROLE_PERMISSIONS.CRM_CONTACTS },
       { name: 'Leads', href: '/crm/leads', roles: ROLE_PERMISSIONS.CRM_LEADS },
       { name: 'Opportunities', href: '/crm/opportunities', roles: ROLE_PERMISSIONS.CRM_OPPORTUNITIES },
+      { name: 'Quotes', href: '/crm/quotes', roles: ROLE_PERMISSIONS.CRM_LEADS },
       { name: 'Campaigns', href: '/crm/campaigns', roles: ROLE_PERMISSIONS.CRM_CAMPAIGNS },
     ],
   },

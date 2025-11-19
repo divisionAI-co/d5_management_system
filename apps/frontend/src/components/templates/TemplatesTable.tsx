@@ -14,6 +14,7 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
   TASK_ASSIGNED: 'Task Assigned',
   MENTION_NOTIFICATION: 'Mention Notification',
   REMOTE_WORK_WINDOW_OPENED: 'Remote Work Window Opened',
+  QUOTE: 'Quote',
 };
 
 interface TemplatesTableProps {

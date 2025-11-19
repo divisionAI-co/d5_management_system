@@ -10,7 +10,8 @@ export type TemplateType =
   | 'LEAVE_REQUEST_REJECTED'
   | 'TASK_ASSIGNED'
   | 'MENTION_NOTIFICATION'
-  | 'REMOTE_WORK_WINDOW_OPENED';
+  | 'REMOTE_WORK_WINDOW_OPENED'
+  | 'QUOTE';
 
 export interface TemplateVariable {
   key: string;

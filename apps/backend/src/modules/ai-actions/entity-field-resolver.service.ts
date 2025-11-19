@@ -164,6 +164,35 @@ type TaskSnapshot = {
   customerId?: string | null;
 };
 
+type QuoteSnapshot = {
+  quoteNumber: string;
+  title: string;
+  description?: string | null;
+  overview?: string | null;
+  functionalProposal?: string | null;
+  technicalProposal?: string | null;
+  teamComposition?: string | null;
+  paymentTerms?: string | null;
+  warrantyPeriod?: string | null;
+  totalValue?: Prisma.Decimal | null;
+  currency?: string | null;
+  status: string;
+  sentAt?: Date | null;
+  sentTo?: string | null;
+  lead?: {
+    title: string | null;
+    description: string | null;
+    contacts?: Array<{
+      contact: {
+        firstName: string | null;
+        lastName: string | null;
+        email: string | null;
+        phone: string | null;
+      };
+    }>;
+  } | null;
+};
+
 type EntitySnapshot =
   | CandidateSnapshot
   | OpportunitySnapshot
@@ -171,7 +200,8 @@ type EntitySnapshot =
   | CustomerSnapshot
   | ContactSnapshot
   | LeadSnapshot
-  | TaskSnapshot;
+  | TaskSnapshot
+  | QuoteSnapshot;
 
 @Injectable()
 export class EntityFieldResolver {
@@ -658,6 +688,115 @@ export class EntityFieldResolver {
     },
   ];
 
+  private readonly quoteFields: FieldSelector<QuoteSnapshot>[] = [
+    {
+      key: 'quoteNumber',
+      label: 'Quote number',
+      select: (quote) => quote.quoteNumber,
+    },
+    {
+      key: 'title',
+      label: 'Quote title',
+      select: (quote) => quote.title,
+    },
+    {
+      key: 'description',
+      label: 'Description',
+      select: (quote) => quote.description,
+    },
+    {
+      key: 'overview',
+      label: 'Overview',
+      select: (quote) => quote.overview,
+    },
+    {
+      key: 'functionalProposal',
+      label: 'Functional proposal',
+      select: (quote) => quote.functionalProposal,
+    },
+    {
+      key: 'technicalProposal',
+      label: 'Technical proposal',
+      select: (quote) => quote.technicalProposal,
+    },
+    {
+      key: 'teamComposition',
+      label: 'Team composition',
+      select: (quote) => quote.teamComposition,
+    },
+    {
+      key: 'paymentTerms',
+      label: 'Payment terms',
+      select: (quote) => quote.paymentTerms,
+    },
+    {
+      key: 'warrantyPeriod',
+      label: 'Warranty period',
+      select: (quote) => quote.warrantyPeriod,
+    },
+    {
+      key: 'totalValue',
+      label: 'Total value',
+      select: (quote) => (quote.totalValue ? quote.totalValue.toString() : null),
+    },
+    {
+      key: 'currency',
+      label: 'Currency',
+      select: (quote) => quote.currency,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      select: (quote) => quote.status,
+    },
+    {
+      key: 'sentAt',
+      label: 'Sent at',
+      select: (quote) => (quote.sentAt ? quote.sentAt.toISOString() : null),
+    },
+    {
+      key: 'sentTo',
+      label: 'Sent to',
+      select: (quote) => quote.sentTo,
+    },
+    {
+      key: 'leadTitle',
+      label: 'Lead title',
+      select: (quote) => quote.lead?.title,
+    },
+    {
+      key: 'leadDescription',
+      label: 'Lead description',
+      select: (quote) => quote.lead?.description,
+    },
+    {
+      key: 'contactName',
+      label: 'Contact name',
+      select: (quote) => {
+        const contact = quote.lead?.contacts && quote.lead.contacts.length > 0 ? quote.lead.contacts[0].contact : null;
+        if (!contact) return null;
+        const fullName = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim();
+        return fullName || contact.email || null;
+      },
+    },
+    {
+      key: 'contactEmail',
+      label: 'Contact email',
+      select: (quote) => {
+        const contact = quote.lead?.contacts && quote.lead.contacts.length > 0 ? quote.lead.contacts[0].contact : null;
+        return contact?.email ?? null;
+      },
+    },
+    {
+      key: 'contactPhone',
+      label: 'Contact phone',
+      select: (quote) => {
+        const contact = quote.lead?.contacts && quote.lead.contacts.length > 0 ? quote.lead.contacts[0].contact : null;
+        return contact?.phone ?? null;
+      },
+    },
+  ];
+
   private readonly opportunityFields: FieldSelector<OpportunitySnapshot>[] = [
     {
       key: 'title',
@@ -800,6 +939,13 @@ export class EntityFieldResolver {
         }
         return;
       }
+      case AiEntityType.QUOTE: {
+        const entity = await this.findQuote(entityId);
+        if (!entity) {
+          throw new NotFoundException(`QUOTE with ID ${entityId} was not found`);
+        }
+        return;
+      }
       default:
         throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
     }
@@ -856,6 +1002,13 @@ export class EntityFieldResolver {
         }
         return this.mapFieldValues(fieldKeys, entity, this.taskFields);
       }
+      case AiEntityType.QUOTE: {
+        const entity = await this.findQuote(entityId);
+        if (!entity) {
+          throw new NotFoundException(`QUOTE with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.quoteFields);
+      }
       default:
         throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
     }
@@ -877,6 +1030,8 @@ export class EntityFieldResolver {
         return this.leadFields as FieldSelector<EntitySnapshot>[];
       case AiEntityType.TASK:
         return this.taskFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.QUOTE:
+        return this.quoteFields as FieldSelector<EntitySnapshot>[];
       default:
         return [];
     }
@@ -1158,6 +1313,52 @@ export class EntityFieldResolver {
             firstName: true,
             lastName: true,
             email: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return record;
+  }
+
+  private async findQuote(entityId: string): Promise<QuoteSnapshot | null> {
+    const record = await this.prisma.quote.findUnique({
+      where: { id: entityId },
+      select: {
+        quoteNumber: true,
+        title: true,
+        description: true,
+        overview: true,
+        functionalProposal: true,
+        technicalProposal: true,
+        teamComposition: true,
+        paymentTerms: true,
+        warrantyPeriod: true,
+        totalValue: true,
+        currency: true,
+        status: true,
+        sentAt: true,
+        sentTo: true,
+        lead: {
+          select: {
+            title: true,
+            description: true,
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                  },
+                },
+              },
+            },
           },
         },
       },

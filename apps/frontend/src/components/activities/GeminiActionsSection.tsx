@@ -23,6 +23,7 @@ import type {
 } from '@/types/ai-actions';
 import { cn } from '@/lib/utils';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 type ActivityEntityType =
   | 'customer'
@@ -31,7 +32,8 @@ type ActivityEntityType =
   | 'candidate'
   | 'employee'
   | 'contact'
-  | 'task';
+  | 'task'
+  | 'quote';
 
 function toAiEntityType(entityType: ActivityEntityType): AiEntityType {
   return entityType.toUpperCase() as AiEntityType;
@@ -341,9 +343,12 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
               <p className="font-semibold text-muted-foreground">
                 Generated {new Date(execution.createdAt).toLocaleString()}
               </p>
-              <pre className="max-h-[60vh] whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
-                {outputText || 'Gemini returned an empty response.'}
-              </pre>
+              <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-muted/40 px-4 py-3">
+                <MarkdownRenderer
+                  content={outputText || 'Gemini returned an empty response.'}
+                  className="text-sm text-foreground"
+                />
+              </div>
             </>
           )}
         </div>

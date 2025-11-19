@@ -23,6 +23,8 @@ import LeadsPage from '@/pages/crm/LeadsPage';
 import LeadDetailPage from '@/pages/crm/LeadDetailPage';
 import OpportunitiesPage from '@/pages/crm/OpportunitiesPage';
 import OpportunityDetailPage from '@/pages/crm/OpportunityDetailPage';
+import QuotesPage from '@/pages/crm/QuotesPage';
+import QuoteDetailPage from '@/pages/crm/QuoteDetailPage';
 import CampaignsPage from '@/pages/crm/CampaignsPage';
 
 // Recruitment
@@ -111,6 +113,8 @@ function App() {
             <Route path="leads/:id" element={<LeadDetailPage />} />
             <Route path="opportunities" element={<OpportunitiesPage />} />
             <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
+            <Route path="quotes" element={<QuotesPage />} />
+            <Route path="quotes/:id" element={<QuoteDetailPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
           </Route>
 

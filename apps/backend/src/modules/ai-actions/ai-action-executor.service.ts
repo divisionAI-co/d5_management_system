@@ -1,10 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { ActivityVisibility, Prisma } from '@prisma/client';
-
-type AiEntityType = 'CUSTOMER' | 'LEAD' | 'OPPORTUNITY' | 'CANDIDATE' | 'EMPLOYEE' | 'CONTACT' | 'TASK';
-type AiCollectionKey = 'EOD_REPORTS' | 'OPPORTUNITIES' | 'LEADS' | 'TASKS' | 'ACTIVITIES';
-type AiCollectionFormat = 'TABLE' | 'BULLET_LIST' | 'PLAIN_TEXT';
-type AiActionExecutionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+import { ActivityVisibility, AiEntityType, AiCollectionKey, AiCollectionFormat, AiActionExecutionStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ActivitiesService } from '../activities/activities.service';
@@ -518,6 +513,8 @@ export class AiActionExecutor {
         return { employeeId: entityId };
       case 'TASK':
         return { taskId: entityId };
+      case 'QUOTE':
+        return { quoteId: entityId };
       default:
         throw new BadRequestException(`Unsupported entity type ${entityType} for activity creation`);
     }

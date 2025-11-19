@@ -16,6 +16,7 @@ import { CustomersModule } from './modules/crm/customers/customers.module';
 import { ContactsModule } from './modules/crm/contacts/contacts.module';
 import { LeadsModule } from './modules/crm/leads/leads.module';
 import { OpportunitiesModule } from './modules/crm/opportunities/opportunities.module';
+import { QuotesModule } from './modules/crm/quotes/quotes.module';
 // import { CampaignsModule } from './modules/crm/campaigns/campaigns.module';
 
 // Finance
@@ -93,6 +94,7 @@ import { CacheModule } from './common/cache/cache.module';
     ContactsModule,
     LeadsModule,
     OpportunitiesModule,
+    QuotesModule,
     // CampaignsModule,
 
     // Finance

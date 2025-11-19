@@ -130,6 +130,43 @@ type EodReportPayload = Prisma.EodReportGetPayload<{
   };
 }>;
 
+type QuotePayload = Prisma.QuoteGetPayload<{
+  select: {
+    id: true;
+    quoteNumber: true;
+    title: true;
+    status: true;
+    totalValue: true;
+    currency: true;
+    createdAt: true;
+    sentAt: true;
+  };
+}>;
+
+type FeedbackReportPayload = Prisma.FeedbackReportGetPayload<{
+  select: {
+    id: true;
+    month: true;
+    year: true;
+    status: true;
+    tasksCount: true;
+    totalDaysOffTaken: true;
+    totalRemainingDaysOff: true;
+    hrFeedback: true;
+    amFeedback: true;
+    communicationRating: true;
+    collaborationRating: true;
+    taskEstimationRating: true;
+    timelinessRating: true;
+    employeeSummary: true;
+    submittedAt: true;
+    sentAt: true;
+    sentTo: true;
+    createdAt: true;
+    amUpdatedBy: true;
+  };
+}>;
+
 @Injectable()
 export class CollectionFieldResolver {
   constructor(private readonly prisma: PrismaService) {}
@@ -491,6 +528,197 @@ export class CollectionFieldResolver {
           });
         },
       },
+      [AiCollectionKey.FEEDBACK_REPORTS]: {
+        key: AiCollectionKey.FEEDBACK_REPORTS,
+        label: 'Feedback Reports',
+        description: 'Monthly feedback reports for this employee. Accessible by both employee and account manager.',
+        defaultLimit: 6,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'year',
+            label: 'Year',
+            type: 'number',
+            description: 'Filter by report year',
+          },
+          {
+            key: 'month',
+            label: 'Month',
+            type: 'number',
+            description: 'Filter by report month (1-12)',
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'SUBMITTED', label: 'Submitted' },
+              { value: 'SENT', label: 'Sent' },
+            ],
+          },
+          {
+            key: 'hasAmFeedback',
+            label: 'Has AM feedback',
+            type: 'boolean',
+            description: 'Show only reports with account manager feedback',
+          },
+          {
+            key: 'hasHrFeedback',
+            label: 'Has HR feedback',
+            type: 'boolean',
+            description: 'Show only reports with HR feedback',
+          },
+          {
+            key: 'amUpdatedBy',
+            label: 'Account Manager',
+            type: 'text',
+            description: 'Filter by account manager user ID who updated the report',
+          },
+        ],
+        fields: [
+          {
+            key: 'period',
+            label: 'Period',
+            description: 'Month and year of the report',
+            select: (report: FeedbackReportPayload) => {
+              const monthNames = [
+                'January',
+                'February',
+                'March',
+                'April',
+                'May',
+                'June',
+                'July',
+                'August',
+                'September',
+                'October',
+                'November',
+                'December',
+              ];
+              return `${monthNames[report.month - 1]} ${report.year}`;
+            },
+          },
+          { key: 'status', label: 'Status', select: (report: FeedbackReportPayload) => report.status },
+          {
+            key: 'tasksCount',
+            label: 'Tasks Count',
+            select: (report: FeedbackReportPayload) => report.tasksCount ?? null,
+          },
+          {
+            key: 'totalDaysOffTaken',
+            label: 'Days Off Taken',
+            select: (report: FeedbackReportPayload) => report.totalDaysOffTaken ?? null,
+          },
+          {
+            key: 'totalRemainingDaysOff',
+            label: 'Remaining Days Off',
+            select: (report: FeedbackReportPayload) => report.totalRemainingDaysOff ?? null,
+          },
+          {
+            key: 'hrFeedback',
+            label: 'HR Feedback',
+            select: (report: FeedbackReportPayload) => report.hrFeedback ?? null,
+          },
+          {
+            key: 'amFeedback',
+            label: 'AM Feedback',
+            select: (report: FeedbackReportPayload) => report.amFeedback ?? null,
+          },
+          {
+            key: 'communicationRating',
+            label: 'Communication Rating',
+            select: (report: FeedbackReportPayload) => report.communicationRating ?? null,
+          },
+          {
+            key: 'collaborationRating',
+            label: 'Collaboration Rating',
+            select: (report: FeedbackReportPayload) => report.collaborationRating ?? null,
+          },
+          {
+            key: 'taskEstimationRating',
+            label: 'Task Estimation Rating',
+            select: (report: FeedbackReportPayload) => report.taskEstimationRating ?? null,
+          },
+          {
+            key: 'timelinessRating',
+            label: 'Timeliness Rating',
+            select: (report: FeedbackReportPayload) => report.timelinessRating ?? null,
+          },
+          {
+            key: 'employeeSummary',
+            label: 'Employee Summary',
+            select: (report: FeedbackReportPayload) => report.employeeSummary ?? null,
+          },
+          {
+            key: 'submittedAt',
+            label: 'Submitted At',
+            select: (report: FeedbackReportPayload) => (report.submittedAt ? report.submittedAt.toISOString() : null),
+          },
+          {
+            key: 'sentAt',
+            label: 'Sent At',
+            select: (report: FeedbackReportPayload) => (report.sentAt ? report.sentAt.toISOString() : null),
+          },
+          {
+            key: 'sentTo',
+            label: 'Sent To',
+            select: (report: FeedbackReportPayload) => report.sentTo ?? null,
+          },
+          {
+            key: 'createdAt',
+            label: 'Created',
+            select: (report: FeedbackReportPayload) => report.createdAt.toISOString(),
+          },
+        ],
+        resolve: async ({ entityId, limit, filters }) => {
+          const year = typeof filters?.year === 'number' ? filters.year : undefined;
+          const month = typeof filters?.month === 'number' ? filters.month : undefined;
+          const status = typeof filters?.status === 'string' ? filters.status : undefined;
+          const hasAmFeedback = this.parseBoolean(filters?.hasAmFeedback);
+          const hasHrFeedback = this.parseBoolean(filters?.hasHrFeedback);
+          const amUpdatedBy = typeof filters?.amUpdatedBy === 'string' && filters.amUpdatedBy.trim().length > 0
+            ? filters.amUpdatedBy.trim()
+            : undefined;
+
+          const where: Prisma.FeedbackReportWhereInput = {
+            employeeId: entityId,
+            ...(year ? { year } : {}),
+            ...(month ? { month } : {}),
+            ...(status ? { status: status as any } : {}),
+            ...(hasAmFeedback === true ? { amFeedback: { not: null } } : {}),
+            ...(hasHrFeedback === true ? { hrFeedback: { not: null } } : {}),
+            ...(amUpdatedBy ? { amUpdatedBy } : {}),
+          };
+
+          return this.prisma.feedbackReport.findMany({
+            where,
+            orderBy: [{ year: 'desc' }, { month: 'desc' }],
+            take: limit,
+            select: {
+              id: true,
+              month: true,
+              year: true,
+              status: true,
+              tasksCount: true,
+              totalDaysOffTaken: true,
+              totalRemainingDaysOff: true,
+              hrFeedback: true,
+              amFeedback: true,
+              communicationRating: true,
+              collaborationRating: true,
+              taskEstimationRating: true,
+              timelinessRating: true,
+              employeeSummary: true,
+              submittedAt: true,
+              sentAt: true,
+              sentTo: true,
+              createdAt: true,
+              amUpdatedBy: true,
+            },
+          });
+        },
+      },
     },
     CUSTOMER: {
       [AiCollectionKey.OPPORTUNITIES]: {
@@ -784,6 +1012,85 @@ export class CollectionFieldResolver {
               type: true,
               value: true,
               updatedAt: true,
+            },
+          });
+        },
+      },
+      [AiCollectionKey.QUOTES]: {
+        key: AiCollectionKey.QUOTES,
+        label: 'Quotes',
+        description: 'Quotes associated with this lead.',
+        defaultLimit: 5,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'SENT', label: 'Sent' },
+              { value: 'ACCEPTED', label: 'Accepted' },
+              { value: 'REJECTED', label: 'Rejected' },
+              { value: 'EXPIRED', label: 'Expired' },
+            ],
+          },
+        ],
+        fields: [
+          { key: 'quoteNumber', label: 'Quote Number', select: (row: QuotePayload) => row.quoteNumber },
+          { key: 'title', label: 'Title', select: (row: QuotePayload) => row.title },
+          { key: 'status', label: 'Status', select: (row: QuotePayload) => row.status },
+          {
+            key: 'totalValue',
+            label: 'Total Value',
+            select: (row: QuotePayload) =>
+              row.totalValue && row.currency
+                ? `${row.currency} ${row.totalValue.toString()}`
+                : row.totalValue?.toString() ?? null,
+          },
+          { key: 'createdAt', label: 'Created', select: (row: QuotePayload) => row.createdAt },
+          { key: 'sentAt', label: 'Sent At', select: (row: QuotePayload) => row.sentAt },
+        ],
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const status = filters?.status as string | undefined;
+
+          const where: Prisma.QuoteWhereInput = {
+            leadId: entityId,
+            ...(status ? { status: status as any } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.quote.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              quoteNumber: true,
+              title: true,
+              status: true,
+              totalValue: true,
+              currency: true,
+              createdAt: true,
+              sentAt: true,
             },
           });
         },

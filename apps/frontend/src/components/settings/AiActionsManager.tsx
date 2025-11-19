@@ -75,6 +75,7 @@ const ENTITY_OPTIONS: Array<{ label: string; value: AiEntityType }> = [
   { label: 'Employee', value: 'EMPLOYEE' },
   { label: 'Contact', value: 'CONTACT' },
   { label: 'Task', value: 'TASK' },
+  { label: 'Quote', value: 'QUOTE' },
 ];
 
 export function AiActionsManager() {
