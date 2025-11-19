@@ -120,6 +120,7 @@ async function main() {
       remoteWorkFrequency: 'WEEKLY',
       remoteWorkLimit: 1,
       eodGraceDays: 2,
+      eodLateReportsAllowed: 2,
       eodReportDeadlineHour: 23,
       eodReportDeadlineMin: 59,
       reviewCycleDays: 180,

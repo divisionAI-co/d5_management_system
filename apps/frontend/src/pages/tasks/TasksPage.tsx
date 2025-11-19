@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Columns, Kanban, Filter, Plus, RefreshCw, Search } from 'lucide-react';
+import { Columns, Kanban, Filter, Plus, RefreshCw, Search, Calendar as CalendarIcon } from 'lucide-react';
 import type { DropResult } from '@hello-pangea/dnd';
 import { useNavigate } from 'react-router-dom';
 import { tasksApi } from '@/lib/api/tasks';
 import { usersApi } from '@/lib/api/users';
 import { TaskForm } from '@/components/tasks/TaskForm';
+import { TaskTemplateForm } from '@/components/tasks/TaskTemplateForm';
+import { TaskTemplatesList } from '@/components/tasks/TaskTemplatesList';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useTimerStore } from '@/lib/stores/timer-store';
 import { TaskBoard } from '@/components/tasks/TaskBoard';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
@@ -19,6 +22,7 @@ import type {
   TaskPriority,
   TaskStatus,
   TasksKanbanResponse,
+  TaskTemplate,
 } from '@/types/tasks';
 import type { UsersListResponse, UserSummary } from '@/types/users';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
@@ -60,12 +64,24 @@ export default function TasksPage() {
   const [filters, setFilters] = useState<LocalFilters>({
     status: undefined,
     priority: undefined,
-    assignedToId: undefined,
+    assignedToId: user?.id, // Default to current user
     search: '',
   });
-  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+
+  // Update assignedToId filter when user loads (if it's not already set)
+  useEffect(() => {
+    if (user?.id && !filters.assignedToId) {
+      setFilters((prev) => ({
+        ...prev,
+        assignedToId: user.id,
+      }));
+    }
+  }, [user?.id, filters.assignedToId]);
+  const [viewMode, setViewMode] = useState<'board' | 'list' | 'templates'>('board');
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [showTemplateForm, setShowTemplateForm] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus | undefined>(
     undefined,
   );
@@ -77,16 +93,29 @@ export default function TasksPage() {
   const [showActivitySidebar, setShowActivitySidebar] = useState(false);
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
   
-  // Timer state
-  const [runningTimer, setRunningTimer] = useState<{
-    taskId: string;
-    startTime: number;
-  } | null>(null);
+  // Timer state - using persistent store
+  const { runningTimer, setRunningTimer, clearTimer } = useTimerStore();
   const [timerStopModal, setTimerStopModal] = useState<{
     taskId: string;
     taskTitle: string;
     timeSpent: number;
   } | null>(null);
+
+  // Restore timer state on mount and validate it's still valid
+  useEffect(() => {
+    if (runningTimer) {
+      // Verify the timer is still valid (not too old, e.g., more than 24 hours)
+      const elapsed = Date.now() - runningTimer.startTime;
+      const maxElapsed = 24 * 60 * 60 * 1000; // 24 hours
+      
+      if (elapsed > maxElapsed) {
+        // Timer is too old, clear it
+        clearTimer();
+      }
+      // Timer is valid, it will continue running
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   const sanitizedFilters = useMemo(() => {
     const payload: TaskFilters = {};
@@ -177,6 +206,7 @@ export default function TasksPage() {
     setRunningTimer({
       taskId: task.id,
       startTime: Date.now(),
+      taskTitle: task.title,
     });
   };
 
@@ -204,7 +234,7 @@ export default function TasksPage() {
       });
     }
 
-    setRunningTimer(null);
+    clearTimer();
   };
 
   const handleLogTime = (description: string) => {
@@ -217,10 +247,36 @@ export default function TasksPage() {
     });
   };
 
-  const handleAddToEod = (task: Task) => {
+  const handleAddToEod = async (task: Task) => {
     if (!user) {
       setFeedback('You need to be signed in to add tasks to an EOD report.');
       return;
+    }
+
+    // Check if this task has an active timer
+    if (runningTimer && runningTimer.taskId === task.id) {
+      // Stop the timer and log time automatically
+      const timeSpentMs = Date.now() - runningTimer.startTime;
+      const timeSpentHours = Math.round((timeSpentMs / (1000 * 60 * 60)) * 100) / 100;
+      
+      // Log the time automatically (without showing modal)
+      try {
+        await logTimeMutation.mutateAsync({
+          taskId: task.id,
+          hours: timeSpentHours,
+          description: 'Automatic logging from adding to EOD report',
+        });
+        
+        // Clear the timer
+        clearTimer();
+        
+        // Show feedback that timer was logged
+        setFeedback(`Time logged (${timeSpentHours.toFixed(2)}h) and task added to EOD report.`);
+      } catch (error) {
+        // If logging fails, still allow adding to EOD but show error
+        console.error('Failed to auto-log time when adding to EOD:', error);
+        setFeedback('Failed to log timer time, but task was added to EOD report.');
+      }
     }
 
     setAddingTaskId(task.id);
@@ -395,6 +451,16 @@ export default function TasksPage() {
             >
               <Columns className="h-4 w-4" /> List
             </button>
+            <button
+              onClick={() => setViewMode('templates')}
+              className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 transition ${
+                viewMode === 'templates'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'hover:bg-muted/70'
+              }`}
+            >
+              <CalendarIcon className="h-4 w-4" /> Recurring
+            </button>
           </div>
 
           <button
@@ -419,6 +485,7 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {viewMode !== 'templates' && (
       <div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4">
           <div>
@@ -519,6 +586,7 @@ export default function TasksPage() {
           </div>
         </div>
       </div>
+      )}
 
       {feedback && (
         <FeedbackToast
@@ -559,7 +627,35 @@ export default function TasksPage() {
       )}
 
       <div className="space-y-4">
-        {tasksQuery.isLoading ? (
+        {viewMode === 'templates' ? (
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">Recurring Task Templates</h2>
+                <p className="text-sm text-muted-foreground">
+                  Manage templates that automatically generate tasks on a schedule
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingTemplate(null);
+                  setShowTemplateForm(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                disabled={!user}
+              >
+                <Plus className="h-4 w-4" />
+                New Template
+              </button>
+            </div>
+            <TaskTemplatesList
+              onEdit={(template) => {
+                setEditingTemplate(template);
+                setShowTemplateForm(true);
+              }}
+            />
+          </div>
+        ) : tasksQuery.isLoading ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {STATUS_ORDER.slice(0, 3).map((status) => (
               <div
@@ -600,9 +696,10 @@ export default function TasksPage() {
           />
         )}
 
-        {!tasksQuery.isLoading &&
+        {viewMode !== 'templates' &&
+          !tasksQuery.isLoading &&
           !tasksQuery.isError &&
-          (tasksQuery.data?.total ?? 0) === 0 && (
+          (tasksQuery.data?.total ?? 0) === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-card px-6 py-10 text-center text-sm text-muted-foreground">
               <p className="font-medium text-muted-foreground">
                 No tasks found for the selected filters.
@@ -618,7 +715,7 @@ export default function TasksPage() {
                 Add Task
               </button>
             </div>
-          )}
+          ) : null}
       </div>
 
       {showForm && user && (
@@ -639,6 +736,26 @@ export default function TasksPage() {
             setFeedback(
               `Task "${savedTask.title}" ${
                 editingTask ? 'updated' : 'created'
+              } successfully.`,
+            );
+          }}
+        />
+      )}
+
+      {showTemplateForm && user && (
+        <TaskTemplateForm
+          template={editingTemplate}
+          currentUserId={user.id}
+          onClose={() => {
+            setShowTemplateForm(false);
+            setEditingTemplate(null);
+          }}
+          onSuccess={(savedTemplate) => {
+            setShowTemplateForm(false);
+            setEditingTemplate(null);
+            setFeedback(
+              `Template "${savedTemplate.title}" ${
+                editingTemplate ? 'updated' : 'created'
               } successfully.`,
             );
           }}

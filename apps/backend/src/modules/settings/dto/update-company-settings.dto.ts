@@ -19,6 +19,11 @@ export class UpdateCompanySettingsDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  eodLateReportsAllowed?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
   @Max(23)
   eodReportDeadlineHour?: number;
 

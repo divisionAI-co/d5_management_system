@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { eodReportsApi } from '@/lib/api/hr';
+import { settingsApi } from '@/lib/api/settings';
 import type { CreateEodReportDto, EodReport, EodReportTask, UpdateEodReportDto } from '@/types/hr';
 import { X } from 'lucide-react';
 import { format } from 'date-fns';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useTimerStore } from '@/lib/stores/timer-store';
 import { UserRole } from '@/types/enums';
 import { MentionInput } from '@/components/shared/MentionInput';
 
@@ -35,10 +37,17 @@ type FormValues = {
   submittedAt?: string;
 };
 
+const WORK_TYPE_OPTIONS: Array<{ value: EodReportTask['typeOfWorkDone'][0]; label: string }> = [
+  { value: 'PLANNING', label: 'Planning' },
+  { value: 'RESEARCH', label: 'Research' },
+  { value: 'IMPLEMENTATION', label: 'Implementation' },
+  { value: 'TESTING', label: 'Testing' },
+];
+
 const DEFAULT_TASK: TaskFormValue = {
   clientDetails: '',
   ticket: '',
-  typeOfWorkDone: 'PLANNING',
+  typeOfWorkDone: ['PLANNING'],
   taskEstimatedTime: undefined,
   timeSpentOnTicket: 0,
   taskLifecycle: 'NEW',
@@ -48,20 +57,24 @@ const DEFAULT_TASK: TaskFormValue = {
 export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodReportFormProps) {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { runningTimer } = useTimerStore();
   const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
   const isEdit = !!report;
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [timerWarning, setTimerWarning] = useState<string | null>(null);
   
   // Check if user is privileged (ADMIN or HR)
   const isPrivileged = user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
 
   const initialValues = useMemo<FormValues>(() => {
     if (!report) {
+      const defaultTasks = [{ ...DEFAULT_TASK }];
+      const initialHours = defaultTasks.reduce((sum, task) => sum + (task.timeSpentOnTicket || 0), 0);
       return {
         date: today,
         summary: '',
-        tasks: [{ ...DEFAULT_TASK }],
-        hoursWorked: undefined,
+        tasks: defaultTasks,
+        hoursWorked: initialHours, // Auto-calculated from tasks (initially 0)
       };
     }
 
@@ -75,10 +88,21 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
               };
             }
 
+            // Handle backward compatibility: if typeOfWorkDone is a string, convert to array
+            let typeOfWorkDone: EodReportTask['typeOfWorkDone'];
+            if (Array.isArray(task.typeOfWorkDone)) {
+              typeOfWorkDone = task.typeOfWorkDone;
+            } else if (task.typeOfWorkDone) {
+              // Legacy format: single string value
+              typeOfWorkDone = [task.typeOfWorkDone as EodReportTask['typeOfWorkDone'][0]];
+            } else {
+              typeOfWorkDone = ['PLANNING'];
+            }
+
             return {
               clientDetails: task.clientDetails ?? '',
               ticket: task.ticket ?? '',
-              typeOfWorkDone: (task.typeOfWorkDone ?? 'PLANNING') as TaskFormValue['typeOfWorkDone'],
+              typeOfWorkDone,
               taskEstimatedTime:
                 task.taskEstimatedTime !== undefined && task.taskEstimatedTime !== null
                   ? Number(task.taskEstimatedTime)
@@ -93,6 +117,12 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
           })
         : [{ ...DEFAULT_TASK }];
 
+    // Calculate hours worked from tasks if not explicitly set
+    const taskHoursSum = normalizedTasks.reduce((sum, task) => {
+      const timeSpent = task?.timeSpentOnTicket ?? 0;
+      return sum + (typeof timeSpent === 'number' ? timeSpent : 0);
+    }, 0);
+
     return {
       date: report.date ? report.date.split('T')[0] : today,
       summary: report.summary ?? '',
@@ -100,7 +130,9 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       hoursWorked:
         report.hoursWorked !== undefined && report.hoursWorked !== null
           ? Number(report.hoursWorked)
-          : undefined,
+          : taskHoursSum > 0 
+            ? taskHoursSum 
+            : undefined,
       submittedAt: report.submittedAt 
         ? new Date(report.submittedAt).toISOString().slice(0, 16)
         : undefined,
@@ -111,6 +143,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
     register,
     handleSubmit,
     setError,
+    clearErrors,
     control,
     reset,
     watch,
@@ -125,9 +158,72 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
     name: 'tasks',
   });
 
+  // Watch tasks to calculate hours worked - watch all task fields to ensure we catch changes
+  const watchedTasks = watch('tasks');
+  const watchedFormValues = watch(); // Watch entire form to catch all changes
+  
+  // Calculate total hours worked from tasks
+  const calculatedHoursWorked = useMemo(() => {
+    // Use watchedFormValues.tasks if available, otherwise fall back to watchedTasks
+    const tasks = watchedFormValues?.tasks || watchedTasks;
+    if (!tasks || tasks.length === 0) {
+      return 0;
+    }
+    return tasks.reduce((sum: number, task: TaskFormValue) => {
+      const timeSpent = task?.timeSpentOnTicket ?? 0;
+      const numValue = typeof timeSpent === 'number' ? timeSpent : parseFloat(String(timeSpent)) || 0;
+      return sum + (isNaN(numValue) ? 0 : numValue);
+    }, 0);
+  }, [watchedTasks, watchedFormValues]);
+
+  // Track if hoursWorked was manually edited (to prevent auto-update after manual edit)
+  const [hoursWorkedManuallyEdited, setHoursWorkedManuallyEdited] = useState(false);
+
+  // Reset manual edit flag when initial values change (e.g., when editing a different report)
+  useEffect(() => {
+    setHoursWorkedManuallyEdited(false);
+  }, [report?.id]);
+
+  // Get register props for hoursWorked to combine onChange handlers
+  const hoursWorkedRegister = register('hoursWorked');
+  
+  // Handle manual changes to hoursWorked field
+  const handleHoursWorkedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Call react-hook-form's onChange first
+    hoursWorkedRegister.onChange(e);
+    // Mark as manually edited only for existing reports
+    if (isEdit) {
+      setHoursWorkedManuallyEdited(true);
+    }
+  };
+
   useEffect(() => {
     reset(initialValues);
   }, [initialValues, reset]);
+
+  // Watch hoursWorked to compare with calculated value
+  const watchedHoursWorked = watch('hoursWorked');
+
+  // Auto-update hoursWorked when tasks change
+  useEffect(() => {
+    // Skip if form hasn't been initialized yet
+    const currentTasks = watchedFormValues?.tasks || watchedTasks;
+    if (!currentTasks || currentTasks.length === 0) return;
+
+    // Always auto-update for new reports, or if user hasn't manually edited it for existing reports
+    if (!isEdit || !hoursWorkedManuallyEdited) {
+      // For new reports, always set the calculated value (even if 0)
+      // For existing reports, only update if > 0 to avoid overriding with 0
+      const valueToSet = !isEdit 
+        ? calculatedHoursWorked // For new reports, always use calculated value
+        : (calculatedHoursWorked > 0 ? calculatedHoursWorked : undefined); // For existing reports, only if > 0
+      
+      // Only update if the value has actually changed to avoid unnecessary updates
+      if (watchedHoursWorked !== valueToSet) {
+        setValue('hoursWorked', valueToSet, { shouldDirty: false, shouldValidate: false });
+      }
+    }
+  }, [calculatedHoursWorked, isEdit, hoursWorkedManuallyEdited, setValue, watchedTasks, watchedFormValues, watchedHoursWorked, fields.length]);
 
   const createMutation = useMutation({
     mutationFn: ({
@@ -170,6 +266,22 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
 
   const onSubmit = (data: FormValues, submit: boolean) => {
     setMutationError(null);
+    setTimerWarning(null);
+    
+    // Clear all typeOfWorkDone errors before validation
+    data.tasks.forEach((_, index) => {
+      clearErrors(`tasks.${index}.typeOfWorkDone`);
+    });
+    
+    // Check for active timer before submitting
+    if (submit && runningTimer) {
+      const timeSpentMs = Date.now() - runningTimer.startTime;
+      const timeSpentHours = Math.round((timeSpentMs / (1000 * 60 * 60)) * 100) / 100;
+      setTimerWarning(
+        `Warning: You have an active timer for task "${runningTimer.taskTitle || 'Unknown'}" (${timeSpentHours.toFixed(2)} hours). The timer will continue running after submission. Please stop the timer if you want to log this time.`
+      );
+    }
+    
     if (!data.tasks.length) {
       setError('tasks', {
         type: 'manual',
@@ -178,8 +290,27 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       return;
     }
 
+    // Validate that each task has at least one type of work selected
+    let hasErrors = false;
+    for (let i = 0; i < data.tasks.length; i++) {
+      const task = data.tasks[i];
+      if (!task.typeOfWorkDone || !Array.isArray(task.typeOfWorkDone) || task.typeOfWorkDone.length === 0) {
+        setError(`tasks.${i}.typeOfWorkDone`, {
+          type: 'manual',
+          message: 'At least one type of work must be selected',
+        });
+        hasErrors = true;
+      }
+    }
+    
+    if (hasErrors) {
+      return;
+    }
+
     const normalizedTasks = data.tasks.map((task) => ({
       ...task,
+      // Ensure typeOfWorkDone is always an array
+      typeOfWorkDone: Array.isArray(task.typeOfWorkDone) ? task.typeOfWorkDone : [task.typeOfWorkDone as string],
       taskEstimatedTime:
         task.taskEstimatedTime !== undefined && task.taskEstimatedTime !== null
           ? Number(task.taskEstimatedTime)
@@ -245,27 +376,31 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
   const isSubmitting = isEdit ? updateMutation.isPending : createMutation.isPending;
   const isSubmitted = Boolean(report?.submittedAt);
 
-  // Note: We don't need company settings for grace period calculation
-  // Grace period is simply 1 day after the report date
+  // Fetch company settings for grace period
+  const { data: companySettings } = useQuery({
+    queryKey: ['company-settings'],
+    queryFn: settingsApi.getCompanySettings,
+    enabled: !!report && !!report.submittedAt && !isPrivileged, // Only fetch if needed
+  });
 
   // Calculate if editing is allowed within grace period
-  // Grace period is 1 day after the report date (due date)
-  // For a report due on Tuesday, it can be edited until Wednesday
+  // Grace period is configured in company settings (eodGraceDays)
   const canEditWithinGracePeriod = useMemo(() => {
     if (!report || !report.submittedAt || isPrivileged) {
       return true; // Not submitted or user is privileged
     }
 
     const reportDate = new Date(report.date);
+    const graceDays = companySettings?.eodGraceDays ?? 1; // Default to 1 day if not loaded yet
     
-    // Calculate the grace period end (1 day after the report date)
+    // Calculate the grace period end (graceDays after the report date)
     const gracePeriodEnd = new Date(reportDate);
-    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 1);
+    gracePeriodEnd.setDate(gracePeriodEnd.getDate() + graceDays);
     gracePeriodEnd.setHours(23, 59, 59, 999); // End of the grace period day
 
     const now = new Date();
     return now <= gracePeriodEnd;
-  }, [report, isPrivileged]);
+  }, [report, isPrivileged, companySettings?.eodGraceDays]);
   
   // Disable editing if submitted AND user is not privileged AND grace period has expired
   const isDisabled = isSubmitted && !isPrivileged && !canEditWithinGracePeriod;
@@ -283,6 +418,14 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
           message={mutationError}
           onDismiss={() => setMutationError(null)}
           tone="error"
+        />
+      )}
+
+      {timerWarning && (
+        <FeedbackToast
+          message={timerWarning}
+          onDismiss={() => setTimerWarning(null)}
+          tone="warning"
         />
       )}
 
@@ -410,22 +553,77 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                   </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
-                      Type of Work *
-                    </label>
-                    <select
-                      {...register(`tasks.${index}.typeOfWorkDone`, { required: true })}
-                        className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                        disabled={isDisabled}
-                    >
-                      <option value="PLANNING">Planning</option>
-                      <option value="RESEARCH">Research</option>
-                      <option value="IMPLEMENTATION">Implementation</option>
-                      <option value="TESTING">Testing</option>
-                    </select>
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase text-muted-foreground">
+                    Type of Work * (select all that apply)
+                  </label>
+                  <div className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3 md:grid-cols-4">
+                    {WORK_TYPE_OPTIONS.map((option) => {
+                      const fieldName = `tasks.${index}.typeOfWorkDone` as const;
+                      const currentValues = watch(fieldName) || [];
+                      const isChecked = Array.isArray(currentValues) && currentValues.includes(option.value);
+                      
+                      return (
+                        <label
+                          key={option.value}
+                          className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition ${
+                            isChecked
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-border bg-card hover:bg-muted'
+                          } ${isDisabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const currentArray = watch(fieldName) || [];
+                              let newArray: string[];
+                              
+                              if (e.target.checked) {
+                                // Checking a checkbox - always valid
+                                newArray = Array.isArray(currentArray) 
+                                  ? [...currentArray, option.value]
+                                  : [option.value];
+                                clearErrors(fieldName);
+                                setValue(fieldName, newArray, { shouldValidate: true });
+                              } else {
+                                // Unchecking a checkbox
+                                newArray = Array.isArray(currentArray)
+                                  ? currentArray.filter((val: string) => val !== option.value)
+                                  : [];
+                                
+                                // Ensure at least one is selected
+                                if (newArray.length > 0) {
+                                  // Valid - allow unchecking
+                                  clearErrors(fieldName);
+                                  setValue(fieldName, newArray, { shouldValidate: true });
+                                } else {
+                                  // Trying to uncheck the last option - prevent it
+                                  // Don't update the value (keeps checkbox checked)
+                                  // Don't set an error (form is still valid)
+                                  // Clear any existing errors
+                                  clearErrors(fieldName);
+                                  // Reset checkbox to checked state immediately to prevent visual flash
+                                  e.target.checked = true;
+                                }
+                              }
+                            }}
+                            disabled={isDisabled}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium">{option.label}</span>
+                        </label>
+                      );
+                    })}
                   </div>
+                  {errors.tasks?.[index]?.typeOfWorkDone && (
+                    <p className="mt-1 text-xs text-red-600">
+                      {errors.tasks[index]?.typeOfWorkDone?.message as string || 'At least one type of work must be selected'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
                       Lifecycle *
@@ -461,7 +659,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                     </label>
                     <input
                       type="number"
-                      step="0.25"
+                      step="0.01"
                       min="0"
                       {...register(`tasks.${index}.taskEstimatedTime`)}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
@@ -474,7 +672,7 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                     </label>
                     <input
                       type="number"
-                      step="0.25"
+                      step="0.01"
                       min="0"
                       {...register(`tasks.${index}.timeSpentOnTicket`, { required: true })}
                         className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
@@ -507,13 +705,20 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
             <label className="mb-1 block text-sm font-medium text-muted-foreground">Hours Worked</label>
             <input
               type="number"
-              step="0.25"
+              step="0.01"
               min="0"
-              {...register('hoursWorked')}
-              placeholder="8"
+              {...hoursWorkedRegister}
+              onChange={handleHoursWorkedChange}
+              placeholder={calculatedHoursWorked > 0 ? calculatedHoursWorked.toString() : "8"}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               disabled={isDisabled}
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Automatically calculated from tasks: {calculatedHoursWorked.toFixed(2)} hours
+              {hoursWorkedManuallyEdited && isEdit && (
+                <span className="ml-2 text-amber-600">(manually edited)</span>
+              )}
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 border-t border-border pt-6">

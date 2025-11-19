@@ -4,6 +4,7 @@ import type { TaskPriority, TaskStatus } from '@/types/tasks';
 export interface DashboardStats {
   missingReports: number;
   lateReports: number;
+  lateReportsBeyondThreshold: number;
   totalReports: number;
 }
 

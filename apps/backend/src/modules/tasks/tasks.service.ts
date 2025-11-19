@@ -11,9 +11,13 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { LogTimeDto } from './dto/log-time.dto';
+import { CreateTaskTemplateDto } from './dto/create-task-template.dto';
+import { UpdateTaskTemplateDto } from './dto/update-task-template.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import { extractMentionIdentifiers } from '../../common/utils/mention-parser';
+import { TasksSchedulerService } from './tasks-scheduler.service';
+import { startOfDay } from 'date-fns';
 
 @Injectable()
 export class TasksService {
@@ -21,6 +25,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
+    private readonly tasksSchedulerService: TasksSchedulerService,
   ) {}
 
   private readonly taskInclude = {
@@ -31,6 +36,19 @@ export class TasksService {
         firstName: true,
         lastName: true,
         role: true,
+      },
+    },
+    assignees: {
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
       },
     },
     createdBy: {
@@ -73,8 +91,42 @@ export class TasksService {
       where.priority = filters.priority;
     }
 
+    // Build assignment filter - check both legacy assignedToId and new assignees relation
     if (filters.assignedToId) {
-      where.assignedToId = filters.assignedToId;
+      where.OR = [
+        { assignedToId: filters.assignedToId },
+        { assignees: { some: { userId: filters.assignedToId } } },
+      ];
+    }
+
+    if (filters.search) {
+      const searchCondition = {
+        OR: [
+          {
+            title: {
+              contains: filters.search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            description: {
+              contains: filters.search,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+        ],
+      };
+
+      // If we already have an OR condition (from assignedToId), combine them with AND
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          searchCondition,
+        ];
+        delete where.OR;
+      } else {
+        where.OR = searchCondition.OR;
+      }
     }
 
     if (filters.createdById) {
@@ -83,23 +135,6 @@ export class TasksService {
 
     if (filters.customerId) {
       where.customerId = filters.customerId;
-    }
-
-    if (filters.search) {
-      where.OR = [
-        {
-          title: {
-            contains: filters.search,
-            mode: Prisma.QueryMode.insensitive,
-          },
-        },
-        {
-          description: {
-            contains: filters.search,
-            mode: Prisma.QueryMode.insensitive,
-          },
-        },
-      ];
     }
 
     if (filters.dueBefore || filters.dueAfter) {
@@ -122,17 +157,24 @@ export class TasksService {
   }
 
   async create(createTaskDto: CreateTaskDto) {
-    const [creator, assignee, customerExists] = await Promise.all([
+    // Determine assignee IDs: prefer new array, fall back to legacy single assignee
+    const assigneeIds = createTaskDto.assignedToIds?.length
+      ? createTaskDto.assignedToIds
+      : createTaskDto.assignedToId
+        ? [createTaskDto.assignedToId]
+        : [];
+
+    const [creator, assignees, customerExists] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: createTaskDto.createdById },
         select: { id: true },
       }),
-      createTaskDto.assignedToId
-        ? this.prisma.user.findUnique({
-            where: { id: createTaskDto.assignedToId },
+      assigneeIds.length > 0
+        ? this.prisma.user.findMany({
+            where: { id: { in: assigneeIds } },
             select: { id: true },
           })
-        : Promise.resolve(null),
+        : Promise.resolve([]),
       createTaskDto.customerId
         ? this.prisma.customer.findUnique({
             where: { id: createTaskDto.customerId },
@@ -147,9 +189,11 @@ export class TasksService {
       );
     }
 
-    if (createTaskDto.assignedToId && !assignee) {
+    if (assigneeIds.length > 0 && assignees.length !== assigneeIds.length) {
+      const foundIds = new Set(assignees.map((u) => u.id));
+      const missingIds = assigneeIds.filter((id) => !foundIds.has(id));
       throw new NotFoundException(
-        `Assignee with ID ${createTaskDto.assignedToId} not found`,
+        `Assignees with IDs ${missingIds.join(', ')} not found`,
       );
     }
 
@@ -159,15 +203,23 @@ export class TasksService {
       );
     }
 
+    // Use first assignee for legacy assignedToId (for backward compatibility)
+    const legacyAssignedToId = assigneeIds.length > 0 ? assigneeIds[0] : null;
+
     const data: Prisma.TaskUncheckedCreateInput = {
       title: createTaskDto.title,
       description: createTaskDto.description ?? null,
       status: createTaskDto.status ?? TaskStatus.TODO,
       priority: createTaskDto.priority ?? TaskPriority.MEDIUM,
-      assignedToId: createTaskDto.assignedToId ?? null,
+      assignedToId: legacyAssignedToId, // Keep for backward compatibility
       createdById: createTaskDto.createdById,
       customerId: createTaskDto.customerId ?? null,
       tags: createTaskDto.tags ?? [],
+      assignees: assigneeIds.length > 0
+        ? {
+            create: assigneeIds.map((userId) => ({ userId })),
+          }
+        : undefined,
     };
 
     if (createTaskDto.dueDate) {
@@ -251,16 +303,29 @@ export class TasksService {
       throw new NotFoundException(`Task with ID ${id} not found`);
     }
 
-    if (
-      updateTaskDto.assignedToId &&
-      !(await this.prisma.user.findUnique({
-        where: { id: updateTaskDto.assignedToId },
+    // Determine assignee IDs: prefer new array, fall back to legacy single assignee
+    const assigneeIds =
+      updateTaskDto.assignedToIds !== undefined
+        ? updateTaskDto.assignedToIds
+        : updateTaskDto.assignedToId !== undefined
+          ? updateTaskDto.assignedToId
+            ? [updateTaskDto.assignedToId]
+            : []
+          : undefined; // undefined means don't change assignees
+
+    // Validate assignees if provided
+    if (assigneeIds !== undefined && assigneeIds.length > 0) {
+      const assignees = await this.prisma.user.findMany({
+        where: { id: { in: assigneeIds } },
         select: { id: true },
-      }))
-    ) {
-      throw new NotFoundException(
-        `Assignee with ID ${updateTaskDto.assignedToId} not found`,
-      );
+      });
+      if (assignees.length !== assigneeIds.length) {
+        const foundIds = new Set(assignees.map((u) => u.id));
+        const missingIds = assigneeIds.filter((id) => !foundIds.has(id));
+        throw new NotFoundException(
+          `Assignees with IDs ${missingIds.join(', ')} not found`,
+        );
+      }
     }
 
     if (
@@ -293,8 +358,31 @@ export class TasksService {
       data.priority = updateTaskDto.priority;
     }
 
-    if (updateTaskDto.assignedToId !== undefined) {
+    // Handle assignee updates
+    if (assigneeIds !== undefined) {
+      // Update legacy assignedToId for backward compatibility
+      data.assignedToId = assigneeIds.length > 0 ? assigneeIds[0] : null;
+
+      // Update assignees relation
+      data.assignees = {
+        deleteMany: {}, // Remove all existing assignees
+        create: assigneeIds.map((userId) => ({ userId })),
+      };
+    } else if (updateTaskDto.assignedToId !== undefined) {
+      // Legacy update path - only update if assignedToIds not provided
       data.assignedToId = updateTaskDto.assignedToId ?? null;
+      if (updateTaskDto.assignedToId) {
+        // Also update assignees relation to include the single assignee
+        data.assignees = {
+          deleteMany: {},
+          create: [{ userId: updateTaskDto.assignedToId }],
+        };
+      } else {
+        // Remove all assignees
+        data.assignees = {
+          deleteMany: {},
+        };
+      }
     }
 
     if (updateTaskDto.customerId !== undefined) {
@@ -425,8 +513,11 @@ export class TasksService {
 
     const task = TasksService.formatTask(taskRecord);
 
+    // Check if user is owner (creator) or assignee (legacy or new assignees)
     const isOwner =
-      task.createdById === userId || task.assignedToId === userId;
+      task.createdById === userId ||
+      task.assignedToId === userId ||
+      (task.assignees && task.assignees.some((ta: { userId: string }) => ta.userId === userId));
     const isPrivileged =
       role === UserRole.ADMIN ||
       role === UserRole.HR ||
@@ -684,6 +775,327 @@ export class TasksService {
       // Log error but don't fail the task creation/update
       console.error(`[Mentions] Error processing mentions for task ${taskId}:`, error);
     }
+  }
+
+  // ============================================
+  // Task Template (Recurring Tasks) Methods
+  // ============================================
+
+  async createTemplate(createTemplateDto: CreateTaskTemplateDto) {
+    // Validate creator exists
+    const creator = await this.prisma.user.findUnique({
+      where: { id: createTemplateDto.createdById },
+      select: { id: true },
+    });
+
+    if (!creator) {
+      throw new NotFoundException(
+        `User with ID ${createTemplateDto.createdById} not found`,
+      );
+    }
+
+    // Validate assignees if provided
+    if (createTemplateDto.defaultAssigneeIds && createTemplateDto.defaultAssigneeIds.length > 0) {
+      const assignees = await this.prisma.user.findMany({
+        where: { id: { in: createTemplateDto.defaultAssigneeIds } },
+        select: { id: true },
+      });
+      if (assignees.length !== createTemplateDto.defaultAssigneeIds.length) {
+        const foundIds = new Set(assignees.map((u) => u.id));
+        const missingIds = createTemplateDto.defaultAssigneeIds.filter((id) => !foundIds.has(id));
+        throw new NotFoundException(
+          `Assignees with IDs ${missingIds.join(', ')} not found`,
+        );
+      }
+    }
+
+    // Validate customer if provided
+    if (createTemplateDto.defaultCustomerId) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: createTemplateDto.defaultCustomerId },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new NotFoundException(
+          `Customer with ID ${createTemplateDto.defaultCustomerId} not found`,
+        );
+      }
+    }
+
+    const data: Prisma.TaskTemplateUncheckedCreateInput = {
+      title: createTemplateDto.title,
+      description: createTemplateDto.description ?? null,
+      status: createTemplateDto.status ?? TaskStatus.TODO,
+      priority: createTemplateDto.priority ?? TaskPriority.MEDIUM,
+      recurrenceType: createTemplateDto.recurrenceType as any,
+      recurrenceInterval: createTemplateDto.recurrenceInterval ?? 1,
+      isActive: createTemplateDto.isActive ?? true,
+      startDate: new Date(createTemplateDto.startDate),
+      endDate: createTemplateDto.endDate ? new Date(createTemplateDto.endDate) : null,
+      defaultAssigneeIds: createTemplateDto.defaultAssigneeIds ?? [],
+      defaultCustomerId: createTemplateDto.defaultCustomerId ?? null,
+      defaultTags: createTemplateDto.defaultTags ?? [],
+      defaultEstimatedHours: createTemplateDto.defaultEstimatedHours
+        ? new Prisma.Decimal(createTemplateDto.defaultEstimatedHours)
+        : null,
+      createdById: createTemplateDto.createdById,
+    };
+
+    const template = await this.prisma.taskTemplate.create({
+      data,
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    // If template is active and startDate is today or in the past, generate task immediately for today
+    const today = startOfDay(new Date());
+    const startDate = startOfDay(template.startDate);
+    const shouldGenerateImmediately = template.isActive && startDate.getTime() <= today.getTime();
+    
+    if (shouldGenerateImmediately) {
+      console.log(`[TasksService] Attempting immediate task generation for template ${template.id}, startDate: ${startDate.toISOString()}, today: ${today.toISOString()}`);
+      // Generate task asynchronously (don't wait for it to complete)
+      // This will check if today matches the recurrence pattern and generate if it does
+      this.tasksSchedulerService.generateTaskForTemplateAndDate(
+        template.id,
+        today,
+      ).then((generated) => {
+        if (generated) {
+          console.log(`[TasksService] Successfully generated immediate task for template ${template.id}`);
+        } else {
+          console.log(`[TasksService] Task generation skipped for template ${template.id} (doesn't match recurrence pattern)`);
+        }
+      }).catch((error) => {
+        // Log error but don't fail the template creation
+        console.error(`[TasksService] Failed to generate initial task for template ${template.id}:`, error);
+      });
+    } else {
+      console.log(`[TasksService] Skipping immediate task generation for template ${template.id}, isActive: ${template.isActive}, startDate: ${startDate.toISOString()}, today: ${today.toISOString()}`);
+    }
+
+    return template;
+  }
+
+  async findAllTemplates() {
+    const templates = await this.prisma.taskTemplate.findMany({
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        _count: {
+          select: {
+            generatedTasks: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return templates;
+  }
+
+  async findOneTemplate(id: string) {
+    const template = await this.prisma.taskTemplate.findUnique({
+      where: { id },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        generatedTasks: {
+          take: 10,
+          orderBy: {
+            generatedForDate: 'desc',
+          },
+          include: {
+            assignees: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            generatedTasks: true,
+          },
+        },
+      },
+    });
+
+    if (!template) {
+      throw new NotFoundException(`Task template with ID ${id} not found`);
+    }
+
+    return template;
+  }
+
+  async updateTemplate(id: string, updateTemplateDto: UpdateTaskTemplateDto) {
+    const existing = await this.prisma.taskTemplate.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException(`Task template with ID ${id} not found`);
+    }
+
+    // Validate assignees if provided
+    if (updateTemplateDto.defaultAssigneeIds !== undefined) {
+      if (updateTemplateDto.defaultAssigneeIds.length > 0) {
+        const assignees = await this.prisma.user.findMany({
+          where: { id: { in: updateTemplateDto.defaultAssigneeIds } },
+          select: { id: true },
+        });
+        if (assignees.length !== updateTemplateDto.defaultAssigneeIds.length) {
+          const foundIds = new Set(assignees.map((u) => u.id));
+          const missingIds = updateTemplateDto.defaultAssigneeIds.filter((id) => !foundIds.has(id));
+          throw new NotFoundException(
+            `Assignees with IDs ${missingIds.join(', ')} not found`,
+          );
+        }
+      }
+    }
+
+    // Validate customer if provided
+    if (updateTemplateDto.defaultCustomerId !== undefined && updateTemplateDto.defaultCustomerId) {
+      const customer = await this.prisma.customer.findUnique({
+        where: { id: updateTemplateDto.defaultCustomerId },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new NotFoundException(
+          `Customer with ID ${updateTemplateDto.defaultCustomerId} not found`,
+        );
+      }
+    }
+
+    const data: Prisma.TaskTemplateUncheckedUpdateInput = {};
+
+    if (updateTemplateDto.title !== undefined) {
+      data.title = updateTemplateDto.title;
+    }
+    if (updateTemplateDto.description !== undefined) {
+      data.description = updateTemplateDto.description ?? null;
+    }
+    if (updateTemplateDto.status !== undefined) {
+      data.status = updateTemplateDto.status;
+    }
+    if (updateTemplateDto.priority !== undefined) {
+      data.priority = updateTemplateDto.priority;
+    }
+    if (updateTemplateDto.recurrenceType !== undefined) {
+      data.recurrenceType = updateTemplateDto.recurrenceType as any;
+    }
+    if (updateTemplateDto.recurrenceInterval !== undefined) {
+      data.recurrenceInterval = updateTemplateDto.recurrenceInterval;
+    }
+    if (updateTemplateDto.isActive !== undefined) {
+      data.isActive = updateTemplateDto.isActive;
+    }
+    if (updateTemplateDto.startDate !== undefined) {
+      data.startDate = new Date(updateTemplateDto.startDate);
+    }
+    if (updateTemplateDto.endDate !== undefined) {
+      data.endDate = updateTemplateDto.endDate ? new Date(updateTemplateDto.endDate) : null;
+    }
+    if (updateTemplateDto.defaultAssigneeIds !== undefined) {
+      data.defaultAssigneeIds = updateTemplateDto.defaultAssigneeIds;
+    }
+    if (updateTemplateDto.defaultCustomerId !== undefined) {
+      data.defaultCustomerId = updateTemplateDto.defaultCustomerId ?? null;
+    }
+    if (updateTemplateDto.defaultTags !== undefined) {
+      data.defaultTags = updateTemplateDto.defaultTags;
+    }
+    if (updateTemplateDto.defaultEstimatedHours !== undefined) {
+      data.defaultEstimatedHours = updateTemplateDto.defaultEstimatedHours
+        ? new Prisma.Decimal(updateTemplateDto.defaultEstimatedHours)
+        : null;
+    }
+
+    // Get the final values after update to check if we should generate a task
+    const finalIsActive = updateTemplateDto.isActive !== undefined 
+      ? updateTemplateDto.isActive 
+      : existing.isActive;
+    const finalStartDate = updateTemplateDto.startDate !== undefined
+      ? new Date(updateTemplateDto.startDate)
+      : existing.startDate;
+
+    const template = await this.prisma.taskTemplate.update({
+      where: { id },
+      data,
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    // If template was activated or startDate was changed to today or past, generate task immediately for today
+    const wasActivated = updateTemplateDto.isActive === true && !existing.isActive;
+    const startDateChangedToTodayOrPast = updateTemplateDto.startDate !== undefined &&
+      startOfDay(finalStartDate).getTime() <= startOfDay(new Date()).getTime() &&
+      startOfDay(existing.startDate).getTime() > startOfDay(new Date()).getTime();
+
+    if (finalIsActive && 
+        (wasActivated || startDateChangedToTodayOrPast) &&
+        startOfDay(finalStartDate).getTime() <= startOfDay(new Date()).getTime()) {
+      const today = startOfDay(new Date());
+      // Generate task asynchronously (don't wait for it to complete)
+      // This will check if today matches the recurrence pattern and generate if it does
+      this.tasksSchedulerService.generateTaskForTemplateAndDate(
+        template.id,
+        today,
+      ).catch((error) => {
+        // Log error but don't fail the template update
+        console.error(`Failed to generate initial task for template ${template.id}:`, error);
+      });
+    }
+
+    return template;
+  }
+
+  async removeTemplate(id: string) {
+    const template = await this.prisma.taskTemplate.findUnique({ where: { id } });
+
+    if (!template) {
+      throw new NotFoundException(`Task template with ID ${id} not found`);
+    }
+
+    await this.prisma.taskTemplate.delete({ where: { id } });
+
+    return { message: 'Task template deleted successfully' };
   }
 }
 

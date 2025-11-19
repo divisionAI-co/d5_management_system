@@ -37,7 +37,7 @@ export type User = UserSummary;
 export interface EodReportTask {
   clientDetails: string;
   ticket: string;
-  typeOfWorkDone: 'PLANNING' | 'RESEARCH' | 'IMPLEMENTATION' | 'TESTING';
+  typeOfWorkDone: ('PLANNING' | 'RESEARCH' | 'IMPLEMENTATION' | 'TESTING')[];
   taskEstimatedTime?: number;
   timeSpentOnTicket: number;
   taskLifecycle: 'NEW' | 'RETURNED';

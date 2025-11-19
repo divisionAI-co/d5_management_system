@@ -38,9 +38,15 @@ export class EodReportTaskDto {
   @IsString()
   ticket!: string;
 
-  @ApiProperty({ enum: EodTaskWorkType })
-  @IsEnum(EodTaskWorkType)
-  typeOfWorkDone!: EodTaskWorkType;
+  @ApiProperty({ 
+    enum: EodTaskWorkType,
+    isArray: true,
+    description: 'Types of work done for this task (can be multiple)'
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsEnum(EodTaskWorkType, { each: true })
+  typeOfWorkDone!: EodTaskWorkType[];
 
   @ApiPropertyOptional({ description: 'Estimated time for the task (hours)' })
   @IsNumber({ maxDecimalPlaces: 2 })
