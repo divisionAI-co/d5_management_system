@@ -8,13 +8,16 @@ import { Prisma, LeaveRequestStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateEodReportDto, EodReportTaskDto } from './dto/create-eod-report.dto';
 import { UpdateEodReportDto } from './dto/update-eod-report.dto';
-import { EmailTemplateConfigService } from '../../templates/email-template-config.service';
+import { TemplatesService } from '../../templates/templates.service';
+import { EmailService } from '../../../common/email/email.service';
+import { TemplateType } from '@prisma/client';
 
 @Injectable()
 export class EodReportsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly emailTemplateConfig: EmailTemplateConfigService,
+    private readonly templatesService: TemplatesService,
+    private readonly emailService: EmailService,
   ) {}
 
   private async getCompanySettings() {
@@ -208,33 +211,45 @@ export class EodReportsService {
       return sum + (task.timeSpentOnTicket || 0);
     }, 0);
 
-    await this.emailTemplateConfig.sendEmailWithTemplate(
-      'EOD_REPORT_SUBMITTED',
-      report.user.email,
-      {
-        report: {
-          id: report.id,
-          date: report.date,
-          summary: report.summary,
-          hoursWorked: report.hoursWorked ? Number(report.hoursWorked) : totalHours,
-          isLate: report.isLate,
-          submittedAt: report.submittedAt,
-          tasks: tasks.map((task: any) => ({
-            clientDetails: task.clientDetails,
-            ticket: task.ticket,
-            typeOfWorkDone: task.typeOfWorkDone,
-            timeSpent: task.timeSpentOnTicket,
-            taskLifecycle: task.taskLifecycle,
-            taskStatus: task.taskStatus,
-          })),
+    try {
+      const { html, text } = await this.templatesService.renderDefault(
+        TemplateType.EOD_REPORT_SUBMITTED,
+        {
+          report: {
+            id: report.id,
+            date: report.date,
+            summary: report.summary,
+            hoursWorked: report.hoursWorked ? Number(report.hoursWorked) : totalHours,
+            isLate: report.isLate,
+            submittedAt: report.submittedAt,
+            tasks: tasks.map((task: any) => ({
+              clientDetails: task.clientDetails,
+              ticket: task.ticket,
+              typeOfWorkDone: task.typeOfWorkDone,
+              timeSpent: task.timeSpentOnTicket,
+              taskLifecycle: task.taskLifecycle,
+              taskStatus: task.taskStatus,
+            })),
+          },
+          user: {
+            firstName: report.user.firstName,
+            lastName: report.user.lastName,
+            email: report.user.email,
+          },
         },
-        user: {
-          firstName: report.user.firstName,
-          lastName: report.user.lastName,
-          email: report.user.email,
-        },
-      },
-    );
+      );
+
+      const subject = `EOD Report Submitted - ${report.date}`;
+      await this.emailService.sendEmail({
+        to: report.user.email,
+        subject,
+        html,
+        text,
+      });
+    } catch (error) {
+      console.error('[EodReportsService] Failed to send EOD report email:', error);
+      // Don't throw - email failure shouldn't break the report submission
+    }
   }
 
   async findAll(filters?: {

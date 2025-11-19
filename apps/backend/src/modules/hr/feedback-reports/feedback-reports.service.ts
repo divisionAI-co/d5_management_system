@@ -200,6 +200,7 @@ export class FeedbackReportsService {
 
     const holidays = await this.prisma.nationalHoliday.findMany({
       where: {
+        country: 'AL',
         date: {
           gte: startDate,
           lte: endDate,
@@ -548,7 +549,7 @@ export class FeedbackReportsService {
   /**
    * Prepare template data from report
    */
-  private prepareTemplateData(report: any) {
+  private async prepareTemplateData(report: any) {
     const monthName = new Date(report.year, report.month - 1).toLocaleString('default', {
       month: 'long',
     });
@@ -572,6 +573,9 @@ export class FeedbackReportsService {
       return `<span class="rating rating-${rating}">${rating} - ${ratingLabels[rating]}</span>`;
     };
 
+    // Fetch fresh holidays from database instead of using stored value
+    const bankHolidays = await this.getBankHolidaysForNextMonth(report.month, report.year);
+
     return {
       employeeName,
       jobTitle: report.employee.jobTitle || 'N/A',
@@ -583,10 +587,9 @@ export class FeedbackReportsService {
       tasksCount: report.tasksCount?.toString() || '0',
       totalDaysOffTaken: report.totalDaysOffTaken?.toString() || '0',
       totalRemainingDaysOff: report.totalRemainingDaysOff?.toString() || '0',
-      bankHolidays: report.bankHolidays && Array.isArray(report.bankHolidays) ? report.bankHolidays : [],
-      hrFeedback: report.hrFeedback || null,
-      hrActionDescription: report.hrActionDescription || null,
+      bankHolidays: bankHolidays && Array.isArray(bankHolidays) ? bankHolidays : [],
       amFeedback: report.amFeedback || null,
+      amActionDescription: report.amActionDescription || null,
       communicationRating: report.communicationRating,
       communicationRatingDisplay: getRatingDisplay(report.communicationRating),
       collaborationRating: report.collaborationRating,
@@ -604,7 +607,7 @@ export class FeedbackReportsService {
    */
   async preview(id: string, userId: string, userRole: UserRole) {
     const report = await this.findOne(id, userId, userRole);
-    const templateData = this.prepareTemplateData(report);
+    const templateData = await this.prepareTemplateData(report);
     
     try {
       const { html } = await this.templatesService.renderDefault(
@@ -615,7 +618,7 @@ export class FeedbackReportsService {
     } catch (error) {
       // Fallback to default template if no template found
       const fallbackTemplate = this.getDefaultTemplate();
-      const html = this.renderTemplate(fallbackTemplate, report);
+      const html = await this.renderTemplate(fallbackTemplate, report);
       return { html };
     }
   }
@@ -625,7 +628,7 @@ export class FeedbackReportsService {
    */
   async generatePdf(id: string, userId: string, userRole: UserRole): Promise<Buffer> {
     const report = await this.findOne(id, userId, userRole);
-    const templateData = this.prepareTemplateData(report);
+    const templateData = await this.prepareTemplateData(report);
     
     try {
       const { html } = await this.templatesService.renderDefault(
@@ -636,7 +639,7 @@ export class FeedbackReportsService {
     } catch (error) {
       // Fallback to default template if no template found
       const fallbackTemplate = this.getDefaultTemplate();
-      const html = this.renderTemplate(fallbackTemplate, report);
+      const html = await this.renderTemplate(fallbackTemplate, report);
       return this.pdfService.generatePdfFromHtml(html);
     }
   }
@@ -884,21 +887,14 @@ export class FeedbackReportsService {
         </div>
         {{/if}}
 
-        {{#if hrFeedback}}
-        <div class="section">
-          <h2>HR Feedback</h2>
-          <div class="feedback-text">{{hrFeedback}}</div>
-          {{#if hrActionDescription}}
-          <h3>Action Taken:</h3>
-          <div class="feedback-text">{{hrActionDescription}}</div>
-          {{/if}}
-        </div>
-        {{/if}}
-
         {{#if amFeedback}}
         <div class="section">
           <h2>Account Manager Feedback</h2>
           <div class="feedback-text">{{amFeedback}}</div>
+          {{#if amActionDescription}}
+          <h3>Action Taken:</h3>
+          <div class="feedback-text">{{amActionDescription}}</div>
+          {{/if}}
         </div>
         {{/if}}
 
@@ -942,7 +938,7 @@ export class FeedbackReportsService {
   /**
    * Render template with data using simple string replacement
    */
-  private renderTemplate(template: string, report: any): string {
+  private async renderTemplate(template: string, report: any): Promise<string> {
     const monthName = new Date(report.year, report.month - 1).toLocaleString('default', {
       month: 'long',
     });
@@ -966,6 +962,9 @@ export class FeedbackReportsService {
       return `<span class="rating rating-${rating}">${rating} - ${ratingLabels[rating]}</span>`;
     };
 
+    // Fetch fresh holidays from database instead of using stored value
+    const bankHolidays = await this.getBankHolidaysForNextMonth(report.month, report.year);
+
     const data: Record<string, string> = {
       employeeName,
       jobTitle: report.employee.jobTitle || 'N/A',
@@ -977,9 +976,8 @@ export class FeedbackReportsService {
       tasksCount: report.tasksCount?.toString() || '0',
       totalDaysOffTaken: report.totalDaysOffTaken?.toString() || '0',
       totalRemainingDaysOff: report.totalRemainingDaysOff?.toString() || '0',
-      hrFeedback: report.hrFeedback || '',
-      hrActionDescription: report.hrActionDescription || '',
       amFeedback: report.amFeedback || '',
+      amActionDescription: report.amActionDescription || '',
       communicationRatingDisplay: getRatingDisplay(report.communicationRating),
       collaborationRatingDisplay: getRatingDisplay(report.collaborationRating),
       taskEstimationRatingDisplay: getRatingDisplay(report.taskEstimationRating),
@@ -995,9 +993,9 @@ export class FeedbackReportsService {
       html = html.replace(regex, data[key] || '');
     });
 
-    // Handle bank holidays list
-    if (report.bankHolidays && Array.isArray(report.bankHolidays) && report.bankHolidays.length > 0) {
-      const holidayItems = report.bankHolidays
+    // Handle bank holidays list - use fresh holidays from database
+    if (bankHolidays && Array.isArray(bankHolidays) && bankHolidays.length > 0) {
+      const holidayItems = bankHolidays
         .map((h: any) => `<li><strong>${h.name}</strong> - ${h.date}</li>`)
         .join('\n            ');
       
@@ -1012,7 +1010,7 @@ export class FeedbackReportsService {
     }
 
     // Handle conditional sections
-    const conditionals = ['hrFeedback', 'hrActionDescription', 'amFeedback', 'employeeSummary'];
+    const conditionals = ['amFeedback', 'amActionDescription', 'employeeSummary'];
     conditionals.forEach(field => {
       const regex = new RegExp(`{{#if ${field}}}([\\s\\S]*?){{/if}}`, 'g');
       html = html.replace(regex, (match, content) => {

@@ -705,6 +705,7 @@ model FeedbackReport {
 
   // Account Manager Section
   amFeedback              String? @db.Text
+  amActionDescription     String? @db.Text
   amUpdatedAt             DateTime?
   amUpdatedBy             String?
   amUpdatedByUser         User?   @relation("FeedbackReportAMUpdater", fields: [amUpdatedBy], references: [id], onDelete: SetNull)

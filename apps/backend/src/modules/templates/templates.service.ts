@@ -231,12 +231,64 @@ export class TemplatesService {
     });
   }
 
+  /**
+   * Converts Google Drive sharing links to direct image URLs in HTML
+   * Supports formats:
+   * - https://drive.google.com/file/d/FILE_ID/view
+   * - https://drive.google.com/file/d/FILE_ID/edit
+   * - https://drive.google.com/open?id=FILE_ID
+   * - https://drive.google.com/file/d/FILE_ID
+   */
+  private convertGoogleDriveUrls(html: string): string {
+    if (!html || typeof html !== 'string') {
+      return html;
+    }
+
+    // Extract file ID from various Google Drive URL formats
+    const extractFileId = (url: string): string | null => {
+      // Format: https://drive.google.com/file/d/FILE_ID/view or /edit or /preview
+      // Also handles: https://drive.google.com/file/d/FILE_ID/view?usp=drive_link
+      const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileIdMatch) {
+        return fileIdMatch[1];
+      }
+      
+      // Format: https://drive.google.com/open?id=FILE_ID
+      const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (idMatch) {
+        return idMatch[1];
+      }
+      
+      return null;
+    };
+
+    // Match img src attributes with Google Drive URLs (both single and double quotes)
+    // Use backend proxy to bypass CORS restrictions from Google Drive
+    const googleDriveUrlPattern = /(<img)([^>]+src=)(["'])(https?:\/\/drive\.google\.com\/[^"']+)(\3)([^>]*>)/gi;
+    
+    return html.replace(googleDriveUrlPattern, (match, imgTag, srcPrefix, quote, url, quoteEnd, rest) => {
+      const fileId = extractFileId(url);
+      if (fileId) {
+        // Use backend proxy endpoint to serve Google Drive images
+        // This bypasses CORS restrictions that prevent direct loading in iframes
+        // uc?export=view returns the full resolution image
+        const proxyUrl = `/api/v1/templates/proxy/google-drive-image?fileId=${fileId}`;
+        
+        return `${imgTag}${srcPrefix}${quote}${proxyUrl}${quoteEnd}${rest}`;
+      }
+      // If we can't extract the ID, return the original
+      return match;
+    });
+  }
+
   private renderTemplate(template: Template, data: Record<string, any>) {
     try {
       const compiled = this.handlebars.compile(template.htmlContent);
       const sanitizedData = this.sanitizeData(data);
       const html = compiled(sanitizedData);
-      return this.injectCss(html, template.cssContent);
+      const htmlWithCss = this.injectCss(html, template.cssContent);
+      // Convert Google Drive URLs to direct image URLs
+      return this.convertGoogleDriveUrls(htmlWithCss);
     } catch (error: any) {
       throw new BadRequestException(`Failed to render template: ${error?.message ?? 'Unknown error'}`);
     }

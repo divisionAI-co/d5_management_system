@@ -19,15 +19,5 @@ export class UpdateHrSectionDto {
   @IsInt()
   @Min(0)
   totalRemainingDaysOff?: number;
-
-  @ApiProperty({ description: 'HR feedback text', required: false })
-  @IsOptional()
-  @IsString()
-  hrFeedback?: string;
-
-  @ApiProperty({ description: 'Description of action taken by HR', required: false })
-  @IsOptional()
-  @IsString()
-  hrActionDescription?: string;
 }
 
