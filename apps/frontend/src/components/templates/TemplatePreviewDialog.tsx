@@ -71,7 +71,7 @@ export function TemplatePreviewDialog({ template, onClose }: TemplatePreviewDial
       // API_URL already includes /api/v1, so remove it from the path
       const processedHtml = response.renderedHtml.replace(
         /src=["'](\/api\/v1\/[^"']+)["']/gi,
-        (match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+        (_match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
       );
       // Use iframe srcDoc to render HTML - iframe provides isolation
       // No sanitization needed as iframe sandbox prevents script execution

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { opportunitiesApi, customersApi, leadsApi } from '@/lib/api/crm';
@@ -12,7 +12,7 @@ import type {
   Lead,
   CustomerType,
 } from '@/types/crm';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, ChevronDown, Search } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
 
 interface OpportunityFormProps {
@@ -65,14 +65,29 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
       }),
   });
 
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
+  const [debouncedLeadSearchTerm, setDebouncedLeadSearchTerm] = useState('');
+  const [showLeadDropdown, setShowLeadDropdown] = useState(false);
+  const leadDropdownRef = useRef<HTMLDivElement>(null);
+  const leadInputRef = useRef<HTMLInputElement>(null);
+
+  // Debounce search term
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedLeadSearchTerm(leadSearchTerm);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [leadSearchTerm]);
+
   const leadsQuery = useQuery({
-    queryKey: ['leads', 'options'],
+    queryKey: ['leads', 'options', debouncedLeadSearchTerm],
     queryFn: () =>
       leadsApi.list({
         page: 1,
-        pageSize: 50,
+        pageSize: 100,
         sortBy: 'createdAt',
         sortOrder: 'desc',
+        search: debouncedLeadSearchTerm || undefined,
       }),
   });
 
@@ -294,7 +309,38 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
     ) {
       setValue('customerId', selectedLead.convertedCustomerId);
     }
-  }, [selectedLeadId, selectedCustomerId, leads, setValue]);
+    
+    // Update search term to show selected lead title
+    if (selectedLead && selectedLeadId && leadSearchTerm !== selectedLead.title) {
+      setLeadSearchTerm(selectedLead.title);
+    }
+  }, [selectedLeadId, selectedCustomerId, leads, setValue, leadSearchTerm]);
+
+  // Initialize lead search term when editing
+  useEffect(() => {
+    if (opportunity?.lead && opportunity.lead.id && !leadSearchTerm) {
+      setLeadSearchTerm(opportunity.lead.title);
+    }
+  }, [opportunity?.lead, leadSearchTerm]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        leadDropdownRef.current &&
+        !leadDropdownRef.current.contains(event.target as Node) &&
+        leadInputRef.current &&
+        !leadInputRef.current.contains(event.target as Node)
+      ) {
+        setShowLeadDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateOpportunityPayload) => opportunitiesApi.create(payload),
@@ -382,17 +428,88 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Lead<span className="text-rose-500">*</span>
               </label>
-              <select
-                {...register('leadId', { required: 'Select a lead' })}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select lead</option>
-                {leads.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.title}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={leadDropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    ref={leadInputRef}
+                    type="text"
+                    value={leadSearchTerm}
+                    onChange={(e) => {
+                      setLeadSearchTerm(e.target.value);
+                      setShowLeadDropdown(true);
+                    }}
+                    onFocus={() => setShowLeadDropdown(true)}
+                    placeholder="Search leads by title or contact..."
+                    className="w-full rounded-lg border border-border pl-10 pr-10 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  />
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="hidden"
+                    {...register('leadId', { required: 'Select a lead' })}
+                  />
+                </div>
+                
+                {showLeadDropdown && (
+                  <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
+                    {leadsQuery.isLoading ? (
+                      <div className="flex items-center justify-center px-4 py-3 text-sm text-muted-foreground">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading leads...
+                      </div>
+                    ) : leads.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-muted-foreground">
+                        {leadSearchTerm ? 'No leads found matching your search' : 'No leads available'}
+                      </div>
+                    ) : (
+                      leads.map((lead) => (
+                        <button
+                          key={lead.id}
+                          type="button"
+                          onClick={() => {
+                            setValue('leadId', lead.id, { shouldValidate: true });
+                            setLeadSearchTerm(lead.title);
+                            setShowLeadDropdown(false);
+                          }}
+                          className={`w-full px-4 py-2 text-left text-sm transition hover:bg-muted ${
+                            selectedLeadId === lead.id ? 'bg-blue-50 text-blue-900' : 'text-foreground'
+                          }`}
+                        >
+                          <div className="font-medium">{lead.title}</div>
+                          {(() => {
+                            const contactsToShow = (lead.contacts && lead.contacts.length > 0) 
+                              ? lead.contacts 
+                              : (lead.contact ? [lead.contact] : []);
+                            const hasMultipleContacts = lead.contacts && lead.contacts.length > 1;
+                            
+                            return contactsToShow.length > 0 ? (
+                              <div className="text-xs text-muted-foreground">
+                                {contactsToShow.slice(0, 2).map((contact, idx) => (
+                                  <div key={contact.id || idx}>
+                                    {contact.firstName} {contact.lastName}
+                                    {contact.companyName && ` • ${contact.companyName}`}
+                                    {contact.email && ` • ${contact.email}`}
+                                  </div>
+                                ))}
+                                {hasMultipleContacts && contactsToShow.length > 2 && (
+                                  <div className="mt-1 text-blue-600">
+                                    +{contactsToShow.length - 2} more contact{contactsToShow.length - 2 !== 1 ? 's' : ''}
+                                  </div>
+                                )}
+                                {hasMultipleContacts && contactsToShow.length <= 2 && (
+                                  <div className="mt-1 text-blue-600">
+                                    ({contactsToShow.length} contacts)
+                                  </div>
+                                )}
+                              </div>
+                            ) : null;
+                          })()}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
               {errors.leadId ? (
                 <p className="mt-1 text-sm text-rose-600">{errors.leadId.message}</p>
               ) : null}

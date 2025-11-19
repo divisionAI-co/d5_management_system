@@ -65,7 +65,7 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
     // API_URL already includes /api/v1, so remove it from the path
     return html.replace(
       /src=["'](\/api\/v1\/[^"']+)["']/gi,
-      (match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+      (_match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
     );
   };
 

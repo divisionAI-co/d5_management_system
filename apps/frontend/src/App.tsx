@@ -57,6 +57,7 @@ import SettingsPage from '@/pages/settings/SettingsPage';
 import CompanySettingsPage from '@/pages/settings/CompanySettingsPage';
 import NotificationSettingsPage from '@/pages/settings/NotificationSettingsPage';
 import IntegrationsSettingsPage from '@/pages/settings/IntegrationsSettingsPage';
+import DataCleanupPage from '@/pages/settings/DataCleanupPage';
 import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
 import TemplatesPage from '@/pages/settings/TemplatesPage';
 import TemplateVariablesPage from '@/pages/settings/TemplateVariablesPage';
@@ -157,6 +158,7 @@ function App() {
             <Route path="activity-types" element={<ActivityTypesPage />} />
             <Route path="ai-actions" element={<AiActionsPage />} />
             <Route path="system-export" element={<SystemExportPage />} />
+            <Route path="data-cleanup" element={<DataCleanupPage />} />
           </Route>
 
           {/* OAuth Callbacks - must be before catch-all routes */}

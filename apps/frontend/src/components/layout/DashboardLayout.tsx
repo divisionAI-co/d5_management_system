@@ -83,6 +83,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'Templates', href: '/settings/templates', roles: ROLE_PERMISSIONS.TEMPLATES },
       { name: 'Template Variables', href: '/settings/template-variables', roles: ROLE_PERMISSIONS.TEMPLATES },
       { name: 'System Export / Import', href: '/settings/system-export', roles: ROLE_PERMISSIONS.SYSTEM_EXPORT },
+      { name: 'Data Cleanup', href: '/settings/data-cleanup', roles: ROLE_PERMISSIONS.DATA_CLEANUP },
     ],
   },
 ];

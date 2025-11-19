@@ -15,6 +15,8 @@ import { SendReportDto } from './dto/send-report.dto';
 import { PdfService } from '../../../common/pdf/pdf.service';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class FeedbackReportsService {
@@ -23,6 +25,7 @@ export class FeedbackReportsService {
     private pdfService: PdfService,
     private emailService: EmailService,
     private templatesService: TemplatesService,
+    private notificationsService: NotificationsService,
   ) {}
 
   private readonly reportInclude = {
@@ -292,6 +295,28 @@ export class FeedbackReportsService {
       include: this.reportInclude,
     });
 
+    // Notify the employee about the new feedback report
+    const employeeUserId = report.employee.user.id;
+    const monthName = new Date(createDto.year, createDto.month - 1).toLocaleString('default', {
+      month: 'long',
+    });
+
+    this.notificationsService
+      .createNotification(
+        employeeUserId,
+        NotificationType.FEEDBACK_REPORT,
+        'New Feedback Report Created',
+        `A feedback report for ${monthName} ${createDto.year} has been created. Please review and fill in your section.`,
+        'feedback_report',
+        report.id,
+      )
+      .catch((error) => {
+        console.error(
+          `[FeedbackReports] Failed to send notification to employee ${employeeUserId}:`,
+          error,
+        );
+      });
+
     return report;
   }
 
@@ -346,13 +371,20 @@ export class FeedbackReportsService {
    * Find one feedback report by ID
    */
   async findOne(id: string, userId: string, userRole: UserRole) {
+    // Trim and validate ID to handle potential whitespace or encoding issues
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
       include: this.reportInclude,
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     // Role-based access control
@@ -374,12 +406,18 @@ export class FeedbackReportsService {
    * Update HR section (only HR can do this)
    */
   async updateHrSection(id: string, updateDto: UpdateHrSectionDto, userId: string) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -387,7 +425,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         ...updateDto,
         hrUpdatedAt: new Date(),
@@ -403,12 +441,18 @@ export class FeedbackReportsService {
    * Update Account Manager section (only Account Manager can do this)
    */
   async updateAmSection(id: string, updateDto: UpdateAmSectionDto, userId: string) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -416,7 +460,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         ...updateDto,
         amUpdatedAt: new Date(),
@@ -436,8 +480,14 @@ export class FeedbackReportsService {
     updateDto: UpdateEmployeeSectionDto,
     userId: string,
   ) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
       include: {
         employee: {
           select: {
@@ -448,7 +498,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.employee.userId !== userId) {
@@ -460,7 +510,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         ...updateDto,
         employeeUpdatedAt: new Date(),
@@ -475,12 +525,18 @@ export class FeedbackReportsService {
    * Submit a report (mark as submitted)
    */
   async submit(id: string, userId: string, userRole: UserRole) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status !== FeedbackReportStatus.DRAFT) {
@@ -493,7 +549,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         status: FeedbackReportStatus.SUBMITTED,
         submittedAt: new Date(),
@@ -513,12 +569,18 @@ export class FeedbackReportsService {
       throw new ForbiddenException('Only HR can recompile report data');
     }
 
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -533,7 +595,7 @@ export class FeedbackReportsService {
     );
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         tasksCount: compiledData.tasksCount,
         totalDaysOffTaken: compiledData.totalDaysOffTaken,
@@ -690,8 +752,9 @@ export class FeedbackReportsService {
     });
 
     // Update report status
+    const trimmedId = id?.trim();
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         status: FeedbackReportStatus.SENT,
         sentAt: new Date(),
@@ -712,12 +775,18 @@ export class FeedbackReportsService {
       throw new ForbiddenException('Only HR can delete feedback reports');
     }
 
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -725,7 +794,7 @@ export class FeedbackReportsService {
     }
 
     await this.prisma.feedbackReport.delete({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     return { deleted: true };

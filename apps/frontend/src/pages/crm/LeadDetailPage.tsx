@@ -81,15 +81,9 @@ export default function LeadDetailPage() {
     },
   });
 
-  const handleDelete = () => {
-    if (!leadQuery.data) return;
-    if (window.confirm(`Delete lead "${leadQuery.data.title}"? This action cannot be undone.`)) {
-      deleteMutation.mutate();
-    }
-  };
-
   const lead = leadQuery.data;
 
+  // All hooks must be called before any conditional returns
   const formattedExpectedClose = useMemo(() => {
     if (!lead?.expectedCloseDate) return null;
     return format(new Date(lead.expectedCloseDate), 'MMM dd, yyyy');
@@ -99,6 +93,23 @@ export default function LeadDetailPage() {
     if (!lead?.actualCloseDate) return null;
     return format(new Date(lead.actualCloseDate), 'MMM dd, yyyy');
   }, [lead?.actualCloseDate]);
+
+  // Get all contacts (from contacts array or fallback to legacy single contact)
+  const allContacts = useMemo(() => {
+    if (!lead) return [];
+    if (lead.contacts && lead.contacts.length > 0) {
+      // Extract contact objects from many-to-many structure
+      return lead.contacts.map((lc: any) => lc.contact || lc).filter(Boolean);
+    }
+    return lead.contact ? [lead.contact] : [];
+  }, [lead]);
+
+  const handleDelete = () => {
+    if (!leadQuery.data) return;
+    if (window.confirm(`Delete lead "${leadQuery.data.title}"? This action cannot be undone.`)) {
+      deleteMutation.mutate();
+    }
+  };
 
   if (!id) {
     return (
@@ -139,6 +150,9 @@ export default function LeadDetailPage() {
   const probabilityLabel = lead.probability !== null && lead.probability !== undefined ? `${lead.probability}%` : '—';
   const valueLabel = lead.value !== null && lead.value !== undefined ? lead.value.toLocaleString() : '—';
 
+  // Get primary contact (first contact) for header display
+  const primaryContact = allContacts[0];
+
   return (
     <div className="space-y-6 py-8">
       <button
@@ -153,21 +167,33 @@ export default function LeadDetailPage() {
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-xl font-semibold text-blue-700">
-              {lead.contact.firstName[0] ?? 'L'}
+              {primaryContact?.firstName?.[0] ?? 'L'}
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-bold text-foreground">{lead.title}</h1>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span>{lead.contact.firstName} {lead.contact.lastName}</span>
-                <span>•</span>
-                <span>{lead.contact.email}</span>
-                {lead.contact.companyName ? (
-                  <>
-                    <span>•</span>
-                    <span>{lead.contact.companyName}</span>
-                  </>
-                ) : null}
-              </div>
+              {primaryContact ? (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <span>{primaryContact.firstName} {primaryContact.lastName}</span>
+                  <span>•</span>
+                  <span>{primaryContact.email}</span>
+                  {primaryContact.companyName ? (
+                    <>
+                      <span>•</span>
+                      <span>{primaryContact.companyName}</span>
+                    </>
+                  ) : null}
+                  {allContacts.length > 1 && (
+                    <>
+                      <span>•</span>
+                      <span className="font-medium text-blue-600">
+                        +{allContacts.length - 1} more contact{allContacts.length - 1 !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">No contacts</div>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -240,26 +266,32 @@ export default function LeadDetailPage() {
               <Activity className="h-5 w-5 text-blue-500" /> Lead Overview
             </h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="flex items-start gap-3">
-                <Mail className="mt-1 h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Email</p>
-                  <a className="text-sm text-blue-600 hover:underline" href={`mailto:${lead.contact.email}`}>
-                    {lead.contact.email}
-                  </a>
-                </div>
-              </div>
-              {lead.contact.phone ? (
-                <div className="flex items-start gap-3">
-                  <Phone className="mt-1 h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">Phone</p>
-                    <a className="text-sm text-blue-600 hover:underline" href={`tel:${lead.contact.phone}`}>
-                      {lead.contact.phone}
-                    </a>
+              {primaryContact ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <Mail className="mt-1 h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">Primary Email</p>
+                      <a className="text-sm text-blue-600 hover:underline" href={`mailto:${primaryContact.email}`}>
+                        {primaryContact.email}
+                      </a>
+                    </div>
                   </div>
-                </div>
-              ) : null}
+                  {primaryContact.phone ? (
+                    <div className="flex items-start gap-3">
+                      <Phone className="mt-1 h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Primary Phone</p>
+                        <a className="text-sm text-blue-600 hover:underline" href={`tel:${primaryContact.phone}`}>
+                          {primaryContact.phone}
+                        </a>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <div className="col-span-2 text-sm text-muted-foreground">No contacts available</div>
+              )}
               {lead.prospectWebsite ? (
                 <div className="flex items-start gap-3">
                   <Globe className="mt-1 h-4 w-4 text-muted-foreground" />
@@ -343,32 +375,55 @@ export default function LeadDetailPage() {
 
         <aside className="space-y-6">
           <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-foreground">Contact</h2>
-            <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <User className="h-4 w-4" />
-                <span>{lead.contact.firstName} {lead.contact.lastName}</span>
-              </div>
-              {lead.contact.phone ? (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4" />
-                  <a className="text-blue-600 hover:underline" href={`tel:${lead.contact.phone}`}>
-                    {lead.contact.phone}
-                  </a>
-                </div>
-              ) : null}
-              <div className="flex items-center gap-3">
-                <Mail className="h-4 w-4" />
-                <a className="text-blue-600 hover:underline" href={`mailto:${lead.contact.email}`}>
-                  {lead.contact.email}
-                </a>
-              </div>
-              {lead.contact.companyName ? (
-                <div className="flex items-center gap-3 text-sm">
-                  <Building className="h-4 w-4" />
-                  <span>{lead.contact.companyName}</span>
-                </div>
-              ) : null}
+            <h2 className="text-lg font-semibold text-foreground">
+              Contact{allContacts.length > 1 ? `s (${allContacts.length})` : ''}
+            </h2>
+            <div className="mt-4 space-y-4 text-sm text-muted-foreground">
+              {allContacts.length === 0 ? (
+                <div className="text-muted-foreground">No contacts</div>
+              ) : (
+                allContacts.map((contact, index) => (
+                  <div
+                    key={contact.id}
+                    className={`rounded-lg border border-border p-3 ${index === 0 ? 'bg-blue-50 dark:bg-blue-950/20' : 'bg-muted/30'}`}
+                  >
+                    {index === 0 && (
+                      <div className="mb-2 text-xs font-semibold uppercase text-blue-700 dark:text-blue-300">
+                        Primary Contact
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 mb-2">
+                      <User className="h-4 w-4" />
+                      <span className="font-medium text-foreground">
+                        {contact.firstName} {contact.lastName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Mail className="h-4 w-4" />
+                      <a className="text-blue-600 hover:underline" href={`mailto:${contact.email}`}>
+                        {contact.email}
+                      </a>
+                    </div>
+                    {contact.phone && (
+                      <div className="flex items-center gap-3 mb-2">
+                        <Phone className="h-4 w-4" />
+                        <a className="text-blue-600 hover:underline" href={`tel:${contact.phone}`}>
+                          {contact.phone}
+                        </a>
+                      </div>
+                    )}
+                    {contact.companyName && (
+                      <div className="flex items-center gap-3">
+                        <Building className="h-4 w-4" />
+                        <span>{contact.companyName}</span>
+                      </div>
+                    )}
+                    {contact.role && (
+                      <div className="mt-2 text-xs text-muted-foreground">Role: {contact.role}</div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 

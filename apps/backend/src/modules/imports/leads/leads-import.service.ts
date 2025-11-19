@@ -560,10 +560,14 @@ export class LeadsImportService {
           equals: title,
           mode: Prisma.QueryMode.insensitive,
         },
-        contact: {
-          email: {
-            equals: contactEmail,
-            mode: Prisma.QueryMode.insensitive,
+        contacts: {
+          some: {
+            contact: {
+              email: {
+                equals: contactEmail,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
           },
         },
       },
@@ -790,9 +794,12 @@ export class LeadsImportService {
               LeadImportField.SOURCE,
             ) ?? null,
           expectedCloseDate: expectedCloseDate ?? undefined,
-          contact: {
-            connect: { id: contactId },
+          contacts: {
+            create: {
+              contactId,
+            },
           },
+          contactId, // Legacy field for backward compatibility
           assignedTo: ownerId ? { connect: { id: ownerId } } : undefined,
           convertedCustomer: customerId
             ? { connect: { id: customerId } }

@@ -211,15 +211,22 @@ export class EodReportsService {
       return sum + (task.timeSpentOnTicket || 0);
     }, 0);
 
+    const reportDate = new Date(report.date).toLocaleDateString();
+    const userName = `${report.user.firstName} ${report.user.lastName}`;
+    const hoursWorked = report.hoursWorked ? Number(report.hoursWorked) : totalHours;
+
+    let html: string;
+    let text: string;
+
     try {
-      const { html, text } = await this.templatesService.renderDefault(
+      const rendered = await this.templatesService.renderDefault(
         TemplateType.EOD_REPORT_SUBMITTED,
         {
           report: {
             id: report.id,
             date: report.date,
             summary: report.summary,
-            hoursWorked: report.hoursWorked ? Number(report.hoursWorked) : totalHours,
+            hoursWorked,
             isLate: report.isLate,
             submittedAt: report.submittedAt,
             tasks: tasks.map((task: any) => ({
@@ -238,8 +245,34 @@ export class EodReportsService {
           },
         },
       );
+      html = rendered.html;
+      text = rendered.text;
+    } catch (templateError) {
+      console.warn(
+        `[EodReportsService] Failed to render EOD template, falling back to default HTML:`,
+        templateError,
+      );
+      // Fallback to default HTML template
+      html = this.getDefaultEodTemplate({
+        userName,
+        reportDate,
+        hoursWorked,
+        summary: report.summary,
+        tasks,
+        isLate: report.isLate,
+      });
+      text = this.getDefaultEodText({
+        userName,
+        reportDate,
+        hoursWorked,
+        summary: report.summary,
+        tasks,
+        isLate: report.isLate,
+      });
+    }
 
-      const subject = `EOD Report Submitted - ${report.date}`;
+    const subject = `EOD Report Submitted - ${reportDate}`;
+    try {
       await this.emailService.sendEmail({
         to: report.user.email,
         subject,
@@ -250,6 +283,108 @@ export class EodReportsService {
       console.error('[EodReportsService] Failed to send EOD report email:', error);
       // Don't throw - email failure shouldn't break the report submission
     }
+  }
+
+  private getDefaultEodTemplate(data: {
+    userName: string;
+    reportDate: string;
+    hoursWorked: number;
+    summary: string;
+    tasks: any[];
+    isLate: boolean;
+  }): string {
+    const tasksList = data.tasks
+      .map(
+        (task) => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${task.ticket || task.clientDetails || 'N/A'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${Array.isArray(task.typeOfWorkDone) ? task.typeOfWorkDone.join(', ') : task.typeOfWorkDone || 'N/A'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${task.timeSpent || 0} hours</td>
+      </tr>
+    `,
+      )
+      .join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; color: #6b7280; margin-bottom: 5px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; background-color: white; }
+          th { background-color: #f3f4f6; padding: 10px; text-align: left; font-weight: bold; border-bottom: 2px solid #e5e7eb; }
+          td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+          .late-badge { display: inline-block; background-color: #ef4444; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; margin-left: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">EOD Report Submitted</h1>
+          <p style="margin: 5px 0 0 0; opacity: 0.9;">${data.reportDate}${data.isLate ? '<span class="late-badge">LATE</span>' : ''}</p>
+        </div>
+        <div class="content">
+          <div class="section">
+            <div class="label">Employee:</div>
+            <div>${data.userName}</div>
+          </div>
+          <div class="section">
+            <div class="label">Hours Worked:</div>
+            <div><strong>${data.hoursWorked} hours</strong></div>
+          </div>
+          ${data.summary ? `
+          <div class="section">
+            <div class="label">Summary:</div>
+            <div>${data.summary.replace(/\n/g, '<br>')}</div>
+          </div>
+          ` : ''}
+          ${data.tasks.length > 0 ? `
+          <div class="section">
+            <div class="label">Tasks Worked On:</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Ticket/Client</th>
+                  <th>Type of Work</th>
+                  <th>Time Spent</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tasksList}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getDefaultEodText(data: {
+    userName: string;
+    reportDate: string;
+    hoursWorked: number;
+    summary: string;
+    tasks: any[];
+    isLate: boolean;
+  }): string {
+    const tasksList = data.tasks
+      .map(
+        (task) =>
+          `- ${task.ticket || task.clientDetails || 'N/A'}: ${Array.isArray(task.typeOfWorkDone) ? task.typeOfWorkDone.join(', ') : task.typeOfWorkDone || 'N/A'} (${task.timeSpent || 0} hours)`,
+      )
+      .join('\n');
+
+    return `EOD Report Submitted - ${data.reportDate}${data.isLate ? ' [LATE]' : ''}
+
+Employee: ${data.userName}
+Hours Worked: ${data.hoursWorked} hours
+
+${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? `Tasks Worked On:\n${tasksList}` : ''}`;
   }
 
   async findAll(filters?: {

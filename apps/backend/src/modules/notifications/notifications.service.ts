@@ -77,6 +77,8 @@ export class NotificationsService {
         return settings.leaveApproved ?? true;
       case NotificationType.PERFORMANCE_REVIEW:
         return settings.performanceReview ?? true;
+      case NotificationType.FEEDBACK_REPORT:
+        return settings.feedbackReport ?? true;
       case NotificationType.NEW_CANDIDATE:
         return settings.newCandidate ?? true;
       case NotificationType.NEW_OPPORTUNITY:
@@ -190,6 +192,7 @@ export class NotificationsService {
       LEAVE_REQUEST: TemplateType.LEAVE_REQUEST_CREATED,
       TASK_DUE_SOON: null, // No template for this yet
       PERFORMANCE_REVIEW: TemplateType.PERFORMANCE_REVIEW,
+      FEEDBACK_REPORT: null, // No template for this yet
       NEW_CANDIDATE: null, // No template for this yet
       NEW_OPPORTUNITY: null, // No template for this yet
       INVOICE_OVERDUE: null, // No template for this yet

@@ -973,10 +973,14 @@ export class CandidatesService {
           const rendered = await this.templatesService.render(dto.templateId, templateData);
           emailBody = rendered.html;
           emailSubject = `Update on Your Application - ${updated.firstName} ${updated.lastName}`;
-        } catch (error: any) {
-          throw new BadRequestException(
-            `Failed to render email template: ${error?.message ?? 'Unknown error'}`,
+        } catch (templateError: any) {
+          console.warn(
+            `[Candidates] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
+            templateError,
           );
+          // Fallback to default HTML template
+          emailBody = this.getDefaultCandidateEmailTemplate(updated, dto.reason);
+          emailSubject = `Update on Your Application - ${updated.firstName} ${updated.lastName}`;
         }
       } else {
         // Use custom email
@@ -1084,9 +1088,19 @@ export class CandidatesService {
         })),
       };
 
-      const rendered = await this.templatesService.render(dto.templateId, templateData);
-      htmlContent = rendered.html;
-      textContent = rendered.text;
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        console.warn(
+          `[Candidates] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultCandidateSendEmailTemplate(candidateRaw, templateData);
+        textContent = this.getDefaultCandidateSendEmailText(candidateRaw, templateData);
+      }
     } else if (!htmlContent) {
       throw new BadRequestException(
         'Either templateId or htmlContent must be provided',
@@ -1137,6 +1151,120 @@ export class CandidatesService {
         firstName: 'asc',
       },
     });
+  }
+
+  private getDefaultCandidateEmailTemplate(candidate: any, reason?: string): string {
+    const fullName = `${candidate.firstName} ${candidate.lastName}`;
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
+          .section { margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">Update on Your Application</h1>
+        </div>
+        <div class="content">
+          <div class="section">
+            <p>Dear ${fullName},</p>
+            ${reason ? `
+            <p>${reason}</p>
+            ` : `
+            <p>This is an update regarding your application with us.</p>
+            `}
+            <p>If you have any questions, please don't hesitate to contact us.</p>
+            <p>Best regards,<br />Recruitment Team</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getDefaultCandidateSendEmailTemplate(candidate: any, templateData: any): string {
+    const fullName = `${candidate.firstName} ${candidate.lastName}`;
+    const currentPositions = templateData.candidatePositions || [];
+    
+    const positionsHtml = currentPositions
+      .map((cp: any) => `
+                  <tr>
+                    <td>${cp.position?.title || 'N/A'}</td>
+                    <td>${cp.status || 'N/A'}</td>
+                  </tr>
+                `)
+      .join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; color: #6b7280; margin-bottom: 5px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; background-color: white; }
+          th { background-color: #f3f4f6; padding: 10px; text-align: left; font-weight: bold; border-bottom: 2px solid #e5e7eb; }
+          td { padding: 8px; border-bottom: 1px solid #e5e7eb; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">${fullName}</h1>
+        </div>
+        <div class="content">
+          ${candidate.email ? `
+          <div class="section">
+            <div class="label">Email:</div>
+            <div>${candidate.email}</div>
+          </div>
+          ` : ''}
+          ${candidate.phone ? `
+          <div class="section">
+            <div class="label">Phone:</div>
+            <div>${candidate.phone}</div>
+          </div>
+          ` : ''}
+          ${currentPositions.length > 0 ? `
+          <div class="section">
+            <div class="label">Applied Positions:</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Position</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${positionsHtml}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getDefaultCandidateSendEmailText(candidate: any, templateData: any): string {
+    const fullName = `${candidate.firstName} ${candidate.lastName}`;
+    const currentPositions = templateData.candidatePositions || [];
+    const positionsList = currentPositions
+      .map((cp: any) => `- ${cp.position?.title || 'N/A'} (${cp.status || 'N/A'})`)
+      .join('\n');
+
+    return `${fullName}
+
+${candidate.email ? `Email: ${candidate.email}\n` : ''}${candidate.phone ? `Phone: ${candidate.phone}\n` : ''}${currentPositions.length > 0 ? `\nApplied Positions:\n${positionsList}` : ''}`;
   }
 
   /**

@@ -19,9 +19,16 @@ const CUSTOMER_SENTIMENTS: CustomerSentiment[] = ['HAPPY', 'NEUTRAL', 'UNHAPPY']
 export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalProps) {
   const queryClient = useQueryClient();
 
-  const defaultCustomerName = lead.contact.companyName
-    ? lead.contact.companyName
-    : `${lead.contact.firstName} ${lead.contact.lastName}`;
+  // Get primary contact from contacts array or fallback to legacy contact
+  const primaryContact = (lead.contacts && lead.contacts.length > 0)
+    ? lead.contacts[0]
+    : lead.contact;
+
+  const defaultCustomerName = primaryContact?.companyName
+    ? primaryContact.companyName
+    : primaryContact
+      ? `${primaryContact.firstName} ${primaryContact.lastName}`
+      : '';
 
   const {
     register,
@@ -30,8 +37,8 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
   } = useForm<FormValues>({
     defaultValues: {
       customerName: defaultCustomerName,
-      customerEmail: lead.contact.email,
-      customerPhone: lead.contact.phone ?? undefined,
+      customerEmail: primaryContact?.email || '',
+      customerPhone: primaryContact?.phone ?? undefined,
       customerWebsite: lead.prospectWebsite ?? undefined,
       customerIndustry: lead.prospectIndustry ?? undefined,
       customerType: 'STAFF_AUGMENTATION',
@@ -84,7 +91,11 @@ export function LeadConvertModal({ lead, onClose, onSuccess }: LeadConvertModalP
           <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
             <p>
               Converting lead <span className="font-semibold text-foreground">{lead.title}</span> for contact
-              <span className="font-semibold text-foreground"> {lead.contact.firstName} {lead.contact.lastName}</span>.
+              {primaryContact ? (
+                <span className="font-semibold text-foreground"> {primaryContact.firstName} {primaryContact.lastName}</span>
+              ) : (
+                <span className="font-semibold text-foreground"> (No contact)</span>
+              )}.
             </p>
             {lead.prospectCompanyName && (
               <p className="mt-1">

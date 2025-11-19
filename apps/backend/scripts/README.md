@@ -4,6 +4,83 @@ This directory contains utility scripts for database maintenance and migrations.
 
 ## Available Scripts
 
+### cleanup-crm-data.ts
+
+Cleans up CRM data (contacts, leads, and opportunities) to prepare for reimport.
+
+**⚠️ WARNING:** This will permanently delete all contacts, leads, and opportunities. This action cannot be undone!
+
+**When to use:**
+- Before reimporting CRM data from an external source
+- When you need to reset CRM data for testing
+- After data migration or cleanup operations
+
+**Usage:**
+```bash
+cd apps/backend
+npx ts-node scripts/cleanup-crm-data.ts
+```
+
+Or with tsx:
+```bash
+cd apps/backend
+npx tsx scripts/cleanup-crm-data.ts
+```
+
+**What it does:**
+1. Shows current counts of contacts, leads, and opportunities
+2. Deletes all opportunities (cascades to OpenPositions and Activities)
+3. Deletes all leads (cascades to LeadContact entries and Activities)
+4. Deletes all contacts (cascades to remaining LeadContact entries and Activities)
+5. Verifies deletion and shows final counts
+
+**Safety:**
+- Shows data counts before deletion
+- Uses proper deletion order to respect foreign key constraints
+- Provides clear output and verification
+- Can be run via API endpoint (requires admin role) at `POST /admin/data-cleanup/crm`
+
+**Example output:**
+```
+🚀 Starting CRM data cleanup...
+
+📊 Current data counts:
+   - Contacts: 150
+   - Leads: 75
+   - Opportunities: 30
+   - Total: 255
+
+🗑️  Deleting opportunities...
+   ✓ Deleted 30 opportunities
+
+🗑️  Deleting leads...
+   ✓ Deleted 75 leads
+
+🗑️  Deleting contacts...
+   ✓ Deleted 150 contacts
+
+✅ Cleanup completed successfully!
+
+📊 Remaining data counts:
+   - Contacts: 0
+   - Leads: 0
+   - Opportunities: 0
+
+✨ All CRM data has been successfully removed. Ready for reimport!
+```
+
+**API Alternative:**
+You can also use the API endpoint (requires admin authentication):
+```bash
+# Get counts first
+curl -X GET http://localhost:3000/admin/data-cleanup/counts \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Perform cleanup
+curl -X POST http://localhost:3000/admin/data-cleanup/crm \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 ### fix-leave-days.sh
 
 Recalculates `totalDays` for all existing leave requests to exclude weekends and holidays.

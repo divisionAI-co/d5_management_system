@@ -5,6 +5,7 @@ import { employeesApi } from '@/lib/api/hr/employees';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Plus, Eye, Download, Send, RefreshCw, Trash2, FileText, X } from 'lucide-react';
 import type { FeedbackReport, CreateFeedbackReportDto } from '@/types/feedback-reports';
+import { FeedbackReportStatus } from '@/types/feedback-reports';
 import { formatReportPeriod, getStatusBadgeColor, getRatingLabel } from '@/lib/api/feedback-reports';
 
 export default function FeedbackReportsPage() {
@@ -31,7 +32,7 @@ export default function FeedbackReportsPage() {
     queryFn: () => feedbackReportsApi.getAll({
       month: filterMonth,
       year: filterYear,
-      status: filterStatus || undefined,
+      status: filterStatus ? (filterStatus as FeedbackReportStatus) : undefined,
     }),
   });
 

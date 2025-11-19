@@ -11,6 +11,7 @@ import {
   extractPageWidthFromHtml,
   getDefaultTemplateBlocks,
   injectBlockMetadata,
+  parseHtmlToBlocks,
   renderBlocksToHtml,
 } from './template-blocks';
 
@@ -757,6 +758,32 @@ export function TemplateFormModal({
                       onChange={(event) =>
                         setFormValues((prev) => ({ ...prev, htmlContent: event.target.value }))
                       }
+                      onPaste={(event) => {
+                        // Auto-detect if pasted HTML can be converted to blocks
+                        const pastedText = event.clipboardData.getData('text/html') || event.clipboardData.getData('text/plain');
+                        if (pastedText && pastedText.includes('<') && (pastedText.includes('table') || pastedText.includes('h1') || pastedText.includes('h2') || pastedText.includes('h3'))) {
+                          // Small delay to let paste complete, then check
+                          // Store textarea reference before setTimeout
+                          const textarea = event.currentTarget;
+                          setTimeout(() => {
+                            // Get the updated value after paste
+                            if (!textarea) return;
+                            const updatedHtml = textarea.value;
+                            const parsedBlocks = parseHtmlToBlocks(updatedHtml);
+                            if (parsedBlocks && parsedBlocks.length > 0) {
+                              const shouldConvert = window.confirm(
+                                'Detected HTML structure that can be converted to blocks. Would you like to convert it now?',
+                              );
+                              if (shouldConvert) {
+                                const extractedPageWidth = extractPageWidthFromHtml(updatedHtml);
+                                setBlocks(parsedBlocks);
+                                setPageWidth(extractedPageWidth);
+                                setEditingMode('visual');
+                              }
+                            }
+                          }, 100);
+                        }
+                      }}
                       rows={28}
                       spellCheck={false}
                       className="w-full rounded-lg border border-border px-3 py-2 font-mono text-xs leading-5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -765,35 +792,36 @@ export function TemplateFormModal({
                     <p className="text-xs text-muted-foreground">
                       Build markup using Handlebars tokens. You can include conditionals like
                       {' {{#if isOverdue}}...{{/if}} '}.
+                      {' '}Paste HTML generated from blocks to automatically convert it back to blocks.
                     </p>
-                    {mode === 'edit' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            blocks.length === 1 &&
-                            blocks[0].type === 'raw_html' &&
-                            blocks[0].html === template?.htmlContent
-                          ) {
-                            setBlocks(getDefaultTemplateBlocks());
-                            setEditingMode('visual');
-                            return;
-                          }
-
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Try to parse HTML to blocks
+                        const parsedBlocks = parseHtmlToBlocks(formValues.htmlContent);
+                        
+                        if (parsedBlocks && parsedBlocks.length > 0) {
+                          const extractedPageWidth = extractPageWidthFromHtml(formValues.htmlContent);
+                          setBlocks(parsedBlocks);
+                          setPageWidth(extractedPageWidth);
+                          setEditingMode('visual');
+                        } else {
+                          // If parsing fails, ask user if they want to switch anyway
                           const confirmSwitch = window.confirm(
-                            'Switching to the visual builder will regenerate the template layout based on blocks and may overwrite custom HTML. Continue?',
+                            'Could not automatically convert HTML to blocks. The HTML structure may not match the block system format.\n\n' +
+                            'Would you like to switch to visual builder anyway? This will create a raw HTML block with your current content.',
                           );
 
                           if (confirmSwitch) {
-                            setBlocks(getDefaultTemplateBlocks());
+                            setBlocks([createRawHtmlBlock(formValues.htmlContent)]);
                             setEditingMode('visual');
                           }
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                      >
-                        Use Visual Builder
-                      </button>
-                    )}
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    >
+                      Convert to Blocks
+                    </button>
                   </div>
                 )}
               </div>
