@@ -18,6 +18,9 @@ module.exports = {
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_',
     }],
+    '@typescript-eslint/no-explicit-any': 'off',
+    'no-control-regex': 'off',
+    'no-useless-escape': 'off',
   },
 };
 
