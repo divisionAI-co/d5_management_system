@@ -47,11 +47,6 @@ export interface LeadImportSummary {
 
 type LeadFieldMapping = Partial<Record<LeadImportField, string>>;
 
-interface ParsedSheet {
-  headers: string[];
-  rows: Record<string, any>[];
-}
-
 const LEAD_FIELD_DEFINITIONS: LeadImportFieldMetadata[] = [
   {
     key: LeadImportField.TITLE,

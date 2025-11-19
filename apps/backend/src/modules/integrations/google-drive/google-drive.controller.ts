@@ -19,7 +19,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { GoogleDriveService } from './google-drive.service';
 import { ListDriveFilesDto } from './dto/list-drive-files.dto';

@@ -58,13 +58,6 @@ type OpportunityFieldMapping = Partial<
   Record<OpportunityImportField, string>
 >;
 
-interface ParsedSheet {
-  headers: string[];
-  rows: Record<string, any>[];
-}
-
-const SUPPORTED_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
-
 const OPPORTUNITY_FIELD_DEFINITIONS: OpportunityImportFieldMetadata[] = [
   {
     key: OpportunityImportField.TITLE,

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CandidateStage, EmploymentStatus, NotificationType, Prisma, UserRole } from '@prisma/client';
+import { CandidateStage, EmploymentStatus, Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';
@@ -1036,7 +1036,7 @@ export class CandidatesService {
     const candidate = this.formatCandidate(candidateRaw);
 
     let htmlContent = dto.htmlContent;
-    let textContent = dto.textContent;
+    const textContent = dto.textContent;
 
     // If template is provided, render it with candidate data
     if (dto.templateId) {

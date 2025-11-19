@@ -51,10 +51,6 @@ export interface EodImportFieldMetadata {
   required: boolean;
 }
 
-type ParsedSheet = {
-  headers: string[];
-  rows: Record<string, any>[];
-};
 
 const EOD_FIELD_DEFINITIONS: EodImportFieldMetadata[] = [
   {

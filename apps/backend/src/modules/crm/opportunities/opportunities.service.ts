@@ -444,7 +444,7 @@ export class OpportunitiesService {
       );
     }
 
-    const customer = await this.findCustomerSummary(resolvedCustomerId);
+    const _customer = await this.findCustomerSummary(resolvedCustomerId);
 
     if (createDto.assignedToId) {
       await this.ensureEligibleAssignee(createDto.assignedToId);
@@ -495,7 +495,7 @@ export class OpportunitiesService {
         await this.notifyRecruiters(tx, {
           opportunityId: opportunity.id,
           opportunityTitle: createDto.title,
-          customerName: customer?.name ?? lead.contact?.companyName ?? undefined,
+          customerName: _customer?.name ?? lead.contact?.companyName ?? undefined,
         });
       }
 
@@ -592,7 +592,7 @@ export class OpportunitiesService {
       );
     }
 
-    const customer = await this.findCustomerSummary(resolvedCustomerId);
+    const _customer = await this.findCustomerSummary(resolvedCustomerId);
 
     if (
       updateDto.assignedToId &&
@@ -879,7 +879,7 @@ export class OpportunitiesService {
     }
 
     let htmlContent = dto.htmlContent;
-    let textContent = dto.textContent;
+    const textContent = dto.textContent;
 
     // If template is provided, render it with opportunity data
     if (dto.templateId) {

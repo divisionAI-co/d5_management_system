@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, CompanySettings, NotificationType, UserRole } from '@prisma/client';
+import { Prisma, CompanySettings, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { CreateRemoteWorkLogDto } from './dto/create-remote-work-log.dto';
