@@ -56,7 +56,7 @@ export class RemoteWorkController {
       targetUserId = user.id;
     }
 
-    const { employeeId, ...payload } = createDto;
+    const { employeeId: _employeeId, ...payload } = createDto;
     return this.remoteWorkService.create(targetUserId, targetEmployeeId, payload);
   }
 

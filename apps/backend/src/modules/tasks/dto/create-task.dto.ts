@@ -9,7 +9,6 @@ import {
   IsUUID,
   MaxLength,
   Min,
-  ArrayMinSize,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { TaskPriority, TaskStatus } from '@prisma/client';

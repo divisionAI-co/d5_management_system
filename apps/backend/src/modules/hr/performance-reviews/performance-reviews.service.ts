@@ -279,7 +279,7 @@ export class PerformanceReviewsService {
     `;
   }
 
-  async getUpcomingReviews(daysAhead: number = 30) {
+  async getUpcomingReviews(_daysAhead: number = 30) {
     const today = new Date();
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(today.getMonth() - 6);

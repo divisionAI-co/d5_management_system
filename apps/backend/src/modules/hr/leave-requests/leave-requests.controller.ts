@@ -53,7 +53,7 @@ export class LeaveRequestsController {
       targetEmployee = await this.employeesService.findByUserId(user.id);
     }
 
-    const { employeeId, ...payload } = createLeaveDto;
+    const { employeeId: _employeeId, ...payload } = createLeaveDto;
 
     return this.leaveService.create(
       targetEmployee.userId,

@@ -51,11 +51,6 @@ export interface InvoiceImportFieldMetadata {
 
 type InvoiceFieldMapping = Partial<Record<InvoiceImportField, string>>;
 
-type ParsedSheet = {
-  headers: string[];
-  rows: Record<string, any>[];
-};
-
 const INVOICE_FIELD_DEFINITIONS: InvoiceImportFieldMetadata[] = [
   {
     key: InvoiceImportField.INVOICE_NUMBER,

@@ -268,7 +268,7 @@ const encodeToBase64 = (value: string) => {
       return window.btoa(unescape(encodeURIComponent(value)));
     }
 
-    // @ts-ignore
+    // @ts-expect-error - Buffer is not available in browser, but this is handled in catch
     return Buffer.from(value, 'utf-8').toString('base64');
   } catch {
     return '';
@@ -281,7 +281,7 @@ const decodeFromBase64 = (value: string) => {
       return decodeURIComponent(escape(window.atob(value)));
     }
 
-    // @ts-ignore
+    // @ts-expect-error - Buffer is not available in browser, but this is handled in catch
     return Buffer.from(value, 'base64').toString('utf-8');
   } catch {
     return '';

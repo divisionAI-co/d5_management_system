@@ -3,7 +3,6 @@ import {
   CanActivate,
   ExecutionContext,
   HttpException,
-  HttpStatus,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { RateLimitingService } from '../../../common/rate-limiting/rate-limiting.service';

@@ -22,7 +22,6 @@ import { RolesGuard } from '../../../modules/auth/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { SystemExportService } from './system-export.service';
-import { ImportSystemDto } from './dto/import-system.dto';
 
 @ApiTags('System Export/Import')
 @ApiBearerAuth()
