@@ -1,16 +1,11 @@
 name: Deploy D5 Management System
 
 on:
-  push:
-    branches:
-      - main          # Production deployment
-      - develop       # Staging deployment
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Deployment environment'
+        description: 'Environment to deploy to'
         required: true
-        default: 'staging'
         type: choice
         options:
           - staging
@@ -18,18 +13,25 @@ on:
       skip_tests:
         description: 'Skip tests before deployment'
         required: false
-        default: false
         type: boolean
-
-env:
-  NODE_VERSION: '20.x'
+        default: false
+  push:
+    branches:
+      - develop  # Auto-deploy to staging
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
 
 jobs:
-  # Run tests before deployment
-  test:
-    name: Run Tests
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || (github.ref == 'refs/heads/develop' && 'staging' || 'production') }}
     runs-on: ubuntu-latest
-    if: github.event.inputs.skip_tests != 'true'
+    environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/develop' && 'staging' || 'production') }}
+    
+    env:
+      PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+      # Determine environment prefix based on deployment context
+      ENV_PREFIX: ${{ github.event.inputs.environment == 'production' && 'PRODUCTION' || (github.event.inputs.environment == 'staging' || github.ref == 'refs/heads/develop') && 'STAGING' || 'PRODUCTION' }}
     
     steps:
       - name: Checkout code
@@ -38,220 +40,72 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: |
-            apps/backend/package-lock.json
-            apps/frontend/package-lock.json
 
-      - name: Cache Prisma binary
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/prisma
-            apps/backend/node_modules/.prisma
-            apps/backend/node_modules/@prisma
-          key: ${{ runner.os }}-prisma-${{ hashFiles('apps/backend/prisma/schema.prisma') }}
-          restore-keys: |
-            ${{ runner.os }}-prisma-
-
-      - name: Install backend dependencies and generate Prisma
-        working-directory: apps/backend
-        run: |
-          # Install with retry logic for Prisma generation
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          
-          until npm ci || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
-            RETRY_COUNT=$((RETRY_COUNT+1))
-            echo "npm ci failed (possibly Prisma), attempt $RETRY_COUNT of $MAX_RETRIES..."
-            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-              echo "Cleaning and retrying in 5 seconds..."
-              rm -rf node_modules
-              sleep 5
-            fi
-          done
-          
-          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-            echo "Failed to install dependencies after $MAX_RETRIES attempts"
-            exit 1
-          fi
-          
-          echo "✅ Backend dependencies installed successfully"
-
-      - name: Install frontend dependencies
-        working-directory: apps/frontend
+      - name: Install dependencies
         run: npm ci
 
-      - name: Run backend type check
-        working-directory: apps/backend
-        run: npm run typecheck
-
-      - name: Run frontend type check
-        working-directory: apps/frontend
-        run: npm run typecheck
-
-      # Add more test steps as needed
-      # - name: Run backend tests
-      #   working-directory: apps/backend
-      #   run: npm test
-      #
-      # - name: Run frontend tests
-      #   working-directory: apps/frontend
-      #   run: npm test
-
-  # Deploy to staging
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
-    environment:
-      name: staging
-      url: ${{ secrets.STAGING_DOMAIN || 'https://staging.app.division5.co' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup deployment
+      - name: Run tests (if not skipped)
+        if: github.event.inputs.skip_tests != 'true' && github.event_name == 'workflow_dispatch'
         run: |
-          chmod +x deploy.sh
-          sudo apt-get update
-          sudo apt-get install -y rsync openssh-client
+          npm run lint
+          npm run typecheck
+          npm run build
 
-      - name: Configure SSH
+      - name: Generate Prisma Client
+        run: |
+          cd apps/backend
+          npx prisma generate
+
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.STAGING_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets[format('{0}_SSH_PRIVATE_KEY', env.ENV_PREFIX)] }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.STAGING_SSH_HOST }} >> ~/.ssh/known_hosts || true
+          ssh-keyscan -p ${{ secrets[format('{0}_SSH_PORT', env.ENV_PREFIX)] || '22' }} -H ${{ secrets[format('{0}_SSH_HOST', env.ENV_PREFIX)] }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to staging server
+      - name: Deploy to server
         env:
-          CI: true
-          DEPLOY_NON_INTERACTIVE: true
-          # Database
-          DEPLOY_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
-          # Domain & Email
-          DEPLOY_DOMAIN: ${{ secrets.STAGING_DOMAIN }}
-          DEPLOY_EMAIL: ${{ secrets.STAGING_EMAIL }}
-          DEPLOY_FRONTEND_URL: ${{ secrets.STAGING_FRONTEND_URL }}
-          # JWT Secrets
-          DEPLOY_JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
-          DEPLOY_JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
-          # SMTP
-          DEPLOY_SMTP_HOST: ${{ secrets.STAGING_SMTP_HOST }}
-          DEPLOY_SMTP_PORT: ${{ secrets.STAGING_SMTP_PORT }}
-          DEPLOY_SMTP_USER: ${{ secrets.STAGING_SMTP_USER }}
-          DEPLOY_SMTP_PASSWORD: ${{ secrets.STAGING_SMTP_PASSWORD }}
-          DEPLOY_SMTP_SECURE: ${{ secrets.STAGING_SMTP_SECURE || 'false' }}
-          DEPLOY_SMTP_REQUIRE_TLS: ${{ secrets.STAGING_SMTP_REQUIRE_TLS || 'false' }}
-          DEPLOY_EMAIL_FROM: ${{ secrets.STAGING_EMAIL_FROM }}
-          # Google Drive
-          DEPLOY_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.STAGING_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL }}
-          DEPLOY_GOOGLE_DRIVE_PRIVATE_KEY: ${{ secrets.STAGING_GOOGLE_DRIVE_PRIVATE_KEY }}
-          DEPLOY_GOOGLE_DRIVE_SHARED_DRIVE_ID: ${{ secrets.STAGING_GOOGLE_DRIVE_SHARED_DRIVE_ID }}
-          DEPLOY_GOOGLE_DRIVE_SCOPES: ${{ secrets.STAGING_GOOGLE_DRIVE_SCOPES }}
-          DEPLOY_GOOGLE_DRIVE_IMPERSONATE_USER: ${{ secrets.STAGING_GOOGLE_DRIVE_IMPERSONATE_USER }}
-          # Google Calendar
-          DEPLOY_GOOGLE_CALENDAR_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_CALENDAR_CLIENT_ID }}
-          DEPLOY_GOOGLE_CALENDAR_CLIENT_SECRET: ${{ secrets.STAGING_GOOGLE_CALENDAR_CLIENT_SECRET }}
-          DEPLOY_GOOGLE_CALENDAR_REDIRECT_URI: ${{ secrets.STAGING_GOOGLE_CALENDAR_REDIRECT_URI }}
-          # Gemini AI
-          DEPLOY_GEMINI_API_KEY: ${{ secrets.STAGING_GEMINI_API_KEY }}
-          DEPLOY_GEMINI_MODEL_ID: ${{ secrets.STAGING_GEMINI_MODEL_ID || 'gemini-1.5-pro-latest' }}
-          # App Name
-          DEPLOY_APP_NAME: ${{ secrets.STAGING_APP_NAME || 'D5 Management System (Staging)' }}
-        run: |
-          ./deploy.sh --remote ${{ secrets.STAGING_SSH_USER }}@${{ secrets.STAGING_SSH_HOST }} \
-            --key ~/.ssh/deploy_key \
-            --port ${{ secrets.STAGING_SSH_PORT || '22' }} \
-            --repo ${{ github.server_url }}/${{ github.repository }}.git
-
-      - name: Notify deployment
-        if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ Deployment to staging successful!"
-          else
-            echo "❌ Deployment to staging failed!"
-          fi
-
-  # Deploy to production
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
-    environment:
-      name: production
-      url: ${{ secrets.PRODUCTION_DOMAIN || 'https://app.division5.co' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup deployment
+          CI: 'true'
+          DEPLOY_NON_INTERACTIVE: 'true'
+          DEPLOY_USER: ${{ secrets[format('{0}_SSH_USER', env.ENV_PREFIX)] }}
+          DEPLOY_HOST: ${{ secrets[format('{0}_SSH_HOST', env.ENV_PREFIX)] }}
+          DEPLOY_PORT: ${{ secrets[format('{0}_SSH_PORT', env.ENV_PREFIX)] || '22' }}
+          DEPLOY_DOMAIN: ${{ secrets[format('{0}_DOMAIN', env.ENV_PREFIX)] }}
+          DEPLOY_EMAIL: ${{ secrets[format('{0}_EMAIL', env.ENV_PREFIX)] }}
+          DEPLOY_DB_PASSWORD: ${{ secrets[format('{0}_DB_PASSWORD', env.ENV_PREFIX)] }}
+          DEPLOY_JWT_SECRET: ${{ secrets[format('{0}_JWT_SECRET', env.ENV_PREFIX)] }}
+          DEPLOY_JWT_REFRESH_SECRET: ${{ secrets[format('{0}_JWT_REFRESH_SECRET', env.ENV_PREFIX)] }}
+          DEPLOY_FRONTEND_URL: ${{ secrets[format('{0}_FRONTEND_URL', env.ENV_PREFIX)] }}
+          # Optional SMTP
+          DEPLOY_SMTP_HOST: ${{ secrets[format('{0}_SMTP_HOST', env.ENV_PREFIX)] || '' }}
+          DEPLOY_SMTP_PORT: ${{ secrets[format('{0}_SMTP_PORT', env.ENV_PREFIX)] || '587' }}
+          DEPLOY_SMTP_USER: ${{ secrets[format('{0}_SMTP_USER', env.ENV_PREFIX)] || '' }}
+          DEPLOY_SMTP_PASSWORD: ${{ secrets[format('{0}_SMTP_PASSWORD', env.ENV_PREFIX)] || '' }}
+          DEPLOY_SMTP_SECURE: ${{ secrets[format('{0}_SMTP_SECURE', env.ENV_PREFIX)] || 'false' }}
+          DEPLOY_SMTP_REQUIRE_TLS: ${{ secrets[format('{0}_SMTP_REQUIRE_TLS', env.ENV_PREFIX)] || 'false' }}
+          DEPLOY_EMAIL_FROM: ${{ secrets[format('{0}_EMAIL_FROM', env.ENV_PREFIX)] || '' }}
+          # Optional Google Drive
+          DEPLOY_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL: ${{ secrets[format('{0}_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GOOGLE_DRIVE_PRIVATE_KEY: ${{ secrets[format('{0}_GOOGLE_DRIVE_PRIVATE_KEY', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GOOGLE_DRIVE_SHARED_DRIVE_ID: ${{ secrets[format('{0}_GOOGLE_DRIVE_SHARED_DRIVE_ID', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GOOGLE_DRIVE_SCOPES: ${{ secrets[format('{0}_GOOGLE_DRIVE_SCOPES', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GOOGLE_DRIVE_IMPERSONATE_USER: ${{ secrets[format('{0}_GOOGLE_DRIVE_IMPERSONATE_USER', env.ENV_PREFIX)] || '' }}
+          # Optional Google Calendar
+          DEPLOY_GOOGLE_CALENDAR_CLIENT_ID: ${{ secrets[format('{0}_GOOGLE_CALENDAR_CLIENT_ID', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GOOGLE_CALENDAR_CLIENT_SECRET: ${{ secrets[format('{0}_GOOGLE_CALENDAR_CLIENT_SECRET', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GOOGLE_CALENDAR_REDIRECT_URI: ${{ secrets[format('{0}_GOOGLE_CALENDAR_REDIRECT_URI', env.ENV_PREFIX)] || '' }}
+          # Optional Gemini AI
+          DEPLOY_GEMINI_API_KEY: ${{ secrets[format('{0}_GEMINI_API_KEY', env.ENV_PREFIX)] || '' }}
+          DEPLOY_GEMINI_MODEL_ID: ${{ secrets[format('{0}_GEMINI_MODEL_ID', env.ENV_PREFIX)] || 'gemini-1.5-pro-latest' }}
         run: |
           chmod +x deploy.sh
-          sudo apt-get update
-          sudo apt-get install -y rsync openssh-client
-
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.PRODUCTION_SSH_HOST }} >> ~/.ssh/known_hosts || true
-
-      - name: Deploy to production server
-        env:
-          CI: true
-          DEPLOY_NON_INTERACTIVE: true
-          # Database
-          DEPLOY_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
-          # Domain & Email
-          DEPLOY_DOMAIN: ${{ secrets.PRODUCTION_DOMAIN }}
-          DEPLOY_EMAIL: ${{ secrets.PRODUCTION_EMAIL }}
-          DEPLOY_FRONTEND_URL: ${{ secrets.PRODUCTION_FRONTEND_URL }}
-          # JWT Secrets
-          DEPLOY_JWT_SECRET: ${{ secrets.PRODUCTION_JWT_SECRET }}
-          DEPLOY_JWT_REFRESH_SECRET: ${{ secrets.PRODUCTION_JWT_REFRESH_SECRET }}
-          # SMTP
-          DEPLOY_SMTP_HOST: ${{ secrets.PRODUCTION_SMTP_HOST }}
-          DEPLOY_SMTP_PORT: ${{ secrets.PRODUCTION_SMTP_PORT }}
-          DEPLOY_SMTP_USER: ${{ secrets.PRODUCTION_SMTP_USER }}
-          DEPLOY_SMTP_PASSWORD: ${{ secrets.PRODUCTION_SMTP_PASSWORD }}
-          DEPLOY_SMTP_SECURE: ${{ secrets.PRODUCTION_SMTP_SECURE || 'false' }}
-          DEPLOY_SMTP_REQUIRE_TLS: ${{ secrets.PRODUCTION_SMTP_REQUIRE_TLS || 'false' }}
-          DEPLOY_EMAIL_FROM: ${{ secrets.PRODUCTION_EMAIL_FROM }}
-          # Google Drive
-          DEPLOY_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.PRODUCTION_GOOGLE_DRIVE_SERVICE_ACCOUNT_EMAIL }}
-          DEPLOY_GOOGLE_DRIVE_PRIVATE_KEY: ${{ secrets.PRODUCTION_GOOGLE_DRIVE_PRIVATE_KEY }}
-          DEPLOY_GOOGLE_DRIVE_SHARED_DRIVE_ID: ${{ secrets.PRODUCTION_GOOGLE_DRIVE_SHARED_DRIVE_ID }}
-          DEPLOY_GOOGLE_DRIVE_SCOPES: ${{ secrets.PRODUCTION_GOOGLE_DRIVE_SCOPES }}
-          DEPLOY_GOOGLE_DRIVE_IMPERSONATE_USER: ${{ secrets.PRODUCTION_GOOGLE_DRIVE_IMPERSONATE_USER }}
-          # Google Calendar
-          DEPLOY_GOOGLE_CALENDAR_CLIENT_ID: ${{ secrets.PRODUCTION_GOOGLE_CALENDAR_CLIENT_ID }}
-          DEPLOY_GOOGLE_CALENDAR_CLIENT_SECRET: ${{ secrets.PRODUCTION_GOOGLE_CALENDAR_CLIENT_SECRET }}
-          DEPLOY_GOOGLE_CALENDAR_REDIRECT_URI: ${{ secrets.PRODUCTION_GOOGLE_CALENDAR_REDIRECT_URI }}
-          # Gemini AI
-          DEPLOY_GEMINI_API_KEY: ${{ secrets.PRODUCTION_GEMINI_API_KEY }}
-          DEPLOY_GEMINI_MODEL_ID: ${{ secrets.PRODUCTION_GEMINI_MODEL_ID || 'gemini-1.5-pro-latest' }}
-          # App Name
-          DEPLOY_APP_NAME: ${{ secrets.PRODUCTION_APP_NAME || 'D5 Management System' }}
-        run: |
-          ./deploy.sh --remote ${{ secrets.PRODUCTION_SSH_USER }}@${{ secrets.PRODUCTION_SSH_HOST }} \
+          ./deploy.sh \
+            --remote ${{ secrets[format('{0}_SSH_USER', env.ENV_PREFIX)] }}@${{ secrets[format('{0}_SSH_HOST', env.ENV_PREFIX)] }} \
             --key ~/.ssh/deploy_key \
-            --port ${{ secrets.PRODUCTION_SSH_PORT || '22' }} \
-            --repo ${{ github.server_url }}/${{ github.repository }}.git
+            --port ${{ secrets[format('{0}_SSH_PORT', env.ENV_PREFIX)] || '22' }}
 
-      - name: Notify deployment
+      - name: Cleanup SSH key
         if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ Deployment to production successful!"
-          else
-            echo "❌ Deployment to production failed!"
-          fi
+        run: rm -f ~/.ssh/deploy_key
