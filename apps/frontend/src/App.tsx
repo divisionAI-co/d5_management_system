@@ -29,6 +29,7 @@ import CampaignsPage from '@/pages/crm/CampaignsPage';
 import CandidatesPage from '@/pages/recruitment/CandidatesPage';
 import CandidateDetailPage from '@/pages/recruitment/CandidateDetailPage';
 import OpenPositionsPage from '@/pages/recruitment/OpenPositionsPage';
+import PositionDetailPage from '@/pages/recruitment/PositionDetailPage';
 
 // Employees & HR
 import EmployeesPage from '@/pages/employees/EmployeesPage';
@@ -118,6 +119,7 @@ function App() {
             <Route path="candidates" element={<CandidatesPage />} />
             <Route path="candidates/:id" element={<CandidateDetailPage />} />
             <Route path="positions" element={<OpenPositionsPage />} />
+            <Route path="positions/:id" element={<PositionDetailPage />} />
           </Route>
 
           {/* Employees */}

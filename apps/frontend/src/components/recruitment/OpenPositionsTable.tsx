@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { UserRound, Users } from 'lucide-react';
+import { UserRound, Users, ExternalLink } from 'lucide-react';
 import type { OpenPositionSummary, PositionStatus } from '@/types/recruitment';
 
 const STATUS_COLORS: Record<PositionStatus, string> = {
@@ -110,19 +110,36 @@ export function OpenPositionsTable({
                   </td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">
                     {position.opportunity ? (
-                      <div>
-                        <p className="font-medium text-foreground">
+                      <div className="space-y-1">
+                        <Link
+                          to={`/crm/opportunities/${position.opportunity.id}`}
+                          className="font-medium text-blue-600 hover:underline inline-flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {position.opportunity.title}
-                        </p>
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <UserRound className="h-3.5 w-3.5" />
                           <span>{position.opportunity.customer?.name ?? '—'}</span>
                         </div>
-                        {position.opportunity.lead?.leadType && (
-                          <div className="mt-1 text-xs">
-                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
-                              {position.opportunity.lead.leadType === 'END_CUSTOMER' ? 'End Customer' : 'Intermediary'}
-                            </span>
+                        {position.opportunity.lead && (
+                          <div className="mt-1 space-y-1">
+                            <Link
+                              to={`/crm/leads/${position.opportunity.lead.id}`}
+                              className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Lead: {position.opportunity.lead.title}
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                            {position.opportunity.lead.leadType && (
+                              <div className="text-xs">
+                                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
+                                  {position.opportunity.lead.leadType === 'END_CUSTOMER' ? 'End Customer' : 'Intermediary'}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -177,11 +194,7 @@ export function OpenPositionsTable({
                     <div className="flex flex-wrap justify-end gap-2">
                       {onSelect && (
                         <Link
-                          to="#"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            onSelect(position);
-                          }}
+                          to={`/recruitment/positions/${position.id}`}
                           className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/70"
                         >
                           View
