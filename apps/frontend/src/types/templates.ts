@@ -75,6 +75,7 @@ interface TemplateBlockBase {
   id: string;
   type: TemplateBlockType;
   customStyle?: string; // Custom inline CSS styles for this block
+  stackOnBlockId?: string; // ID of another block to stack on top of (for layering)
 }
 
 export interface TemplateHeadingBlock extends TemplateBlockBase {
@@ -108,6 +109,7 @@ export interface TemplateImageBlock extends TemplateBlockBase {
   width: number;
   align: 'left' | 'center' | 'right';
   fullWidth?: boolean; // If true, image spans full viewport width
+  position?: 'top' | 'bottom' | 'inline'; // Position for all images: top (always top), bottom (always bottom), inline (respect block order)
   overlayText?: string;
   overlayPosition?: 'top' | 'center' | 'bottom';
   overlayTextColor?: string;

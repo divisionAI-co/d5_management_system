@@ -1,7 +1,24 @@
 import { useState } from 'react';
-import { Plus, ArrowDown, ArrowUp, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Plus, ArrowDown, ArrowUp, ChevronDown, ChevronUp, Trash2, GripVertical } from 'lucide-react';
 import type { TemplateBlock, TemplateBlockType, TemplateRowBlock } from '@/types/templates';
 import { createBlock, convertGoogleDriveUrl } from './template-blocks';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type TemplateBlockEditorProps = {
   blocks: TemplateBlock[];
@@ -43,6 +60,7 @@ const headingLevels: Array<{ value: 'h1' | 'h2' | 'h3'; label: string }> = [
 const fontFamilyOptions: Array<{ value: string; label: string }> = [
   { value: 'Arial', label: 'Arial' },
   { value: 'Helvetica', label: 'Helvetica' },
+  { value: 'Proxima Nova', label: 'Proxima Nova' },
   { value: 'Georgia', label: 'Georgia' },
   { value: 'Times New Roman', label: 'Times New Roman' },
   { value: 'Courier New', label: 'Courier New' },
@@ -53,8 +71,31 @@ const fontFamilyOptions: Array<{ value: string; label: string }> = [
   { value: 'Impact', label: 'Impact' },
 ];
 
+
 export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] }: TemplateBlockEditorProps) {
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = blocks.findIndex((block) => block.id === active.id);
+      const newIndex = blocks.findIndex((block) => block.id === over.id);
+
+      onChange(arrayMove(blocks, oldIndex, newIndex));
+    }
+  };
 
   const toggleBlock = (blockId: string) => {
     setExpandedBlocks((prev) => {
@@ -189,17 +230,86 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
         </section>
       )}
 
-      <div className="space-y-4">
-        {blocks.length === 0 && (
-          <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
-            No blocks added yet. Start by selecting a block type above.
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-4">
+            {blocks.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
+                No blocks added yet. Start by selecting a block type above.
+              </div>
+            )}
+
+            {blocks.map((block, index) => {
+              const isExpanded = expandedBlocks.has(block.id);
+              
+              return <BlockItem
+                key={block.id}
+                block={block}
+                index={index}
+                isExpanded={isExpanded}
+                expandedBlocks={expandedBlocks}
+                availableVariables={availableVariables}
+                blocks={blocks}
+                onToggle={toggleBlock}
+                onUpdate={handleUpdateBlock}
+                onRemove={handleRemoveBlock}
+                onMove={moveBlock}
+                onDuplicate={duplicateBlock}
+                onInsertVariable={insertVariable}
+              />;
+            })}
           </div>
-        )}
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+}
 
-        {blocks.map((block, index) => {
-          const isExpanded = expandedBlocks.has(block.id);
+type BlockItemProps = {
+  block: TemplateBlock;
+  index: number;
+  isExpanded: boolean;
+  expandedBlocks: Set<string>;
+  availableVariables: string[];
+  blocks: TemplateBlock[];
+  onToggle: (blockId: string) => void;
+  onUpdate: (id: string, payload: Partial<TemplateBlock>) => void;
+  onRemove: (id: string) => void;
+  onMove: (id: string, direction: 'up' | 'down') => void;
+  onDuplicate: (id: string) => void;
+  onInsertVariable: (blockId: string, field: 'text' | 'label' | 'html', variable: string) => void;
+};
 
-          const renderBlockPreview = () => {
+function BlockItem({
+  block,
+  index,
+  isExpanded,
+  expandedBlocks,
+  availableVariables,
+  blocks,
+  onToggle,
+  onUpdate,
+  onRemove,
+  onMove,
+  onDuplicate,
+  onInsertVariable,
+}: BlockItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: block.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const renderBlockPreview = () => {
             switch (block.type) {
               case 'heading':
                 return (
@@ -262,72 +372,88 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
             }
           };
 
-          return (
-            <div key={block.id} className="rounded-lg border border-border bg-card shadow-sm">
-              <div className="flex items-center justify-between p-4">
-                <button
-                  type="button"
-                  onClick={() => toggleBlock(block.id)}
-                  className="flex flex-1 items-center gap-3 text-left hover:opacity-80"
-                >
-                  {isExpanded ? (
-                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-foreground">
-                        {BLOCK_OPTIONS.find((group) => group.type === block.type)?.label ?? block.type}
-                      </h4>
-                      <span className="text-xs text-muted-foreground">#{index + 1}</span>
-                    </div>
-                    {!isExpanded && (
-                      <div className="mt-1.5">
-                        {renderBlockPreview()}
-                      </div>
-                    )}
-                  </div>
-                </button>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => moveBlock(block.id, 'up')}
-                    disabled={index === 0}
-                    className="rounded-lg border border-border p-1 text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Move block up"
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveBlock(block.id, 'down')}
-                    disabled={index === blocks.length - 1}
-                    className="rounded-lg border border-border p-1 text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Move block down"
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => duplicateBlock(block.id)}
-                    className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  >
-                    Duplicate
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveBlock(block.id)}
-                    className="rounded-lg border border-border p-1 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600"
-                    aria-label="Remove block"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-lg border border-border bg-card shadow-sm ${isDragging ? 'ring-2 ring-blue-500' : ''}`}
+    >
+      <div className="flex items-center justify-between p-4">
+        <div className="flex items-center gap-2 flex-1">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors p-1 -ml-1"
+            aria-label="Drag to reorder"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onToggle(block.id)}
+            className="flex flex-1 items-center gap-3 text-left hover:opacity-80"
+          >
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-foreground">
+                  {BLOCK_OPTIONS.find((group) => group.type === block.type)?.label ?? block.type}
+                </h4>
+                <span className="text-xs text-muted-foreground">#{index + 1}</span>
               </div>
+              {!isExpanded && (
+                <div className="mt-1.5">
+                  {renderBlockPreview()}
+                </div>
+              )}
+            </div>
+          </button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onMove(block.id, 'up')}
+            disabled={index === 0}
+            className="rounded-lg border border-border p-1 text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Move block up"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMove(block.id, 'down')}
+            disabled={index === blocks.length - 1}
+            className="rounded-lg border border-border p-1 text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Move block down"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDuplicate(block.id)}
+            className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemove(block.id)}
+            className="rounded-lg border border-border p-1 text-muted-foreground transition hover:bg-rose-50 hover:text-rose-600"
+            aria-label="Remove block"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
 
-              {isExpanded && (
-                <div className="border-t border-border p-4 space-y-3">
+      {isExpanded && (
+        <div className="border-t border-border p-4 space-y-3">
 
             {block.type === 'heading' && (
               <div className="space-y-3">
@@ -337,7 +463,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <input
                       type="text"
                       value={block.text}
-                      onChange={(event) => handleUpdateBlock(block.id, { text: event.target.value })}
+                      onChange={(event) => onUpdate(block.id, { text: event.target.value })}
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -348,7 +474,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <select
                       value={block.level}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { level: event.target.value as 'h1' | 'h2' | 'h3' })
+                        onUpdate(block.id, { level: event.target.value as 'h1' | 'h2' | 'h3' })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -366,7 +492,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <select
                       value={block.fontFamily || 'Arial'}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { fontFamily: event.target.value || undefined })
+                        onUpdate(block.id, { fontFamily: event.target.value || undefined })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -382,7 +508,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <select
                       value={block.align}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
+                        onUpdate(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -401,7 +527,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       <button
                         key={variable}
                         type="button"
-                        onClick={() => insertVariable(block.id, 'text', variable)}
+                        onClick={() => onInsertVariable(block.id, 'text', variable)}
                         className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
                       >
                         {'{{'}
@@ -418,13 +544,40 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     type="text"
                     value={block.customStyle || ''}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { customStyle: event.target.value || undefined })
+                      onUpdate(block.id, { customStyle: event.target.value || undefined })
                     }
                     placeholder="e.g., font-style:italic; text-decoration:underline;"
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Add inline CSS styles (e.g., "color:#ff0000; font-weight:bold;")
+                  </p>
+                </div>
+                
+                <div className="border-t border-border pt-3">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Stack On Block (optional)</label>
+                  <select
+                    value={block.stackOnBlockId || ''}
+                    onChange={(event) =>
+                      onUpdate(block.id, { stackOnBlockId: event.target.value || undefined })
+                    }
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">None (normal position)</option>
+                    {blocks
+                      .filter((b) => b.id !== block.id && (b.type === 'image' || b.type === 'text'))
+                      .map((b) => {
+                        const blockLabel = BLOCK_OPTIONS.find((opt) => opt.type === b.type)?.label || b.type;
+                        const blockIndex = blocks.findIndex((bl) => bl.id === b.id) + 1;
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {blockLabel} #{blockIndex}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Stack this block on top of another block (image or text). The stacked block will be positioned absolutely on top.
                   </p>
                 </div>
               </div>
@@ -437,7 +590,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                 </label>
                 <textarea
                   value={block.text}
-                  onChange={(event) => handleUpdateBlock(block.id, { text: event.target.value })}
+                  onChange={(event) => onUpdate(block.id, { text: event.target.value })}
                   rows={5}
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Write the body copy for this section..."
@@ -448,7 +601,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <select
                       value={block.fontFamily || 'Arial'}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { fontFamily: event.target.value || undefined })
+                        onUpdate(block.id, { fontFamily: event.target.value || undefined })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -464,7 +617,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <select
                       value={block.align}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
+                        onUpdate(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -483,7 +636,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       <button
                         key={variable}
                         type="button"
-                        onClick={() => insertVariable(block.id, 'text', variable)}
+                        onClick={() => onInsertVariable(block.id, 'text', variable)}
                         className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
                       >
                         {'{{'}
@@ -500,13 +653,40 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     type="text"
                     value={block.customStyle || ''}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { customStyle: event.target.value || undefined })
+                      onUpdate(block.id, { customStyle: event.target.value || undefined })
                     }
                     placeholder="e.g., font-style:italic; color:#666;"
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Add inline CSS styles (e.g., "font-weight:bold; text-decoration:underline;")
+                  </p>
+                </div>
+                
+                <div className="border-t border-border pt-3">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Stack On Block (optional)</label>
+                  <select
+                    value={block.stackOnBlockId || ''}
+                    onChange={(event) =>
+                      onUpdate(block.id, { stackOnBlockId: event.target.value || undefined })
+                    }
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">None (normal position)</option>
+                    {blocks
+                      .filter((b) => b.id !== block.id && (b.type === 'image' || b.type === 'text'))
+                      .map((b) => {
+                        const blockLabel = BLOCK_OPTIONS.find((opt) => opt.type === b.type)?.label || b.type;
+                        const blockIndex = blocks.findIndex((bl) => bl.id === b.id) + 1;
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {blockLabel} #{blockIndex}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Stack this block on top of another block (image or text). The stacked block will be positioned absolutely on top.
                   </p>
                 </div>
               </div>
@@ -520,7 +700,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <input
                       type="text"
                       value={block.label}
-                      onChange={(event) => handleUpdateBlock(block.id, { label: event.target.value })}
+                      onChange={(event) => onUpdate(block.id, { label: event.target.value })}
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -529,7 +709,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <input
                       type="text"
                       value={block.url}
-                      onChange={(event) => handleUpdateBlock(block.id, { url: event.target.value })}
+                      onChange={(event) => onUpdate(block.id, { url: event.target.value })}
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -540,7 +720,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <select
                       value={block.align}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
+                        onUpdate(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -559,7 +739,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       type="color"
                       value={block.backgroundColor}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { backgroundColor: event.target.value })
+                        onUpdate(block.id, { backgroundColor: event.target.value })
                       }
                       className="mt-2 h-10 w-full rounded-lg border border-border bg-card"
                     />
@@ -569,7 +749,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <input
                       type="color"
                       value={block.textColor}
-                      onChange={(event) => handleUpdateBlock(block.id, { textColor: event.target.value })}
+                      onChange={(event) => onUpdate(block.id, { textColor: event.target.value })}
                       className="mt-2 h-10 w-full rounded-lg border border-border bg-card"
                     />
                   </div>
@@ -581,13 +761,40 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     type="text"
                     value={block.customStyle || ''}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { customStyle: event.target.value || undefined })
+                      onUpdate(block.id, { customStyle: event.target.value || undefined })
                     }
                     placeholder="e.g., box-shadow:0 2px 4px rgba(0,0,0,0.1); border:2px solid #000;"
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Add inline CSS styles for the button
+                  </p>
+                </div>
+                
+                <div className="border-t border-border pt-3">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Stack On Block (optional)</label>
+                  <select
+                    value={block.stackOnBlockId || ''}
+                    onChange={(event) =>
+                      onUpdate(block.id, { stackOnBlockId: event.target.value || undefined })
+                    }
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">None (normal position)</option>
+                    {blocks
+                      .filter((b) => b.id !== block.id && (b.type === 'image' || b.type === 'text'))
+                      .map((b) => {
+                        const blockLabel = BLOCK_OPTIONS.find((opt) => opt.type === b.type)?.label || b.type;
+                        const blockIndex = blocks.findIndex((bl) => bl.id === b.id) + 1;
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {blockLabel} #{blockIndex}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Stack this block on top of another block (image or text). The stacked block will be positioned absolutely on top.
                   </p>
                 </div>
               </div>
@@ -600,7 +807,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                   <input
                     type="url"
                     value={block.url}
-                    onChange={(event) => handleUpdateBlock(block.id, { url: event.target.value })}
+                    onChange={(event) => onUpdate(block.id, { url: event.target.value })}
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="https://..."
                   />
@@ -611,7 +818,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     <input
                       type="text"
                       value={block.altText}
-                      onChange={(event) => handleUpdateBlock(block.id, { altText: event.target.value })}
+                      onChange={(event) => onUpdate(block.id, { altText: event.target.value })}
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -621,7 +828,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       type="number"
                       value={block.width}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { width: Number(event.target.value) || 0 })
+                        onUpdate(block.id, { width: Number(event.target.value) || 0 })
                       }
                       min={100}
                       max={640}
@@ -652,7 +859,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       type="checkbox"
                       checked={block.fullWidth || false}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { fullWidth: event.target.checked })
+                        onUpdate(block.id, { fullWidth: event.target.checked })
                       }
                       className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
                     />
@@ -666,13 +873,35 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                 </div>
                 
                 <div className="border-t border-border pt-3">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Position</label>
+                  <select
+                    value={block.position || 'inline'}
+                    onChange={(event) =>
+                      onUpdate(block.id, {
+                        position: event.target.value as 'top' | 'bottom' | 'inline',
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="inline">Respect Block Order</option>
+                    <option value="top">Always at Top</option>
+                    <option value="bottom">Always at Bottom</option>
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {block.position === 'top' && 'Image will always render at the top of the page, before all content.'}
+                    {block.position === 'bottom' && 'Image will always render at the bottom of the page, after all content.'}
+                    {(block.position === 'inline' || !block.position) && 'Image will render at its position in the block order (inside main content for normal images, or before/after main content for full-width images).'}
+                  </p>
+                </div>
+                
+                <div className="border-t border-border pt-3">
                   <div className="mb-3">
                     <label className="text-xs font-semibold uppercase text-muted-foreground">Overlay Text (optional)</label>
                     <input
                       type="text"
                       value={block.overlayText || ''}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { overlayText: event.target.value || undefined })
+                        onUpdate(block.id, { overlayText: event.target.value || undefined })
                       }
                       className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Text to display on top of image"
@@ -686,7 +915,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                         <select
                           value={block.overlayPosition || 'center'}
                           onChange={(event) =>
-                            handleUpdateBlock(block.id, {
+                            onUpdate(block.id, {
                               overlayPosition: event.target.value as 'top' | 'center' | 'bottom',
                             })
                           }
@@ -705,7 +934,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                             type="color"
                             value={block.overlayTextColor || '#ffffff'}
                             onChange={(event) =>
-                              handleUpdateBlock(block.id, { overlayTextColor: event.target.value })
+                              onUpdate(block.id, { overlayTextColor: event.target.value })
                             }
                             className="mt-2 h-10 w-full rounded-lg border border-border bg-card"
                           />
@@ -716,7 +945,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                             type="color"
                             value={block.overlayBackgroundColor || '#000000'}
                             onChange={(event) =>
-                              handleUpdateBlock(block.id, { overlayBackgroundColor: event.target.value })
+                              onUpdate(block.id, { overlayBackgroundColor: event.target.value })
                             }
                             className="mt-2 h-10 w-full rounded-lg border border-border bg-card"
                           />
@@ -733,7 +962,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                           max="100"
                           value={block.overlayBackgroundOpacity ?? 50}
                           onChange={(event) =>
-                            handleUpdateBlock(block.id, {
+                            onUpdate(block.id, {
                               overlayBackgroundOpacity: Number(event.target.value),
                             })
                           }
@@ -750,13 +979,40 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     type="text"
                     value={block.customStyle || ''}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { customStyle: event.target.value || undefined })
+                      onUpdate(block.id, { customStyle: event.target.value || undefined })
                     }
                     placeholder="e.g., filter:brightness(1.1); border:1px solid #ccc;"
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
                     Add inline CSS styles for the image
+                  </p>
+                </div>
+                
+                <div className="border-t border-border pt-3">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Stack On Block (optional)</label>
+                  <select
+                    value={block.stackOnBlockId || ''}
+                    onChange={(event) =>
+                      onUpdate(block.id, { stackOnBlockId: event.target.value || undefined })
+                    }
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">None (normal position)</option>
+                    {blocks
+                      .filter((b) => b.id !== block.id && (b.type === 'image' || b.type === 'text'))
+                      .map((b) => {
+                        const blockLabel = BLOCK_OPTIONS.find((opt) => opt.type === b.type)?.label || b.type;
+                        const blockIndex = blocks.findIndex((bl) => bl.id === b.id) + 1;
+                        return (
+                          <option key={b.id} value={b.id}>
+                            {blockLabel} #{blockIndex}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Stack this block on top of another block (image or text). The stacked block will be positioned absolutely on top.
                   </p>
                 </div>
               </div>
@@ -773,7 +1029,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       onChange={(event) => {
                         const leftWidth = Number(event.target.value) || 50;
                         const rightWidth = 100 - leftWidth;
-                        handleUpdateBlock(block.id, { leftWidth, rightWidth });
+                        onUpdate(block.id, { leftWidth, rightWidth });
                       }}
                       min={10}
                       max={90}
@@ -788,7 +1044,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       onChange={(event) => {
                         const rightWidth = Number(event.target.value) || 50;
                         const leftWidth = 100 - rightWidth;
-                        handleUpdateBlock(block.id, { leftWidth, rightWidth });
+                        onUpdate(block.id, { leftWidth, rightWidth });
                       }}
                       min={10}
                       max={90}
@@ -801,7 +1057,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       type="number"
                       value={block.gap ?? 24}
                       onChange={(event) =>
-                        handleUpdateBlock(block.id, { gap: Number(event.target.value) || 24 })
+                        onUpdate(block.id, { gap: Number(event.target.value) || 24 })
                       }
                       min={0}
                       max={60}
@@ -818,7 +1074,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                         type="button"
                         onClick={() => {
                           const rowBlock = block as TemplateRowBlock;
-                          handleUpdateBlock(block.id, {
+                          onUpdate(block.id, {
                             leftBlocks: [...rowBlock.leftBlocks, createBlock('text')],
                           });
                         }}
@@ -835,7 +1091,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                         <TemplateBlockEditor
                           blocks={(block as TemplateRowBlock).leftBlocks}
                           onChange={(newBlocks) => {
-                            handleUpdateBlock(block.id, { leftBlocks: newBlocks });
+                            onUpdate(block.id, { leftBlocks: newBlocks });
                           }}
                           availableVariables={availableVariables}
                         />
@@ -850,7 +1106,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                         type="button"
                         onClick={() => {
                           const rowBlock = block as TemplateRowBlock;
-                          handleUpdateBlock(block.id, {
+                          onUpdate(block.id, {
                             rightBlocks: [...rowBlock.rightBlocks, createBlock('text')],
                           });
                         }}
@@ -867,7 +1123,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                         <TemplateBlockEditor
                           blocks={(block as TemplateRowBlock).rightBlocks}
                           onChange={(newBlocks) => {
-                            handleUpdateBlock(block.id, { rightBlocks: newBlocks });
+                            onUpdate(block.id, { rightBlocks: newBlocks });
                           }}
                           availableVariables={availableVariables}
                         />
@@ -888,7 +1144,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     min={1}
                     max={6}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { thickness: Number(event.target.value) || 1 })
+                      onUpdate(block.id, { thickness: Number(event.target.value) || 1 })
                     }
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -898,7 +1154,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                   <input
                     type="color"
                     value={block.color}
-                    onChange={(event) => handleUpdateBlock(block.id, { color: event.target.value })}
+                    onChange={(event) => onUpdate(block.id, { color: event.target.value })}
                     className="mt-2 h-10 w-full rounded-lg border border-border bg-card"
                   />
                 </div>
@@ -917,7 +1173,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     max={96}
                     value={block.height}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { height: Number(event.target.value) || 8 })
+                      onUpdate(block.id, { height: Number(event.target.value) || 8 })
                     }
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -929,7 +1185,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     type="text"
                     value={block.customStyle || ''}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { customStyle: event.target.value || undefined })
+                      onUpdate(block.id, { customStyle: event.target.value || undefined })
                     }
                     placeholder="e.g., background-color:#f0f0f0;"
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -946,7 +1202,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                 <label className="text-xs font-semibold uppercase text-muted-foreground">Custom HTML</label>
                 <textarea
                   value={block.html}
-                  onChange={(event) => handleUpdateBlock(block.id, { html: event.target.value })}
+                  onChange={(event) => onUpdate(block.id, { html: event.target.value })}
                   rows={8}
                   className="w-full rounded-lg border border-border px-3 py-2 font-mono text-xs focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Paste or write your custom HTML snippet here..."
@@ -957,7 +1213,7 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                       <button
                         key={variable}
                         type="button"
-                        onClick={() => insertVariable(block.id, 'html', variable)}
+                        onClick={() => onInsertVariable(block.id, 'html', variable)}
                         className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
                       >
                         {'{{'}
@@ -967,14 +1223,10 @@ export function TemplateBlockEditor({ blocks, onChange, availableVariables = [] 
                     ))}
                   </div>
                 )}
-                </div>
-              )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </div>
+            )}
+        </div>
+      )}
     </div>
   );
 }

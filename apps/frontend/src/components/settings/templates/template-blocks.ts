@@ -57,6 +57,7 @@ export const createBlock = (type: TemplateBlockType): TemplateBlock => {
         width: 560,
         align: 'center',
         fullWidth: false,
+        position: 'inline', // Default: respect block order
         overlayText: undefined,
         overlayPosition: 'center',
         overlayTextColor: '#ffffff',
@@ -259,8 +260,11 @@ const hexToRgba = (hex: string, opacity: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
 
-const renderFullWidthImage = (block: TemplateImageBlock): string => {
+const renderFullWidthImage = (block: TemplateImageBlock, stackedBlocks: TemplateBlock[] = []): string => {
   const imageUrl = convertGoogleDriveUrl(block.url);
+  
+  // Render all stacked blocks with proper z-index layering
+  const stackedContent = renderStackedBlocks(stackedBlocks, 2);
   
   // Full-width images are rendered outside the main content table
   // They span the full viewport width
@@ -284,13 +288,14 @@ const renderFullWidthImage = (block: TemplateImageBlock): string => {
                 alt="${escapeHtml(block.altText)}"
                 style="width:100%; max-width:100%; height:auto; display:block;${block.customStyle ? ` ${block.customStyle}` : ''}"
               />
-              <div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; ${positionStyles} justify-content:center; padding:20px; box-sizing:border-box;">
+              <div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; ${positionStyles} justify-content:center; padding:20px; box-sizing:border-box; z-index:1;">
                 <div style="background-color:${backgroundColor}; padding:12px 24px; border-radius:8px; width:100%; max-width:600px; box-sizing:border-box;">
                   <div style="color:${block.overlayTextColor ?? '#ffffff'}; font-size:18px; font-weight:600; text-align:center; line-height:1.5;">
                     ${escapeHtml(block.overlayText)}
                   </div>
                 </div>
               </div>
+              ${stackedContent}
             </div>
           </td>
         </tr>
@@ -306,11 +311,14 @@ const renderFullWidthImage = (block: TemplateImageBlock): string => {
       <tbody>
         <tr>
           <td style="padding:0;">
-      <img
-              src="${imageUrl}"
-              alt="${escapeHtml(block.altText)}"
-              style="${baseStyle}${customStyle}"
-            />
+            <div style="position:relative; width:100%;">
+              <img
+                src="${imageUrl}"
+                alt="${escapeHtml(block.altText)}"
+                style="${baseStyle}${customStyle}"
+              />
+              ${stackedContent}
+            </div>
           </td>
         </tr>
       </tbody>
@@ -318,13 +326,13 @@ const renderFullWidthImage = (block: TemplateImageBlock): string => {
   `;
 };
 
-const renderImage = (block: TemplateImageBlock) => {
-  // Full-width images are handled separately in renderBlocksToHtml
-  if (block.fullWidth) {
-    return ''; // Full-width images are rendered outside the main table
-  }
-  
+// Helper function to render normal (non-full-width) images outside the main table
+// Used when position is 'top' or 'bottom'
+const renderNormalImageOutside = (block: TemplateImageBlock, stackedBlocks: TemplateBlock[] = []): string => {
   const imageUrl = convertGoogleDriveUrl(block.url);
+  
+  // Render all stacked blocks with proper z-index layering
+  const stackedContent = renderStackedBlocks(stackedBlocks, 2);
   
   // If overlay text is provided, render image with overlay
   if (block.overlayText) {
@@ -336,23 +344,116 @@ const renderImage = (block: TemplateImageBlock) => {
       bottom: 'align-items:flex-end;',
     }[block.overlayPosition ?? 'center'];
     
+    // For center alignment, use margin:0 auto; for left/right, rely on text-align
+    const containerStyle = block.align === 'center' 
+      ? `position:relative; display:block; max-width:100%; width:${block.width}px; margin:0 auto;`
+      : `position:relative; display:inline-block; max-width:100%; width:${block.width}px;`;
+    
+    return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; background-color:#f8fafc;">
+      <tbody>
+        <tr>
+          <td align="${block.align}" style="padding:20px 12px; text-align:${block.align};">
+            <div style="${containerStyle}">
+              <img
+                src="${imageUrl}"
+                alt="${escapeHtml(block.altText)}"
+                width="${block.width}"
+                style="max-width:100%; border-radius:8px; display:block;${block.customStyle ? ` ${block.customStyle}` : ''}"
+              />
+              <div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; ${positionStyles} justify-content:center; padding:20px; box-sizing:border-box; z-index:1;">
+                <div style="background-color:${backgroundColor}; padding:12px 24px; border-radius:8px; width:100%; box-sizing:border-box;">
+                  <div style="color:${block.overlayTextColor ?? '#ffffff'}; font-size:18px; font-weight:600; text-align:center; line-height:1.5;">
+                    ${escapeHtml(block.overlayText)}
+                  </div>
+                </div>
+              </div>
+              ${stackedContent}
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+  }
+  
+  // Regular image without overlay
+  // For center alignment, use margin:0 auto; for left/right, rely on text-align
+  const imageDisplayStyle = block.align === 'center' 
+    ? `max-width:100%; border-radius:8px; display:block; margin:0 auto;`
+    : `max-width:100%; border-radius:8px; display:block;`;
+  const customStyle = block.customStyle ? ` ${block.customStyle}` : '';
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; background-color:#f8fafc;">
+      <tbody>
+        <tr>
+          <td align="${block.align}" style="padding:20px 12px; text-align:${block.align};">
+            <div style="position:relative; display:${block.align === 'center' ? 'block' : 'inline-block'};">
+              <img
+                src="${imageUrl}"
+                alt="${escapeHtml(block.altText)}"
+                width="${block.width}"
+                style="${imageDisplayStyle}${customStyle}"
+              />
+              ${stackedContent}
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+};
+
+const renderImage = (block: TemplateImageBlock, stackedBlocks: TemplateBlock[] = []) => {
+  // Full-width images and normal images with top/bottom position are handled separately in renderBlocksToHtml
+  if (block.fullWidth) {
+    return ''; // Full-width images are rendered outside the main table
+  }
+  
+  // Normal images with top/bottom position are also rendered outside the main table
+  const position = block.position || 'inline';
+  if (position === 'top' || position === 'bottom') {
+    return ''; // These are rendered outside the main table
+  }
+  
+  const imageUrl = convertGoogleDriveUrl(block.url);
+  
+  // Render all stacked blocks with proper z-index layering
+  const stackedContent = renderStackedBlocks(stackedBlocks, 2);
+  
+  // If overlay text is provided, render image with overlay
+  if (block.overlayText) {
+    const overlayOpacity = (block.overlayBackgroundOpacity ?? 50) / 100;
+    const backgroundColor = hexToRgba(block.overlayBackgroundColor ?? '#000000', overlayOpacity);
+    const positionStyles = {
+      top: 'align-items:flex-start;',
+      center: 'align-items:center;',
+      bottom: 'align-items:flex-end;',
+    }[block.overlayPosition ?? 'center'];
+    
+    // For center alignment, use margin:0 auto; for left/right, rely on text-align
+    const containerStyle = block.align === 'center' 
+      ? `position:relative; display:block; max-width:100%; width:${block.width}px; margin:0 auto;`
+      : `position:relative; display:inline-block; max-width:100%; width:${block.width}px;`;
+    
     return `
   <tr>
     <td align="${block.align}" style="padding:20px 24px; text-align:${block.align};">
-      <div style="position:relative; display:inline-block; max-width:100%; width:${block.width}px;${block.align === 'left' ? ' float:left;' : block.align === 'right' ? ' float:right;' : ''}">
+      <div style="${containerStyle}">
         <img
           src="${imageUrl}"
           alt="${escapeHtml(block.altText)}"
           width="${block.width}"
           style="max-width:100%; border-radius:8px; display:block;${block.customStyle ? ` ${block.customStyle}` : ''}"
         />
-        <div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; ${positionStyles} justify-content:center; padding:20px; box-sizing:border-box;">
+        <div style="position:absolute; top:0; left:0; right:0; bottom:0; display:flex; ${positionStyles} justify-content:center; padding:20px; box-sizing:border-box; z-index:1;">
           <div style="background-color:${backgroundColor}; padding:12px 24px; border-radius:8px; width:100%; box-sizing:border-box;">
             <div style="color:${block.overlayTextColor ?? '#ffffff'}; font-size:18px; font-weight:600; text-align:center; line-height:1.5;">
               ${escapeHtml(block.overlayText)}
             </div>
           </div>
         </div>
+        ${stackedContent}
       </div>
     </td>
   </tr>
@@ -360,18 +461,23 @@ const renderImage = (block: TemplateImageBlock) => {
   }
   
   // Regular image without overlay
-  const baseStyle = `max-width:100%; border-radius:8px; display:inline-block;`;
+  // For center alignment, use margin:0 auto; for left/right, rely on text-align
+  const imageDisplayStyle = block.align === 'center' 
+    ? `max-width:100%; border-radius:8px; display:block; margin:0 auto;`
+    : `max-width:100%; border-radius:8px; display:block;`;
   const customStyle = block.customStyle ? ` ${block.customStyle}` : '';
-  const floatStyle = block.align === 'left' ? ' float:left;' : block.align === 'right' ? ' float:right;' : '';
   return `
   <tr>
     <td align="${block.align}" style="padding:20px 24px; text-align:${block.align};">
-      <img
-        src="${imageUrl}"
-        alt="${escapeHtml(block.altText)}"
-        width="${block.width}"
-        style="${baseStyle}${floatStyle}${customStyle}"
-      />
+      <div style="position:relative; display:${block.align === 'center' ? 'block' : 'inline-block'};">
+        <img
+          src="${imageUrl}"
+          alt="${escapeHtml(block.altText)}"
+          width="${block.width}"
+          style="${imageDisplayStyle}${customStyle}"
+        />
+        ${stackedContent}
+      </div>
     </td>
   </tr>
 `;
@@ -440,65 +546,286 @@ const extractTableContent = (html: string): string => {
   return match ? match[1] : html;
 };
 
-// Helper function to render blocks without the outer table structure (for nested blocks in rows)
-const renderBlocksToHtmlInner = (blocks: TemplateBlock[]): string => {
-  return blocks
-    .map((block) => {
-      let html = '';
-      switch (block.type) {
-        case 'heading':
-          html = renderHeading(block);
-          break;
-        case 'text':
-          html = renderText(block);
-          break;
-        case 'button':
-          html = renderButton(block);
-          break;
-        case 'image':
-          html = renderImage(block);
-          break;
-        case 'divider':
-          html = renderDivider(block);
-          break;
-        case 'spacer':
-          html = renderSpacer(block);
-          break;
-        case 'raw_html':
-          html = renderRaw(block);
-          break;
-        case 'row':
-          html = renderRow(block);
-          break;
-        default:
-          return '';
+// Helper function to render multiple stacked blocks with proper z-index layering
+const renderStackedBlocks = (stackedBlocks: TemplateBlock[], baseZIndex: number = 2): string => {
+  if (stackedBlocks.length === 0) {
+    return '';
+  }
+  
+  return stackedBlocks
+    .map((stackedBlock, index) => {
+      const zIndex = baseZIndex + index;
+      
+      if (stackedBlock.type === 'image') {
+        // Special handling for stacked images - extract the img tag directly
+        const stackedImageBlock = stackedBlock as TemplateImageBlock;
+        const stackedImageUrl = convertGoogleDriveUrl(stackedImageBlock.url);
+        return `
+        <div style="position:absolute; top:0; left:0; right:0; bottom:0; z-index:${zIndex}; pointer-events:none; display:flex; align-items:center; justify-content:center;">
+          <img
+            src="${stackedImageUrl}"
+            alt="${escapeHtml(stackedImageBlock.altText)}"
+            width="${stackedImageBlock.width || 560}"
+            style="max-width:100%; max-height:100%; object-fit:contain; display:block;${stackedImageBlock.customStyle ? ` ${stackedImageBlock.customStyle}` : ''}"
+          />
+        </div>
+      `;
+      } else {
+        const stackedHtml = renderSingleBlock(stackedBlock);
+        // Extract content and wrap for absolute positioning
+        // For text blocks, ensure they're visible with proper styling
+        let stackedHtmlContent = extractTableContent(stackedHtml);
+        if (stackedBlock.type === 'text' || stackedBlock.type === 'heading') {
+          // Ensure text is visible with proper contrast - add text shadow and white color
+          stackedHtmlContent = stackedHtmlContent.replace(
+            /<p style="([^"]*)"/g,
+            (match, style) => `<p style="${style} color:#ffffff; text-shadow:1px 1px 2px rgba(0,0,0,0.8);"`
+          ).replace(
+            /<(h[1-3]) style="([^"]*)"/g,
+            (match, tag, style) => `<${tag} style="${style} color:#ffffff; text-shadow:1px 1px 2px rgba(0,0,0,0.8);"`
+          );
+        }
+        return `
+        <div style="position:absolute; top:0; left:0; right:0; bottom:0; z-index:${zIndex}; pointer-events:none; display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box;">
+          <div style="width:100%; height:100%;">
+            ${stackedHtmlContent}
+          </div>
+        </div>
+      `;
       }
-      // For nested blocks, extract just the content (remove outer <tr><td> wrapper)
-      return extractTableContent(html);
     })
     .join('\n');
 };
 
-export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 640): string => {
-  // Separate full-width blocks from regular blocks
-  const regularBlocks: TemplateBlock[] = [];
-  const fullWidthBlocks: TemplateBlock[] = [];
+// Helper function to render a single block (returns the HTML for the block)
+const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] = []): string => {
+  switch (block.type) {
+    case 'heading':
+      return renderHeading(block);
+    case 'text':
+      return renderText(block);
+    case 'button':
+      return renderButton(block);
+    case 'image':
+      return renderImage(block as TemplateImageBlock, stackedBlocks);
+    case 'divider':
+      return renderDivider(block);
+    case 'spacer':
+      return renderSpacer(block);
+    case 'raw_html':
+      return renderRaw(block);
+    case 'row':
+      return renderRow(block);
+    default:
+      return '';
+  }
+};
+
+// Helper function to render blocks with stacking support
+const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[]): string => {
+  // Check if this block is stacked on another block
+  if (block.stackOnBlockId) {
+    const baseBlock = allBlocks.find(b => b.id === block.stackOnBlockId);
+    if (!baseBlock) {
+      // Base block not found, render normally
+      return renderSingleBlock(block);
+    }
+    
+    // Special handling for images - they already handle stacking internally
+    if (baseBlock.type === 'image') {
+      const imageBlock = baseBlock as TemplateImageBlock;
+      // Check if it's an inline image (not full-width and not top/bottom position)
+      const position = imageBlock.position || 'inline';
+      if (!imageBlock.fullWidth && position === 'inline') {
+        // Find all blocks stacked on this image (including the current one)
+        const allStackedBlocks = allBlocks.filter(b => b.stackOnBlockId === imageBlock.id);
+        // Inline image - render with all stacked blocks
+        return renderImage(imageBlock, allStackedBlocks);
+      }
+      // For images rendered outside, they're handled in renderBlocksToHtml
+      return '';
+    }
+    
+    // For non-image blocks, find all blocks stacked on the base block
+    const allStackedBlocks = allBlocks.filter(b => b.stackOnBlockId === baseBlock.id);
+    
+    // For non-image blocks, render with absolute positioning
+    const baseHtml = renderSingleBlock(baseBlock);
+    
+    // Render all stacked blocks with proper layering
+    const stackedContent = renderStackedBlocks(allStackedBlocks, 2);
+    
+    // Extract content from base block
+    const baseContent = extractTableContent(baseHtml);
+    
+    // Wrap in a relative container with all stacked blocks absolutely positioned
+    // Use flexbox for centering when stacking on text blocks
+    return `
+      <tr>
+        <td style="padding:0; position:relative;">
+          <div style="position:relative; min-height:60px;">
+            ${baseContent}
+            ${stackedContent}
+          </div>
+        </td>
+      </tr>
+    `;
+  }
   
-  blocks.forEach((block) => {
-    if (block.type === 'image' && block.fullWidth) {
-      fullWidthBlocks.push(block);
+  // Check if any other blocks are stacked on this block
+  const stackedOnThis = allBlocks.filter(b => b.stackOnBlockId === block.id);
+  if (stackedOnThis.length > 0 && block.type !== 'image') {
+    // This block has other blocks stacked on it, but they will handle the container
+    // Just render this block normally (the stacked blocks will handle the container)
+    return renderSingleBlock(block);
+  }
+  
+  // Normal rendering
+  return renderSingleBlock(block);
+};
+
+// Helper function to render blocks without the outer table structure (for nested blocks in rows)
+const renderBlocksToHtmlInner = (blocks: TemplateBlock[], allBlocks: TemplateBlock[] = blocks): string => {
+  return blocks
+    .map((block) => {
+      // Skip blocks that are stacked on other blocks (they will be rendered as part of the base block)
+      if (block.stackOnBlockId) {
+        return '';
+      }
+      
+      // Check if this block is already handled as part of a stack
+      const isStackedOn = allBlocks.some(b => b.stackOnBlockId === block.id);
+      if (isStackedOn) {
+        // This block is the base of a stack, skip it here (it will be rendered by the stacked block)
+        return '';
+      }
+      
+      const html = renderBlockWithStacking(block, allBlocks);
+      // For nested blocks, extract just the content (remove outer <tr><td> wrapper)
+      return extractTableContent(html);
+    })
+    .filter(Boolean) // Remove empty strings
+    .join('\n');
+};
+
+export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 640): string => {
+  // Helper to find all stacked blocks for an image
+  const findStackedBlocks = (imageBlock: TemplateImageBlock): TemplateBlock[] => {
+    return blocks.filter(b => b.stackOnBlockId === imageBlock.id);
+  };
+  
+  // Separate blocks by type
+  const regularBlocks: TemplateBlock[] = [];
+  const topFullWidthImages: Array<{ block: TemplateImageBlock; stacked?: TemplateBlock[] }> = [];
+  const bottomFullWidthImages: Array<{ block: TemplateImageBlock; stacked?: TemplateBlock[] }> = [];
+  const inlineFullWidthImages: Array<{ block: TemplateImageBlock; index: number; stacked?: TemplateBlock[] }> = [];
+  const topNormalImages: Array<{ block: TemplateImageBlock; stacked?: TemplateBlock[] }> = [];
+  const bottomNormalImages: Array<{ block: TemplateImageBlock; stacked?: TemplateBlock[] }> = [];
+  
+  // Track which blocks are stacked on images (to skip them in regular rendering)
+  const blocksStackedOnImages = new Set<string>();
+  
+  // Find the first and last regular block indices to determine inline positioning
+  let firstRegularBlockIndex = -1;
+  let lastRegularBlockIndex = -1;
+  
+  blocks.forEach((block, index) => {
+    if (block.type === 'image') {
+      // Skip images that are stacked on other blocks (they will be rendered as part of the base block)
+      if (block.stackOnBlockId) {
+        blocksStackedOnImages.add(block.id);
+        return; // Skip this block, it will be rendered with its base block
+      }
+      
+      const imageBlock = block as TemplateImageBlock;
+      const position = imageBlock.position || 'inline';
+      const stackedBlocks = findStackedBlocks(imageBlock);
+      
+      // Track all stacked blocks so they're not rendered separately
+      stackedBlocks.forEach(stackedBlock => {
+        blocksStackedOnImages.add(stackedBlock.id);
+      });
+      
+      if (imageBlock.fullWidth) {
+        // Full-width images
+        if (position === 'top') {
+          topFullWidthImages.push({ block: imageBlock, stacked: stackedBlocks });
+        } else if (position === 'bottom') {
+          bottomFullWidthImages.push({ block: imageBlock, stacked: stackedBlocks });
+        } else {
+          // 'inline' - position based on block order
+          inlineFullWidthImages.push({ block: imageBlock, index, stacked: stackedBlocks });
+        }
+      } else {
+        // Normal (non-full-width) images
+        if (position === 'top') {
+          topNormalImages.push({ block: imageBlock, stacked: stackedBlocks });
+        } else if (position === 'bottom') {
+          bottomNormalImages.push({ block: imageBlock, stacked: stackedBlocks });
+        } else {
+          // 'inline' - render inside main table, so add to regularBlocks
+          regularBlocks.push(block);
+          if (firstRegularBlockIndex === -1) {
+            firstRegularBlockIndex = index;
+          }
+          lastRegularBlockIndex = index;
+        }
+      }
     } else {
-      regularBlocks.push(block);
+      // Skip blocks that are stacked on images
+      if (!blocksStackedOnImages.has(block.id)) {
+        regularBlocks.push(block);
+        if (firstRegularBlockIndex === -1) {
+          firstRegularBlockIndex = index;
+        }
+        lastRegularBlockIndex = index;
+      }
     }
   });
 
-  const inner = renderBlocksToHtmlInner(regularBlocks);
+  const inner = renderBlocksToHtmlInner(regularBlocks, blocks);
   
-  // Render full-width images outside the main content table
-  const fullWidthImages = fullWidthBlocks
-    .filter((block): block is TemplateImageBlock => block.type === 'image')
-    .map((block) => renderFullWidthImage(block))
-    .join('\n');
+  // Render full-width images with stacking support
+  const renderFullWidthImageHtml = ({ block, stacked }: { block: TemplateImageBlock; stacked?: TemplateBlock[] }) => 
+    renderFullWidthImage(block, stacked || []);
+  
+  // Render normal images outside table with stacking support
+  const renderNormalImageHtml = ({ block, stacked }: { block: TemplateImageBlock; stacked?: TemplateBlock[] }) => 
+    renderNormalImageOutside(block, stacked || []);
+  
+  const topFullWidth = topFullWidthImages.map(renderFullWidthImageHtml).join('\n');
+  const bottomFullWidth = bottomFullWidthImages.map(renderFullWidthImageHtml).join('\n');
+  const topNormal = topNormalImages.map(renderNormalImageHtml).join('\n');
+  const bottomNormal = bottomNormalImages.map(renderNormalImageHtml).join('\n');
+  
+  // For inline full-width images, determine if they should go before or after main content
+  const inlineFullWidthBefore: string[] = [];
+  const inlineFullWidthAfter: string[] = [];
+  
+  inlineFullWidthImages.forEach(({ block, index, stacked }) => {
+    if (firstRegularBlockIndex === -1) {
+      // No regular blocks, all images go before
+      inlineFullWidthBefore.push(renderFullWidthImageHtml({ block, stacked }));
+    } else if (index < firstRegularBlockIndex) {
+      // Image appears before any regular blocks
+      inlineFullWidthBefore.push(renderFullWidthImageHtml({ block, stacked }));
+    } else {
+      // Image appears after or between regular blocks
+      inlineFullWidthAfter.push(renderFullWidthImageHtml({ block, stacked }));
+    }
+  });
+  
+  const allImagesBefore = [
+    topFullWidth,
+    topNormal,
+    ...inlineFullWidthBefore,
+  ].filter(Boolean).join('\n');
+  
+  const allImagesAfter = [
+    ...inlineFullWidthAfter,
+    bottomNormal,
+    bottomFullWidth,
+  ].filter(Boolean).join('\n');
 
   return `
     <!DOCTYPE html>
@@ -510,7 +837,7 @@ export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 
         <title>Email Template</title>
       </head>
       <body style="margin:0; padding:0; background-color:#f8fafc;">
-        ${fullWidthImages}
+        ${allImagesBefore}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; width:100%;">
           <tbody>
             <tr>
@@ -524,6 +851,7 @@ export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 
             </tr>
           </tbody>
         </table>
+        ${allImagesAfter}
       </body>
     </html>
   `;
@@ -992,6 +1320,7 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           width: 640,
           align: 'center',
           fullWidth: true,
+          position: 'inline', // Default to inline when parsing (user can change in editor)
           overlayText: overlayText || undefined,
           overlayPosition,
           overlayTextColor,
@@ -1153,6 +1482,7 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           width,
           align,
           fullWidth: isFullWidth,
+          position: isFullWidth ? 'inline' : undefined, // Default to inline for full-width images when parsing
           overlayText: overlayText || undefined,
           customStyle,
         } satisfies TemplateImageBlock;

@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { QuoteStatus, Prisma, TemplateType } from '@prisma/client';
+import { format } from 'date-fns';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { PdfService } from '../../../common/pdf/pdf.service';
 import { EmailService } from '../../../common/email/email.service';
@@ -316,56 +317,93 @@ export class QuotesService {
   async generatePdf(id: string): Promise<Buffer> {
     const quote = await this.findOne(id);
 
-    // Get default template
-    let templateHtml: string;
-    try {
-      const template = await this.prisma.template.findFirst({
-        where: {
-          type: TemplateType.QUOTE,
-          isDefault: true,
-          isActive: true,
-        },
-      });
-      templateHtml = template?.htmlContent || this.getDefaultTemplate();
-    } catch (error) {
-      // Fallback to default template if no template found
-      templateHtml = this.getDefaultTemplate();
-    }
-
     // Prepare data for template
     const data = this.prepareTemplateData(quote);
 
-    return this.pdfService.generatePdfFromTemplate(templateHtml, data);
+    // Use templatesService to render the template with proper helpers
+    let renderedHtml: string;
+    try {
+      const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
+      renderedHtml = rendered.html;
+    } catch (error) {
+      // Fallback to default template if no template found or rendering fails
+      const templateHtml = this.getDefaultTemplate();
+      const Handlebars = require('handlebars');
+      const handlebars = Handlebars.create();
+      
+      // Register helpers for fallback template
+      handlebars.registerHelper('formatDate', (value: unknown, dateFormat = 'PPP') => {
+        if (!value) {
+          return '';
+        }
+        const date = value instanceof Date ? value : new Date(String(value));
+        if (Number.isNaN(date.getTime())) {
+          return '';
+        }
+        return format(date, dateFormat);
+      });
+
+      handlebars.registerHelper('formatCurrency', (value: unknown, currency = 'USD') => {
+        const amount = typeof value === 'number' ? value : Number(value);
+        if (Number.isNaN(amount)) {
+          return '';
+        }
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency,
+        }).format(amount);
+      });
+
+      const template = handlebars.compile(templateHtml);
+      renderedHtml = template(data);
+    }
+
+    return this.pdfService.generatePdfFromHtml(renderedHtml);
   }
 
   async preview(id: string): Promise<{ html: string }> {
     const quote = await this.findOne(id);
 
-    // Get default template
-    let templateHtml: string;
-    try {
-      const template = await this.prisma.template.findFirst({
-        where: {
-          type: TemplateType.QUOTE,
-          isDefault: true,
-          isActive: true,
-        },
-      });
-      templateHtml = template?.htmlContent || this.getDefaultTemplate();
-    } catch (error) {
-      // Fallback to default template if no template found
-      templateHtml = this.getDefaultTemplate();
-    }
-
     // Prepare data for template
     const data = this.prepareTemplateData(quote);
 
-    // Render template manually
-    const Handlebars = require('handlebars');
-    const template = Handlebars.compile(templateHtml);
-    const html = template(data);
+    // Use templatesService to render the template with proper helpers
+    try {
+      const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
+      return { html: rendered.html };
+    } catch (error) {
+      // Fallback to default template if no template found or rendering fails
+      const templateHtml = this.getDefaultTemplate();
+      const Handlebars = require('handlebars');
+      const handlebars = Handlebars.create();
+      
+      // Register helpers for fallback template
+      handlebars.registerHelper('formatDate', (value: unknown, dateFormat = 'PPP') => {
+        if (!value) {
+          return '';
+        }
+        const date = value instanceof Date ? value : new Date(String(value));
+        if (Number.isNaN(date.getTime())) {
+          return '';
+        }
+        return format(date, dateFormat);
+      });
 
-    return { html };
+      handlebars.registerHelper('formatCurrency', (value: unknown, currency = 'USD') => {
+        const amount = typeof value === 'number' ? value : Number(value);
+        if (Number.isNaN(amount)) {
+          return '';
+        }
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency,
+        }).format(amount);
+      });
+
+      const template = handlebars.compile(templateHtml);
+      const html = template(data);
+      return { html };
+    }
   }
 
   async send(id: string, sendDto: SendQuoteDto, userId: string) {
@@ -399,8 +437,9 @@ export class QuotesService {
     let emailHtml: string;
     let emailText: string;
     try {
+      const templateData = this.prepareTemplateData(quote);
       const rendered = await this.templatesService.renderDefault(TemplateType.EMAIL, {
-        quote: this.prepareTemplateData(quote),
+        ...templateData,
         recipientName: primaryContact
           ? `${primaryContact.firstName} ${primaryContact.lastName}`
           : 'Customer',
@@ -596,37 +635,39 @@ export class QuotesService {
     const primaryContact = contacts[0] || null;
 
     return {
-      quoteNumber: quote.quoteNumber,
-      title: quote.title,
-      description: quote.description || '',
-      overview: quote.overview || '',
-      functionalProposal: quote.functionalProposal || '',
-      technicalProposal: quote.technicalProposal || '',
-      teamComposition: quote.teamComposition || '',
-      milestones: quote.milestones || '',
-      paymentTerms: quote.paymentTerms || '',
-      warrantyPeriod: quote.warrantyPeriod || '',
-      totalValue: quote.totalValue ? Number(quote.totalValue) : null,
-      currency: quote.currency || 'USD',
-      status: quote.status,
-      createdAt: quote.createdAt,
-      updatedAt: quote.updatedAt,
-      lead: {
-        title: lead.title || '',
-        description: lead.description || '',
-        prospectCompanyName: lead.prospectCompanyName || '',
-        prospectWebsite: lead.prospectWebsite || '',
-        prospectIndustry: lead.prospectIndustry || '',
+      quote: {
+        quoteNumber: quote.quoteNumber,
+        title: quote.title,
+        description: quote.description || '',
+        overview: quote.overview || '',
+        functionalProposal: quote.functionalProposal || '',
+        technicalProposal: quote.technicalProposal || '',
+        teamComposition: quote.teamComposition || '',
+        milestones: quote.milestones || '',
+        paymentTerms: quote.paymentTerms || '',
+        warrantyPeriod: quote.warrantyPeriod || '',
+        totalValue: quote.totalValue ? Number(quote.totalValue) : null,
+        currency: quote.currency || 'USD',
+        status: quote.status,
+        createdAt: quote.createdAt,
+        updatedAt: quote.updatedAt,
+        lead: {
+          title: lead.title || '',
+          description: lead.description || '',
+          prospectCompanyName: lead.prospectCompanyName || '',
+          prospectWebsite: lead.prospectWebsite || '',
+          prospectIndustry: lead.prospectIndustry || '',
+        },
+        contact: primaryContact
+          ? {
+              firstName: primaryContact.firstName || '',
+              lastName: primaryContact.lastName || '',
+              email: primaryContact.email || '',
+              phone: primaryContact.phone || '',
+              companyName: primaryContact.companyName || '',
+            }
+          : null,
       },
-      contact: primaryContact
-        ? {
-            firstName: primaryContact.firstName || '',
-            lastName: primaryContact.lastName || '',
-            email: primaryContact.email || '',
-            phone: primaryContact.phone || '',
-            companyName: primaryContact.companyName || '',
-          }
-        : null,
     };
   }
 
@@ -693,56 +734,56 @@ export class QuotesService {
 <body>
   <div class="header">
     <h1>QUOTE</h1>
-    <p><strong>Quote Number:</strong> {{quoteNumber}}</p>
-    <p><strong>Date:</strong> {{formatDate createdAt}}</p>
+    <p><strong>Quote Number:</strong> {{quote.quoteNumber}}</p>
+    <p><strong>Date:</strong> {{formatDate quote.createdAt}}</p>
   </div>
 
   <div class="quote-info">
-    <h2>{{title}}</h2>
-    {{#if description}}
-    <p>{{description}}</p>
+    <h2>{{quote.title}}</h2>
+    {{#if quote.description}}
+    <p>{{quote.description}}</p>
     {{/if}}
   </div>
 
-  {{#if contact}}
+  {{#if quote.contact}}
   <div class="section">
     <h2>Customer Information</h2>
-    <p><strong>Name:</strong> {{contact.firstName}} {{contact.lastName}}</p>
-    {{#if contact.companyName}}
-    <p><strong>Company:</strong> {{contact.companyName}}</p>
+    <p><strong>Name:</strong> {{quote.contact.firstName}} {{quote.contact.lastName}}</p>
+    {{#if quote.contact.companyName}}
+    <p><strong>Company:</strong> {{quote.contact.companyName}}</p>
     {{/if}}
-    <p><strong>Email:</strong> {{contact.email}}</p>
-    {{#if contact.phone}}
-    <p><strong>Phone:</strong> {{contact.phone}}</p>
+    <p><strong>Email:</strong> {{quote.contact.email}}</p>
+    {{#if quote.contact.phone}}
+    <p><strong>Phone:</strong> {{quote.contact.phone}}</p>
     {{/if}}
   </div>
   {{/if}}
 
-  {{#if functionalProposal}}
+  {{#if quote.functionalProposal}}
   <div class="section">
     <h2>Functional Proposal</h2>
-    <p>{{{functionalProposal}}}</p>
+    <p>{{{quote.functionalProposal}}}</p>
   </div>
   {{/if}}
 
-  {{#if technicalProposal}}
+  {{#if quote.technicalProposal}}
   <div class="section">
     <h2>Technical Proposal</h2>
-    <p>{{{technicalProposal}}}</p>
+    <p>{{{quote.technicalProposal}}}</p>
   </div>
   {{/if}}
 
-  {{#if teamComposition}}
+  {{#if quote.teamComposition}}
   <div class="section">
     <h2>Team Composition</h2>
-    <p>{{{teamComposition}}}</p>
+    <p>{{{quote.teamComposition}}}</p>
   </div>
   {{/if}}
 
-  {{#if milestones}}
+  {{#if quote.milestones}}
   <div class="section">
     <h2>Milestones</h2>
-    {{#each milestones}}
+    {{#each quote.milestones}}
     <div class="milestone">
       <h3>{{name}}</h3>
       {{#if description}}
@@ -752,30 +793,30 @@ export class QuotesService {
       <p><strong>Due Date:</strong> {{dueDate}}</p>
       {{/if}}
       {{#if value}}
-      <p><strong>Value:</strong> {{formatCurrency value ../currency}}</p>
+      <p><strong>Value:</strong> {{formatCurrency value ../quote.currency}}</p>
       {{/if}}
     </div>
     {{/each}}
   </div>
   {{/if}}
 
-  {{#if paymentTerms}}
+  {{#if quote.paymentTerms}}
   <div class="section">
     <h2>Payment Terms</h2>
-    <p>{{{paymentTerms}}}</p>
+    <p>{{{quote.paymentTerms}}}</p>
   </div>
   {{/if}}
 
-  {{#if warrantyPeriod}}
+  {{#if quote.warrantyPeriod}}
   <div class="section">
     <h2>Warranty Period</h2>
-    <p>{{warrantyPeriod}}</p>
+    <p>{{quote.warrantyPeriod}}</p>
   </div>
   {{/if}}
 
-  {{#if totalValue}}
+  {{#if quote.totalValue}}
   <div class="total-value">
-    Total Value: {{formatCurrency totalValue currency}}
+    Total Value: {{formatCurrency quote.totalValue quote.currency}}
   </div>
   {{/if}}
 
