@@ -268,6 +268,7 @@ const encodeToBase64 = (value: string) => {
       return window.btoa(unescape(encodeURIComponent(value)));
     }
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - Buffer is not available in browser, but this is handled in catch
     return Buffer.from(value, 'utf-8').toString('base64');
   } catch {
@@ -281,6 +282,7 @@ const decodeFromBase64 = (value: string) => {
       return decodeURIComponent(escape(window.atob(value)));
     }
 
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - Buffer is not available in browser, but this is handled in catch
     return Buffer.from(value, 'base64').toString('utf-8');
   } catch {
