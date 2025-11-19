@@ -4,6 +4,7 @@ import { Outlet, Link, useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/types/users';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { ROLE_PERMISSIONS } from '@/constants/permissions';
+import { autoLogTimerOnLogout } from '@/lib/utils/timer-logout';
 import { NotificationsPanel } from './NotificationsPanel';
 
 type NavItem = {
@@ -96,7 +97,17 @@ export default function DashboardLayout() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Auto-log time if timer is running (must be called BEFORE clearAuth to have valid token)
+    // Don't await - allow it to run but don't block logout if it fails
+    // The function handles errors internally and always clears the timer
+    try {
+      await autoLogTimerOnLogout();
+    } catch (error) {
+      // Log but don't block logout
+      console.error('[DashboardLayout] Error in auto-log during logout:', error);
+    }
+    
     clearAuth();
     navigate('/auth/login');
   };

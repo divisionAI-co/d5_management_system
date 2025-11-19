@@ -35,7 +35,7 @@ type FormValues = {
   description?: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assignedToId?: string;
+  assignedToIds?: string[];
   customerId?: string;
   dueDate?: string;
   startDate?: string;
@@ -71,7 +71,7 @@ export function TaskForm({
         description: '',
         status: defaultStatus ?? 'TODO',
         priority: 'MEDIUM',
-        assignedToId: currentUserId, // Default to current user when creating
+        assignedToIds: [currentUserId], // Default to current user when creating
         customerId: undefined,
         dueDate: undefined,
         startDate: undefined,
@@ -81,12 +81,21 @@ export function TaskForm({
       };
     }
 
+    // Handle multiple assignees - prefer new assignees array, fall back to legacy assignedToId
+    let assignedToIds: string[] = [];
+    if (task.assignees && task.assignees.length > 0) {
+      assignedToIds = task.assignees.map((ta) => ta.userId);
+    } else if (task.assignedToId) {
+      // Legacy format: single assignee
+      assignedToIds = [task.assignedToId];
+    }
+
     return {
       title: task.title,
       description: task.description ?? '',
       status: task.status,
       priority: task.priority,
-      assignedToId: task.assignedToId ?? undefined,
+      assignedToIds,
       customerId: task.customerId ?? undefined,
       dueDate: task.dueDate ? task.dueDate.substring(0, 10) : undefined,
       startDate: task.startDate ? task.startDate.substring(0, 10) : undefined,
@@ -161,7 +170,7 @@ export function TaskForm({
       description: values.description || undefined,
       status: values.status,
       priority: values.priority,
-      assignedToId: values.assignedToId || undefined,
+      assignedToIds: values.assignedToIds && values.assignedToIds.length > 0 ? values.assignedToIds : undefined,
       customerId: values.customerId || undefined,
       dueDate: values.dueDate || undefined,
       startDate: values.startDate || undefined,
@@ -213,7 +222,7 @@ export function TaskForm({
     if (!task && currentUserId && users.length > 0) {
       const currentUserInList = users.find((u: UserSummary) => u.id === currentUserId);
       if (currentUserInList) {
-        setValue('assignedToId', currentUserId);
+        setValue('assignedToIds', [currentUserId]);
       }
     }
   }, [task, currentUserId, users, setValue]);
@@ -305,22 +314,52 @@ export function TaskForm({
               </select>
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                Assignee
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-muted-foreground">
+                Assignees (select all that apply)
               </label>
-              <select
-                {...register('assignedToId')}
-                disabled={currentUserRole === 'EMPLOYEE' && !task}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60"
-              >
-                <option value="">Unassigned</option>
-                {users.map((user: UserSummary) => (
-                  <option key={user.id} value={user.id}>
-                    {user.firstName} {user.lastName} ({user.role})
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-border p-3 md:grid-cols-3 lg:grid-cols-4">
+                {users.map((user: UserSummary) => {
+                  const fieldName = 'assignedToIds' as const;
+                  const currentValues = watch(fieldName) || [];
+                  const isChecked = Array.isArray(currentValues) && currentValues.includes(user.id);
+                  
+                  return (
+                    <label
+                      key={user.id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition ${
+                        isChecked
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-border bg-card hover:bg-muted'
+                      } ${currentUserRole === 'EMPLOYEE' && !task ? 'cursor-not-allowed opacity-60' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const currentArray = watch(fieldName) || [];
+                          let newArray: string[];
+                          if (e.target.checked) {
+                            newArray = Array.isArray(currentArray) 
+                              ? [...currentArray, user.id]
+                              : [user.id];
+                          } else {
+                            newArray = Array.isArray(currentArray)
+                              ? currentArray.filter((id: string) => id !== user.id)
+                              : [];
+                          }
+                          setValue(fieldName, newArray, { shouldValidate: true });
+                        }}
+                        disabled={currentUserRole === 'EMPLOYEE' && !task}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium">
+                        {user.firstName} {user.lastName}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
               {currentUserRole === 'EMPLOYEE' && !task && (
                 <p className="mt-1 text-xs text-muted-foreground">
                   Tasks are assigned to you by default

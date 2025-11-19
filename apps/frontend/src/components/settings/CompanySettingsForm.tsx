@@ -15,6 +15,7 @@ type CompanySettingsFormValues = {
   remoteWorkFrequency: RemoteWorkFrequency;
   remoteWorkLimit: number;
   eodGraceDays: number;
+  eodLateReportsAllowed: number;
   eodReportDeadlineHour: number;
   eodReportDeadlineMin: number;
   reviewCycleDays: number;
@@ -25,6 +26,7 @@ const DEFAULT_VALUES: CompanySettingsFormValues = {
   remoteWorkFrequency: 'WEEKLY',
   remoteWorkLimit: 1,
   eodGraceDays: 2,
+  eodLateReportsAllowed: 2,
   eodReportDeadlineHour: 23,
   eodReportDeadlineMin: 59,
   reviewCycleDays: 180,
@@ -62,6 +64,7 @@ export function CompanySettingsForm() {
         remoteWorkFrequency: data.remoteWorkFrequency,
         remoteWorkLimit: data.remoteWorkLimit,
         eodGraceDays: data.eodGraceDays,
+        eodLateReportsAllowed: data.eodLateReportsAllowed,
         eodReportDeadlineHour: data.eodReportDeadlineHour,
         eodReportDeadlineMin: data.eodReportDeadlineMin,
         reviewCycleDays: data.reviewCycleDays,
@@ -84,6 +87,7 @@ export function CompanySettingsForm() {
       remoteWorkFrequency: values.remoteWorkFrequency,
       remoteWorkLimit: values.remoteWorkLimit,
       eodGraceDays: values.eodGraceDays,
+      eodLateReportsAllowed: values.eodLateReportsAllowed,
       eodReportDeadlineHour: values.eodReportDeadlineHour,
       eodReportDeadlineMin: values.eodReportDeadlineMin,
       reviewCycleDays: values.reviewCycleDays,
@@ -100,6 +104,7 @@ export function CompanySettingsForm() {
         remoteWorkFrequency: data.remoteWorkFrequency,
         remoteWorkLimit: data.remoteWorkLimit,
         eodGraceDays: data.eodGraceDays,
+        eodLateReportsAllowed: data.eodLateReportsAllowed,
         eodReportDeadlineHour: data.eodReportDeadlineHour,
         eodReportDeadlineMin: data.eodReportDeadlineMin,
         reviewCycleDays: data.reviewCycleDays,
@@ -162,6 +167,25 @@ export function CompanySettingsForm() {
               disabled={isLoading || isFetching}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Days after report date to submit without being considered late
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
+              EOD Late Reports Allowed
+            </label>
+            <input
+              type="number"
+              min={0}
+              {...register('eodLateReportsAllowed', { valueAsNumber: true, min: 0 })}
+              disabled={isLoading || isFetching}
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Number of late reports allowed per month
+            </p>
           </div>
 
           <div>

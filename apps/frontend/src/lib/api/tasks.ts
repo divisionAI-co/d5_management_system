@@ -7,6 +7,9 @@ import type {
   TasksKanbanResponse,
   UpdateTaskPayload,
   UpdateTaskStatusPayload,
+  TaskTemplate,
+  CreateTaskTemplatePayload,
+  UpdateTaskTemplatePayload,
 } from '@/types/tasks';
 
 export const tasksApi = {
@@ -60,6 +63,34 @@ export const tasksApi = {
       description,
     });
     return data;
+  },
+
+  // Task Templates (Recurring Tasks)
+  templates: {
+    list: async () => {
+      const { data } = await apiClient.get<TaskTemplate[]>('/tasks/templates');
+      return data;
+    },
+
+    getById: async (id: string) => {
+      const { data } = await apiClient.get<TaskTemplate>(`/tasks/templates/${id}`);
+      return data;
+    },
+
+    create: async (payload: CreateTaskTemplatePayload) => {
+      const { data } = await apiClient.post<TaskTemplate>('/tasks/templates', payload);
+      return data;
+    },
+
+    update: async (id: string, payload: UpdateTaskTemplatePayload) => {
+      const { data } = await apiClient.patch<TaskTemplate>(`/tasks/templates/${id}`, payload);
+      return data;
+    },
+
+    remove: async (id: string) => {
+      const { data } = await apiClient.delete<{ message: string }>(`/tasks/templates/${id}`);
+      return data;
+    },
   },
 };
 

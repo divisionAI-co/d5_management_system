@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { autoLogTimerOnLogout } from '@/lib/utils/timer-logout';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
@@ -126,6 +127,12 @@ apiClient.interceptors.response.use(
       } catch (refreshError: any) {
         // Only logout if refresh explicitly fails (401/403), not on network errors
         if (refreshError.response?.status === 401 || refreshError.response?.status === 403) {
+          // Try to auto-log timer before clearing auth (token might still be valid)
+          // Don't await - let it run in background, don't block logout
+          autoLogTimerOnLogout().catch(() => {
+            // Silently fail - can't log if token is already invalid
+          });
+          
           useAuthStore.getState().clearAuth();
           window.location.href = '/auth/login';
         }

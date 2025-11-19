@@ -373,7 +373,17 @@ export function EodReportsList({
                                   : null;
                               const spent =
                                 task.timeSpentOnTicket !== undefined ? Number(task.timeSpentOnTicket) : null;
-                              const typeLabel = task.typeOfWorkDone ? task.typeOfWorkDone.replace('_', ' ') : '—';
+                              // Handle both array and legacy single string format
+                              const typeOfWorkDone = task.typeOfWorkDone as ('PLANNING' | 'RESEARCH' | 'IMPLEMENTATION' | 'TESTING')[] | string | undefined;
+                              let typeLabel = '—';
+                              if (typeOfWorkDone) {
+                                if (Array.isArray(typeOfWorkDone)) {
+                                  typeLabel = typeOfWorkDone.map(t => t.replace('_', ' ')).join(', ');
+                                } else if (typeof typeOfWorkDone === 'string') {
+                                  // Legacy format: single string
+                                  typeLabel = typeOfWorkDone.replace('_', ' ');
+                                }
+                              }
                               const lifecycleLabel = task.taskLifecycle ?? '—';
                               const statusLabel = task.taskStatus ? task.taskStatus.replace('_', ' ') : '—';
 

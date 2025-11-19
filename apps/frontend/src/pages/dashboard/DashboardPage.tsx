@@ -128,6 +128,39 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        <div className={`rounded-lg border p-5 shadow-sm ${
+          data.stats.lateReportsBeyondThreshold > 0 
+            ? 'border-red-300 bg-red-50' 
+            : 'border-border bg-card'
+        }`}>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className={`h-10 w-10 rounded-full p-2 ${
+              data.stats.lateReportsBeyondThreshold > 0
+                ? 'bg-red-100 text-red-600'
+                : 'bg-muted text-muted-foreground'
+            }`} />
+            <div>
+              <p className={`text-xs font-semibold uppercase ${
+                data.stats.lateReportsBeyondThreshold > 0
+                  ? 'text-red-700'
+                  : 'text-muted-foreground'
+              }`}>
+                Beyond Limit
+              </p>
+              <p className={`text-3xl font-bold ${
+                data.stats.lateReportsBeyondThreshold > 0
+                  ? 'text-red-900'
+                  : 'text-foreground'
+              }`}>
+                {data.stats.lateReportsBeyondThreshold}
+              </p>
+              {data.stats.lateReportsBeyondThreshold > 0 && (
+                <p className="mt-1 text-xs text-red-600">late reports this month</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center gap-3">
             <ClipboardList className="h-10 w-10 rounded-full bg-blue-50 p-2 text-blue-500" />
