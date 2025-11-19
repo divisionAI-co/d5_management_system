@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { leadsApi } from '@/lib/api/crm';
 import { usersApi } from '@/lib/api/users';
-import type { CreateLeadPayload, Lead, LeadStatus, LeadType, LeadContactPayload } from '@/types/crm';
-import { X } from 'lucide-react';
+import type { CreateLeadPayload, Lead, LeadStatus, LeadType, LeadContactPayload, Contact } from '@/types/crm';
+import { X, Search, ChevronDown, XCircle } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
 
 interface LeadFormProps {
@@ -15,7 +15,8 @@ interface LeadFormProps {
 
 type FormValues = {
   contactMode: 'existing' | 'new';
-  contactId?: string;
+  contactIds?: string[];
+  contactId?: string; // Legacy single contact
   contact?: LeadContactPayload;
   title: string;
   description?: string;
@@ -39,6 +40,11 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const isEdit = Boolean(lead);
 
   const [contactSearch, setContactSearch] = useState('');
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [selectedContactsCache, setSelectedContactsCache] = useState<Map<string, Contact>>(new Map());
+  const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const contactDropdownRef = useRef<HTMLDivElement>(null);
+  const contactInputRef = useRef<HTMLInputElement>(null);
 
   const usersQuery = useQuery({
     queryKey: ['users', 'lead-select'],
@@ -48,14 +54,23 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const defaultValues = useMemo<FormValues>(() => {
     if (!lead) {
       return {
+        title: '',
         contactMode: 'new',
         status: 'NEW',
+        contactIds: [],
       } as FormValues;
     }
 
+    // Get contacts from many-to-many relationship or fallback to legacy single contact
+    const contacts = (lead.contacts && lead.contacts.length > 0) 
+      ? lead.contacts 
+      : (lead.contact ? [lead.contact] : []);
+    const contactIds = contacts.map(c => c.id);
+
     return {
-      contactMode: 'existing',
-      contactId: lead.contact?.id,
+      contactMode: contacts.length > 0 ? 'existing' : 'new',
+      contactIds: contactIds,
+      contactId: contactIds[0], // Legacy single contact for backward compatibility
       title: lead.title,
       description: lead.description ?? '',
       status: lead.status,
@@ -70,15 +85,15 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
       prospectWebsite: lead.prospectWebsite ?? '',
       prospectIndustry: lead.prospectIndustry ?? '',
       leadType: lead.leadType ?? undefined,
-      contact: lead.contact
+      contact: contacts[0]
         ? {
-            firstName: lead.contact.firstName,
-            lastName: lead.contact.lastName,
-            email: lead.contact.email,
-            phone: lead.contact.phone ?? undefined,
-            role: lead.contact.role ?? undefined,
-            companyName: lead.contact.companyName ?? undefined,
-            customerId: lead.contact.customerId ?? undefined,
+            firstName: contacts[0].firstName,
+            lastName: contacts[0].lastName,
+            email: contacts[0].email,
+            phone: contacts[0].phone ?? undefined,
+            role: contacts[0].role ?? undefined,
+            companyName: contacts[0].companyName ?? undefined,
+            customerId: contacts[0].customerId ?? undefined,
           }
         : undefined,
     } as FormValues;
@@ -89,6 +104,8 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     handleSubmit,
     setValue,
     watch,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<FormValues>({
     defaultValues,
@@ -97,58 +114,117 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const descriptionValue = watch('description') || '';
   const contactMode = watch('contactMode');
   const selectedContactId = watch('contactId');
+  
+  // Initialize selected contact IDs when editing
+  useEffect(() => {
+    if (lead) {
+      // Extract contacts from many-to-many relationship (contacts array has nested contact objects)
+      // or fallback to legacy single contact
+      const contacts = (lead.contacts && lead.contacts.length > 0) 
+        ? lead.contacts.map((lc: any) => lc.contact || lc).filter(Boolean)
+        : (lead.contact ? [lead.contact] : []);
+      const contactIds = contacts.map((c: any) => c.id).filter(Boolean);
+      setSelectedContactIds(contactIds);
+      
+      // Also populate the cache with these contacts
+      const cache = new Map<string, Contact>();
+      contacts.forEach((c: any) => {
+        if (c && c.id) {
+          cache.set(c.id, c);
+        }
+      });
+      setSelectedContactsCache(cache);
+    } else {
+      setSelectedContactIds([]);
+      setSelectedContactsCache(new Map());
+    }
+  }, [lead]);
 
   const contactsQuery = useQuery({
     queryKey: ['lead-contacts', contactSearch],
     queryFn: () => leadsApi.listContacts(contactSearch || undefined),
   });
 
-  // Get the selected contact to ensure it's always in the options
-  const selectedContact = useMemo(() => {
-    if (!selectedContactId) return null;
-    // First check if it's in the current query results
-    const inResults = contactsQuery.data?.find((c) => c.id === selectedContactId);
-    if (inResults) return inResults;
-    // If not in results but we have the lead's contact, use that
-    if (lead?.contact?.id === selectedContactId) {
-      return {
-        id: lead.contact.id,
-        firstName: lead.contact.firstName,
-        lastName: lead.contact.lastName,
-        email: lead.contact.email,
-        phone: lead.contact.phone ?? null,
-        role: lead.contact.role ?? null,
-        companyName: lead.contact.companyName ?? null,
-        customerId: lead.contact.customerId ?? null,
-        createdAt: '',
-        updatedAt: '',
-      };
-    }
-    return null;
-  }, [selectedContactId, contactsQuery.data, lead?.contact]);
+  // Note: selectedContactId is used for the legacy single contact mode
+  // The selectedContacts memo below handles the multi-contact display
 
-  // Build the list of contacts to show in dropdown
-  // Only include selected contact if it matches the search or if search is empty
+  // Build the list of contacts to show in dropdown (excluding already selected ones)
   const contactOptions = useMemo(() => {
     const results = contactsQuery.data ?? [];
-    
-    // If there's a selected contact and it's not in the filtered results
-    // Only add it if search is empty (showing all) or if it matches the search
-    if (selectedContact && !results.some((c) => c.id === selectedContact.id)) {
-      // Only include selected contact if search is empty or if it would match the search
-      const searchLower = contactSearch.toLowerCase();
-      const matchesSearch = !contactSearch || 
-        selectedContact.firstName.toLowerCase().includes(searchLower) ||
-        selectedContact.lastName.toLowerCase().includes(searchLower) ||
-        selectedContact.email.toLowerCase().includes(searchLower) ||
-        (selectedContact.companyName?.toLowerCase().includes(searchLower) ?? false);
-      
-      if (matchesSearch) {
-        return [selectedContact, ...results];
-      }
+    // Filter out already selected contacts
+    return results.filter(c => !selectedContactIds.includes(c.id));
+  }, [contactsQuery.data, selectedContactIds]);
+
+  // Update cache when contactsQuery data changes
+  useEffect(() => {
+    if (contactsQuery.data && selectedContactIds.length > 0) {
+      setSelectedContactsCache(prev => {
+        const newCache = new Map(prev);
+        let updated = false;
+        selectedContactIds.forEach(id => {
+          if (!newCache.has(id)) {
+            const contact = contactsQuery.data?.find(c => c.id === id);
+            if (contact) {
+              newCache.set(id, contact);
+              updated = true;
+            }
+          }
+        });
+        return updated ? newCache : prev;
+      });
     }
-    return results;
-  }, [contactsQuery.data, selectedContact, contactSearch]);
+  }, [contactsQuery.data, selectedContactIds]);
+
+  // Get selected contact objects for display
+  const selectedContacts = useMemo(() => {
+    if (selectedContactIds.length === 0) {
+      return [];
+    }
+    
+    const allContacts = contactsQuery.data ?? [];
+    const result: Contact[] = [];
+    const addedIds = new Set<string>();
+    
+    // First, try to get contacts from cache (most reliable)
+    selectedContactIds.forEach(id => {
+      const cached = selectedContactsCache.get(id);
+      if (cached && !addedIds.has(id)) {
+        result.push(cached);
+        addedIds.add(id);
+      }
+    });
+    
+    // Then, get contacts from the search results that match selected IDs
+    selectedContactIds.forEach(id => {
+      if (!addedIds.has(id)) {
+        const contact = allContacts.find(c => c.id === id);
+        if (contact) {
+          result.push(contact);
+          addedIds.add(id);
+        }
+      }
+    });
+    
+    // Also include lead's contacts that are selected but not in search results
+    // Handle both many-to-many structure (with nested contact) and legacy single contact
+    if (lead?.contacts && lead.contacts.length > 0) {
+      lead.contacts.forEach((lc: any) => {
+        const contactObj = lc.contact || lc;
+        if (contactObj && contactObj.id && selectedContactIds.includes(contactObj.id) && !addedIds.has(contactObj.id)) {
+          result.push(contactObj);
+          addedIds.add(contactObj.id);
+        }
+      });
+    }
+    
+    // Include legacy contact if selected but not already included
+    if (lead?.contact && selectedContactIds.includes(lead.contact.id) && !addedIds.has(lead.contact.id)) {
+      result.push(lead.contact);
+      addedIds.add(lead.contact.id);
+    }
+    
+    return result;
+  }, [selectedContactIds, contactsQuery.data, lead, selectedContactsCache]);
 
   useEffect(() => {
     if (!isEdit) {
@@ -156,13 +232,24 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     }
   }, [isEdit, setValue]);
 
-  // Initialize contact search and selection when editing
+  // Close dropdown when clicking outside
   useEffect(() => {
-    if (lead?.contact && isEdit && contactMode === 'existing' && !selectedContactId) {
-      setValue('contactId', lead.contact.id, { shouldValidate: false });
-      // Don't set search initially - let user search freely
-    }
-  }, [lead?.contact, isEdit, contactMode, selectedContactId, setValue]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        contactDropdownRef.current &&
+        !contactDropdownRef.current.contains(event.target as Node) &&
+        contactInputRef.current &&
+        !contactInputRef.current.contains(event.target as Node)
+      ) {
+        setShowContactDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Auto-select first filtered result when searching
   useEffect(() => {
@@ -193,6 +280,9 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   });
 
   const onSubmit = (values: FormValues) => {
+    // Clear previous errors
+    clearErrors('contactMode');
+    
     const payload: CreateLeadPayload = {
       title: values.title,
       description: values.description || undefined,
@@ -209,10 +299,19 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     };
 
     if (values.contactMode === 'existing') {
-      if (!values.contactId) {
-        throw new Error('Please select a contact');
+      if (selectedContactIds.length === 0) {
+        setError('contactMode', {
+          type: 'manual',
+          message: 'Please select at least one contact',
+        });
+        return;
       }
-      payload.contactId = values.contactId;
+      // Use new multiple contactIds approach
+      payload.contactIds = selectedContactIds;
+      // Also set legacy contactId for backward compatibility (first contact)
+      if (selectedContactIds.length > 0) {
+        payload.contactId = selectedContactIds[0];
+      }
     } else if (values.contact) {
       payload.contact = {
         firstName: values.contact.firstName,
@@ -283,45 +382,120 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
 
             {contactMode === 'existing' ? (
               <div className="space-y-3">
-                <input
-                  type="text"
-                  placeholder="Search contacts by name, email, or company"
-                  value={contactSearch}
-                  onChange={(event) => {
-                    const newSearch = event.target.value;
-                    setContactSearch(newSearch);
-                    // Clear selection if user is actively searching and there are multiple results
-                    // This allows auto-selection of first result when there's only one match
-                    if (newSearch && contactOptions.length > 1 && selectedContactId) {
-                      // Don't clear - let user keep their selection unless they want to change it
-                    }
-                  }}
-                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                />
-                <select
-                  {...register('contactId', {
-                    required: contactMode === 'existing' ? 'Please select a contact' : false,
-                  })}
-                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                  value={selectedContactId || ''}
-                  onChange={(e) => {
-                    setValue('contactId', e.target.value, { shouldValidate: true });
-                  }}
-                >
-                  <option value="">Select a contact</option>
-                  {contactOptions.map((contact) => (
-                    <option key={contact.id} value={contact.id}>
-                      {contact.firstName} {contact.lastName} — {contact.email}
-                    </option>
-                  ))}
-                </select>
-                {selectedContact && (
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                    <span className="font-semibold">Selected:</span> {selectedContact.firstName} {selectedContact.lastName} — {selectedContact.email}
+                <label className="block text-sm font-medium text-muted-foreground">
+                  Select Contacts {selectedContactIds.length > 0 && `(${selectedContactIds.length} selected)`}
+                </label>
+                <div className="relative" ref={contactDropdownRef}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <input
+                      ref={contactInputRef}
+                      type="text"
+                      placeholder="Search contacts by name, email, or company..."
+                      value={contactSearch}
+                      onChange={(event) => {
+                        setContactSearch(event.target.value);
+                        setShowContactDropdown(true);
+                      }}
+                      onFocus={() => setShowContactDropdown(true)}
+                      className="w-full rounded-lg border border-border pl-10 pr-10 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    />
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  </div>
+
+                  {showContactDropdown && (
+                    <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-border bg-card shadow-lg">
+                      {contactsQuery.isLoading ? (
+                        <div className="flex items-center justify-center px-4 py-3 text-sm text-muted-foreground">
+                          Loading contacts...
+                        </div>
+                      ) : contactOptions.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-muted-foreground">
+                          {contactSearch ? 'No contacts found matching your search' : 'No contacts available'}
+                        </div>
+                      ) : (
+                        contactOptions.map((contact) => (
+                          <button
+                            key={contact.id}
+                            type="button"
+                            onClick={() => {
+                              const newIds = [...selectedContactIds, contact.id];
+                              setSelectedContactIds(newIds);
+                              // Immediately add to cache so it shows up right away
+                              setSelectedContactsCache(prev => new Map(prev).set(contact.id, contact));
+                              setContactSearch('');
+                              setShowContactDropdown(false);
+                              // Clear error when a contact is selected
+                              if (selectedContactIds.length === 0) {
+                                clearErrors('contactMode');
+                              }
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm transition hover:bg-muted text-foreground"
+                          >
+                            <div className="font-medium">{contact.firstName} {contact.lastName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {contact.email}
+                              {contact.companyName && ` • ${contact.companyName}`}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {selectedContacts.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-muted-foreground">
+                      Selected Contacts:
+                    </label>
+                    <div className="space-y-2">
+                      {selectedContacts.map((contact) => (
+                        <div
+                          key={contact.id}
+                          className="flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm"
+                        >
+                          <div>
+                            <span className="font-semibold text-blue-900">
+                              {contact.firstName} {contact.lastName}
+                            </span>
+                            <span className="ml-2 text-xs text-blue-700">
+                              {contact.email}
+                              {contact.companyName && ` • ${contact.companyName}`}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updatedIds = selectedContactIds.filter(id => id !== contact.id);
+                              setSelectedContactIds(updatedIds);
+                              // Remove from cache
+                              setSelectedContactsCache(prev => {
+                                const newCache = new Map(prev);
+                                newCache.delete(contact.id);
+                                return newCache;
+                              });
+                              // Clear error if there are still contacts selected
+                              if (updatedIds.length > 0) {
+                                clearErrors('contactMode');
+                              }
+                            }}
+                            className="text-blue-600 hover:text-blue-800 transition"
+                            aria-label={`Remove ${contact.firstName} ${contact.lastName}`}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
-                {errors.contactId && (
-                  <p className="text-sm text-red-600">{errors.contactId.message}</p>
+
+                {((selectedContactIds.length === 0 && contactMode === 'existing') || errors.contactMode) && (
+                  <p className="text-sm text-red-600">
+                    {errors.contactMode?.message || 'Please select at least one contact'}
+                  </p>
                 )}
               </div>
             ) : (

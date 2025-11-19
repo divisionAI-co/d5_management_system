@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { FeedbackReportStatus, LeaveRequestStatus, UserRole, Prisma } from '@prisma/client';
+import { FeedbackReportStatus, LeaveRequestStatus, UserRole, Prisma, TemplateType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateFeedbackReportDto } from './dto/create-feedback-report.dto';
 import { UpdateHrSectionDto } from './dto/update-hr-section.dto';
@@ -14,6 +14,9 @@ import { FilterFeedbackReportsDto } from './dto/filter-feedback-reports.dto';
 import { SendReportDto } from './dto/send-report.dto';
 import { PdfService } from '../../../common/pdf/pdf.service';
 import { EmailService } from '../../../common/email/email.service';
+import { TemplatesService } from '../../templates/templates.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class FeedbackReportsService {
@@ -21,6 +24,8 @@ export class FeedbackReportsService {
     private prisma: PrismaService,
     private pdfService: PdfService,
     private emailService: EmailService,
+    private templatesService: TemplatesService,
+    private notificationsService: NotificationsService,
   ) {}
 
   private readonly reportInclude = {
@@ -198,6 +203,7 @@ export class FeedbackReportsService {
 
     const holidays = await this.prisma.nationalHoliday.findMany({
       where: {
+        country: 'AL',
         date: {
           gte: startDate,
           lte: endDate,
@@ -289,6 +295,28 @@ export class FeedbackReportsService {
       include: this.reportInclude,
     });
 
+    // Notify the employee about the new feedback report
+    const employeeUserId = report.employee.user.id;
+    const monthName = new Date(createDto.year, createDto.month - 1).toLocaleString('default', {
+      month: 'long',
+    });
+
+    this.notificationsService
+      .createNotification(
+        employeeUserId,
+        NotificationType.FEEDBACK_REPORT,
+        'New Feedback Report Created',
+        `A feedback report for ${monthName} ${createDto.year} has been created. Please review and fill in your section.`,
+        'feedback_report',
+        report.id,
+      )
+      .catch((error) => {
+        console.error(
+          `[FeedbackReports] Failed to send notification to employee ${employeeUserId}:`,
+          error,
+        );
+      });
+
     return report;
   }
 
@@ -343,13 +371,20 @@ export class FeedbackReportsService {
    * Find one feedback report by ID
    */
   async findOne(id: string, userId: string, userRole: UserRole) {
+    // Trim and validate ID to handle potential whitespace or encoding issues
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
       include: this.reportInclude,
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     // Role-based access control
@@ -371,12 +406,18 @@ export class FeedbackReportsService {
    * Update HR section (only HR can do this)
    */
   async updateHrSection(id: string, updateDto: UpdateHrSectionDto, userId: string) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -384,7 +425,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         ...updateDto,
         hrUpdatedAt: new Date(),
@@ -400,12 +441,18 @@ export class FeedbackReportsService {
    * Update Account Manager section (only Account Manager can do this)
    */
   async updateAmSection(id: string, updateDto: UpdateAmSectionDto, userId: string) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -413,7 +460,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         ...updateDto,
         amUpdatedAt: new Date(),
@@ -433,8 +480,14 @@ export class FeedbackReportsService {
     updateDto: UpdateEmployeeSectionDto,
     userId: string,
   ) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
       include: {
         employee: {
           select: {
@@ -445,7 +498,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.employee.userId !== userId) {
@@ -457,7 +510,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         ...updateDto,
         employeeUpdatedAt: new Date(),
@@ -472,12 +525,18 @@ export class FeedbackReportsService {
    * Submit a report (mark as submitted)
    */
   async submit(id: string, userId: string, userRole: UserRole) {
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status !== FeedbackReportStatus.DRAFT) {
@@ -490,7 +549,7 @@ export class FeedbackReportsService {
     }
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         status: FeedbackReportStatus.SUBMITTED,
         submittedAt: new Date(),
@@ -510,12 +569,18 @@ export class FeedbackReportsService {
       throw new ForbiddenException('Only HR can recompile report data');
     }
 
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -530,7 +595,7 @@ export class FeedbackReportsService {
     );
 
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         tasksCount: compiledData.tasksCount,
         totalDaysOffTaken: compiledData.totalDaysOffTaken,
@@ -544,13 +609,80 @@ export class FeedbackReportsService {
   }
 
   /**
+   * Prepare template data from report
+   */
+  private async prepareTemplateData(report: any) {
+    const monthName = new Date(report.year, report.month - 1).toLocaleString('default', {
+      month: 'long',
+    });
+    
+    let nextMonth = report.month + 1;
+    let nextYear = report.year;
+    if (nextMonth > 12) {
+      nextMonth = 1;
+      nextYear += 1;
+    }
+    const nextMonthName = new Date(nextYear, nextMonth - 1).toLocaleString('default', {
+      month: 'long',
+    });
+
+    const employeeName = `${report.employee.user.firstName} ${report.employee.user.lastName}`;
+    
+    const ratingLabels = ['', 'Unacceptable', 'Needs improvement', 'Meets expectations', 'Exceeds expectations', 'Outstanding'];
+    
+    const getRatingDisplay = (rating: number | null) => {
+      if (!rating) return 'Not rated';
+      return `<span class="rating rating-${rating}">${rating} - ${ratingLabels[rating]}</span>`;
+    };
+
+    // Fetch fresh holidays from database instead of using stored value
+    const bankHolidays = await this.getBankHolidaysForNextMonth(report.month, report.year);
+
+    return {
+      employeeName,
+      jobTitle: report.employee.jobTitle || 'N/A',
+      department: report.employee.department || 'N/A',
+      monthYear: `${monthName} ${report.year}`,
+      monthName,
+      nextMonthName,
+      nextMonthYear: nextYear.toString(),
+      tasksCount: report.tasksCount?.toString() || '0',
+      totalDaysOffTaken: report.totalDaysOffTaken?.toString() || '0',
+      totalRemainingDaysOff: report.totalRemainingDaysOff?.toString() || '0',
+      bankHolidays: bankHolidays && Array.isArray(bankHolidays) ? bankHolidays : [],
+      amFeedback: report.amFeedback || null,
+      amActionDescription: report.amActionDescription || null,
+      communicationRating: report.communicationRating,
+      communicationRatingDisplay: getRatingDisplay(report.communicationRating),
+      collaborationRating: report.collaborationRating,
+      collaborationRatingDisplay: getRatingDisplay(report.collaborationRating),
+      taskEstimationRating: report.taskEstimationRating,
+      taskEstimationRatingDisplay: getRatingDisplay(report.taskEstimationRating),
+      timelinessRating: report.timelinessRating,
+      timelinessRatingDisplay: getRatingDisplay(report.timelinessRating),
+      employeeSummary: report.employeeSummary || null,
+    };
+  }
+
+  /**
    * Generate preview of the report
    */
   async preview(id: string, userId: string, userRole: UserRole) {
     const report = await this.findOne(id, userId, userRole);
-    const template = this.getDefaultTemplate();
-    const html = this.renderTemplate(template, report);
-    return { html };
+    const templateData = await this.prepareTemplateData(report);
+    
+    try {
+      const { html } = await this.templatesService.renderDefault(
+        TemplateType.CUSTOMER_REPORT,
+        templateData
+      );
+      return { html };
+    } catch (error) {
+      // Fallback to default template if no template found
+      const fallbackTemplate = this.getDefaultTemplate();
+      const html = await this.renderTemplate(fallbackTemplate, report);
+      return { html };
+    }
   }
 
   /**
@@ -558,10 +690,20 @@ export class FeedbackReportsService {
    */
   async generatePdf(id: string, userId: string, userRole: UserRole): Promise<Buffer> {
     const report = await this.findOne(id, userId, userRole);
-    const template = this.getDefaultTemplate();
-    const html = this.renderTemplate(template, report);
+    const templateData = await this.prepareTemplateData(report);
     
-    return this.pdfService.generatePdfFromHtml(html);
+    try {
+      const { html } = await this.templatesService.renderDefault(
+        TemplateType.CUSTOMER_REPORT,
+        templateData
+      );
+      return this.pdfService.generatePdfFromHtml(html);
+    } catch (error) {
+      // Fallback to default template if no template found
+      const fallbackTemplate = this.getDefaultTemplate();
+      const html = await this.renderTemplate(fallbackTemplate, report);
+      return this.pdfService.generatePdfFromHtml(html);
+    }
   }
 
   /**
@@ -610,8 +752,9 @@ export class FeedbackReportsService {
     });
 
     // Update report status
+    const trimmedId = id?.trim();
     const updatedReport = await this.prisma.feedbackReport.update({
-      where: { id },
+      where: { id: trimmedId },
       data: {
         status: FeedbackReportStatus.SENT,
         sentAt: new Date(),
@@ -632,12 +775,18 @@ export class FeedbackReportsService {
       throw new ForbiddenException('Only HR can delete feedback reports');
     }
 
+    const trimmedId = id?.trim();
+    
+    if (!trimmedId) {
+      throw new NotFoundException(`Feedback report ID is required`);
+    }
+
     const report = await this.prisma.feedbackReport.findUnique({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${id} not found`);
+      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -645,7 +794,7 @@ export class FeedbackReportsService {
     }
 
     await this.prisma.feedbackReport.delete({
-      where: { id },
+      where: { id: trimmedId },
     });
 
     return { deleted: true };
@@ -807,21 +956,14 @@ export class FeedbackReportsService {
         </div>
         {{/if}}
 
-        {{#if hrFeedback}}
-        <div class="section">
-          <h2>HR Feedback</h2>
-          <div class="feedback-text">{{hrFeedback}}</div>
-          {{#if hrActionDescription}}
-          <h3>Action Taken:</h3>
-          <div class="feedback-text">{{hrActionDescription}}</div>
-          {{/if}}
-        </div>
-        {{/if}}
-
         {{#if amFeedback}}
         <div class="section">
           <h2>Account Manager Feedback</h2>
           <div class="feedback-text">{{amFeedback}}</div>
+          {{#if amActionDescription}}
+          <h3>Action Taken:</h3>
+          <div class="feedback-text">{{amActionDescription}}</div>
+          {{/if}}
         </div>
         {{/if}}
 
@@ -865,7 +1007,7 @@ export class FeedbackReportsService {
   /**
    * Render template with data using simple string replacement
    */
-  private renderTemplate(template: string, report: any): string {
+  private async renderTemplate(template: string, report: any): Promise<string> {
     const monthName = new Date(report.year, report.month - 1).toLocaleString('default', {
       month: 'long',
     });
@@ -889,6 +1031,9 @@ export class FeedbackReportsService {
       return `<span class="rating rating-${rating}">${rating} - ${ratingLabels[rating]}</span>`;
     };
 
+    // Fetch fresh holidays from database instead of using stored value
+    const bankHolidays = await this.getBankHolidaysForNextMonth(report.month, report.year);
+
     const data: Record<string, string> = {
       employeeName,
       jobTitle: report.employee.jobTitle || 'N/A',
@@ -900,9 +1045,8 @@ export class FeedbackReportsService {
       tasksCount: report.tasksCount?.toString() || '0',
       totalDaysOffTaken: report.totalDaysOffTaken?.toString() || '0',
       totalRemainingDaysOff: report.totalRemainingDaysOff?.toString() || '0',
-      hrFeedback: report.hrFeedback || '',
-      hrActionDescription: report.hrActionDescription || '',
       amFeedback: report.amFeedback || '',
+      amActionDescription: report.amActionDescription || '',
       communicationRatingDisplay: getRatingDisplay(report.communicationRating),
       collaborationRatingDisplay: getRatingDisplay(report.collaborationRating),
       taskEstimationRatingDisplay: getRatingDisplay(report.taskEstimationRating),
@@ -918,9 +1062,9 @@ export class FeedbackReportsService {
       html = html.replace(regex, data[key] || '');
     });
 
-    // Handle bank holidays list
-    if (report.bankHolidays && Array.isArray(report.bankHolidays) && report.bankHolidays.length > 0) {
-      const holidayItems = report.bankHolidays
+    // Handle bank holidays list - use fresh holidays from database
+    if (bankHolidays && Array.isArray(bankHolidays) && bankHolidays.length > 0) {
+      const holidayItems = bankHolidays
         .map((h: any) => `<li><strong>${h.name}</strong> - ${h.date}</li>`)
         .join('\n            ');
       
@@ -935,7 +1079,7 @@ export class FeedbackReportsService {
     }
 
     // Handle conditional sections
-    const conditionals = ['hrFeedback', 'hrActionDescription', 'amFeedback', 'employeeSummary'];
+    const conditionals = ['amFeedback', 'amActionDescription', 'employeeSummary'];
     conditionals.forEach(field => {
       const regex = new RegExp(`{{#if ${field}}}([\\s\\S]*?){{/if}}`, 'g');
       html = html.replace(regex, (match, content) => {

@@ -2,7 +2,15 @@ export type TemplateType =
   | 'INVOICE'
   | 'CUSTOMER_REPORT'
   | 'PERFORMANCE_REVIEW'
-  | 'EMAIL';
+  | 'FEEDBACK_REPORT'
+  | 'EMAIL'
+  | 'EOD_REPORT_SUBMITTED'
+  | 'LEAVE_REQUEST_CREATED'
+  | 'LEAVE_REQUEST_APPROVED'
+  | 'LEAVE_REQUEST_REJECTED'
+  | 'TASK_ASSIGNED'
+  | 'MENTION_NOTIFICATION'
+  | 'REMOTE_WORK_WINDOW_OPENED';
 
 export interface TemplateVariable {
   key: string;
@@ -59,11 +67,13 @@ export type TemplateBlockType =
   | 'image'
   | 'divider'
   | 'spacer'
-  | 'raw_html';
+  | 'raw_html'
+  | 'row';
 
 interface TemplateBlockBase {
   id: string;
   type: TemplateBlockType;
+  customStyle?: string; // Custom inline CSS styles for this block
 }
 
 export interface TemplateHeadingBlock extends TemplateBlockBase {
@@ -71,12 +81,14 @@ export interface TemplateHeadingBlock extends TemplateBlockBase {
   text: string;
   level: 'h1' | 'h2' | 'h3';
   align: 'left' | 'center' | 'right';
+  fontFamily?: string; // Font family for the heading (e.g., 'Arial', 'Georgia', 'Times New Roman')
 }
 
 export interface TemplateTextBlock extends TemplateBlockBase {
   type: 'text';
   text: string;
   align: 'left' | 'center' | 'right';
+  fontFamily?: string; // Font family for the text (e.g., 'Arial', 'Georgia', 'Times New Roman')
 }
 
 export interface TemplateButtonBlock extends TemplateBlockBase {
@@ -94,6 +106,12 @@ export interface TemplateImageBlock extends TemplateBlockBase {
   altText: string;
   width: number;
   align: 'left' | 'center' | 'right';
+  fullWidth?: boolean; // If true, image spans full viewport width
+  overlayText?: string;
+  overlayPosition?: 'top' | 'center' | 'bottom';
+  overlayTextColor?: string;
+  overlayBackgroundColor?: string;
+  overlayBackgroundOpacity?: number; // 0-100
 }
 
 export interface TemplateDividerBlock extends TemplateBlockBase {
@@ -112,6 +130,15 @@ export interface TemplateRawHtmlBlock extends TemplateBlockBase {
   html: string;
 }
 
+export interface TemplateRowBlock extends TemplateBlockBase {
+  type: 'row';
+  leftBlocks: TemplateBlock[];
+  rightBlocks: TemplateBlock[];
+  leftWidth?: number; // Percentage (0-100), defaults to 50
+  rightWidth?: number; // Percentage (0-100), defaults to 50
+  gap?: number; // Gap between columns in pixels, defaults to 24
+}
+
 export type TemplateBlock =
   | TemplateHeadingBlock
   | TemplateTextBlock
@@ -119,7 +146,8 @@ export type TemplateBlock =
   | TemplateImageBlock
   | TemplateDividerBlock
   | TemplateSpacerBlock
-  | TemplateRawHtmlBlock;
+  | TemplateRawHtmlBlock
+  | TemplateRowBlock;
 
 
 

@@ -522,7 +522,242 @@ async function main() {
   console.log('  ✅ Activity types seeded and 3 activities created');
 
   // ============================================
-  // 10. CREATE SAMPLE FEEDBACK REPORT
+  // 10. CREATE DEFAULT FEEDBACK REPORT TEMPLATE
+  // ============================================
+  console.log('\n📄 Creating default feedback report template...');
+  
+  await prisma.template.upsert({
+    where: { id: 'default-feedback-report' },
+    update: {},
+    create: {
+      id: 'default-feedback-report',
+      name: 'Default Feedback Report Template',
+      type: 'FEEDBACK_REPORT',
+      isDefault: true,
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 40px;
+      color: #333;
+    }
+    .header { 
+      text-align: center; 
+      margin-bottom: 40px;
+      border-bottom: 2px solid #2563EB;
+      padding-bottom: 20px;
+    }
+    .header h1 {
+      color: #2563EB;
+      margin: 0;
+    }
+    .header p {
+      color: #666;
+      margin: 10px 0 0 0;
+    }
+    .section { 
+      margin-bottom: 30px;
+      page-break-inside: avoid;
+    }
+    .section h2 {
+      color: #2563EB;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+    .section h3 {
+      color: #555;
+      margin-bottom: 10px;
+    }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+    td { 
+      padding: 10px; 
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+    }
+    td.label { 
+      font-weight: bold;
+      width: 40%;
+      color: #555;
+    }
+    .rating {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .rating-5 { background-color: #10b981; color: white; }
+    .rating-4 { background-color: #3b82f6; color: white; }
+    .rating-3 { background-color: #f59e0b; color: white; }
+    .rating-2 { background-color: #f97316; color: white; }
+    .rating-1 { background-color: #ef4444; color: white; }
+    .feedback-text {
+      background-color: #f9fafb;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+    .holiday-list {
+      list-style: none;
+      padding: 0;
+    }
+    .holiday-list li {
+      padding: 8px;
+      margin: 4px 0;
+      background-color: #f3f4f6;
+      border-radius: 4px;
+    }
+    .note {
+      background-color: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 12px;
+      margin-top: 20px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Monthly Feedback Report</h1>
+    <p>{{employeeName}} - {{monthYear}}</p>
+  </div>
+
+  <div class="section">
+    <h2>Employee Information</h2>
+    <table>
+      <tr>
+        <td class="label">Employee Name:</td>
+        <td>{{employeeName}}</td>
+      </tr>
+      <tr>
+        <td class="label">Job Title:</td>
+        <td>{{jobTitle}}</td>
+      </tr>
+      <tr>
+        <td class="label">Department:</td>
+        <td>{{department}}</td>
+      </tr>
+      <tr>
+        <td class="label">Reporting Period:</td>
+        <td>{{monthYear}}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Work Summary</h2>
+    <table>
+      <tr>
+        <td class="label">Number of Tasks:</td>
+        <td>{{tasksCount}}</td>
+      </tr>
+      <tr>
+        <td class="label">Total Days Off Taken in {{monthName}}:</td>
+        <td>{{totalDaysOffTaken}}</td>
+      </tr>
+      <tr>
+        <td class="label">Total Remaining Days Off:</td>
+        <td>{{totalRemainingDaysOff}}</td>
+      </tr>
+    </table>
+  </div>
+
+  {{#if bankHolidays}}
+  {{#if bankHolidays.length}}
+  <div class="section">
+    <h2>Bank Holidays {{nextMonthName}} {{nextMonthYear}}</h2>
+    <ul class="holiday-list">
+      {{#each bankHolidays}}
+      <li><strong>{{this.name}}</strong> - {{this.date}}</li>
+      {{/each}}
+    </ul>
+    <div class="note">
+      * If the public holiday/holidays falls/fall on the day or days of the weekend (Saturday and/or Sunday), 
+      the holiday shall be observed on the following working day or days (Monday and Tuesday).
+    </div>
+  </div>
+  {{/if}}
+  {{/if}}
+
+  {{#if amFeedback}}
+  <div class="section">
+    <h2>Account Manager Feedback</h2>
+    <div class="feedback-text">{{amFeedback}}</div>
+    {{#if amActionDescription}}
+    <h3>Action Taken:</h3>
+    <div class="feedback-text">{{amActionDescription}}</div>
+    {{/if}}
+  </div>
+  {{/if}}
+
+  <div class="section">
+    <h2>Employee Self-Assessment</h2>
+    
+    <h3>Performance Ratings</h3>
+    <table>
+      <tr>
+        <td class="label">Communication Effectiveness:</td>
+        <td>{{{communicationRatingDisplay}}}</td>
+      </tr>
+      <tr>
+        <td class="label">Collaboration and Teamwork:</td>
+        <td>{{{collaborationRatingDisplay}}}</td>
+      </tr>
+      <tr>
+        <td class="label">Task Estimation:</td>
+        <td>{{{taskEstimationRatingDisplay}}}</td>
+      </tr>
+      <tr>
+        <td class="label">Timeliness and Meeting Deadlines:</td>
+        <td>{{{timelinessRatingDisplay}}}</td>
+      </tr>
+    </table>
+
+    <p style="font-size: 0.9em; color: #666; margin-top: 5px;">
+      <strong>Rating Scale:</strong> 5 – Outstanding | 4 – Exceeds expectations | 3 – Meets expectations | 2 – Needs improvement | 1 – Unacceptable
+    </p>
+
+    {{#if employeeSummary}}
+    <h3>Summary Feedback of the Month:</h3>
+    <div class="feedback-text">{{employeeSummary}}</div>
+    {{/if}}
+  </div>
+</body>
+</html>`,
+      variables: [
+        { name: 'employeeName', description: 'Employee full name' },
+        { name: 'jobTitle', description: 'Employee job title' },
+        { name: 'department', description: 'Employee department' },
+        { name: 'monthYear', description: 'Reporting period (e.g., January 2025)' },
+        { name: 'monthName', description: 'Month name' },
+        { name: 'nextMonthName', description: 'Next month name' },
+        { name: 'nextMonthYear', description: 'Next month year' },
+        { name: 'tasksCount', description: 'Number of tasks worked on' },
+        { name: 'totalDaysOffTaken', description: 'Days off taken in the month' },
+        { name: 'totalRemainingDaysOff', description: 'Remaining annual leave days' },
+        { name: 'bankHolidays', description: 'Array of bank holidays for next month' },
+        { name: 'amFeedback', description: 'Account Manager feedback text' },
+        { name: 'amActionDescription', description: 'Account Manager action description' },
+        { name: 'communicationRatingDisplay', description: 'Communication rating with badge' },
+        { name: 'collaborationRatingDisplay', description: 'Collaboration rating with badge' },
+        { name: 'taskEstimationRatingDisplay', description: 'Task estimation rating with badge' },
+        { name: 'timelinessRatingDisplay', description: 'Timeliness rating with badge' },
+        { name: 'employeeSummary', description: 'Employee summary feedback' },
+      ],
+    },
+  });
+  console.log('  ✅ Default feedback report template created');
+
+  // ============================================
+  // 11. CREATE SAMPLE FEEDBACK REPORT
   // ============================================
   console.log('\n📊 Creating sample feedback report...');
   
@@ -542,11 +777,8 @@ async function main() {
       bankHolidays: [
         { name: "New Year's Day", date: '2025-01-01' },
       ],
-      hrFeedback: 'Excellent performance this month. The employee has shown great initiative and delivered high-quality work.',
-      hrActionDescription: 'Provided additional training on advanced TypeScript patterns and code review best practices.',
-      hrUpdatedAt: new Date(),
-      hrUpdatedBy: hr.id,
-      amFeedback: 'Outstanding collaboration with the client. The employee has been very responsive and proactive in addressing client needs.',
+      amFeedback: 'Excellent performance this month. The employee has shown great initiative and delivered high-quality work.',
+      amActionDescription: 'Provided additional training on advanced TypeScript patterns and code review best practices.',
       amUpdatedAt: new Date(),
       amUpdatedBy: accountManager.id,
       communicationRating: 4,
@@ -561,7 +793,7 @@ async function main() {
   console.log('  ✅ Feedback report created for', employee.firstName, employee.lastName);
 
   // ============================================
-  // 11. CREATE DEFAULT TEMPLATES
+  // 12. CREATE DEFAULT TEMPLATES (INVOICE & CUSTOMER REPORT)
   // ============================================
   console.log('\n📄 Creating default templates...');
   
@@ -724,6 +956,302 @@ async function main() {
   });
   console.log('  ✅ Customer report template created');
 
+  // Create default email templates
+  const emailTemplates = [
+    {
+      id: 'default-eod-report-submitted',
+      name: 'Default EOD Report Submitted',
+      type: 'EOD_REPORT_SUBMITTED',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #2563EB; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+    .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>EOD Report Submitted</h1>
+  </div>
+  <div class="content">
+    <p>Hi {{user.firstName}},</p>
+    <p>Your End of Day report for <strong>{{report.date}}</strong> has been successfully submitted.</p>
+    {{#if report.isLate}}
+    <p style="color: #dc2626; font-weight: bold;">⚠️ Note: This report was submitted after the deadline.</p>
+    {{/if}}
+    <p><strong>Hours Worked:</strong> {{report.hoursWorked}}</p>
+    {{#if report.summary}}
+    <p><strong>Summary:</strong> {{report.summary}}</p>
+    {{/if}}
+    {{#if report.tasks}}
+    <p><strong>Tasks Worked On:</strong></p>
+    <ul>
+      {{#each report.tasks}}
+      <li>{{this.ticket}} - {{this.typeOfWorkDone}} ({{this.timeSpent}} hours)</li>
+      {{/each}}
+    </ul>
+    {{/if}}
+  </div>
+  <div class="footer">
+    <p>Thank you for your submission!</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'user.firstName', description: 'User first name' },
+        { key: 'report.date', description: 'Report date' },
+        { key: 'report.hoursWorked', description: 'Total hours worked' },
+        { key: 'report.summary', description: 'Report summary' },
+        { key: 'report.isLate', description: 'Whether report was late' },
+        { key: 'report.tasks', description: 'Array of tasks worked on' },
+      ],
+    },
+    {
+      id: 'default-leave-request-created',
+      name: 'Default Leave Request Created',
+      type: 'LEAVE_REQUEST_CREATED',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #10b981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Leave Request Created</h1>
+  </div>
+  <div class="content">
+    <p>A new leave request has been submitted:</p>
+    <p><strong>Employee:</strong> {{employee.firstName}} {{employee.lastName}}</p>
+    <p><strong>Start Date:</strong> {{request.startDate}}</p>
+    <p><strong>End Date:</strong> {{request.endDate}}</p>
+    <p><strong>Type:</strong> {{request.type}}</p>
+    {{#if request.reason}}
+    <p><strong>Reason:</strong> {{request.reason}}</p>
+    {{/if}}
+    <p>Please review and approve or reject this request.</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'employee.firstName', description: 'Employee first name' },
+        { key: 'employee.lastName', description: 'Employee last name' },
+        { key: 'request.startDate', description: 'Leave start date' },
+        { key: 'request.endDate', description: 'Leave end date' },
+        { key: 'request.type', description: 'Leave type' },
+        { key: 'request.reason', description: 'Leave reason' },
+      ],
+    },
+    {
+      id: 'default-leave-request-approved',
+      name: 'Default Leave Request Approved',
+      type: 'LEAVE_REQUEST_APPROVED',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #10b981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Leave Request Approved ✓</h1>
+  </div>
+  <div class="content">
+    <p>Hi {{employee.firstName}},</p>
+    <p>Your leave request has been <strong>approved</strong>.</p>
+    <p><strong>Period:</strong> {{request.startDate}} to {{request.endDate}}</p>
+    <p><strong>Type:</strong> {{request.type}}</p>
+    <p>Enjoy your time off!</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'employee.firstName', description: 'Employee first name' },
+        { key: 'request.startDate', description: 'Leave start date' },
+        { key: 'request.endDate', description: 'Leave end date' },
+        { key: 'request.type', description: 'Leave type' },
+      ],
+    },
+    {
+      id: 'default-leave-request-rejected',
+      name: 'Default Leave Request Rejected',
+      type: 'LEAVE_REQUEST_REJECTED',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #ef4444; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Leave Request Rejected</h1>
+  </div>
+  <div class="content">
+    <p>Hi {{employee.firstName}},</p>
+    <p>Unfortunately, your leave request has been <strong>rejected</strong>.</p>
+    <p><strong>Period:</strong> {{request.startDate}} to {{request.endDate}}</p>
+    {{#if rejectionReason}}
+    <p><strong>Reason:</strong> {{rejectionReason}}</p>
+    {{/if}}
+    <p>Please contact HR if you have any questions.</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'employee.firstName', description: 'Employee first name' },
+        { key: 'request.startDate', description: 'Leave start date' },
+        { key: 'request.endDate', description: 'Leave end date' },
+        { key: 'rejectionReason', description: 'Rejection reason' },
+      ],
+    },
+    {
+      id: 'default-task-assigned',
+      name: 'Default Task Assigned',
+      type: 'TASK_ASSIGNED',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #3b82f6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>New Task Assigned</h1>
+  </div>
+  <div class="content">
+    <p>Hi {{assignedTo.firstName}},</p>
+    <p>A new task has been assigned to you:</p>
+    <p><strong>Title:</strong> {{task.title}}</p>
+    {{#if task.description}}
+    <p><strong>Description:</strong> {{task.description}}</p>
+    {{/if}}
+    {{#if task.dueDate}}
+    <p><strong>Due Date:</strong> {{task.dueDate}}</p>
+    {{/if}}
+    <p><strong>Priority:</strong> {{task.priority}}</p>
+    <p>Assigned by: {{assignedBy.firstName}} {{assignedBy.lastName}}</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'assignedTo.firstName', description: 'Assignee first name' },
+        { key: 'task.title', description: 'Task title' },
+        { key: 'task.description', description: 'Task description' },
+        { key: 'task.dueDate', description: 'Task due date' },
+        { key: 'task.priority', description: 'Task priority' },
+        { key: 'assignedBy.firstName', description: 'Assigner first name' },
+        { key: 'assignedBy.lastName', description: 'Assigner last name' },
+      ],
+    },
+    {
+      id: 'default-mention-notification',
+      name: 'Default Mention Notification',
+      type: 'MENTION_NOTIFICATION',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #8b5cf6; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+    .button { display: inline-block; padding: 10px 20px; background-color: #8b5cf6; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>You Were Mentioned</h1>
+  </div>
+  <div class="content">
+    <p>Hi,</p>
+    <p><strong>{{mentionedBy.firstName}} {{mentionedBy.lastName}}</strong> mentioned you in {{entityType}}:</p>
+    <p style="background-color: #fff; padding: 15px; border-left: 4px solid #8b5cf6; margin: 15px 0;">
+      {{activity.content}}
+    </p>
+    {{#if entityLink}}
+    <a href="{{entityLink}}" class="button">View Activity</a>
+    {{/if}}
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'mentionedBy.firstName', description: 'Mentioner first name' },
+        { key: 'mentionedBy.lastName', description: 'Mentioner last name' },
+        { key: 'entityType', description: 'Entity type where mention occurred' },
+        { key: 'activity.content', description: 'Activity content' },
+        { key: 'entityLink', description: 'Link to the entity' },
+      ],
+    },
+    {
+      id: 'default-remote-work-window-opened',
+      name: 'Default Remote Work Window Opened',
+      type: 'REMOTE_WORK_WINDOW_OPENED',
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    .header { background-color: #f59e0b; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Remote Work Window Opened</h1>
+  </div>
+  <div class="content">
+    <p>Hi,</p>
+    <p>A remote work window has been opened:</p>
+    <p><strong>Start Date:</strong> {{window.startDate}}</p>
+    <p><strong>End Date:</strong> {{window.endDate}}</p>
+    <p><strong>Limit:</strong> {{window.limit}} days</p>
+    <p>You can now submit remote work requests for this period.</p>
+    <p>Opened by: {{openedBy.firstName}} {{openedBy.lastName}}</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'window.startDate', description: 'Window start date' },
+        { key: 'window.endDate', description: 'Window end date' },
+        { key: 'window.limit', description: 'Remote work limit in days' },
+        { key: 'openedBy.firstName', description: 'Opener first name' },
+        { key: 'openedBy.lastName', description: 'Opener last name' },
+      ],
+    },
+  ];
+
+  for (const template of emailTemplates) {
+    await prisma.template.upsert({
+      where: { id: template.id },
+      update: {},
+      create: {
+        id: template.id,
+        name: template.name,
+        type: template.type as any,
+        isDefault: true,
+        isActive: true,
+        htmlContent: template.htmlContent,
+        cssContent: null,
+        variables: template.variables as any,
+      },
+    });
+    console.log(`  ✅ ${template.name} created`);
+  }
+
   // ============================================
   // SUMMARY
   // ============================================
@@ -749,7 +1277,7 @@ async function main() {
   console.log('  • 3 Activities');
   console.log('  • 1 Feedback Report (Draft)');
   console.log('  • 13 Albanian National Holidays (2025)');
-  console.log('  • 2 Default Templates (Invoice & Report)');
+  console.log('  • 10 Default Templates (Invoice, Customer Report, Feedback Report & 7 Email Templates)');
   console.log('');
   console.log('⚙️  Company Settings Configured');
   console.log('');

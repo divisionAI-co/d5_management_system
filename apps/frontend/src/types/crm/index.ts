@@ -245,7 +245,10 @@ export interface Lead {
   convertedCustomerId?: string | null;
   createdAt: string;
   updatedAt: string;
-  contact: Contact;
+  // New many-to-many relationship - array of contacts
+  contacts?: Contact[];
+  // Legacy single contact for backward compatibility
+  contact?: Contact;
   assignedTo?: {
     id: string;
     firstName: string;
@@ -292,7 +295,8 @@ export interface LeadContactPayload {
 }
 
 export interface CreateLeadPayload {
-  contactId?: string;
+  contactIds?: string[];
+  contactId?: string; // Legacy single contactId
   contact?: LeadContactPayload;
   title: string;
   description?: string;

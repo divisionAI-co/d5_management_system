@@ -25,6 +25,7 @@ export interface FeedbackReport {
   
   // Account Manager Section
   amFeedback: string | null;
+  amActionDescription: string | null;
   amUpdatedAt: string | null;
   amUpdatedBy: string | null;
   amUpdatedByUser?: User;

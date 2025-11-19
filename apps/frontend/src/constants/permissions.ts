@@ -35,6 +35,9 @@ export const ROLE_PERMISSIONS = {
   APPEARANCE_SETTINGS: ['ADMIN'],
   ACTIVITY_TYPES: ['ADMIN'],
   TEMPLATES: ['ADMIN', 'HR'],
+  SYSTEM_EXPORT: ['ADMIN'],
+  DATA_CLEANUP: ['ADMIN'],
+  FEEDBACK_REPORTS: ALL_ROLES, // All roles can view, but permissions enforced at API level
 } satisfies Record<string, UserRole[]>;
 
 

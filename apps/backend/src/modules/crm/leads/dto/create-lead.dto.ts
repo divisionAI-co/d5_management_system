@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -10,6 +11,7 @@ import {
   Max,
   Min,
   ValidateNested,
+  ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { LeadStatus, LeadType } from '@prisma/client';
@@ -51,12 +53,22 @@ export class LeadContactInputDto {
 }
 
 export class CreateLeadDto {
-  @ApiPropertyOptional({ description: 'Existing contact identifier to attach to the lead' })
+  @ApiPropertyOptional({ 
+    description: 'Existing contact identifiers to attach to the lead (can provide multiple)',
+    type: [String],
+    example: ['contact-uuid-1', 'contact-uuid-2']
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  contactIds?: string[];
+
+  @ApiPropertyOptional({ description: 'Legacy: Single contact identifier (use contactIds for multiple)' })
   @IsUUID()
   @IsOptional()
   contactId?: string;
 
-  @ApiPropertyOptional({ description: 'Contact details used when no contactId is provided', type: LeadContactInputDto })
+  @ApiPropertyOptional({ description: 'Contact details used when no contactIds/contactId is provided', type: LeadContactInputDto })
   @ValidateNested()
   @Type(() => LeadContactInputDto)
   @IsOptional()

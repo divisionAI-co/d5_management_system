@@ -20,6 +20,21 @@ export class LeadsService {
       value: lead?.value ? Number(lead.value) : null,
     };
 
+    // Normalize contacts: combine many-to-many contacts with legacy single contact
+    if (lead.contacts && Array.isArray(lead.contacts) && lead.contacts.length > 0) {
+      // Use many-to-many contacts
+      formatted.contacts = lead.contacts.map((lc: any) => lc.contact);
+      // For backward compatibility, also set the first contact as the primary contact
+      formatted.contact = lead.contacts[0]?.contact || lead.contact;
+    } else if (lead.contact) {
+      // Fallback to legacy single contact
+      formatted.contacts = [lead.contact];
+      formatted.contact = lead.contact;
+    } else {
+      formatted.contacts = [];
+      formatted.contact = null;
+    }
+
     if (Array.isArray(lead?.opportunities)) {
       formatted.opportunities = lead.opportunities.map((opportunity: any) => ({
         ...opportunity,
@@ -39,33 +54,48 @@ export class LeadsService {
     return formatted;
   }
 
-  private async resolveContact(createDto: CreateLeadDto): Promise<string> {
+  private async resolveContacts(createDto: CreateLeadDto): Promise<string[]> {
+    // Handle multiple contactIds (new approach)
+    if (createDto.contactIds && createDto.contactIds.length > 0) {
+      const contacts = await this.prisma.contact.findMany({
+        where: { id: { in: createDto.contactIds } },
+      });
+      if (contacts.length !== createDto.contactIds.length) {
+        const foundIds = new Set(contacts.map(c => c.id));
+        const missingIds = createDto.contactIds.filter(id => !foundIds.has(id));
+        throw new NotFoundException(`Contacts not found: ${missingIds.join(', ')}`);
+      }
+      return contacts.map(c => c.id);
+    }
+
+    // Handle legacy single contactId
     if (createDto.contactId) {
       const existing = await this.prisma.contact.findUnique({ where: { id: createDto.contactId } });
       if (!existing) {
         throw new NotFoundException(`Contact ${createDto.contactId} not found`);
       }
-      return existing.id;
+      return [existing.id];
     }
 
-    if (!createDto.contact) {
-      throw new BadRequestException('Either contactId or contact details must be provided');
+    // Handle creating a new contact
+    if (createDto.contact) {
+      const existingByEmail = await this.prisma.contact.findUnique({ where: { email: createDto.contact.email } });
+      if (existingByEmail) {
+        return [existingByEmail.id];
+      }
+
+      const { customerId, ...contactData } = createDto.contact;
+      const newContact = await this.prisma.contact.create({
+        data: {
+          ...contactData,
+          customerId,
+        },
+      });
+
+      return [newContact.id];
     }
 
-    const existingByEmail = await this.prisma.contact.findUnique({ where: { email: createDto.contact.email } });
-    if (existingByEmail) {
-      return existingByEmail.id;
-    }
-
-    const { customerId, ...contactData } = createDto.contact;
-    const newContact = await this.prisma.contact.create({
-      data: {
-        ...contactData,
-        customerId,
-      },
-    });
-
-    return newContact.id;
+    throw new BadRequestException('Either contactIds, contactId, or contact details must be provided');
   }
 
   private buildWhereClause(filters: FilterLeadsDto): Prisma.LeadWhereInput {
@@ -75,13 +105,18 @@ export class LeadsService {
       where.OR = [
         { title: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
         {
-          contact: {
-            OR: [
-              { firstName: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-              { lastName: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-              { email: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-              { companyName: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-            ],
+          // Search in contacts via the many-to-many relationship
+          contacts: {
+            some: {
+              contact: {
+                OR: [
+                  { firstName: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
+                  { lastName: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
+                  { email: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
+                  { companyName: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
+                ],
+              },
+            },
           },
         },
       ];
@@ -96,7 +131,11 @@ export class LeadsService {
     }
 
     if (filters.contactId) {
-      where.contactId = filters.contactId;
+      // Support both new many-to-many and legacy single contact
+      where.OR = [
+        { contacts: { some: { contactId: filters.contactId } } },
+        { contactId: filters.contactId },
+      ];
     }
 
     if (filters.convertedCustomerId) {
@@ -107,11 +146,14 @@ export class LeadsService {
   }
 
   async create(createLeadDto: CreateLeadDto) {
-    const contactId = await this.resolveContact(createLeadDto);
+    const contactIds = await this.resolveContacts(createLeadDto);
+
+    // Create lead with first contactId for backward compatibility (legacy field)
+    const firstContactId = contactIds[0];
 
     const lead = await this.prisma.lead.create({
       data: {
-        contactId,
+        contactId: firstContactId, // Legacy field for backward compatibility
         title: createLeadDto.title,
         description: createLeadDto.description,
         status: createLeadDto.status ?? LeadStatus.NEW,
@@ -129,6 +171,12 @@ export class LeadsService {
         prospectWebsite: createLeadDto.prospectWebsite,
         prospectIndustry: createLeadDto.prospectIndustry,
         leadType: createLeadDto.leadType,
+        // Create many-to-many relationships
+        contacts: {
+          create: contactIds.map(contactId => ({
+            contactId,
+          })),
+        },
       },
     });
 
@@ -153,16 +201,21 @@ export class LeadsService {
         skip,
         take: pageSize,
         include: {
-          contact: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true,
-              role: true,
-              companyName: true,
-              customerId: true,
+          // New many-to-many relationship
+          contacts: {
+            include: {
+              contact: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                  role: true,
+                  companyName: true,
+                  customerId: true,
+                },
+              },
             },
           },
           assignedTo: {
@@ -198,16 +251,21 @@ export class LeadsService {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
       include: {
-        contact: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-            role: true,
-            companyName: true,
-            customerId: true,
+        // New many-to-many relationship
+        contacts: {
+          include: {
+            contact: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                role: true,
+                companyName: true,
+                customerId: true,
+              },
+            },
           },
         },
         assignedTo: {
@@ -254,22 +312,45 @@ export class LeadsService {
   async update(id: string, updateDto: UpdateLeadDto) {
     const existing = await this.prisma.lead.findUnique({
       where: { id },
-      include: { contact: true },
+      include: { 
+        contacts: {
+          include: { contact: true },
+        },
+      },
     });
 
     if (!existing) {
       throw new NotFoundException(`Lead with ID ${id} not found`);
     }
 
-    let contactId = existing.contactId;
+    // Handle contact updates
+    let contactIds: string[] | undefined;
+    let firstContactId = existing.contactId;
 
-    if (updateDto.contactId && updateDto.contactId !== existing.contactId) {
+    // Handle new contactIds array (multiple contacts)
+    if (updateDto.contactIds) {
+      const contacts = await this.prisma.contact.findMany({
+        where: { id: { in: updateDto.contactIds } },
+      });
+      if (contacts.length !== updateDto.contactIds.length) {
+        const foundIds = new Set(contacts.map(c => c.id));
+        const missingIds = updateDto.contactIds.filter(id => !foundIds.has(id));
+        throw new NotFoundException(`Contacts not found: ${missingIds.join(', ')}`);
+      }
+      contactIds = contacts.map(c => c.id);
+      firstContactId = contactIds[0];
+    } 
+    // Handle legacy single contactId
+    else if (updateDto.contactId) {
       const newContact = await this.prisma.contact.findUnique({ where: { id: updateDto.contactId } });
       if (!newContact) {
         throw new NotFoundException(`Contact ${updateDto.contactId} not found`);
       }
-      contactId = newContact.id;
-    } else if (updateDto.contact) {
+      firstContactId = newContact.id;
+      contactIds = [newContact.id];
+    }
+    // Handle contact update (updating existing contact details)
+    else if (updateDto.contact && existing.contactId) {
       await this.prisma.contact.update({
         where: { id: existing.contactId },
         data: {
@@ -281,7 +362,7 @@ export class LeadsService {
     const lead = await this.prisma.lead.update({
       where: { id },
       data: {
-        contactId,
+        contactId: firstContactId, // Legacy field for backward compatibility
         title: updateDto.title,
         description: updateDto.description,
         status: updateDto.status,
@@ -299,6 +380,13 @@ export class LeadsService {
         prospectWebsite: updateDto.prospectWebsite,
         prospectIndustry: updateDto.prospectIndustry,
         leadType: updateDto.leadType,
+        // Update many-to-many relationships if contactIds provided
+        ...(contactIds && {
+          contacts: {
+            deleteMany: {}, // Remove all existing
+            create: contactIds.map(contactId => ({ contactId })),
+          },
+        }),
       },
     });
 
@@ -322,7 +410,11 @@ export class LeadsService {
   async convert(id: string, convertDto: ConvertLeadDto) {
     const lead = await this.prisma.lead.findUnique({
       where: { id },
-      include: { contact: true },
+      include: { 
+        contacts: {
+          include: { contact: true },
+        },
+      },
     });
 
     if (!lead) {
@@ -331,6 +423,17 @@ export class LeadsService {
 
     if (lead.convertedCustomerId) {
       throw new BadRequestException('Lead is already converted to a customer');
+    }
+
+    // Get the first contact for customer link (or use contactId if contacts array is empty)
+    const firstContact = lead.contacts && lead.contacts.length > 0 
+      ? lead.contacts[0].contact
+      : lead.contactId 
+        ? await this.prisma.contact.findUnique({ where: { id: lead.contactId } })
+        : null;
+
+    if (!firstContact && !lead.contactId) {
+      throw new BadRequestException('Lead has no contacts to convert');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -372,13 +475,23 @@ export class LeadsService {
         },
       });
 
-      await tx.contact.update({
-        where: { id: lead.contactId },
-        data: {
-          customerId,
-          companyName: lead.contact.companyName || convertDto.customerName,
-        },
-      });
+      // Update all contacts linked to this lead to associate with the customer
+      const contactIds = lead.contacts.map(lc => lc.contactId);
+      if (lead.contactId && !contactIds.includes(lead.contactId)) {
+        contactIds.push(lead.contactId);
+      }
+
+      if (contactIds.length > 0) {
+        await tx.contact.updateMany({
+          where: { id: { in: contactIds } },
+          data: {
+            customerId,
+            ...(convertDto.customerName && {
+              companyName: firstContact?.companyName || convertDto.customerName,
+            }),
+          },
+        });
+      }
 
       return this.findOne(id);
     });

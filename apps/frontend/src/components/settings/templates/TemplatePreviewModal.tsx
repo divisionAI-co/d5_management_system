@@ -57,6 +57,18 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
     setState({ status: 'idle', html: null, error: null });
   }, [open, template, sampleData]);
 
+  // Convert relative API URLs to absolute URLs for iframe compatibility
+  const convertRelativeUrls = (html: string): string => {
+    if (!html) return html;
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+    // Replace relative API URLs with absolute ones
+    // API_URL already includes /api/v1, so remove it from the path
+    return html.replace(
+      /src=["'](\/api\/v1\/[^"']+)["']/gi,
+      (_match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+    );
+  };
+
   const fetchPreview = useCallback(async () => {
     if (!template) {
       return;
@@ -76,7 +88,9 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
       }
 
       const response = await templatesApi.preview(template.id, { data: payload });
-      setState({ status: 'success', html: response.renderedHtml, error: null });
+      // Convert relative URLs to absolute for iframe compatibility
+      const processedHtml = convertRelativeUrls(response.renderedHtml);
+      setState({ status: 'success', html: processedHtml, error: null });
     } catch (error: any) {
       const message =
         error?.response?.data?.message ??
@@ -127,13 +141,17 @@ export function TemplatePreviewModal({ open, template, onClose }: TemplatePrevie
     }
 
     if (state.status === 'success' && state.html) {
+      // Add CSP meta tag to iframe content to allow loading images from localhost
+      const htmlWithCsp = `<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"></head><body>${state.html}</body></html>`;
+      
       return (
         <div className="h-full min-h-0 overflow-hidden rounded-lg border border-border bg-card">
           <iframe
             title="Template preview"
             className="h-full w-full border-0"
-            srcDoc={state.html}
-            sandbox="allow-same-origin"
+            srcDoc={htmlWithCsp}
+            sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+            referrerPolicy="no-referrer"
           />
         </div>
       );

@@ -25,8 +25,17 @@ export const feedbackReportsApi = {
    * Get all feedback reports with optional filters
    */
   getAll: async (filters?: FilterFeedbackReportsDto): Promise<FeedbackReport[]> => {
+    // Filter out empty strings and undefined values
+    const cleanFilters = filters
+      ? Object.fromEntries(
+          Object.entries(filters).filter(
+            ([_, value]) => value !== undefined && value !== null && value !== ''
+          )
+        )
+      : undefined;
+    
     const response = await apiClient.get<FeedbackReport[]>(BASE_URL, {
-      params: filters,
+      params: cleanFilters,
     });
     return response.data;
   },

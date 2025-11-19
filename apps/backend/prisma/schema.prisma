@@ -90,6 +90,7 @@ model NotificationSettings {
   taskDueSoon       Boolean @default(true)
   leaveApproved     Boolean @default(true)
   performanceReview Boolean @default(true)
+  feedbackReport    Boolean @default(true)
   newCandidate      Boolean @default(true)
   newOpportunity    Boolean @default(true)
   mentionedInActivity Boolean @default(true)
@@ -199,7 +200,7 @@ model Contact {
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  leads      Lead[]
+  leadContacts LeadContact[]
   activities Activity[]
 
   createdAt DateTime @default(now())
@@ -211,8 +212,10 @@ model Contact {
 
 model Lead {
   id        String  @id @default(uuid())
-  contactId String
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  // Legacy field for backward compatibility - kept for migration
+  contactId String? @map("contactId")
+  // New many-to-many relationship
+  contacts  LeadContact[]
 
   title       String
   description String?
@@ -250,6 +253,21 @@ model Lead {
   @@index([status])
   @@index([assignedToId])
   @@map("leads")
+}
+
+// Many-to-many relationship between Lead and Contact
+model LeadContact {
+  id        String   @id @default(uuid())
+  leadId    String
+  contactId String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([leadId, contactId])
+  @@index([leadId])
+  @@index([contactId])
+  @@map("lead_contacts")
 }
 
 model Opportunity {
@@ -705,6 +723,7 @@ model FeedbackReport {
 
   // Account Manager Section
   amFeedback              String? @db.Text
+  amActionDescription     String? @db.Text
   amUpdatedAt             DateTime?
   amUpdatedBy             String?
   amUpdatedByUser         User?   @relation("FeedbackReportAMUpdater", fields: [amUpdatedBy], references: [id], onDelete: SetNull)
@@ -834,6 +853,15 @@ model CompanySettings {
 
   // Leave Policy
   annualLeaveAllowanceDays Int @default(20)
+
+  // Email Template Configuration
+  emailTemplateEodReportSubmittedId String?
+  emailTemplateLeaveRequestCreatedId String?
+  emailTemplateLeaveRequestApprovedId String?
+  emailTemplateLeaveRequestRejectedId String?
+  emailTemplateTaskAssignedId String?
+  emailTemplateMentionNotificationId String?
+  emailTemplateRemoteWorkWindowOpenedId String?
 
   updatedAt DateTime @updatedAt
 
@@ -1317,6 +1345,7 @@ enum NotificationType {
   LEAVE_APPROVED
   LEAVE_REJECTED
   PERFORMANCE_REVIEW
+  FEEDBACK_REPORT
   NEW_CANDIDATE
   NEW_OPPORTUNITY
   INVOICE_OVERDUE
@@ -1374,7 +1403,15 @@ enum TemplateType {
   INVOICE
   CUSTOMER_REPORT
   PERFORMANCE_REVIEW
+  FEEDBACK_REPORT
   EMAIL
+  EOD_REPORT_SUBMITTED
+  LEAVE_REQUEST_CREATED
+  LEAVE_REQUEST_APPROVED
+  LEAVE_REQUEST_REJECTED
+  TASK_ASSIGNED
+  MENTION_NOTIFICATION
+  REMOTE_WORK_WINDOW_OPENED
 }
 
 model Template {

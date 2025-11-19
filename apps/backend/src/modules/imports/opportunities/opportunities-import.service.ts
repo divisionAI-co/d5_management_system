@@ -745,10 +745,14 @@ export class OpportunitiesImportService {
           equals: title,
           mode: Prisma.QueryMode.insensitive,
         },
-        contact: {
-          email: {
-            equals: contactEmail,
-            mode: Prisma.QueryMode.insensitive,
+        contacts: {
+          some: {
+            contact: {
+              email: {
+                equals: contactEmail,
+                mode: Prisma.QueryMode.insensitive,
+              },
+            },
           },
         },
       },
@@ -1135,7 +1139,12 @@ export class OpportunitiesImportService {
               title: leadTitle,
               description: leadDescription,
               status: leadStatus,
-              contact: { connect: { id: contactId } },
+              contacts: {
+                create: {
+                  contactId,
+                },
+              },
+              contactId, // Legacy field for backward compatibility
               assignedTo: ownerId ? { connect: { id: ownerId } } : undefined,
               source: 'Import',
             },

@@ -107,13 +107,40 @@ export function LeadsTable({
                 {lead.source && <div className="text-xs text-muted-foreground">Source: {lead.source}</div>}
               </td>
               <td className="px-6 py-4 text-sm text-muted-foreground">
-                <div className="font-medium text-foreground">
-                  {lead.contact.firstName} {lead.contact.lastName}
-                </div>
-                <div className="text-xs text-muted-foreground">{lead.contact.email}</div>
+                {(() => {
+                  // Get first contact from contacts array or fallback to legacy contact
+                  const contact = (lead.contacts && lead.contacts.length > 0) 
+                    ? lead.contacts[0] 
+                    : lead.contact;
+                  
+                  if (!contact) {
+                    return <div className="text-muted-foreground">No contact</div>;
+                  }
+                  
+                  return (
+                    <>
+                      <div className="font-medium text-foreground">
+                        {contact.firstName} {contact.lastName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{contact.email}</div>
+                      {lead.contacts && lead.contacts.length > 1 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          +{lead.contacts.length - 1} more contact{lead.contacts.length - 1 !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </td>
               <td className="px-6 py-4 text-sm text-muted-foreground">
-                {lead.contact.companyName || lead.prospectCompanyName || '—'}
+                {(() => {
+                  // Get first contact from contacts array or fallback to legacy contact
+                  const contact = (lead.contacts && lead.contacts.length > 0) 
+                    ? lead.contacts[0] 
+                    : lead.contact;
+                  
+                  return contact?.companyName || lead.prospectCompanyName || '—';
+                })()}
               </td>
               <td className="px-6 py-4 text-sm">
                 <span

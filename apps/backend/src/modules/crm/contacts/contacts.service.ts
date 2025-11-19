@@ -36,13 +36,15 @@ export class ContactsService {
       };
     }
 
-    if (Array.isArray(formatted.leads)) {
-      formatted.leads = formatted.leads.map((lead: any) => ({
-        id: lead.id,
-        title: lead.title,
-        status: lead.status,
-        value: lead.value ? Number(lead.value) : null,
+    // Handle leadContacts (many-to-many) - extract leads from the join table
+    if (Array.isArray(formatted.leadContacts)) {
+      formatted.leads = formatted.leadContacts.map((lc: any) => ({
+        id: lc.lead.id,
+        title: lc.lead.title,
+        status: lc.lead.status,
+        value: lc.lead.value ? Number(lc.lead.value) : null,
       }));
+      delete formatted.leadContacts; // Remove the join table data, keep only leads array for backward compatibility
     }
 
     if (Array.isArray(formatted.activities)) {
@@ -95,14 +97,18 @@ export class ContactsService {
         },
         include: {
           customer: true,
-          leads: {
+          leadContacts: {
             orderBy: { createdAt: 'desc' },
             take: 5,
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              value: true,
+            include: {
+              lead: {
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  value: true,
+                },
+              },
             },
           },
         },
@@ -145,7 +151,7 @@ export class ContactsService {
           },
           _count: {
             select: {
-              leads: true,
+              leadContacts: true,
               activities: true,
             },
           },
@@ -176,15 +182,19 @@ export class ContactsService {
             phone: true,
           },
         },
-        leads: {
+        leadContacts: {
           orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            value: true,
-            probability: true,
-            createdAt: true,
+          include: {
+            lead: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                value: true,
+                probability: true,
+                createdAt: true,
+              },
+            },
           },
         },
         activities: {
@@ -226,14 +236,18 @@ export class ContactsService {
               phone: true,
             },
           },
-          leads: {
+          leadContacts: {
             orderBy: { createdAt: 'desc' },
             take: 5,
-            select: {
-              id: true,
-              title: true,
-              status: true,
-              value: true,
+            include: {
+              lead: {
+                select: {
+                  id: true,
+                  title: true,
+                  status: true,
+                  value: true,
+                },
+              },
             },
           },
         },
@@ -304,16 +318,20 @@ export class ContactsService {
     const leadWithRelations = await this.prisma.lead.findUnique({
       where: { id: lead.id },
       include: {
-        contact: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
-            role: true,
-            companyName: true,
-            customerId: true,
+        contacts: {
+          include: {
+            contact: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+                role: true,
+                companyName: true,
+                customerId: true,
+              },
+            },
           },
         },
         assignedTo: {

@@ -8,8 +8,10 @@ import { FeedbackToast } from '@/components/ui/feedback-toast';
 import {
   createRawHtmlBlock,
   extractBlocksFromHtml,
+  extractPageWidthFromHtml,
   getDefaultTemplateBlocks,
   injectBlockMetadata,
+  parseHtmlToBlocks,
   renderBlocksToHtml,
 } from './template-blocks';
 
@@ -65,6 +67,46 @@ const TEMPLATE_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; descrip
     label: 'Performance Review',
     description: 'Documents for employee review exports or emails.',
   },
+  {
+    value: 'FEEDBACK_REPORT',
+    label: 'Feedback Report',
+    description: 'Templates for feedback report exports or emails.',
+  },
+  {
+    value: 'EOD_REPORT_SUBMITTED',
+    label: 'EOD Report Submitted',
+    description: 'Email sent to employees when they submit their End of Day report.',
+  },
+  {
+    value: 'LEAVE_REQUEST_CREATED',
+    label: 'Leave Request Created',
+    description: 'Email sent to HR when an employee creates a leave request.',
+  },
+  {
+    value: 'LEAVE_REQUEST_APPROVED',
+    label: 'Leave Request Approved',
+    description: 'Email sent to employees when their leave request is approved.',
+  },
+  {
+    value: 'LEAVE_REQUEST_REJECTED',
+    label: 'Leave Request Rejected',
+    description: 'Email sent to employees when their leave request is rejected.',
+  },
+  {
+    value: 'TASK_ASSIGNED',
+    label: 'Task Assigned',
+    description: 'Email sent to users when a task is assigned to them.',
+  },
+  {
+    value: 'MENTION_NOTIFICATION',
+    label: 'Mention Notification',
+    description: 'Email sent to users when they are mentioned in an activity.',
+  },
+  {
+    value: 'REMOTE_WORK_WINDOW_OPENED',
+    label: 'Remote Work Window Opened',
+    description: 'Email sent to all users when a remote work window is opened.',
+  },
 ];
 
 const INPUT_BASE_CLASS =
@@ -72,6 +114,9 @@ const INPUT_BASE_CLASS =
 
 const INPUT_DENSE_CLASS =
   'w-full rounded-lg border border-border bg-muted/20 px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
+
+const SELECT_BASE_CLASS =
+  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer';
 
 const TEXTAREA_MONO_CLASS =
   'w-full rounded-lg border border-border bg-muted/20 px-3 py-2 font-mono text-xs leading-5 text-foreground placeholder:text-muted-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500';
@@ -145,6 +190,71 @@ const DATA_CONTEXT_HELP: Record<
     description:
       'Performance review exports include the review details (employee, period, overall rating, strengths, improvements). Match those keys with variables or reference nested objects like {{review.employee.firstName}}.',
   },
+  FEEDBACK_REPORT: {
+    heading: 'Feedback report context',
+    description:
+      'Feedback reports include report details, employee information, and feedback data. Reference fields like {{report.date}}, {{employee.firstName}}, and {{feedback.content}}. Use {{#if bankHolidays}}...{{/if}} and {{#each bankHolidays}}...{{/each}} to display arrays.',
+    groups: [
+      {
+        title: 'Report & Employee',
+        items: ['{{report.date}}', '{{employee.firstName}}', '{{employee.lastName}}', '{{feedback.content}}'],
+      },
+      {
+        title: 'Bank Holidays (array) - Use {{#if bankHolidays}}...{{/if}} and {{#each bankHolidays}}...{{/each}}',
+        items: ['{{this.name}}', '{{this.date}}'],
+      },
+    ],
+  },
+  EOD_REPORT_SUBMITTED: {
+    heading: 'EOD Report data context',
+    description:
+      'EOD report emails include report details and task information. Available fields: {{report.date}}, {{report.summary}}, {{report.hoursWorked}}, {{report.isLate}}, {{report.tasks}} (array), {{user.firstName}}, {{user.lastName}}, {{user.email}}.',
+    groups: [
+      {
+        title: 'Report',
+        items: ['{{report.date}}', '{{report.summary}}', '{{report.hoursWorked}}', '{{report.isLate}}', '{{report.submittedAt}}'],
+      },
+      {
+        title: 'User',
+        items: ['{{user.firstName}}', '{{user.lastName}}', '{{user.email}}'],
+      },
+      {
+        title: 'Tasks (loop with {{#each report.tasks}} ... {{/each}})',
+        items: ['{{clientDetails}}', '{{ticket}}', '{{typeOfWorkDone}}', '{{timeSpent}}', '{{taskLifecycle}}', '{{taskStatus}}'],
+      },
+    ],
+  },
+  LEAVE_REQUEST_CREATED: {
+    heading: 'Leave request data context',
+    description:
+      'Leave request emails include request details and employee information. Available fields: {{request.startDate}}, {{request.endDate}}, {{request.type}}, {{request.reason}}, {{employee.firstName}}, {{employee.lastName}}, {{employee.email}}.',
+  },
+  LEAVE_REQUEST_APPROVED: {
+    heading: 'Leave request approval data context',
+    description:
+      'Leave approval emails include request details and employee information. Available fields: {{request.startDate}}, {{request.endDate}}, {{request.type}}, {{request.reason}}, {{employee.firstName}}, {{employee.lastName}}, {{approvedBy.firstName}}.',
+  },
+  LEAVE_REQUEST_REJECTED: {
+    heading: 'Leave request rejection data context',
+    description:
+      'Leave rejection emails include request details and rejection reason. Available fields: {{request.startDate}}, {{request.endDate}}, {{request.type}}, {{request.reason}}, {{rejectionReason}}, {{employee.firstName}}, {{employee.lastName}}, {{rejectedBy.firstName}}.',
+  },
+  TASK_ASSIGNED: {
+    heading: 'Task assignment data context',
+    description:
+      'Task assignment emails include task details and assignee information. Available fields: {{task.title}}, {{task.description}}, {{task.dueDate}}, {{task.priority}}, {{task.status}}, {{assignedTo.firstName}}, {{assignedTo.lastName}}, {{assignedBy.firstName}}.',
+  },
+  MENTION_NOTIFICATION: {
+    heading: 'Mention notification data context',
+    description:
+      'Mention notification emails include activity details and entity information. Available fields: {{activity.content}}, {{activity.type}}, {{entityType}}, {{entityLink}}, {{mentionedBy.firstName}}, {{mentionedBy.lastName}}.',
+    note: 'The {{entityLink}} field contains a URL to navigate to the entity where the mention occurred.',
+  },
+  REMOTE_WORK_WINDOW_OPENED: {
+    heading: 'Remote work window data context',
+    description:
+      'Remote work window emails include window details. Available fields: {{window.startDate}}, {{window.endDate}}, {{window.limit}}, {{openedBy.firstName}}, {{openedBy.lastName}}.',
+  },
 };
 
 const generateId = () => {
@@ -193,6 +303,7 @@ export function TemplateFormModal({
 
   const [variables, setVariables] = useState<TemplateVariableForm[]>(() => [newVariable()]);
   const [blocks, setBlocks] = useState<TemplateBlock[]>(() => getDefaultTemplateBlocks());
+  const [pageWidth, setPageWidth] = useState<number>(640);
   const [editingMode, setEditingMode] = useState<'visual' | 'html'>('visual');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -203,6 +314,7 @@ export function TemplateFormModal({
 
     if (template) {
       const { blocks: storedBlocks, htmlWithoutMeta } = extractBlocksFromHtml(template.htmlContent);
+      const extractedPageWidth = extractPageWidthFromHtml(template.htmlContent);
 
       setFormValues({
         name: template.name,
@@ -217,6 +329,7 @@ export function TemplateFormModal({
         ? template.variables.map((item) => toFormVariable(item))
         : [newVariable()];
       setVariables(vars);
+      setPageWidth(extractedPageWidth);
 
       if (storedBlocks && storedBlocks.length) {
         setBlocks(storedBlocks);
@@ -230,13 +343,14 @@ export function TemplateFormModal({
       setFormValues({
         name: '',
         type: 'EMAIL',
-        htmlContent: renderBlocksToHtml(defaultBlocks),
+        htmlContent: renderBlocksToHtml(defaultBlocks, 640),
         cssContent: '',
         isDefault: false,
         isActive: true,
       });
       setVariables([newVariable()]);
       setBlocks(defaultBlocks);
+      setPageWidth(640);
       setEditingMode('visual');
     }
     setErrorMessage(null);
@@ -247,18 +361,13 @@ export function TemplateFormModal({
       return;
     }
 
-    const generated = renderBlocksToHtml(blocks);
-    setFormValues((prev) => {
-      if (prev.htmlContent === generated) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        htmlContent: generated,
-      };
-    });
-  }, [blocks, editingMode]);
+    const generated = renderBlocksToHtml(blocks, pageWidth);
+    // Always update to ensure page width changes are reflected
+    setFormValues((prev) => ({
+      ...prev,
+      htmlContent: generated,
+    }));
+  }, [blocks, pageWidth, editingMode]);
 
   const dialogTitle = useMemo(
     () => (mode === 'create' ? 'Create Template' : `Edit ${template?.name ?? 'Template'}`),
@@ -330,7 +439,7 @@ export function TemplateFormModal({
     let htmlContent = formValues.htmlContent;
 
     if (editingMode === 'visual') {
-      const htmlFromBlocks = renderBlocksToHtml(blocks);
+      const htmlFromBlocks = renderBlocksToHtml(blocks, pageWidth);
       htmlContent = injectBlockMetadata(htmlFromBlocks, blocks);
     }
 
@@ -386,7 +495,8 @@ export function TemplateFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-6">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-6">
           <div className="grid gap-6 lg:grid-cols-[2fr,3fr]">
             <div className="space-y-6">
               <div className="space-y-2">
@@ -405,32 +515,65 @@ export function TemplateFormModal({
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">Template Type</label>
-                <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-                  {TEMPLATE_TYPE_OPTIONS.map((option) => (
-                    <label
-                      key={option.value}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition ${
-                        formValues.type === option.value
-                          ? 'border-blue-500 bg-blue-500/20 shadow-sm'
-                          : 'border-transparent bg-muted/10 hover:border-border'
-                      }`}
+                <div className="relative">
+                  <select
+                    value={formValues.type}
+                    onChange={(event) =>
+                      setFormValues((prev) => ({ ...prev, type: event.target.value as TemplateType }))
+                    }
+                    className={SELECT_BASE_CLASS}
+                    required
+                  >
+                    {TEMPLATE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                    <svg
+                      className="h-5 w-5 text-muted-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      <input
-                        type="radio"
-                        name="template-type"
-                        value={option.value}
-                        checked={formValues.type === option.value}
-                        onChange={() => setFormValues((prev) => ({ ...prev, type: option.value }))}
-                        className="mt-1 h-4 w-4 border-border text-blue-500 focus:ring-blue-500"
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
                       />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{option.label}</p>
-                        <p className="text-xs text-muted-foreground">{option.description}</p>
-                      </div>
-                    </label>
-                  ))}
+                    </svg>
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {TEMPLATE_TYPE_OPTIONS.find((opt) => opt.value === formValues.type)?.description}
+                </p>
               </div>
+
+              {editingMode === 'visual' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Page Width (px)</label>
+                  <input
+                    type="number"
+                    min="320"
+                    max="1200"
+                    step="10"
+                    value={pageWidth}
+                    onChange={(event) => {
+                      const newWidth = parseInt(event.target.value, 10);
+                      if (!isNaN(newWidth) && newWidth >= 320 && newWidth <= 1200) {
+                        setPageWidth(newWidth);
+                      }
+                    }}
+                    className={INPUT_BASE_CLASS}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Set the width of the email template content area (320-1200px). Default is 640px.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-muted-foreground">CSS Styles (optional)</label>
@@ -615,6 +758,32 @@ export function TemplateFormModal({
                       onChange={(event) =>
                         setFormValues((prev) => ({ ...prev, htmlContent: event.target.value }))
                       }
+                      onPaste={(event) => {
+                        // Auto-detect if pasted HTML can be converted to blocks
+                        const pastedText = event.clipboardData.getData('text/html') || event.clipboardData.getData('text/plain');
+                        if (pastedText && pastedText.includes('<') && (pastedText.includes('table') || pastedText.includes('h1') || pastedText.includes('h2') || pastedText.includes('h3'))) {
+                          // Small delay to let paste complete, then check
+                          // Store textarea reference before setTimeout
+                          const textarea = event.currentTarget;
+                          setTimeout(() => {
+                            // Get the updated value after paste
+                            if (!textarea) return;
+                            const updatedHtml = textarea.value;
+                            const parsedBlocks = parseHtmlToBlocks(updatedHtml);
+                            if (parsedBlocks && parsedBlocks.length > 0) {
+                              const shouldConvert = window.confirm(
+                                'Detected HTML structure that can be converted to blocks. Would you like to convert it now?',
+                              );
+                              if (shouldConvert) {
+                                const extractedPageWidth = extractPageWidthFromHtml(updatedHtml);
+                                setBlocks(parsedBlocks);
+                                setPageWidth(extractedPageWidth);
+                                setEditingMode('visual');
+                              }
+                            }
+                          }, 100);
+                        }
+                      }}
                       rows={28}
                       spellCheck={false}
                       className="w-full rounded-lg border border-border px-3 py-2 font-mono text-xs leading-5 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -623,35 +792,36 @@ export function TemplateFormModal({
                     <p className="text-xs text-muted-foreground">
                       Build markup using Handlebars tokens. You can include conditionals like
                       {' {{#if isOverdue}}...{{/if}} '}.
+                      {' '}Paste HTML generated from blocks to automatically convert it back to blocks.
                     </p>
-                    {mode === 'edit' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            blocks.length === 1 &&
-                            blocks[0].type === 'raw_html' &&
-                            blocks[0].html === template?.htmlContent
-                          ) {
-                            setBlocks(getDefaultTemplateBlocks());
-                            setEditingMode('visual');
-                            return;
-                          }
-
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Try to parse HTML to blocks
+                        const parsedBlocks = parseHtmlToBlocks(formValues.htmlContent);
+                        
+                        if (parsedBlocks && parsedBlocks.length > 0) {
+                          const extractedPageWidth = extractPageWidthFromHtml(formValues.htmlContent);
+                          setBlocks(parsedBlocks);
+                          setPageWidth(extractedPageWidth);
+                          setEditingMode('visual');
+                        } else {
+                          // If parsing fails, ask user if they want to switch anyway
                           const confirmSwitch = window.confirm(
-                            'Switching to the visual builder will regenerate the template layout based on blocks and may overwrite custom HTML. Continue?',
+                            'Could not automatically convert HTML to blocks. The HTML structure may not match the block system format.\n\n' +
+                            'Would you like to switch to visual builder anyway? This will create a raw HTML block with your current content.',
                           );
 
                           if (confirmSwitch) {
-                            setBlocks(getDefaultTemplateBlocks());
+                            setBlocks([createRawHtmlBlock(formValues.htmlContent)]);
                             setEditingMode('visual');
                           }
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                      >
-                        Use Visual Builder
-                      </button>
-                    )}
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    >
+                      Convert to Blocks
+                    </button>
                   </div>
                 )}
               </div>
@@ -689,8 +859,9 @@ export function TemplateFormModal({
               )}
             </div>
           </div>
+          </div>
 
-          <div className="mt-8 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border bg-card-elevated px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
               onClick={onClose}

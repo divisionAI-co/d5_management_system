@@ -97,27 +97,31 @@ export class OpportunitiesService {
         },
         {
           lead: {
-            contact: {
-              OR: [
-                {
-                  firstName: {
-                    contains: filters.search,
-                    mode: Prisma.QueryMode.insensitive,
-                  },
+            contacts: {
+              some: {
+                contact: {
+                  OR: [
+                    {
+                      firstName: {
+                        contains: filters.search,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
+                    },
+                    {
+                      lastName: {
+                        contains: filters.search,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
+                    },
+                    {
+                      companyName: {
+                        contains: filters.search,
+                        mode: Prisma.QueryMode.insensitive,
+                      },
+                    },
+                  ],
                 },
-                {
-                  lastName: {
-                    contains: filters.search,
-                    mode: Prisma.QueryMode.insensitive,
-                  },
-                },
-                {
-                  companyName: {
-                    contains: filters.search,
-                    mode: Prisma.QueryMode.insensitive,
-                  },
-                },
-              ],
+              },
             },
           },
         },
@@ -216,13 +220,17 @@ export class OpportunitiesService {
           },
           lead: {
             include: {
-              contact: {
-            select: {
-              id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phone: true,
+              contacts: {
+                include: {
+                  contact: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                    },
+                  },
                 },
               },
             },
@@ -275,13 +283,17 @@ export class OpportunitiesService {
         },
         lead: {
           include: {
-            contact: {
-          select: {
-            id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                  },
+                },
               },
             },
           },
@@ -330,11 +342,15 @@ export class OpportunitiesService {
         title: true,
         status: true,
         convertedCustomerId: true,
-        contact: {
-          select: {
-            id: true,
-            customerId: true,
-            companyName: true,
+        contacts: {
+          include: {
+            contact: {
+              select: {
+                id: true,
+                customerId: true,
+                companyName: true,
+              },
+            },
           },
         },
       },
@@ -434,14 +450,16 @@ export class OpportunitiesService {
       resolvedCustomerId = lead.convertedCustomerId ?? undefined;
     }
 
-    if (
-      resolvedCustomerId &&
-      lead.contact?.customerId &&
-      lead.contact.customerId !== resolvedCustomerId
-    ) {
-      throw new BadRequestException(
-        'Lead contact belongs to a different customer',
+    // Check if any contact belongs to a different customer
+    if (resolvedCustomerId && lead.contacts && lead.contacts.length > 0) {
+      const contactWithDifferentCustomer = lead.contacts.find(
+        (lc) => lc.contact.customerId && lc.contact.customerId !== resolvedCustomerId
       );
+      if (contactWithDifferentCustomer) {
+        throw new BadRequestException(
+          'Lead contact belongs to a different customer',
+        );
+      }
     }
 
     const _customer = await this.findCustomerSummary(resolvedCustomerId);
@@ -495,7 +513,7 @@ export class OpportunitiesService {
         await this.notifyRecruiters(tx, {
           opportunityId: opportunity.id,
           opportunityTitle: createDto.title,
-          customerName: _customer?.name ?? lead.contact?.companyName ?? undefined,
+          customerName: _customer?.name ?? (lead.contacts && lead.contacts.length > 0 ? lead.contacts[0].contact.companyName : undefined) ?? undefined,
         });
       }
 
@@ -518,13 +536,17 @@ export class OpportunitiesService {
           },
           lead: {
             include: {
-              contact: {
-            select: {
-              id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phone: true,
+              contacts: {
+                include: {
+                  contact: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                    },
+                  },
                 },
               },
             },
@@ -582,14 +604,16 @@ export class OpportunitiesService {
       resolvedCustomerId = lead.convertedCustomerId ?? undefined;
     }
 
-    if (
-      resolvedCustomerId &&
-      lead.contact?.customerId &&
-      lead.contact.customerId !== resolvedCustomerId
-    ) {
-      throw new BadRequestException(
-        'Lead contact belongs to a different customer',
+    // Check if any contact belongs to a different customer
+    if (resolvedCustomerId && lead.contacts && lead.contacts.length > 0) {
+      const contactWithDifferentCustomer = lead.contacts.find(
+        (lc) => lc.contact.customerId && lc.contact.customerId !== resolvedCustomerId
       );
+      if (contactWithDifferentCustomer) {
+        throw new BadRequestException(
+          'Lead contact belongs to a different customer',
+        );
+      }
     }
 
     const _customer = await this.findCustomerSummary(resolvedCustomerId);
@@ -716,13 +740,17 @@ export class OpportunitiesService {
           },
           lead: {
             include: {
-              contact: {
-            select: {
-              id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phone: true,
+              contacts: {
+                include: {
+                  contact: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                    },
+                  },
                 },
               },
             },
@@ -805,13 +833,17 @@ export class OpportunitiesService {
           },
           lead: {
             include: {
-              contact: {
-            select: {
-              id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  phone: true,
+              contacts: {
+                include: {
+                  contact: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      phone: true,
+                    },
+                  },
                 },
               },
             },
@@ -842,15 +874,19 @@ export class OpportunitiesService {
         },
         lead: {
           include: {
-            contact: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
-                role: true,
-                companyName: true,
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                    role: true,
+                    companyName: true,
+                  },
+                },
               },
             },
           },
@@ -879,7 +915,7 @@ export class OpportunitiesService {
     }
 
     let htmlContent = dto.htmlContent;
-    const textContent = dto.textContent;
+    let textContent = dto.textContent;
 
     // If template is provided, render it with opportunity data
     if (dto.templateId) {
@@ -914,14 +950,14 @@ export class OpportunitiesService {
           ? {
               id: opportunity.lead.id,
               title: opportunity.lead.title,
-              contact: opportunity.lead.contact
+              contact: opportunity.lead.contacts && opportunity.lead.contacts.length > 0
                 ? {
-                    firstName: opportunity.lead.contact.firstName,
-                    lastName: opportunity.lead.contact.lastName,
-                    email: opportunity.lead.contact.email,
-                    phone: opportunity.lead.contact.phone,
-                    role: opportunity.lead.contact.role,
-                    companyName: opportunity.lead.contact.companyName,
+                    firstName: opportunity.lead.contacts[0].contact.firstName,
+                    lastName: opportunity.lead.contacts[0].contact.lastName,
+                    email: opportunity.lead.contacts[0].contact.email,
+                    phone: opportunity.lead.contacts[0].contact.phone,
+                    role: opportunity.lead.contacts[0].contact.role,
+                    companyName: opportunity.lead.contacts[0].contact.companyName,
                   }
                 : null,
             }
@@ -942,7 +978,19 @@ export class OpportunitiesService {
           : null,
       };
 
-      htmlContent = await this.templatesService.render(dto.templateId, templateData);
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        console.warn(
+          `[Opportunities] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultOpportunityEmailTemplate(opportunity, templateData);
+        textContent = this.getDefaultOpportunityEmailText(opportunity, templateData);
+      }
     } else if (!htmlContent) {
       throw new BadRequestException(
         'Either templateId or htmlContent must be provided',
@@ -972,6 +1020,80 @@ export class OpportunitiesService {
       to: dto.to,
       subject: dto.subject,
     };
+  }
+
+  private getDefaultOpportunityEmailTemplate(opportunity: any, templateData: any): string {
+    const customerName = templateData.customer?.name || 'N/A';
+    const value = templateData.opportunity.value
+      ? new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+        }).format(templateData.opportunity.value)
+      : 'N/A';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
+          .section { margin-bottom: 20px; }
+          .label { font-weight: bold; color: #6b7280; margin-bottom: 5px; }
+          .value { color: #111827; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">${opportunity.title}</h1>
+        </div>
+        <div class="content">
+          ${templateData.opportunity.description ? `
+          <div class="section">
+            <div class="label">Description:</div>
+            <div class="value">${templateData.opportunity.description.replace(/\n/g, '<br>')}</div>
+          </div>
+          ` : ''}
+          <div class="section">
+            <div class="label">Customer:</div>
+            <div class="value">${customerName}</div>
+          </div>
+          <div class="section">
+            <div class="label">Stage:</div>
+            <div class="value">${templateData.opportunity.stage || 'N/A'}</div>
+          </div>
+          <div class="section">
+            <div class="label">Value:</div>
+            <div class="value">${value}</div>
+          </div>
+          ${templateData.position ? `
+          <div class="section">
+            <div class="label">Position:</div>
+            <div class="value">${templateData.position.title || 'N/A'}</div>
+          </div>
+          ` : ''}
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getDefaultOpportunityEmailText(opportunity: any, templateData: any): string {
+    const customerName = templateData.customer?.name || 'N/A';
+    const value = templateData.opportunity.value
+      ? new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+        }).format(templateData.opportunity.value)
+      : 'N/A';
+
+    return `${opportunity.title}
+
+${templateData.opportunity.description ? `Description:\n${templateData.opportunity.description}\n\n` : ''}Customer: ${customerName}
+Stage: ${templateData.opportunity.stage || 'N/A'}
+Value: ${value}
+${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` : ''}`;
   }
 
   async remove(id: string) {

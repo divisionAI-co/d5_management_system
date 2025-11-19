@@ -1,0 +1,6 @@
+# Ensure bash scripts use LF line endings
+*.sh text eol=lf
+
+# Ensure scripts are executable
+*.sh text eol=lf
+

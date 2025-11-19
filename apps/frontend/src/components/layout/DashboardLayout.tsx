@@ -62,6 +62,10 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     items: [{ name: 'Tasks', href: '/tasks', roles: ROLE_PERMISSIONS.TASKS }],
   },
   {
+    label: 'Reports',
+    items: [{ name: 'Feedback Reports', href: '/reports/feedback-reports', roles: ROLE_PERMISSIONS.FEEDBACK_REPORTS }],
+  },
+  {
     label: 'Documents',
     items: [{ name: 'Documents', href: '/documents', roles: ROLE_PERMISSIONS.DOCUMENTS }],
   },
@@ -78,6 +82,8 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'Gemini Actions', href: '/settings/ai-actions', roles: ROLE_PERMISSIONS.AI_ACTIONS },
       { name: 'Templates', href: '/settings/templates', roles: ROLE_PERMISSIONS.TEMPLATES },
       { name: 'Template Variables', href: '/settings/template-variables', roles: ROLE_PERMISSIONS.TEMPLATES },
+      { name: 'System Export / Import', href: '/settings/system-export', roles: ROLE_PERMISSIONS.SYSTEM_EXPORT },
+      { name: 'Data Cleanup', href: '/settings/data-cleanup', roles: ROLE_PERMISSIONS.DATA_CLEANUP },
     ],
   },
 ];

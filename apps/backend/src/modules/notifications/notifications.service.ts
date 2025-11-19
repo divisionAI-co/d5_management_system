@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, NotificationType } from '@prisma/client';
+import { Prisma, NotificationType, TemplateType } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
+import { TemplatesService } from '../templates/templates.service';
 
 @Injectable()
 export class NotificationsService {
@@ -11,6 +12,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
+    private readonly templatesService: TemplatesService,
   ) {}
 
   async getRecentNotifications(userId: string, limit = 20) {
@@ -75,6 +77,8 @@ export class NotificationsService {
         return settings.leaveApproved ?? true;
       case NotificationType.PERFORMANCE_REVIEW:
         return settings.performanceReview ?? true;
+      case NotificationType.FEEDBACK_REPORT:
+        return settings.feedbackReport ?? true;
       case NotificationType.NEW_CANDIDATE:
         return settings.newCandidate ?? true;
       case NotificationType.NEW_OPPORTUNITY:
@@ -177,6 +181,29 @@ export class NotificationsService {
   }
 
   /**
+   * Map NotificationType to TemplateType for email templates
+   */
+  private getTemplateTypeForNotification(notificationType: NotificationType): TemplateType | null {
+    const mapping: Record<NotificationType, TemplateType | null> = {
+      MENTIONED_IN_ACTIVITY: TemplateType.MENTION_NOTIFICATION,
+      TASK_ASSIGNED: TemplateType.TASK_ASSIGNED,
+      LEAVE_APPROVED: TemplateType.LEAVE_REQUEST_APPROVED,
+      LEAVE_REJECTED: TemplateType.LEAVE_REQUEST_REJECTED,
+      LEAVE_REQUEST: TemplateType.LEAVE_REQUEST_CREATED,
+      TASK_DUE_SOON: null, // No template for this yet
+      PERFORMANCE_REVIEW: TemplateType.PERFORMANCE_REVIEW,
+      FEEDBACK_REPORT: null, // No template for this yet
+      NEW_CANDIDATE: null, // No template for this yet
+      NEW_OPPORTUNITY: null, // No template for this yet
+      INVOICE_OVERDUE: null, // No template for this yet
+      MEETING_REMINDER: null, // No template for this yet
+      SYSTEM: null, // No template for this yet
+    };
+
+    return mapping[notificationType] ?? null;
+  }
+
+  /**
    * Send email notification if user has email notifications enabled
    */
   private async sendEmailNotification(
@@ -224,16 +251,57 @@ export class NotificationsService {
         entityLink = await this.generateEntityLink(entityType, entityId);
       }
 
-      // Build HTML email with link if available
-      let htmlContent = `<p>${message.replace(/\n/g, '<br>')}</p>`;
-      if (entityLink && entityType) {
-        htmlContent += `<p><a href="${entityLink}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">View ${this.getEntityTypeLabel(entityType)}</a></p>`;
+      // Try to use template if available
+      const templateType = this.getTemplateTypeForNotification(type);
+      let htmlContent: string;
+      let textContent: string;
+
+      if (templateType) {
+        try {
+          // Build template data based on notification type
+          const templateData = await this.buildTemplateData(
+            type,
+            user,
+            message,
+            entityType,
+            entityId,
+            entityLink,
+          );
+
+          // Debug: Log template data for mentions
+          if (type === NotificationType.MENTIONED_IN_ACTIVITY) {
+            console.log(`[Notifications] Template data for mention:`, JSON.stringify(templateData, null, 2));
+          }
+
+          const rendered = await this.templatesService.renderDefault(templateType, templateData);
+          htmlContent = rendered.html;
+          textContent = rendered.text;
+          console.log(`[Notifications] ✅ Used template ${templateType} for notification type ${type}`);
+        } catch (templateError) {
+          console.warn(
+            `[Notifications] ⚠️  Failed to render template ${templateType}, falling back to default HTML:`,
+            templateError,
+          );
+          // Fallback to default HTML
+          htmlContent = `<p>${message.replace(/\n/g, '<br>')}</p>`;
+          if (entityLink && entityType) {
+            htmlContent += `<p><a href="${entityLink}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">View ${this.getEntityTypeLabel(entityType)}</a></p>`;
+          }
+          textContent = message + (entityLink && entityType ? `\n\nView ${this.getEntityTypeLabel(entityType)}: ${entityLink}` : '');
+        }
+      } else {
+        // No template available, use default HTML
+        htmlContent = `<p>${message.replace(/\n/g, '<br>')}</p>`;
+        if (entityLink && entityType) {
+          htmlContent += `<p><a href="${entityLink}" style="display: inline-block; padding: 10px 20px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">View ${this.getEntityTypeLabel(entityType)}</a></p>`;
+        }
+        textContent = message + (entityLink && entityType ? `\n\nView ${this.getEntityTypeLabel(entityType)}: ${entityLink}` : '');
       }
 
       const emailSent = await this.emailService.sendEmail({
         to: user.email,
         subject: title,
-        text: message + (entityLink && entityType ? `\n\nView ${this.getEntityTypeLabel(entityType)}: ${entityLink}` : ''),
+        text: textContent,
         html: htmlContent,
       });
 
@@ -245,6 +313,165 @@ export class NotificationsService {
     } catch (error) {
       console.error(`[Notifications] ❌ Failed to send email to ${user.email}:`, error);
       // Don't throw - we don't want email failures to break notification creation
+    }
+  }
+
+  /**
+   * Build template data for different notification types
+   */
+  private async buildTemplateData(
+    notificationType: NotificationType,
+    user: { email: string; firstName: string; lastName: string },
+    message: string,
+    entityType?: string,
+    entityId?: string,
+    entityLink?: string | null,
+  ): Promise<Record<string, any>> {
+    const baseData: Record<string, any> = {
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+    };
+
+    switch (notificationType) {
+      case NotificationType.MENTIONED_IN_ACTIVITY:
+        // For mentions, we need to fetch the activity and who mentioned them
+        if (entityType === 'activity' && entityId) {
+          const activity = await this.prisma.activity.findUnique({
+            where: { id: entityId },
+            include: {
+              createdBy: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              activityType: {
+                select: {
+                  name: true,
+                },
+              },
+              customer: { select: { name: true } },
+              lead: { select: { prospectCompanyName: true, title: true } },
+              opportunity: { select: { title: true } },
+              candidate: { select: { firstName: true, lastName: true } },
+              employee: { select: { id: true } },
+              task: { select: { title: true } },
+            },
+          });
+
+          if (activity && activity.createdBy) {
+            // Determine where the mention occurred
+            let mentionContext = 'an activity';
+            if (activity.customer) {
+              mentionContext = `a customer activity (${activity.customer.name})`;
+            } else if (activity.lead) {
+              const leadName = activity.lead.prospectCompanyName || activity.lead.title || 'Lead';
+              mentionContext = `a lead activity (${leadName})`;
+            } else if (activity.opportunity) {
+              mentionContext = `an opportunity activity (${activity.opportunity.title})`;
+            } else if (activity.candidate) {
+              mentionContext = `a candidate activity (${activity.candidate.firstName} ${activity.candidate.lastName})`;
+            } else if (activity.task) {
+              mentionContext = `a task activity (${activity.task.title})`;
+            }
+
+            return {
+              firstName: user.firstName || '',
+              lastName: user.lastName || '',
+              email: user.email || '',
+              mentionedBy: {
+                firstName: activity.createdBy.firstName || '',
+                lastName: activity.createdBy.lastName || '',
+              },
+              entityType: this.getEntityTypeLabel(entityType),
+              mentionContext,
+              activity: {
+                subject: activity.subject || '',
+                content: activity.body || activity.subject || '',
+                type: activity.activityType?.name || 'Activity',
+                date: activity.activityDate ? new Date(activity.activityDate).toLocaleDateString() : undefined,
+              },
+              entityLink: entityLink || undefined,
+            };
+          }
+        }
+        // Fallback if activity not found
+        return {
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          mentionedBy: {
+            firstName: '',
+            lastName: '',
+          },
+          entityType: this.getEntityTypeLabel(entityType || 'activity'),
+          mentionContext: 'an activity',
+          activity: {
+            subject: '',
+            content: message || '',
+            type: 'Activity',
+            date: undefined,
+          },
+          entityLink: entityLink || undefined,
+        };
+
+      case NotificationType.TASK_ASSIGNED:
+        if (entityType === 'task' && entityId) {
+          const task = await this.prisma.task.findUnique({
+            where: { id: entityId },
+            include: {
+              createdBy: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          });
+
+          if (task) {
+            return {
+              ...baseData,
+              assignedTo: {
+                firstName: user.firstName,
+              },
+              task: {
+                title: task.title,
+                description: task.description,
+                dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : undefined,
+                priority: task.priority,
+              },
+              assignedBy: {
+                firstName: task.createdBy?.firstName || '',
+                lastName: task.createdBy?.lastName || '',
+              },
+            };
+          }
+        }
+        return baseData;
+
+      case NotificationType.LEAVE_APPROVED:
+      case NotificationType.LEAVE_REJECTED:
+      case NotificationType.LEAVE_REQUEST:
+        // For leave requests, we'd need to fetch the leave request
+        // For now, return basic data
+        return {
+          ...baseData,
+          employee: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+          request: {
+            startDate: 'N/A', // Would need to fetch from leave request
+            endDate: 'N/A',
+            type: 'N/A',
+          },
+        };
+
+      default:
+        return baseData;
     }
   }
 

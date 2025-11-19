@@ -128,7 +128,16 @@ type LeadSnapshot = {
     lastName: string | null;
     email: string | null;
   } | null;
-  contact: {
+  contacts?: Array<{
+    contact: {
+      firstName: string | null;
+      lastName: string | null;
+      email: string | null;
+      phone: string | null;
+    };
+  }>;
+  // Legacy contact for backward compatibility (first contact)
+  contact?: {
     firstName: string | null;
     lastName: string | null;
     email: string | null;
@@ -556,7 +565,8 @@ export class EntityFieldResolver {
       key: 'contactName',
       label: 'Primary contact name',
       select: (lead) => {
-        const contact = lead.contact;
+        const contact = lead.contacts && lead.contacts.length > 0 ? lead.contacts[0].contact : lead.contact;
+        if (!contact) return null;
         const fullName = `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim();
         return fullName || contact.email || null;
       },
@@ -564,12 +574,18 @@ export class EntityFieldResolver {
     {
       key: 'contactEmail',
       label: 'Primary contact email',
-      select: (lead) => lead.contact.email,
+      select: (lead) => {
+        const contact = lead.contacts && lead.contacts.length > 0 ? lead.contacts[0].contact : lead.contact;
+        return contact?.email ?? null;
+      },
     },
     {
       key: 'contactPhone',
       label: 'Primary contact phone',
-      select: (lead) => lead.contact.phone,
+      select: (lead) => {
+        const contact = lead.contacts && lead.contacts.length > 0 ? lead.contacts[0].contact : lead.contact;
+        return contact?.phone ?? null;
+      },
     },
   ];
 
@@ -906,12 +922,16 @@ export class EntityFieldResolver {
           select: {
             title: true,
             description: true,
-            contact: {
-              select: {
-                firstName: true,
-                lastName: true,
-                email: true,
-                phone: true,
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                  },
+                },
               },
             },
           },
@@ -921,7 +941,22 @@ export class EntityFieldResolver {
     if (!record) {
       return null;
     }
-    return record;
+    
+    // Normalize contacts array and provide legacy contact for backward compatibility
+    const normalized = {
+      ...record,
+      lead: record.lead
+        ? {
+            ...record.lead,
+            contact:
+              record.lead.contacts && record.lead.contacts.length > 0
+                ? record.lead.contacts[0].contact
+                : null,
+          }
+        : null,
+    };
+
+    return normalized;
   }
 
   private async findEmployee(entityId: string): Promise<EmployeeSnapshot | null> {
@@ -1073,12 +1108,16 @@ export class EntityFieldResolver {
             email: true,
           },
         },
-        contact: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-            phone: true,
+        contacts: {
+          include: {
+            contact: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
           },
         },
       },
@@ -1088,7 +1127,15 @@ export class EntityFieldResolver {
       return null;
     }
 
-    return record;
+    // Normalize contacts array and provide legacy contact for backward compatibility
+    const normalized = {
+      ...record,
+      contact: record.contacts && record.contacts.length > 0 
+        ? record.contacts[0].contact 
+        : undefined,
+    };
+
+    return normalized;
   }
 
   private async findTask(entityId: string): Promise<TaskSnapshot | null> {

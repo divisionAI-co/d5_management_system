@@ -29,6 +29,7 @@ import CampaignsPage from '@/pages/crm/CampaignsPage';
 import CandidatesPage from '@/pages/recruitment/CandidatesPage';
 import CandidateDetailPage from '@/pages/recruitment/CandidateDetailPage';
 import OpenPositionsPage from '@/pages/recruitment/OpenPositionsPage';
+import PositionDetailPage from '@/pages/recruitment/PositionDetailPage';
 
 // Employees & HR
 import EmployeesPage from '@/pages/employees/EmployeesPage';
@@ -42,6 +43,9 @@ import HolidaysPage from '@/pages/settings/HolidaysPage';
 // Tasks
 import TasksPage from '@/pages/tasks/TasksPage';
 
+// Reports
+import FeedbackReportsPage from '@/pages/reports/FeedbackReportsPage';
+
 // Invoices
 import InvoicesPage from '@/pages/invoices/InvoicesPage';
 import InvoiceDetailPage from '@/pages/invoices/InvoiceDetailPage';
@@ -54,6 +58,7 @@ import SettingsPage from '@/pages/settings/SettingsPage';
 import CompanySettingsPage from '@/pages/settings/CompanySettingsPage';
 import NotificationSettingsPage from '@/pages/settings/NotificationSettingsPage';
 import IntegrationsSettingsPage from '@/pages/settings/IntegrationsSettingsPage';
+import DataCleanupPage from '@/pages/settings/DataCleanupPage';
 import AppearanceSettingsPage from '@/pages/settings/AppearanceSettingsPage';
 import TemplatesPage from '@/pages/settings/TemplatesPage';
 import TemplateVariablesPage from '@/pages/settings/TemplateVariablesPage';
@@ -61,6 +66,7 @@ import ActivityTypesPage from '@/pages/settings/ActivityTypesPage';
 import ProfilePage from '@/pages/profile/ProfilePage';
 import GoogleOAuthCallbackPage from '@/pages/integrations/GoogleOAuthCallbackPage';
 import AiActionsPage from '@/pages/settings/AiActionsPage';
+import SystemExportPage from '@/pages/settings/SystemExportPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -113,6 +119,7 @@ function App() {
             <Route path="candidates" element={<CandidatesPage />} />
             <Route path="candidates/:id" element={<CandidateDetailPage />} />
             <Route path="positions" element={<OpenPositionsPage />} />
+            <Route path="positions/:id" element={<PositionDetailPage />} />
           </Route>
 
           {/* Employees */}
@@ -127,6 +134,9 @@ function App() {
 
           {/* Tasks */}
           <Route path="tasks" element={<TasksPage />} />
+
+          {/* Reports */}
+          <Route path="reports/feedback-reports" element={<FeedbackReportsPage />} />
 
           {/* Documents */}
           <Route path="documents" element={<DocumentsPage />} />
@@ -149,6 +159,8 @@ function App() {
             <Route path="template-variables" element={<TemplateVariablesPage />} />
             <Route path="activity-types" element={<ActivityTypesPage />} />
             <Route path="ai-actions" element={<AiActionsPage />} />
+            <Route path="system-export" element={<SystemExportPage />} />
+            <Route path="data-cleanup" element={<DataCleanupPage />} />
           </Route>
 
           {/* OAuth Callbacks - must be before catch-all routes */}

@@ -5,7 +5,15 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
   INVOICE: 'Invoice',
   CUSTOMER_REPORT: 'Customer Report',
   PERFORMANCE_REVIEW: 'Performance Review',
+  FEEDBACK_REPORT: 'Feedback Report',
   EMAIL: 'Email',
+  EOD_REPORT_SUBMITTED: 'EOD Report Submitted',
+  LEAVE_REQUEST_CREATED: 'Leave Request Created',
+  LEAVE_REQUEST_APPROVED: 'Leave Request Approved',
+  LEAVE_REQUEST_REJECTED: 'Leave Request Rejected',
+  TASK_ASSIGNED: 'Task Assigned',
+  MENTION_NOTIFICATION: 'Mention Notification',
+  REMOTE_WORK_WINDOW_OPENED: 'Remote Work Window Opened',
 };
 
 interface TemplatesTableProps {
