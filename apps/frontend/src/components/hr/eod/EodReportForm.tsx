@@ -307,10 +307,12 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
       return;
     }
 
-    const normalizedTasks = data.tasks.map((task) => ({
+    const normalizedTasks: EodReportTask[] = data.tasks.map((task) => ({
       ...task,
-      // Ensure typeOfWorkDone is always an array
-      typeOfWorkDone: Array.isArray(task.typeOfWorkDone) ? task.typeOfWorkDone : [task.typeOfWorkDone as string],
+      // Ensure typeOfWorkDone is always an array with proper typing
+      typeOfWorkDone: (Array.isArray(task.typeOfWorkDone) 
+        ? task.typeOfWorkDone 
+        : [task.typeOfWorkDone as EodReportTask['typeOfWorkDone'][0]]) as EodReportTask['typeOfWorkDone'],
       taskEstimatedTime:
         task.taskEstimatedTime !== undefined && task.taskEstimatedTime !== null
           ? Number(task.taskEstimatedTime)
@@ -577,20 +579,20 @@ export function EodReportForm({ report, onClose, onSuccess, employeeId }: EodRep
                             checked={isChecked}
                             onChange={(e) => {
                               const currentArray = watch(fieldName) || [];
-                              let newArray: string[];
+                              let newArray: EodReportTask['typeOfWorkDone'];
                               
                               if (e.target.checked) {
                                 // Checking a checkbox - always valid
-                                newArray = Array.isArray(currentArray) 
+                                newArray = (Array.isArray(currentArray) 
                                   ? [...currentArray, option.value]
-                                  : [option.value];
+                                  : [option.value]) as EodReportTask['typeOfWorkDone'];
                                 clearErrors(fieldName);
                                 setValue(fieldName, newArray, { shouldValidate: true });
                               } else {
                                 // Unchecking a checkbox
-                                newArray = Array.isArray(currentArray)
+                                newArray = (Array.isArray(currentArray)
                                   ? currentArray.filter((val: string) => val !== option.value)
-                                  : [];
+                                  : []) as EodReportTask['typeOfWorkDone'];
                                 
                                 // Ensure at least one is selected
                                 if (newArray.length > 0) {

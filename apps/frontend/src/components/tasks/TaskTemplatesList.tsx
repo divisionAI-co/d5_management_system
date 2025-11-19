@@ -17,7 +17,7 @@ interface TaskTemplatesListProps {
   onClose?: () => void;
 }
 
-export function TaskTemplatesList({ onEdit, onClose }: TaskTemplatesListProps) {
+export function TaskTemplatesList({ onEdit }: TaskTemplatesListProps) {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

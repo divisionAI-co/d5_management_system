@@ -374,12 +374,12 @@ export function EodReportsList({
                               const spent =
                                 task.timeSpentOnTicket !== undefined ? Number(task.timeSpentOnTicket) : null;
                               // Handle both array and legacy single string format
-                              const typeOfWorkDone = task.typeOfWorkDone;
+                              const typeOfWorkDone = task.typeOfWorkDone as ('PLANNING' | 'RESEARCH' | 'IMPLEMENTATION' | 'TESTING')[] | string | undefined;
                               let typeLabel = '—';
                               if (typeOfWorkDone) {
                                 if (Array.isArray(typeOfWorkDone)) {
                                   typeLabel = typeOfWorkDone.map(t => t.replace('_', ' ')).join(', ');
-                                } else {
+                                } else if (typeof typeOfWorkDone === 'string') {
                                   // Legacy format: single string
                                   typeLabel = typeOfWorkDone.replace('_', ' ');
                                 }
