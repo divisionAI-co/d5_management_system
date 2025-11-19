@@ -58,11 +58,6 @@ export interface EmployeeImportFieldMetadata {
 
 type EmployeeFieldMapping = Partial<Record<EmployeeImportField, string>>;
 
-type ParsedSheet = {
-  headers: string[];
-  rows: Record<string, any>[];
-};
-
 const EMPLOYEE_FIELD_DEFINITIONS: EmployeeImportFieldMetadata[] = [
   {
     key: EmployeeImportField.EMAIL,

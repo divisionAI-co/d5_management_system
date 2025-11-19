@@ -94,9 +94,18 @@ export function TaskTable({
                   task.priority.slice(1).toLowerCase()}
               </td>
               <td className="px-6 py-4 text-sm text-muted-foreground">
-                {task.assignedTo
-                  ? `${task.assignedTo.firstName} ${task.assignedTo.lastName}`
-                  : 'Unassigned'}
+                {(() => {
+                  // Handle multiple assignees - prefer new assignees array, fall back to legacy assignedTo
+                  const assignees = task.assignees && task.assignees.length > 0
+                    ? task.assignees.map((ta) => ta.user)
+                    : task.assignedTo
+                      ? [task.assignedTo]
+                      : [];
+                  
+                  if (assignees.length === 0) return 'Unassigned';
+                  
+                  return assignees.map((u) => `${u.firstName} ${u.lastName}`).join(', ');
+                })()}
               </td>
               <td className="px-6 py-4 text-sm text-muted-foreground">
                 {task.dueDate

@@ -51,11 +51,6 @@ export interface ContactImportSummary {
 
 type ContactFieldMapping = Partial<Record<ContactImportField, string>>;
 
-interface ParsedSheet {
-  headers: string[];
-  rows: Record<string, any>[];
-}
-
 const CONTACT_FIELD_DEFINITIONS: ContactImportFieldMetadata[] = [
   {
     key: ContactImportField.EMAIL,

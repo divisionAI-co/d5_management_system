@@ -51,7 +51,9 @@ model User {
   assignedLeads         Lead[]
   assignedOpportunities Opportunity[]
   assignedTasks         Task[]                    @relation("AssignedTasks")
+  taskAssignments       TaskAssignee[]            @relation("TaskAssigneeUser")
   createdTasks          Task[]                    @relation("CreatedTasks")
+  createdTaskTemplates  TaskTemplate[]            @relation("CreatedTaskTemplates")
   activities            Activity[]
   assignedActivities    Activity[]                @relation("AssignedActivities")
   notifications         Notification[]
@@ -822,7 +824,8 @@ model CompanySettings {
   remoteWorkWindowEnd   DateTime?
 
   // EOD Settings
-  eodGraceDays          Int @default(2)
+  eodGraceDays          Int @default(2) // Days after report date to submit without being late
+  eodLateReportsAllowed Int @default(2) // Number of late reports allowed per month
   eodReportDeadlineHour Int @default(23)
   eodReportDeadlineMin  Int @default(59)
 
@@ -902,9 +905,18 @@ model Task {
   status   TaskStatus   @default(TODO)
   priority TaskPriority @default(MEDIUM)
 
-  // Assignment
+  // Assignment (legacy single assignee - kept for backward compatibility)
   assignedToId String?
   assignedTo   User?   @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Multiple assignees via join table
+  assignees TaskAssignee[]
+
+  // Recurring task template (if this task was generated from a template)
+  templateId String?
+  template   TaskTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  generatedAt DateTime? // When this task instance was generated from template
+  generatedForDate DateTime? // The date this task instance is for (for daily recurring tasks)
 
   createdById String
   createdBy   User   @relation("CreatedTasks", fields: [createdById], references: [id])
@@ -931,7 +943,76 @@ model Task {
   @@index([assignedToId])
   @@index([status])
   @@index([customerId])
+  @@index([templateId])
+  @@index([generatedForDate])
   @@map("tasks")
+}
+
+model TaskAssignee {
+  id     String @id @default(uuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation("TaskAssigneeUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  assignedAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_assignees")
+}
+
+enum TaskRecurrenceType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model TaskTemplate {
+  id          String  @id @default(uuid())
+  title       String
+  description String? @db.Text
+
+  status   TaskStatus   @default(TODO)
+  priority TaskPriority @default(MEDIUM)
+
+  // Recurrence configuration
+  recurrenceType TaskRecurrenceType
+  recurrenceInterval Int @default(1) // Every N days/weeks/months/years (e.g., every 2 weeks = interval 2, type WEEKLY)
+  isActive Boolean @default(true) // Whether to continue generating tasks
+
+  // Start and end dates for recurrence
+  startDate DateTime // When to start generating tasks
+  endDate DateTime? // When to stop generating tasks (null = no end date)
+
+  // Default assignees (users who will be assigned to generated tasks)
+  defaultAssigneeIds String[] // Array of user IDs
+
+  // Default customer/project
+  defaultCustomerId String?
+
+  // Default metadata
+  defaultTags String[]
+  defaultEstimatedHours Decimal? @db.Decimal(5, 2)
+
+  // Creator
+  createdById String
+  createdBy   User   @relation("CreatedTaskTemplates", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  generatedTasks Task[] // Tasks generated from this template
+  lastGeneratedDate DateTime? // Last date a task was generated (to prevent duplicates)
+
+  @@index([createdById])
+  @@index([isActive])
+  @@index([recurrenceType])
+  @@map("task_templates")
 }
 
 // ============================================

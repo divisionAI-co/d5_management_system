@@ -66,6 +66,7 @@ export class DashboardService {
         stats: {
           missingReports: 0,
           lateReports: 0,
+          lateReportsBeyondThreshold: 0,
           totalReports: 0,
         },
         timeframe: null,
@@ -79,8 +80,12 @@ export class DashboardService {
     const monthBoundaries = this.getMonthBoundaries(now);
     const referenceForMonth = this.toDateOnly(now) < monthBoundaries.end ? now : monthBoundaries.end;
 
+    // Fetch company settings to get late reports threshold
+    const companySettings = await this.prisma.companySettings.findFirst();
+    const lateReportsAllowed = companySettings?.eodLateReportsAllowed ?? 2;
+
     // Optimized: Use database-level filtering and aggregation instead of loading all reports
-    const [recentReports, lateReportsCount, totalReportsCount, currentMonthReports] =
+    const [recentReports, lateReportsCount, lateReportsThisMonth, totalReportsCount, currentMonthReports] =
       await Promise.all([
         // Fetch only the 3 most recent reports
         this.prisma.eodReport.findMany({
@@ -96,11 +101,22 @@ export class DashboardService {
             summary: true,
           },
         }),
-        // Use database aggregation for late reports count
+        // Use database aggregation for total late reports count (all time)
         this.prisma.eodReport.count({
           where: {
             userId,
             isLate: true,
+          },
+        }),
+        // Count late reports for current month only
+        this.prisma.eodReport.count({
+          where: {
+            userId,
+            isLate: true,
+            date: {
+              gte: monthBoundaries.start,
+              lte: monthBoundaries.end,
+            },
           },
         }),
         // Use database aggregation for total reports count
@@ -121,6 +137,9 @@ export class DashboardService {
           },
         }),
       ]);
+
+    // Calculate how many late reports are beyond the threshold
+    const lateReportsBeyondThreshold = Math.max(0, lateReportsThisMonth - lateReportsAllowed);
 
     const formattedRecentReports = recentReports.map((report) => ({
       id: report.id,
@@ -154,6 +173,7 @@ export class DashboardService {
       stats: {
         missingReports: missingCurrentMonth.count,
         lateReports: lateReportsCount,
+        lateReportsBeyondThreshold,
         totalReports: totalReportsCount,
       },
       timeframe: {

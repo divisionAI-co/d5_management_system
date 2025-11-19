@@ -41,11 +41,20 @@ export class CreateTaskDto {
   createdById!: string;
 
   @ApiPropertyOptional({
-    description: 'User ID of the assignee',
+    description: 'User ID of the assignee (legacy - single assignee, deprecated)',
   })
   @IsUUID()
   @IsOptional()
   assignedToId?: string;
+
+  @ApiPropertyOptional({
+    description: 'User IDs of assignees (can be multiple)',
+    type: [String],
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  assignedToIds?: string[];
 
   @ApiPropertyOptional({
     description: 'Related customer ID',

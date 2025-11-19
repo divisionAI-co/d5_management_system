@@ -865,7 +865,7 @@ export class InvoicesService {
         template.cssContent,
       );
       const data = this.buildInvoiceTemplateData(invoice, templateData);
-      const handlebars = require('handlebars');
+      const handlebars = (await import('handlebars')).default;
       const compiledTemplate = handlebars.compile(htmlTemplate);
       renderedHtml = compiledTemplate(data);
     } else {

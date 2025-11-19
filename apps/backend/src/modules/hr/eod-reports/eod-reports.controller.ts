@@ -11,7 +11,7 @@ import {
   Request,
   ForbiddenException,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -58,7 +58,7 @@ export class EodReportsController {
       targetEmployeeId = employee.id;
     }
 
-    const { employeeId, ...payload } = createDto;
+    const { employeeId: _employeeId, ...payload } = createDto;
 
     return this.eodReportsService.create(targetUserId, targetEmployeeId, payload);
   }

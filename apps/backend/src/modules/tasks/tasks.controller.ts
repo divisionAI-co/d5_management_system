@@ -22,6 +22,8 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { LogTimeDto } from './dto/log-time.dto';
+import { CreateTaskTemplateDto } from './dto/create-task-template.dto';
+import { UpdateTaskTemplateDto } from './dto/update-task-template.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -59,6 +61,37 @@ export class TasksController {
   })
   findAll(@Query() filters: FilterTasksDto) {
     return this.tasksService.findAll(filters);
+  }
+
+  // ============================================
+  // Task Templates (Recurring Tasks) Endpoints
+  // Must come before @Get(':id') to avoid route conflicts
+  // ============================================
+
+  @Get('templates')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.ACCOUNT_MANAGER,
+    UserRole.SALESPERSON,
+    UserRole.HR,
+    UserRole.RECRUITER,
+  )
+  @ApiOperation({ summary: 'Get all recurring task templates' })
+  findAllTemplates() {
+    return this.tasksService.findAllTemplates();
+  }
+
+  @Get('templates/:id')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.ACCOUNT_MANAGER,
+    UserRole.SALESPERSON,
+    UserRole.HR,
+    UserRole.RECRUITER,
+  )
+  @ApiOperation({ summary: 'Get a task template by ID' })
+  findOneTemplate(@Param('id') id: string) {
+    return this.tasksService.findOneTemplate(id);
   }
 
   @Get(':id')
@@ -144,6 +177,33 @@ export class TasksController {
   @ApiOperation({ summary: 'Delete a task' })
   remove(@Param('id') id: string) {
     return this.tasksService.remove(id);
+  }
+
+  // Task Templates POST/PATCH/DELETE routes
+  // GET routes are defined above, before @Get(':id')
+
+  @Post('templates')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.HR, UserRole.RECRUITER)
+  @ApiOperation({ summary: 'Create a recurring task template' })
+  createTemplate(@Body() createTemplateDto: CreateTaskTemplateDto) {
+    return this.tasksService.createTemplate(createTemplateDto);
+  }
+
+  @Patch('templates/:id')
+  @Roles(UserRole.ADMIN, UserRole.ACCOUNT_MANAGER, UserRole.SALESPERSON, UserRole.HR, UserRole.RECRUITER)
+  @ApiOperation({ summary: 'Update a task template' })
+  updateTemplate(
+    @Param('id') id: string,
+    @Body() updateTemplateDto: UpdateTaskTemplateDto,
+  ) {
+    return this.tasksService.updateTemplate(id, updateTemplateDto);
+  }
+
+  @Delete('templates/:id')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete a task template' })
+  removeTemplate(@Param('id') id: string) {
+    return this.tasksService.removeTemplate(id);
   }
 }
 

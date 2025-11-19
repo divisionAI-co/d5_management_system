@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { FeedbackReportStatus, LeaveRequestStatus, TaskStatus, UserRole, Prisma, TemplateType } from '@prisma/client';
+import { FeedbackReportStatus, LeaveRequestStatus, UserRole, Prisma, TemplateType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
 import { CreateFeedbackReportDto } from './dto/create-feedback-report.dto';
 import { UpdateHrSectionDto } from './dto/update-hr-section.dto';
@@ -242,7 +242,7 @@ export class FeedbackReportsService {
   /**
    * Create a new feedback report
    */
-  async create(createDto: CreateFeedbackReportDto, userId: string) {
+  async create(createDto: CreateFeedbackReportDto, _userId: string) {
     // Check if employee exists
     const employee = await this.prisma.employee.findUnique({
       where: { id: createDto.employeeId },

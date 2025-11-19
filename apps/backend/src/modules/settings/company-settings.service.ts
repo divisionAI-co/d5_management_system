@@ -50,6 +50,10 @@ export class CompanySettingsService {
       data.eodGraceDays = dto.eodGraceDays;
     }
 
+    if (dto.eodLateReportsAllowed !== undefined) {
+      data.eodLateReportsAllowed = dto.eodLateReportsAllowed;
+    }
+
     if (dto.eodReportDeadlineHour !== undefined) {
       data.eodReportDeadlineHour = dto.eodReportDeadlineHour;
     }

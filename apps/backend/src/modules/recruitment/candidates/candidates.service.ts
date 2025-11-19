@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CandidateStage, EmploymentStatus, NotificationType, Prisma, UserRole } from '@prisma/client';
+import { CandidateStage, EmploymentStatus, Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';

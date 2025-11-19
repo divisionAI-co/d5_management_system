@@ -1,81 +1,46 @@
-name: CI - Tests and Linting
+name: CI
 
 on:
   pull_request:
     branches:
       - main
-      - master
+      - develop
   push:
     branches:
       - main
-      - master
-
-env:
-  NODE_VERSION: '20'
+      - develop
 
 jobs:
   lint-and-typecheck:
     name: Lint and Type Check
     runs-on: ubuntu-latest
     
+    env:
+      PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: 1
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20'
           cache: 'npm'
-      
-      - name: Cache Prisma binary
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/prisma
-            apps/backend/node_modules/.prisma
-            apps/backend/node_modules/@prisma
-          key: ${{ runner.os }}-prisma-${{ hashFiles('apps/backend/prisma/schema.prisma') }}
-          restore-keys: |
-            ${{ runner.os }}-prisma-
-      
-      - name: Install dependencies and generate Prisma
-        run: |
-          # Install with retry logic for Prisma generation
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          
-          until npm install || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
-            RETRY_COUNT=$((RETRY_COUNT+1))
-            echo "npm install failed (possibly Prisma), attempt $RETRY_COUNT of $MAX_RETRIES..."
-            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-              echo "Cleaning and retrying in 5 seconds..."
-              rm -rf node_modules apps/*/node_modules
-              sleep 5
-            fi
-          done
-          
-          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-            echo "Failed to install dependencies after $MAX_RETRIES attempts"
-            exit 1
-          fi
-          
-          echo "✅ Dependencies installed successfully"
-      
-      - name: Lint backend
-        run: npm run lint --workspace=apps/backend
-        continue-on-error: true
-      
-      - name: Lint frontend
-        run: npm run lint --workspace=apps/frontend
-        continue-on-error: true
-      
-      - name: Type check frontend
-        run: npm run typecheck --workspace=apps/frontend
-      
-      - name: Build backend
-        run: npm run build --workspace=apps/backend
-      
-      - name: Build frontend
-        run: npm run build --workspace=apps/frontend
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: |
+          cd apps/backend
+          npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

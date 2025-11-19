@@ -516,8 +516,8 @@ export class LegacyEodImportService {
 
       // Return the date closest to fallback, preferring dates before/on the fallback
       const fallbackTime = fallback.getTime();
-      let closest = candidates[0];
-      let minDiff = Math.abs(candidates[0].getTime() - fallbackTime);
+      const _closest = candidates[0];
+      const _minDiff = Math.abs(candidates[0].getTime() - fallbackTime);
       
       // Sort candidates by absolute distance from fallback
       const sorted = candidates.map(date => ({

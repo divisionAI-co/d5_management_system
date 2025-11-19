@@ -52,11 +52,6 @@ export interface CandidateImportFieldMetadata {
 
 type CandidateFieldMapping = Partial<Record<CandidateImportField, string>>;
 
-type ParsedSheet = {
-  headers: string[];
-  rows: Record<string, any>[];
-};
-
 const CANDIDATE_FIELD_DEFINITIONS: CandidateImportFieldMetadata[] = [
   {
     key: CandidateImportField.EMAIL,

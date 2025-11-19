@@ -529,7 +529,7 @@ export class GoogleDriveService {
    * For shared drives, also considers drive-level permissions
    */
   async getUserFilePermissions(fileId: string, userEmail: string, userId?: string): Promise<UserFilePermissions> {
-    const drive = await this.getDriveClient(userId);
+    const _drive = await this.getDriveClient(userId);
     
     // Get file metadata to check ownership and drive membership
     const file = await this.getFileMetadata(fileId, userId);
@@ -563,7 +563,7 @@ export class GoogleDriveService {
     // Find permissions that apply to this user
     const userPermissions: DrivePermission[] = [];
     const emailLower = userEmail.toLowerCase();
-    const domain = emailLower.split('@')[1];
+    const _domain = emailLower.split('@')[1];
 
     for (const perm of allPermissions) {
       // Direct user permission

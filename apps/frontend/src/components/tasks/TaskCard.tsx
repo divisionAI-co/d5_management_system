@@ -75,7 +75,11 @@ export function TaskCard({
   const [elapsedTime, setElapsedTime] = useState(0);
 
   const isTimerRunning = runningTimer?.taskId === task.id;
-  const isMyTask = currentUserId && task.assignedToId === currentUserId;
+  // Check if user is assigned (legacy assignedToId or new assignees)
+  const isMyTask = currentUserId && (
+    task.assignedToId === currentUserId ||
+    (task.assignees && task.assignees.some((ta) => ta.userId === currentUserId))
+  );
 
   useEffect(() => {
     if (!isTimerRunning) {
@@ -236,12 +240,32 @@ export function TaskCard({
               {formatElapsedTime(elapsedTime)}
             </span>
           )}
-          {task.assignedTo && (
-            <span className="inline-flex items-center gap-1">
-              <User className="h-4 w-4" />
-              {task.assignedTo.firstName} {task.assignedTo.lastName}
-            </span>
-          )}
+          {(() => {
+            // Handle multiple assignees - prefer new assignees array, fall back to legacy assignedTo
+            const assignees = task.assignees && task.assignees.length > 0
+              ? task.assignees.map((ta) => ta.user)
+              : task.assignedTo
+                ? [task.assignedTo]
+                : [];
+            
+            if (assignees.length === 0) return null;
+            
+            if (assignees.length === 1) {
+              return (
+                <span className="inline-flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  {assignees[0].firstName} {assignees[0].lastName}
+                </span>
+              );
+            }
+            
+            return (
+              <span className="inline-flex items-center gap-1" title={assignees.map((u) => `${u.firstName} ${u.lastName}`).join(', ')}>
+                <User className="h-4 w-4" />
+                {assignees.length} assignees
+              </span>
+            );
+          })()}
           {dueDateInfo && (
             <span
               className={`inline-flex items-center gap-1 ${
@@ -270,12 +294,23 @@ export function TaskCard({
           )}
 
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {task.assignedTo && (
-              <span className="inline-flex items-center gap-1">
-                <User className="h-4 w-4" />
-                {task.assignedTo.firstName} {task.assignedTo.lastName}
-              </span>
-            )}
+            {(() => {
+              // Handle multiple assignees - prefer new assignees array, fall back to legacy assignedTo
+              const assignees = task.assignees && task.assignees.length > 0
+                ? task.assignees.map((ta) => ta.user)
+                : task.assignedTo
+                  ? [task.assignedTo]
+                  : [];
+              
+              if (assignees.length === 0) return null;
+              
+              return (
+                <span className="inline-flex items-center gap-1">
+                  <User className="h-4 w-4" />
+                  {assignees.map((u) => `${u.firstName} ${u.lastName}`).join(', ')}
+                </span>
+              );
+            })()}
             {dueDateInfo && (
               <span
                 className={`inline-flex items-center gap-1 ${

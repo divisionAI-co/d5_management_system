@@ -4,11 +4,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
+import { TasksSchedulerService } from './tasks-scheduler.service';
 
 @Module({
   imports: [PrismaModule, NotificationsModule, UsersModule],
   controllers: [TasksController],
-  providers: [TasksService],
+  providers: [TasksService, TasksSchedulerService],
   exports: [TasksService],
 })
 export class TasksModule {}

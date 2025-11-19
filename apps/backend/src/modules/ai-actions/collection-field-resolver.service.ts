@@ -858,7 +858,7 @@ export class CollectionFieldResolver {
           { key: 'status', label: 'Status', select: (row: LeadPayload) => row.status },
           { key: 'createdAt', label: 'Created', select: (row: LeadPayload) => row.createdAt },
         ],
-        resolve: async ({ entityId, limit }) => {
+        resolve: async ({ entityId, limit: _limit }) => {
           const opportunity = await this.prisma.opportunity.findUnique({
             where: { id: entityId },
             select: { leadId: true },

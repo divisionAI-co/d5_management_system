@@ -5,6 +5,7 @@ export interface CompanySettings {
   remoteWorkFrequency: RemoteWorkFrequency;
   remoteWorkLimit: number;
   eodGraceDays: number;
+  eodLateReportsAllowed: number;
   eodReportDeadlineHour: number;
   eodReportDeadlineMin: number;
   reviewCycleDays: number;
@@ -18,6 +19,7 @@ export type UpdateCompanySettingsPayload = Partial<
     | 'remoteWorkFrequency'
     | 'remoteWorkLimit'
     | 'eodGraceDays'
+    | 'eodLateReportsAllowed'
     | 'eodReportDeadlineHour'
     | 'eodReportDeadlineMin'
     | 'reviewCycleDays'
