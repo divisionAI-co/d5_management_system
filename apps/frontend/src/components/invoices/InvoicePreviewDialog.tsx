@@ -24,7 +24,14 @@ export function InvoicePreviewDialog({
         setIsLoading(true);
         setError(null);
         const result = await invoicesApi.preview(invoice.id, { templateId });
-        setPreview(result);
+        // Convert relative API URLs to absolute URLs for iframe compatibility
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+        // API_URL already includes /api/v1, so remove it from the path
+        const processedHtml = result.renderedHtml.replace(
+          /src=["'](\/api\/v1\/[^"']+)["']/gi,
+          (_match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+        );
+        setPreview({ ...result, renderedHtml: processedHtml });
       } catch (err) {
         console.error('Failed to load preview:', err);
         setError('Failed to load invoice preview. Please try again.');
@@ -57,7 +64,7 @@ export function InvoicePreviewDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-hidden">
           {isLoading && (
             <div className="flex h-full items-center justify-center">
               <div className="flex flex-col items-center gap-3">
@@ -83,12 +90,13 @@ export function InvoicePreviewDialog({
           )}
 
           {!isLoading && !error && preview && (
-            <div className="mx-auto max-w-4xl">
-              <div
-                className="rounded-lg border border-border bg-white p-8 shadow-sm"
-                dangerouslySetInnerHTML={{ __html: preview.renderedHtml }}
-              />
-            </div>
+            <iframe
+              title="Invoice preview"
+              className="h-full w-full border-0 bg-white"
+              srcDoc={`<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"></head><body>${preview.renderedHtml}</body></html>`}
+              sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+              referrerPolicy="no-referrer"
+            />
           )}
         </div>
 

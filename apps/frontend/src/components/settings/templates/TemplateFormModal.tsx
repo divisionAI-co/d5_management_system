@@ -107,6 +107,11 @@ const TEMPLATE_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; descrip
     label: 'Remote Work Window Opened',
     description: 'Email sent to all users when a remote work window is opened.',
   },
+  {
+    value: 'QUOTE',
+    label: 'Quote',
+    description: 'HTML template used when generating quote PDFs or sending quote emails to customers.',
+  },
 ];
 
 const INPUT_BASE_CLASS =
@@ -254,6 +259,58 @@ const DATA_CONTEXT_HELP: Record<
     heading: 'Remote work window data context',
     description:
       'Remote work window emails include window details. Available fields: {{window.startDate}}, {{window.endDate}}, {{window.limit}}, {{openedBy.firstName}}, {{openedBy.lastName}}.',
+  },
+  QUOTE: {
+    heading: 'Quote data context',
+    description:
+      'Quote templates include quote details, lead information, and contact data. Available fields include quote number, title, description, overview, proposals, milestones, payment terms, and customer contact information.',
+    groups: [
+      {
+        title: 'Quote Basic Info',
+        items: [
+          '{{quote.quoteNumber}}',
+          '{{quote.title}}',
+          '{{quote.description}}',
+          '{{quote.status}}',
+          '{{quote.totalValue}}',
+          '{{quote.currency}}',
+          '{{formatDate quote.createdAt}}',
+        ],
+      },
+      {
+        title: 'Quote Content (use {{{...}}} for HTML rendering)',
+        items: [
+          '{{{quote.overview}}}',
+          '{{{quote.functionalProposal}}}',
+          '{{{quote.technicalProposal}}}',
+          '{{{quote.teamComposition}}}',
+          '{{{quote.milestones}}}',
+          '{{{quote.paymentTerms}}}',
+          '{{quote.warrantyPeriod}}',
+        ],
+      },
+      {
+        title: 'Lead Information',
+        items: [
+          '{{quote.lead.title}}',
+          '{{quote.lead.description}}',
+          '{{quote.lead.prospectCompanyName}}',
+          '{{quote.lead.prospectWebsite}}',
+          '{{quote.lead.prospectIndustry}}',
+        ],
+      },
+      {
+        title: 'Contact Information',
+        items: [
+          '{{quote.contact.firstName}}',
+          '{{quote.contact.lastName}}',
+          '{{quote.contact.email}}',
+          '{{quote.contact.phone}}',
+          '{{quote.contact.companyName}}',
+        ],
+      },
+    ],
+    note: 'Use triple braces ({{{...}}}) to render HTML content for formatted fields like overview, proposals, milestones, etc.',
   },
 };
 

@@ -23,6 +23,8 @@ import LeadsPage from '@/pages/crm/LeadsPage';
 import LeadDetailPage from '@/pages/crm/LeadDetailPage';
 import OpportunitiesPage from '@/pages/crm/OpportunitiesPage';
 import OpportunityDetailPage from '@/pages/crm/OpportunityDetailPage';
+import QuotesPage from '@/pages/crm/QuotesPage';
+import QuoteDetailPage from '@/pages/crm/QuoteDetailPage';
 import CampaignsPage from '@/pages/crm/CampaignsPage';
 
 // Recruitment
@@ -35,6 +37,7 @@ import PositionDetailPage from '@/pages/recruitment/PositionDetailPage';
 import EmployeesPage from '@/pages/employees/EmployeesPage';
 import EmployeeDetailPage from '@/pages/employees/EmployeeDetailPage';
 import EodReportsPage from '@/pages/employees/EodReportsPage';
+import CheckInOutsPage from '@/pages/employees/CheckInOutsPage';
 import LeaveRequestsPage from '@/pages/employees/LeaveRequestsPage';
 import PerformanceReviewsPage from '@/pages/employees/PerformanceReviewsPage';
 import RemoteWorkPage from '@/pages/employees/RemoteWorkPage';
@@ -111,6 +114,8 @@ function App() {
             <Route path="leads/:id" element={<LeadDetailPage />} />
             <Route path="opportunities" element={<OpportunitiesPage />} />
             <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
+            <Route path="quotes" element={<QuotesPage />} />
+            <Route path="quotes/:id" element={<QuoteDetailPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
           </Route>
 
@@ -127,6 +132,7 @@ function App() {
             <Route index element={<EmployeesPage />} />
             <Route path=":id" element={<EmployeeDetailPage />} />
             <Route path="eod-reports" element={<EodReportsPage />} />
+            <Route path="check-in-outs" element={<CheckInOutsPage />} />
             <Route path="leave-requests" element={<LeaveRequestsPage />} />
             <Route path="performance-reviews" element={<PerformanceReviewsPage />} />
             <Route path="remote-work" element={<RemoteWorkPage />} />

@@ -21,11 +21,14 @@ import {
   Trash2,
   Trophy,
   User,
+  FileText,
+  Plus,
 } from 'lucide-react';
 import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm';
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
 import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
+import { SafeHtml } from '@/components/ui/SafeHtml';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const VALUE_FORMATTER = new Intl.NumberFormat('en-US', {
@@ -218,6 +221,18 @@ export default function OpportunityDetailPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => navigate(`/crm/quotes?opportunityId=${opportunity.id}&leadId=${opportunity.lead.id}`)}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <FileText className="h-4 w-4" /> View Quotes
+          </button>
+          <button
+            onClick={() => navigate(`/crm/quotes/new?opportunityId=${opportunity.id}&leadId=${opportunity.lead.id}`)}
+            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition hover:bg-blue-100"
+          >
+            <Plus className="h-4 w-4" /> Create Quote
+          </button>
           <button
             onClick={() => setShowActivities(true)}
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
@@ -424,13 +439,17 @@ export default function OpportunityDetailPage() {
                 {opportunity.openPosition.description ? (
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
-                    <p>{opportunity.openPosition.description}</p>
+                    <div className="prose prose-sm max-w-none">
+                      <SafeHtml html={opportunity.openPosition.description} />
+                    </div>
                   </div>
                 ) : null}
                 {opportunity.openPosition.requirements ? (
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Requirements</p>
-                    <p>{opportunity.openPosition.requirements}</p>
+                    <div className="prose prose-sm max-w-none">
+                      <SafeHtml html={opportunity.openPosition.requirements} />
+                    </div>
                   </div>
                 ) : null}
               </div>

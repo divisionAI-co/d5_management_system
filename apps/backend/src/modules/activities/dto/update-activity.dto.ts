@@ -48,6 +48,11 @@ class UpdateTargetsDto {
   @IsUUID()
   @IsOptional()
   taskId?: string | null;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsUUID()
+  @IsOptional()
+  quoteId?: string | null;
 }
 
 export class UpdateActivityDto {

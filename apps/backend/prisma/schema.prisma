@@ -75,6 +75,8 @@ model User {
   recruitedCandidates   Candidate[]               @relation("CandidateRecruiter")
   failedLoginAttempts   FailedLoginAttempt[]
   accountLockout        AccountLockout?
+  sentQuotes            Quote[]
+  importedCheckInOuts   CheckInOut[]              @relation("CheckInOutImportedBy")
 
   @@map("users")
 }
@@ -247,6 +249,7 @@ model Lead {
   // Relations
   opportunities Opportunity[]
   activities    Activity[]
+  quotes        Quote[]
 
   @@index([contactId])
   @@index([convertedCustomerId])
@@ -300,11 +303,76 @@ model Opportunity {
   // Relations
   openPosition OpenPosition?
   activities   Activity[]
+  quotes       Quote[]
 
   @@index([customerId])
   @@index([type])
   @@index([assignedToId])
   @@map("opportunities")
+}
+
+model Quote {
+  id     String @id @default(uuid())
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  // Quote details
+  quoteNumber String @unique // Auto-generated or manual
+  title       String
+  description String? @db.Text
+
+  // Quote sections
+  overview           String? @db.Text
+  functionalProposal String? @db.Text
+  technicalProposal String? @db.Text
+  teamComposition   String? @db.Text
+  milestones        String? @db.Text // Free text milestones with formatting
+  paymentTerms      String? @db.Text
+  warrantyPeriod    String? // e.g., "12 months", "6 months"
+
+  // Financial
+  totalValue Decimal? @db.Decimal(10, 2)
+  currency   String?  @default("USD")
+
+  // Status
+  status QuoteStatus @default(DRAFT)
+
+  // Email tracking
+  sentAt    DateTime?
+  sentTo    String? // Customer email
+  sentBy    String?
+  sentByUser User?  @relation(fields: [sentBy], references: [id], onDelete: SetNull)
+
+  // PDF
+  pdfUrl String?
+
+  // Template
+  templateId String?
+  template   Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  activities Activity[]
+
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([status])
+  @@index([sentBy])
+  @@index([templateId])
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
 }
 
 // ============================================
@@ -647,6 +715,9 @@ model Employee {
   emergencyContactPhone    String?
   emergencyContactRelation String?
 
+  // Card Number for check-in/check-out
+  cardNumber String?
+
   // Documents
   documents Json? // Array of document objects with name, url, type
 
@@ -659,6 +730,7 @@ model Employee {
   remoteWorkLogs     RemoteWorkLog[]
   activities         Activity[]
   feedbackReports    FeedbackReport[]
+  checkInOuts        CheckInOut[]
 
   @@map("employees")
 }
@@ -897,6 +969,36 @@ model EodReport {
   @@map("eod_reports")
 }
 
+enum CheckInOutStatus {
+  IN
+  OUT
+}
+
+model CheckInOut {
+  id         String           @id @default(uuid())
+  employeeId String
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // Date and time combined
+  dateTime DateTime
+
+  // Status (IN or OUT)
+  status CheckInOutStatus
+
+  // Import metadata
+  importedAt DateTime?
+  importedBy String?
+  importedByUser User? @relation("CheckInOutImportedBy", fields: [importedBy], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([dateTime])
+  @@index([status])
+  @@map("check_in_outs")
+}
+
 // ============================================
 // TASK MANAGEMENT
 // ============================================
@@ -1073,6 +1175,9 @@ model Activity {
   taskId String?
   task   Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
+  quoteId String?
+  quote   Quote?  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
   assignedToId String?
   assignedTo   User?   @relation("AssignedActivities", fields: [assignedToId], references: [id], onDelete: SetNull)
 
@@ -1095,6 +1200,7 @@ model Activity {
   @@index([employeeId])
   @@index([contactId])
   @@index([taskId])
+  @@index([quoteId])
   @@index([createdById])
   @@index([assignedToId])
   @@map("activities")
@@ -1137,6 +1243,7 @@ model ActivityType {
 enum AiEntityType {
   CUSTOMER
   LEAD
+  QUOTE
   OPPORTUNITY
   CANDIDATE
   EMPLOYEE
@@ -1154,8 +1261,11 @@ enum AiCollectionKey {
   EOD_REPORTS
   OPPORTUNITIES
   LEADS
+  QUOTES
   TASKS
   ACTIVITIES
+  FEEDBACK_REPORTS
+  CHECK_IN_OUTS
 }
 
 enum AiCollectionFormat {
@@ -1412,6 +1522,7 @@ enum TemplateType {
   TASK_ASSIGNED
   MENTION_NOTIFICATION
   REMOTE_WORK_WINDOW_OPENED
+  QUOTE
 }
 
 model Template {
@@ -1430,6 +1541,9 @@ model Template {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  quotes Quote[]
 
   @@map("templates")
 }

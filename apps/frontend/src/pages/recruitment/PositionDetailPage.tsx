@@ -10,6 +10,7 @@ import {
 } from '@/components/recruitment/CandidateBoard';
 import { CreatePositionModal } from '@/components/recruitment/CreatePositionModal';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { SafeHtml } from '@/components/ui/SafeHtml';
 
 export default function PositionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -182,8 +183,12 @@ export default function PositionDetailPage() {
               <option value="Cancelled">Cancelled</option>
             </select>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {position.description || 'No description provided.'}
+          <div className="text-sm text-muted-foreground prose prose-sm max-w-none">
+            {position.description ? (
+              <SafeHtml html={position.description} />
+            ) : (
+              <span>No description provided.</span>
+            )}
           </div>
         </div>
 
@@ -241,8 +246,8 @@ export default function PositionDetailPage() {
           {position.requirements && (
             <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-foreground mb-4">Requirements</h2>
-              <div className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground">
-                <p className="whitespace-pre-wrap">{position.requirements}</p>
+              <div className="rounded-xl border border-border bg-muted p-4 text-sm text-muted-foreground prose prose-sm max-w-none">
+                <SafeHtml html={position.requirements} />
               </div>
             </div>
           )}

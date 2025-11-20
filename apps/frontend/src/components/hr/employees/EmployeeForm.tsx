@@ -49,6 +49,7 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
       emergencyContactName: employee.emergencyContactName || '',
       emergencyContactPhone: employee.emergencyContactPhone || '',
       emergencyContactRelation: employee.emergencyContactRelation || '',
+      cardNumber: employee.cardNumber || '',
     } : {
       userId: '',
       salaryCurrency: 'USD',
@@ -159,6 +160,18 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
                 {errors.employeeNumber && (
                   <p className="mt-1 text-sm text-red-600">{errors.employeeNumber.message}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Card Number
+                </label>
+                <input
+                  type="text"
+                  {...register('cardNumber')}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="123456"
+                />
               </div>
 
               <div>

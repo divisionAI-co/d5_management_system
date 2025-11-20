@@ -10,6 +10,7 @@ import type {
 } from '@/types/imports';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { usersApi } from '@/lib/api/users';
+import { employeesApi } from '@/lib/api/hr';
 import { customersApi } from '@/lib/api/crm/customers';
 import { positionsApi } from '@/lib/api/recruitment/positions';
 import { activitiesApi } from '@/lib/api/activities';
@@ -48,6 +49,7 @@ interface ImportDialogProps<
     args: { updateExisting: boolean; options: TOptions; manualMatches?: Record<string, Record<string, string>> }
   ) => TExecute;
   initialOptions: () => TOptions;
+  useEmployeesForUnmatched?: boolean; // If true, fetch employees instead of users for unmatchedEmployees
   renderExecuteOptions?: (
     props: RenderExecuteOptionsProps<TOptions>,
   ) => React.ReactNode;
@@ -74,6 +76,7 @@ export function ImportDialog<
   initialOptions,
   renderExecuteOptions,
   invalidateQueries,
+  useEmployeesForUnmatched = false,
 }: ImportDialogProps<TUpload, TSummary, TOptions, TExecute>) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<ImportStep>('upload');
@@ -480,8 +483,10 @@ export function ImportDialog<
   const hasUnmatchedValues = Object.keys(unmatchedValues).length > 0;
   
   const needsUsers = categories.some((cat) => 
-    ['unmatchedRecruiters', 'unmatchedOwners', 'unmatchedEmployees'].includes(cat)
+    ['unmatchedRecruiters', 'unmatchedOwners'].includes(cat) || 
+    (cat === 'unmatchedEmployees' && !useEmployeesForUnmatched)
   );
+  const needsEmployees = categories.includes('unmatchedEmployees') && useEmployeesForUnmatched;
   const needsCustomers = categories.includes('unmatchedCustomers');
   const needsPositions = categories.includes('unmatchedPositions');
   const needsActivityTypes = categories.includes('unmatchedActivityTypes');
@@ -490,6 +495,12 @@ export function ImportDialog<
     queryKey: ['users', 'for-matching'],
     queryFn: () => usersApi.list({ pageSize: 100 }),
     enabled: hasUnmatchedValues && needsUsers,
+  });
+
+  const { data: employeesData, isLoading: isLoadingEmployees } = useQuery({
+    queryKey: ['employees', 'for-matching'],
+    queryFn: () => employeesApi.getAll({ pageSize: 100 }),
+    enabled: hasUnmatchedValues && needsEmployees,
   });
 
   const { data: customersData, isLoading: isLoadingCustomers } = useQuery({
@@ -515,7 +526,6 @@ export function ImportDialog<
       switch (category) {
         case 'unmatchedRecruiters':
         case 'unmatchedOwners':
-        case 'unmatchedEmployees':
           if (!usersData?.data) {
             if (import.meta.env.DEV) {
               console.log('No users data available', { usersData, category });
@@ -526,6 +536,32 @@ export function ImportDialog<
             id: user.id,
             label: `${user.firstName} ${user.lastName} (${user.email})`,
           }));
+        case 'unmatchedEmployees':
+          if (useEmployeesForUnmatched) {
+            if (!employeesData?.data) {
+              if (import.meta.env.DEV) {
+                console.log('No employees data available', { employeesData, category });
+              }
+              return [];
+            }
+            return employeesData.data.map((employee) => ({
+              id: employee.id,
+              label: employee.user 
+                ? `${employee.user.firstName} ${employee.user.lastName} (${employee.employeeNumber})`
+                : employee.employeeNumber,
+            }));
+          } else {
+            if (!usersData?.data) {
+              if (import.meta.env.DEV) {
+                console.log('No users data available', { usersData, category });
+              }
+              return [];
+            }
+            return usersData.data.map((user) => ({
+              id: user.id,
+              label: `${user.firstName} ${user.lastName} (${user.email})`,
+            }));
+          }
         case 'unmatchedCustomers':
           if (!customersData?.data) {
             if (import.meta.env.DEV) {
@@ -625,7 +661,8 @@ export function ImportDialog<
                     {values.map((value) => {
                       const options = getOptionsForCategory(category);
                       const isLoading = 
-                        (category === 'unmatchedRecruiters' || category === 'unmatchedOwners' || category === 'unmatchedEmployees') && isLoadingUsers ||
+                        (category === 'unmatchedRecruiters' || category === 'unmatchedOwners' || (category === 'unmatchedEmployees' && !useEmployeesForUnmatched)) && isLoadingUsers ||
+                        (category === 'unmatchedEmployees' && useEmployeesForUnmatched) && isLoadingEmployees ||
                         category === 'unmatchedCustomers' && isLoadingCustomers ||
                         category === 'unmatchedPositions' && isLoadingPositions ||
                         category === 'unmatchedActivityTypes' && isLoadingActivityTypes;

@@ -465,4 +465,122 @@ export interface CloseOpportunityPayload {
   closedAt?: string;
 }
 
+export type QuoteStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+
+export interface QuoteLead {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: LeadStatus;
+  contacts?: Contact[];
+  assignedTo?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+}
+
+export interface Quote {
+  id: string;
+  leadId: string;
+  opportunityId?: string | null;
+  quoteNumber: string;
+  title: string;
+  description?: string | null;
+  overview?: string | null;
+  functionalProposal?: string | null;
+  technicalProposal?: string | null;
+  teamComposition?: string | null;
+  milestones?: string | null;
+  paymentTerms?: string | null;
+  warrantyPeriod?: string | null;
+  totalValue?: number | null;
+  currency?: string | null;
+  status: QuoteStatus;
+  sentAt?: string | null;
+  sentTo?: string | null;
+  sentBy?: string | null;
+  pdfUrl?: string | null;
+  templateId?: string | null;
+  template?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+  lead: QuoteLead;
+  opportunity?: {
+    id: string;
+    title: string;
+    description?: string | null;
+    value?: number | null;
+    stage: string;
+    isClosed: boolean;
+    isWon: boolean;
+    customer?: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
+  } | null;
+  sentByUser?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+}
+
+export interface QuotesListResponse {
+  data: Quote[];
+  meta: {
+    page: number;
+    pageSize: number;
+    total: number;
+    pageCount: number;
+  };
+}
+
+export interface QuoteFilters {
+  search?: string;
+  leadId?: string;
+  opportunityId?: string;
+  status?: QuoteStatus;
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'createdAt' | 'updatedAt' | 'quoteNumber' | 'title' | 'totalValue';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface CreateQuotePayload {
+  leadId: string;
+  opportunityId?: string;
+  quoteNumber?: string;
+  title: string;
+  description?: string;
+  overview?: string;
+  functionalProposal?: string;
+  technicalProposal?: string;
+  teamComposition?: string;
+  milestones?: string;
+  paymentTerms?: string;
+  warrantyPeriod?: string;
+  totalValue?: number;
+  currency?: string;
+  status?: QuoteStatus;
+  templateId?: string;
+}
+
+export interface UpdateQuotePayload extends Partial<CreateQuotePayload> {}
+
+export interface SendQuotePayload {
+  to: string;
+  subject?: string;
+  message?: string;
+  cc?: string;
+  bcc?: string;
+}
+
 

@@ -33,6 +33,7 @@ export interface CollectionDefinition<T> {
   fields: CollectionFieldSelector<T>[];
   filters?: CollectionFilterDefinition[];
   resolve: (params: { entityId: string; limit: number; filters?: Record<string, unknown> | undefined }) => Promise<T[]>;
+  resolveBulk?: (params: { limit: number; filters?: Record<string, unknown> | undefined }) => Promise<T[]>;
   format?: AiCollectionFormat[];
 }
 
@@ -129,6 +130,70 @@ type EodReportPayload = Prisma.EodReportGetPayload<{
     tasksWorkedOn: true;
   };
 }>;
+
+type QuotePayload = Prisma.QuoteGetPayload<{
+  select: {
+    id: true;
+    quoteNumber: true;
+    title: true;
+    status: true;
+    totalValue: true;
+    currency: true;
+    createdAt: true;
+    sentAt: true;
+  };
+}>;
+
+type FeedbackReportPayload = Prisma.FeedbackReportGetPayload<{
+  select: {
+    id: true;
+    month: true;
+    year: true;
+    status: true;
+    tasksCount: true;
+    totalDaysOffTaken: true;
+    totalRemainingDaysOff: true;
+    hrFeedback: true;
+    amFeedback: true;
+    communicationRating: true;
+    collaborationRating: true;
+    taskEstimationRating: true;
+    timelinessRating: true;
+    employeeSummary: true;
+    submittedAt: true;
+    sentAt: true;
+    sentTo: true;
+    createdAt: true;
+    amUpdatedBy: true;
+  };
+}>;
+
+type CheckInOutPayload = Prisma.CheckInOutGetPayload<{
+  select: {
+    id: true;
+    dateTime: true;
+    status: true;
+    createdAt: true;
+  };
+}>;
+
+type EodReportWithEmployeePayload = EodReportPayload & {
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+};
+
+type CheckInOutWithEmployeePayload = CheckInOutPayload & {
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+};
 
 @Injectable()
 export class CollectionFieldResolver {
@@ -290,6 +355,15 @@ export class CollectionFieldResolver {
           },
         ],
         fields: [
+          {
+            key: 'employeeName',
+            label: 'Employee',
+            description: 'Employee name',
+            select: (report: EodReportPayload | EodReportWithEmployeePayload) =>
+              (report as EodReportWithEmployeePayload).employee
+                ? `${(report as EodReportWithEmployeePayload).employee!.firstName} ${(report as EodReportWithEmployeePayload).employee!.lastName}`
+                : null,
+          },
           { key: 'date', label: 'Date', description: 'Report date', select: (report: EodReportPayload) => report.date },
           {
             key: 'summary',
@@ -365,6 +439,76 @@ export class CollectionFieldResolver {
               tasksWorkedOn: true,
             },
           });
+        },
+        resolveBulk: async ({ limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const lateOnly = this.parseBoolean(filters?.lateOnly);
+
+          const where: Prisma.EodReportWhereInput = {};
+
+          if (startDate || endDate) {
+            where.date = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          if (lateOnly === true) {
+            where.isLate = true;
+          }
+
+          const reports = await this.prisma.eodReport.findMany({
+            where,
+            orderBy: { date: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              date: true,
+              summary: true,
+              hoursWorked: true,
+              isLate: true,
+              submittedAt: true,
+              tasksWorkedOn: true,
+              userId: true,
+            },
+          });
+
+          // Fetch employee information for each report
+          const userIds = [...new Set(reports.map((r) => r.userId).filter(Boolean))];
+          const employees = await this.prisma.employee.findMany({
+            where: { userId: { in: userIds } },
+            select: {
+              id: true,
+              userId: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+
+          const employeeMap = new Map(
+            employees.map((e) => [
+              e.userId,
+              e.user
+                ? {
+                    id: e.id,
+                    firstName: e.user.firstName,
+                    lastName: e.user.lastName,
+                    email: e.user.email,
+                  }
+                : null,
+            ]),
+          );
+
+          return reports.map((report) => ({
+            ...report,
+            employee: report.userId ? employeeMap.get(report.userId) ?? null : null,
+          })) as EodReportWithEmployeePayload[];
         },
       },
       [AiCollectionKey.TASKS]: {
@@ -489,6 +633,350 @@ export class CollectionFieldResolver {
               activityType: { select: { name: true } },
             },
           });
+        },
+      },
+      [AiCollectionKey.FEEDBACK_REPORTS]: {
+        key: AiCollectionKey.FEEDBACK_REPORTS,
+        label: 'Feedback Reports',
+        description: 'Monthly feedback reports for this employee. Accessible by both employee and account manager.',
+        defaultLimit: 6,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'year',
+            label: 'Year',
+            type: 'number',
+            description: 'Filter by report year',
+          },
+          {
+            key: 'month',
+            label: 'Month',
+            type: 'number',
+            description: 'Filter by report month (1-12)',
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'SUBMITTED', label: 'Submitted' },
+              { value: 'SENT', label: 'Sent' },
+            ],
+          },
+          {
+            key: 'hasAmFeedback',
+            label: 'Has AM feedback',
+            type: 'boolean',
+            description: 'Show only reports with account manager feedback',
+          },
+          {
+            key: 'hasHrFeedback',
+            label: 'Has HR feedback',
+            type: 'boolean',
+            description: 'Show only reports with HR feedback',
+          },
+          {
+            key: 'amUpdatedBy',
+            label: 'Account Manager',
+            type: 'text',
+            description: 'Filter by account manager user ID who updated the report',
+          },
+        ],
+        fields: [
+          {
+            key: 'period',
+            label: 'Period',
+            description: 'Month and year of the report',
+            select: (report: FeedbackReportPayload) => {
+              const monthNames = [
+                'January',
+                'February',
+                'March',
+                'April',
+                'May',
+                'June',
+                'July',
+                'August',
+                'September',
+                'October',
+                'November',
+                'December',
+              ];
+              return `${monthNames[report.month - 1]} ${report.year}`;
+            },
+          },
+          { key: 'status', label: 'Status', select: (report: FeedbackReportPayload) => report.status },
+          {
+            key: 'tasksCount',
+            label: 'Tasks Count',
+            select: (report: FeedbackReportPayload) => report.tasksCount ?? null,
+          },
+          {
+            key: 'totalDaysOffTaken',
+            label: 'Days Off Taken',
+            select: (report: FeedbackReportPayload) => report.totalDaysOffTaken ?? null,
+          },
+          {
+            key: 'totalRemainingDaysOff',
+            label: 'Remaining Days Off',
+            select: (report: FeedbackReportPayload) => report.totalRemainingDaysOff ?? null,
+          },
+          {
+            key: 'hrFeedback',
+            label: 'HR Feedback',
+            select: (report: FeedbackReportPayload) => report.hrFeedback ?? null,
+          },
+          {
+            key: 'amFeedback',
+            label: 'AM Feedback',
+            select: (report: FeedbackReportPayload) => report.amFeedback ?? null,
+          },
+          {
+            key: 'communicationRating',
+            label: 'Communication Rating',
+            select: (report: FeedbackReportPayload) => report.communicationRating ?? null,
+          },
+          {
+            key: 'collaborationRating',
+            label: 'Collaboration Rating',
+            select: (report: FeedbackReportPayload) => report.collaborationRating ?? null,
+          },
+          {
+            key: 'taskEstimationRating',
+            label: 'Task Estimation Rating',
+            select: (report: FeedbackReportPayload) => report.taskEstimationRating ?? null,
+          },
+          {
+            key: 'timelinessRating',
+            label: 'Timeliness Rating',
+            select: (report: FeedbackReportPayload) => report.timelinessRating ?? null,
+          },
+          {
+            key: 'employeeSummary',
+            label: 'Employee Summary',
+            select: (report: FeedbackReportPayload) => report.employeeSummary ?? null,
+          },
+          {
+            key: 'submittedAt',
+            label: 'Submitted At',
+            select: (report: FeedbackReportPayload) => (report.submittedAt ? report.submittedAt.toISOString() : null),
+          },
+          {
+            key: 'sentAt',
+            label: 'Sent At',
+            select: (report: FeedbackReportPayload) => (report.sentAt ? report.sentAt.toISOString() : null),
+          },
+          {
+            key: 'sentTo',
+            label: 'Sent To',
+            select: (report: FeedbackReportPayload) => report.sentTo ?? null,
+          },
+          {
+            key: 'createdAt',
+            label: 'Created',
+            select: (report: FeedbackReportPayload) => report.createdAt.toISOString(),
+          },
+        ],
+        resolve: async ({ entityId, limit, filters }) => {
+          const year = typeof filters?.year === 'number' ? filters.year : undefined;
+          const month = typeof filters?.month === 'number' ? filters.month : undefined;
+          const status = typeof filters?.status === 'string' ? filters.status : undefined;
+          const hasAmFeedback = this.parseBoolean(filters?.hasAmFeedback);
+          const hasHrFeedback = this.parseBoolean(filters?.hasHrFeedback);
+          const amUpdatedBy = typeof filters?.amUpdatedBy === 'string' && filters.amUpdatedBy.trim().length > 0
+            ? filters.amUpdatedBy.trim()
+            : undefined;
+
+          const where: Prisma.FeedbackReportWhereInput = {
+            employeeId: entityId,
+            ...(year ? { year } : {}),
+            ...(month ? { month } : {}),
+            ...(status ? { status: status as any } : {}),
+            ...(hasAmFeedback === true ? { amFeedback: { not: null } } : {}),
+            ...(hasHrFeedback === true ? { hrFeedback: { not: null } } : {}),
+            ...(amUpdatedBy ? { amUpdatedBy } : {}),
+          };
+
+          return this.prisma.feedbackReport.findMany({
+            where,
+            orderBy: [{ year: 'desc' }, { month: 'desc' }],
+            take: limit,
+            select: {
+              id: true,
+              month: true,
+              year: true,
+              status: true,
+              tasksCount: true,
+              totalDaysOffTaken: true,
+              totalRemainingDaysOff: true,
+              hrFeedback: true,
+              amFeedback: true,
+              communicationRating: true,
+              collaborationRating: true,
+              taskEstimationRating: true,
+              timelinessRating: true,
+              employeeSummary: true,
+              submittedAt: true,
+              sentAt: true,
+              sentTo: true,
+              createdAt: true,
+              amUpdatedBy: true,
+            },
+          });
+        },
+      },
+      [AiCollectionKey.CHECK_IN_OUTS]: {
+        key: AiCollectionKey.CHECK_IN_OUTS,
+        label: 'Check-In/Check-Out Records',
+        description: 'Recent check-in and check-out records for this employee.',
+        defaultLimit: 10,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Start date',
+            type: 'date',
+            description: 'Include records on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'End date',
+            type: 'date',
+            description: 'Include records on or before this date',
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'IN', label: 'Check-In' },
+              { value: 'OUT', label: 'Check-Out' },
+            ],
+            description: 'Filter by check-in or check-out status',
+          },
+        ],
+        fields: [
+          {
+            key: 'employeeName',
+            label: 'Employee',
+            description: 'Employee name',
+            select: (record: CheckInOutPayload | CheckInOutWithEmployeePayload) =>
+              (record as CheckInOutWithEmployeePayload).employee
+                ? `${(record as CheckInOutWithEmployeePayload).employee!.firstName} ${(record as CheckInOutWithEmployeePayload).employee!.lastName}`
+                : null,
+          },
+          {
+            key: 'dateTime',
+            label: 'Date & Time',
+            description: 'Check-in or check-out timestamp',
+            select: (record: CheckInOutPayload) => record.dateTime.toISOString(),
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            description: 'Check-in or check-out status',
+            select: (record: CheckInOutPayload) => record.status,
+          },
+          {
+            key: 'createdAt',
+            label: 'Created',
+            description: 'When the record was created',
+            select: (record: CheckInOutPayload) => record.createdAt.toISOString(),
+          },
+        ],
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const status = typeof filters?.status === 'string' ? filters.status : undefined;
+
+          const where: Prisma.CheckInOutWhereInput = {
+            employeeId: entityId,
+            ...(status ? { status: status as any } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.dateTime = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.checkInOut.findMany({
+            where,
+            orderBy: { dateTime: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              dateTime: true,
+              status: true,
+              createdAt: true,
+            },
+          });
+        },
+        resolveBulk: async ({ limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const status = typeof filters?.status === 'string' ? filters.status : undefined;
+
+          const where: Prisma.CheckInOutWhereInput = {
+            ...(status ? { status: status as any } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.dateTime = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          const records = await this.prisma.checkInOut.findMany({
+            where,
+            orderBy: { dateTime: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              dateTime: true,
+              status: true,
+              createdAt: true,
+              employeeId: true,
+            },
+          });
+
+          // Fetch employee information for each record
+          const employeeIds = [...new Set(records.map((r) => r.employeeId).filter(Boolean))];
+          const employees = await this.prisma.employee.findMany({
+            where: { id: { in: employeeIds } },
+            select: {
+              id: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+
+          const employeeMap = new Map(
+            employees.map((e) => [
+              e.id,
+              e.user
+                ? {
+                    id: e.id,
+                    firstName: e.user.firstName,
+                    lastName: e.user.lastName,
+                    email: e.user.email,
+                  }
+                : null,
+            ]),
+          );
+
+          return records.map((record) => ({
+            ...record,
+            employee: record.employeeId ? employeeMap.get(record.employeeId) ?? null : null,
+          })) as CheckInOutWithEmployeePayload[];
         },
       },
     },
@@ -784,6 +1272,85 @@ export class CollectionFieldResolver {
               type: true,
               value: true,
               updatedAt: true,
+            },
+          });
+        },
+      },
+      [AiCollectionKey.QUOTES]: {
+        key: AiCollectionKey.QUOTES,
+        label: 'Quotes',
+        description: 'Quotes associated with this lead.',
+        defaultLimit: 5,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Created on/after',
+            type: 'date',
+          },
+          {
+            key: 'endDate',
+            label: 'Created on/before',
+            type: 'date',
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'DRAFT', label: 'Draft' },
+              { value: 'SENT', label: 'Sent' },
+              { value: 'ACCEPTED', label: 'Accepted' },
+              { value: 'REJECTED', label: 'Rejected' },
+              { value: 'EXPIRED', label: 'Expired' },
+            ],
+          },
+        ],
+        fields: [
+          { key: 'quoteNumber', label: 'Quote Number', select: (row: QuotePayload) => row.quoteNumber },
+          { key: 'title', label: 'Title', select: (row: QuotePayload) => row.title },
+          { key: 'status', label: 'Status', select: (row: QuotePayload) => row.status },
+          {
+            key: 'totalValue',
+            label: 'Total Value',
+            select: (row: QuotePayload) =>
+              row.totalValue && row.currency
+                ? `${row.currency} ${row.totalValue.toString()}`
+                : row.totalValue?.toString() ?? null,
+          },
+          { key: 'createdAt', label: 'Created', select: (row: QuotePayload) => row.createdAt },
+          { key: 'sentAt', label: 'Sent At', select: (row: QuotePayload) => row.sentAt },
+        ],
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const status = filters?.status as string | undefined;
+
+          const where: Prisma.QuoteWhereInput = {
+            leadId: entityId,
+            ...(status ? { status: status as any } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.createdAt = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.quote.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              quoteNumber: true,
+              title: true,
+              status: true,
+              totalValue: true,
+              currency: true,
+              createdAt: true,
+              sentAt: true,
             },
           });
         },
@@ -1317,7 +1884,7 @@ export class CollectionFieldResolver {
 
   async resolveCollection(params: {
     entityType: AiEntityType;
-    entityId: string;
+    entityId?: string; // Optional: if omitted, runs on all records
     collectionKey: AiCollectionKey;
     limit?: number;
     fieldKeys: string[];
@@ -1328,11 +1895,25 @@ export class CollectionFieldResolver {
       return [];
     }
 
-    const rows = await definition.resolve({
-      entityId: params.entityId,
-      limit: params.limit ?? definition.defaultLimit,
-      filters: params.filters,
-    });
+    // For bulk operations (no entityId), check if the definition supports bulk resolution
+    if (!params.entityId && !definition.resolveBulk) {
+      // Fall back to regular resolution if bulk is not supported
+      // This will likely return empty results, but won't break
+      return [];
+    }
+
+    const rows = params.entityId
+      ? await definition.resolve({
+          entityId: params.entityId,
+          limit: params.limit ?? definition.defaultLimit,
+          filters: params.filters,
+        })
+      : definition.resolveBulk
+        ? await definition.resolveBulk({
+            limit: params.limit ?? definition.defaultLimit,
+            filters: params.filters,
+          })
+        : [];
 
     const fieldSelectors = definition.fields.filter((field) => params.fieldKeys.includes(field.key));
 

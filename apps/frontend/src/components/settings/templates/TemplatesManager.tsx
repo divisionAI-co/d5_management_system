@@ -24,6 +24,7 @@ const TEMPLATE_TYPE_LABEL: Record<TemplateType, string> = {
   TASK_ASSIGNED: 'Task Assigned',
   MENTION_NOTIFICATION: 'Mention Notification',
   REMOTE_WORK_WINDOW_OPENED: 'Remote Work Window Opened',
+  QUOTE: 'Quote',
 };
 
 const FILTER_TYPE_OPTIONS: Array<{ label: string; value?: TemplateType }> = [
@@ -40,6 +41,7 @@ const FILTER_TYPE_OPTIONS: Array<{ label: string; value?: TemplateType }> = [
   { label: 'Task Assigned', value: 'TASK_ASSIGNED' },
   { label: 'Mention Notification', value: 'MENTION_NOTIFICATION' },
   { label: 'Remote Work Window Opened', value: 'REMOTE_WORK_WINDOW_OPENED' },
+  { label: 'Quote', value: 'QUOTE' },
 ];
 
 export function TemplatesManager() {

@@ -26,6 +26,7 @@ import { GeminiActionsSection } from './GeminiActionsSection';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { MentionInput } from '@/components/shared/MentionInput';
 import { highlightMentions } from '@/lib/utils/mention-highlight';
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 type EntityType =
   | 'customer'
@@ -34,7 +35,8 @@ type EntityType =
   | 'candidate'
   | 'employee'
   | 'contact'
-  | 'task';
+  | 'task'
+  | 'quote';
 
 const AI_ACTIVITY_KEY = 'AI_ACTION';
 
@@ -47,6 +49,7 @@ function buildFilter(entityType: EntityType, entityId: string) {
     employeeId: entityType === 'employee' ? entityId : undefined,
     contactId: entityType === 'contact' ? entityId : undefined,
     taskId: entityType === 'task' ? entityId : undefined,
+    quoteId: entityType === 'quote' ? entityId : undefined,
   };
 }
 
@@ -169,9 +172,18 @@ function ActivityItem({
             </div>
 
             {activity.body && (
-              <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                {highlightMentions(activity.body)}
-              </pre>
+              <div className="rounded-lg border border-border bg-muted/40 px-4 py-3">
+                {isAiActivity ? (
+                  <MarkdownRenderer
+                    content={activity.body}
+                    className="text-sm text-foreground"
+                  />
+                ) : (
+                  <pre className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {highlightMentions(activity.body)}
+                  </pre>
+                )}
+              </div>
             )}
           </>
         ) : null}

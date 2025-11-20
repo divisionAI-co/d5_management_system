@@ -23,6 +23,7 @@ import type {
 } from '@/types/ai-actions';
 import { cn } from '@/lib/utils';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 type ActivityEntityType =
   | 'customer'
@@ -31,7 +32,8 @@ type ActivityEntityType =
   | 'candidate'
   | 'employee'
   | 'contact'
-  | 'task';
+  | 'task'
+  | 'quote';
 
 function toAiEntityType(entityType: ActivityEntityType): AiEntityType {
   return entityType.toUpperCase() as AiEntityType;
@@ -53,7 +55,7 @@ interface AttachModalProps {
 interface AdhocModalProps {
   fields: AiFieldDefinition[];
   onClose: () => void;
-  onSubmit: (payload: { prompt: string; selectedFields: string[]; model?: string; extra?: string }) => void;
+  onSubmit: (payload: { prompt: string; selectedFields: string[]; model?: string; extra?: string; runOnAll?: boolean }) => void;
   isSubmitting: boolean;
   defaultPrompt?: string;
 }
@@ -61,6 +63,14 @@ interface AdhocModalProps {
 interface ExecutionResultModalProps {
   execution: AiActionExecution | null;
   onClose: () => void;
+}
+
+interface ExecuteActionModalProps {
+  actionName: string;
+  entityType: string;
+  onClose: () => void;
+  onExecute: (runOnAll: boolean) => void;
+  isExecuting: boolean;
 }
 
 function AttachActionModal({
@@ -162,6 +172,7 @@ function AdhocPromptModal({
   const [prompt, setPrompt] = useState<string>(defaultPrompt ?? '');
   const [model, setModel] = useState<string>('');
   const [extra, setExtra] = useState<string>('');
+  const [runOnAll, setRunOnAll] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const toggleField = (fieldKey: string) => {
@@ -185,6 +196,7 @@ function AdhocPromptModal({
       selectedFields: selected,
       model: model.trim() || undefined,
       extra: extra.trim() || undefined,
+      runOnAll,
     });
   };
 
@@ -278,6 +290,21 @@ function AdhocPromptModal({
                 className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            <div className="flex items-start gap-2 rounded-lg border border-border bg-background/60 p-3">
+              <input
+                type="checkbox"
+                id="runOnAll"
+                checked={runOnAll}
+                onChange={(e) => setRunOnAll(e.target.checked)}
+                className="mt-1"
+              />
+              <label htmlFor="runOnAll" className="text-xs text-foreground">
+                <span className="block font-semibold">Run on all records</span>
+                <span className="mt-1 block text-muted-foreground">
+                  Execute this prompt across all {fields.length > 0 ? 'records' : 'entities'} of this type instead of just this one.
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -300,6 +327,86 @@ function AdhocPromptModal({
       </div>
     </div>
     </>
+  );
+}
+
+function ExecuteActionModal({ actionName, entityType, onClose, onExecute, isExecuting }: ExecuteActionModalProps) {
+  const [runOnAll, setRunOnAll] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-md rounded-xl border border-border bg-card-elevated shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-blue-500" />
+            <h3 className="text-lg font-semibold text-foreground">Run Action</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{actionName}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Choose how to execute this action</p>
+          </div>
+          <div className="space-y-3">
+            <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 p-4 cursor-pointer transition hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20">
+              <input
+                type="radio"
+                name="executionMode"
+                checked={!runOnAll}
+                onChange={() => setRunOnAll(false)}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">This record only</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Run the action on the current {entityType} record
+                </p>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 p-4 cursor-pointer transition hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20">
+              <input
+                type="radio"
+                name="executionMode"
+                checked={runOnAll}
+                onChange={() => setRunOnAll(true)}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">All records</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Run the action across all {entityType} records
+                </p>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onExecute(runOnAll)}
+            disabled={isExecuting}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isExecuting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Run Action
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -341,9 +448,12 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
               <p className="font-semibold text-muted-foreground">
                 Generated {new Date(execution.createdAt).toLocaleString()}
               </p>
-              <pre className="max-h-[60vh] whitespace-pre-wrap rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground">
-                {outputText || 'Gemini returned an empty response.'}
-              </pre>
+              <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-muted/40 px-4 py-3">
+                <MarkdownRenderer
+                  content={outputText || 'Gemini returned an empty response.'}
+                  className="text-sm text-foreground"
+                />
+              </div>
             </>
           )}
         </div>
@@ -377,6 +487,8 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
 
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [showAdhocModal, setShowAdhocModal] = useState(false);
+  const [showExecuteModal, setShowExecuteModal] = useState(false);
+  const [selectedActionForExecution, setSelectedActionForExecution] = useState<{ actionId: string; actionName: string } | null>(null);
   const [selectedExecution, setSelectedExecution] = useState<AiActionExecution | null>(null);
   const [defaultAdhocPrompt, setDefaultAdhocPrompt] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -450,18 +562,30 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       payload,
     }: {
       actionId: string;
-      payload: { fieldKeys?: string[]; promptOverride?: string; extraInstructions?: string };
-    }) => aiActionsApi.executeSaved(actionId, { entityId, ...payload }),
-    onSuccess: (execution) => {
+      payload: { fieldKeys?: string[]; promptOverride?: string; extraInstructions?: string; runOnAll?: boolean };
+    }) => aiActionsApi.executeSaved(actionId, { 
+      ...(payload.runOnAll ? {} : { entityId }), 
+      fieldKeys: payload.fieldKeys,
+      promptOverride: payload.promptOverride,
+      extraInstructions: payload.extraInstructions,
+    }),
+    onSuccess: (execution, variables) => {
       setError(null);
+      const isBulk = variables.payload.runOnAll;
       toast({
         title: 'Gemini request started',
-        description: 'The response will appear in the activity timeline shortly.',
+        description: isBulk 
+          ? 'Running on all records. The response will appear shortly.'
+          : 'The response will appear in the activity timeline shortly.',
       });
       setSelectedExecution(execution);
-      queryClient.invalidateQueries({ queryKey: ['ai-actions', 'attachments', aiEntityType, entityId] });
-      queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
-      queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      if (!isBulk) {
+        queryClient.invalidateQueries({ queryKey: ['ai-actions', 'attachments', aiEntityType, entityId] });
+        queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
+        queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType] });
+      }
     },
     onError: (err: any) => {
       const message = err?.response?.data?.message ?? 'Gemini request failed.';
@@ -480,30 +604,39 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       selectedFields,
       model,
       extraInstructions,
+      runOnAll,
     }: {
       prompt: string;
       selectedFields: string[];
       model?: string;
       extraInstructions?: string;
+      runOnAll?: boolean;
     }) =>
       aiActionsApi.executeAdhoc({
         entityType: aiEntityType,
-        entityId,
+        ...(runOnAll ? {} : { entityId }),
         prompt,
         fieldKeys: selectedFields,
         model,
         extraInstructions,
       }),
-    onSuccess: (execution) => {
+    onSuccess: (execution, variables) => {
       setError(null);
+      const isBulk = variables.runOnAll;
       toast({
         title: 'Gemini request started',
-        description: 'The response will appear in the activity timeline shortly.',
+        description: isBulk 
+          ? 'Running on all records. The response will appear shortly.'
+          : 'The response will appear in the activity timeline shortly.',
       });
       setShowAdhocModal(false);
       setSelectedExecution(execution);
-      queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
-      queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      if (!isBulk) {
+        queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
+        queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType] });
+      }
     },
     onError: (err: any) => {
       const message = err?.response?.data?.message ?? 'Gemini request failed.';
@@ -613,12 +746,10 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        executeSavedMutation.mutate({
-                          actionId: attachment.actionId,
-                          payload: {},
-                        })
-                      }
+                      onClick={() => {
+                        setSelectedActionForExecution({ actionId: attachment.actionId, actionName: attachment.action.name });
+                        setShowExecuteModal(true);
+                      }}
                       className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
                     >
                       {executeSavedMutation.isPending ? (
@@ -663,16 +794,37 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
             setShowAdhocModal(false);
             setDefaultAdhocPrompt('');
           }}
-          onSubmit={({ prompt, selectedFields, model, extra }) =>
+          onSubmit={({ prompt, selectedFields, model, extra, runOnAll }) =>
             executeAdhocMutation.mutate({
               prompt,
               selectedFields,
               model,
               extraInstructions: extra,
+              runOnAll,
             })
           }
           isSubmitting={executeAdhocMutation.isPending}
           defaultPrompt={defaultAdhocPrompt}
+        />
+      )}
+
+      {showExecuteModal && selectedActionForExecution && (
+        <ExecuteActionModal
+          actionName={selectedActionForExecution.actionName}
+          entityType={entityType}
+          onClose={() => {
+            setShowExecuteModal(false);
+            setSelectedActionForExecution(null);
+          }}
+          onExecute={(runOnAll) => {
+            executeSavedMutation.mutate({
+              actionId: selectedActionForExecution.actionId,
+              payload: { runOnAll },
+            });
+            setShowExecuteModal(false);
+            setSelectedActionForExecution(null);
+          }}
+          isExecuting={executeSavedMutation.isPending}
         />
       )}
 

@@ -65,6 +65,11 @@ export class FilterActivitiesDto {
   @IsOptional()
   taskId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsUUID()
+  @IsOptional()
+  quoteId?: string;
+
   @ApiPropertyOptional({ description: 'Filter by assigned user', format: 'uuid' })
   @IsUUID()
   @IsOptional()

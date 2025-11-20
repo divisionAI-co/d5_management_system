@@ -10,7 +10,8 @@ export type TemplateType =
   | 'LEAVE_REQUEST_REJECTED'
   | 'TASK_ASSIGNED'
   | 'MENTION_NOTIFICATION'
-  | 'REMOTE_WORK_WINDOW_OPENED';
+  | 'REMOTE_WORK_WINDOW_OPENED'
+  | 'QUOTE';
 
 export interface TemplateVariable {
   key: string;
@@ -68,12 +69,14 @@ export type TemplateBlockType =
   | 'divider'
   | 'spacer'
   | 'raw_html'
-  | 'row';
+  | 'row'
+  | 'div';
 
 interface TemplateBlockBase {
   id: string;
   type: TemplateBlockType;
   customStyle?: string; // Custom inline CSS styles for this block
+  stackOnBlockId?: string; // ID of another block to stack on top of (for layering)
 }
 
 export interface TemplateHeadingBlock extends TemplateBlockBase {
@@ -107,6 +110,7 @@ export interface TemplateImageBlock extends TemplateBlockBase {
   width: number;
   align: 'left' | 'center' | 'right';
   fullWidth?: boolean; // If true, image spans full viewport width
+  position?: 'top' | 'bottom' | 'inline'; // Position for all images: top (always top), bottom (always bottom), inline (respect block order)
   overlayText?: string;
   overlayPosition?: 'top' | 'center' | 'bottom';
   overlayTextColor?: string;
@@ -139,6 +143,17 @@ export interface TemplateRowBlock extends TemplateBlockBase {
   gap?: number; // Gap between columns in pixels, defaults to 24
 }
 
+export interface TemplateDivBlock extends TemplateBlockBase {
+  type: 'div';
+  blocks: TemplateBlock[]; // Nested blocks inside the div
+  backgroundColor?: string; // Background color (hex, rgb, etc.)
+  padding?: number; // Padding in pixels, defaults to 24
+  align?: 'left' | 'center' | 'right'; // Content alignment
+  borderRadius?: number; // Border radius in pixels, defaults to 0
+  borderColor?: string; // Border color (hex, rgb, etc.)
+  borderWidth?: number; // Border width in pixels, defaults to 0
+}
+
 export type TemplateBlock =
   | TemplateHeadingBlock
   | TemplateTextBlock
@@ -147,7 +162,8 @@ export type TemplateBlock =
   | TemplateDividerBlock
   | TemplateSpacerBlock
   | TemplateRawHtmlBlock
-  | TemplateRowBlock;
+  | TemplateRowBlock
+  | TemplateDivBlock;
 
 
 

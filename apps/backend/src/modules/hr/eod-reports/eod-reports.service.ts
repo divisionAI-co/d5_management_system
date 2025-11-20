@@ -208,7 +208,13 @@ export class EodReportsService {
   private async sendEodReportEmail(report: any) {
     const tasks = Array.isArray(report.tasksWorkedOn) ? report.tasksWorkedOn : [];
     const totalHours = tasks.reduce((sum: number, task: any) => {
-      return sum + (task.timeSpentOnTicket || 0);
+      // Convert timeSpentOnTicket to number, handling Decimal, string, or number types
+      const timeSpent = task.timeSpentOnTicket != null 
+        ? (typeof task.timeSpentOnTicket === 'object' && 'toNumber' in task.timeSpentOnTicket
+          ? task.timeSpentOnTicket.toNumber()
+          : Number(task.timeSpentOnTicket) || 0)
+        : 0;
+      return sum + timeSpent;
     }, 0);
 
     const reportDate = new Date(report.date).toLocaleDateString();
@@ -229,14 +235,23 @@ export class EodReportsService {
             hoursWorked,
             isLate: report.isLate,
             submittedAt: report.submittedAt,
-            tasks: tasks.map((task: any) => ({
-              clientDetails: task.clientDetails,
-              ticket: task.ticket,
-              typeOfWorkDone: task.typeOfWorkDone,
-              timeSpent: task.timeSpentOnTicket,
-              taskLifecycle: task.taskLifecycle,
-              taskStatus: task.taskStatus,
-            })),
+            tasks: tasks.map((task: any) => {
+              // Convert timeSpentOnTicket to number, handling Decimal, string, or number types
+              const timeSpent = task.timeSpentOnTicket != null 
+                ? (typeof task.timeSpentOnTicket === 'object' && 'toNumber' in task.timeSpentOnTicket
+                  ? task.timeSpentOnTicket.toNumber()
+                  : Number(task.timeSpentOnTicket) || 0)
+                : 0;
+              
+              return {
+                clientDetails: task.clientDetails,
+                ticket: task.ticket,
+                typeOfWorkDone: task.typeOfWorkDone,
+                timeSpent: timeSpent,
+                taskLifecycle: task.taskLifecycle,
+                taskStatus: task.taskStatus,
+              };
+            }),
           },
           user: {
             firstName: report.user.firstName,
@@ -252,13 +267,28 @@ export class EodReportsService {
         `[EodReportsService] Failed to render EOD template, falling back to default HTML:`,
         templateError,
       );
+      // Map tasks for fallback template, converting timeSpentOnTicket to timeSpent
+      const mappedTasks = tasks.map((task: any) => {
+        // Convert timeSpentOnTicket to number, handling Decimal, string, or number types
+        const timeSpent = task.timeSpentOnTicket != null 
+          ? (typeof task.timeSpentOnTicket === 'object' && 'toNumber' in task.timeSpentOnTicket
+            ? task.timeSpentOnTicket.toNumber()
+            : Number(task.timeSpentOnTicket) || 0)
+          : 0;
+        
+        return {
+          ...task,
+          timeSpent: timeSpent,
+        };
+      });
+      
       // Fallback to default HTML template
       html = this.getDefaultEodTemplate({
         userName,
         reportDate,
         hoursWorked,
         summary: report.summary,
-        tasks,
+        tasks: mappedTasks,
         isLate: report.isLate,
       });
       text = this.getDefaultEodText({
@@ -266,7 +296,7 @@ export class EodReportsService {
         reportDate,
         hoursWorked,
         summary: report.summary,
-        tasks,
+        tasks: mappedTasks,
         isLate: report.isLate,
       });
     }

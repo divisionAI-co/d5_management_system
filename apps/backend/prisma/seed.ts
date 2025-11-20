@@ -1253,6 +1253,187 @@ async function main() {
   }
 
   // ============================================
+  // 13. CREATE DEFAULT QUOTE TEMPLATE
+  // ============================================
+  console.log('\n📄 Creating default quote template...');
+
+  await prisma.template.upsert({
+    where: { id: 'default-quote' },
+    update: {},
+    create: {
+      id: 'default-quote',
+      name: 'Default Quote Template',
+      type: 'QUOTE',
+      isDefault: true,
+      isActive: true,
+      htmlContent: `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 3px solid #0066cc;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: #0066cc;
+      margin: 0;
+    }
+    .quote-info {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .section h2 {
+      color: #0066cc;
+      border-bottom: 2px solid #0066cc;
+      padding-bottom: 10px;
+    }
+    .milestone {
+      background-color: #f9f9f9;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-left: 4px solid #0066cc;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #eee;
+      text-align: center;
+      color: #666;
+    }
+    .total-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #0066cc;
+      text-align: right;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>QUOTE</h1>
+    <p><strong>Quote Number:</strong> {{quote.quoteNumber}}</p>
+    <p><strong>Date:</strong> {{formatDate quote.createdAt}}</p>
+  </div>
+
+  <div class="quote-info">
+    <h2>{{quote.title}}</h2>
+    {{#if quote.description}}
+    <p>{{quote.description}}</p>
+    {{/if}}
+  </div>
+
+  {{#if quote.contact}}
+  <div class="section">
+    <h2>Customer Information</h2>
+    <p><strong>Name:</strong> {{quote.contact.firstName}} {{quote.contact.lastName}}</p>
+    {{#if quote.contact.companyName}}
+    <p><strong>Company:</strong> {{quote.contact.companyName}}</p>
+    {{/if}}
+    <p><strong>Email:</strong> {{quote.contact.email}}</p>
+    {{#if quote.contact.phone}}
+    <p><strong>Phone:</strong> {{quote.contact.phone}}</p>
+    {{/if}}
+  </div>
+  {{/if}}
+
+  {{#if quote.overview}}
+  <div class="section">
+    <h2>Overview</h2>
+    <p>{{{quote.overview}}}</p>
+  </div>
+  {{/if}}
+
+  {{#if quote.functionalProposal}}
+  <div class="section">
+    <h2>Functional Proposal</h2>
+    <p>{{{quote.functionalProposal}}}</p>
+  </div>
+  {{/if}}
+
+  {{#if quote.technicalProposal}}
+  <div class="section">
+    <h2>Technical Proposal</h2>
+    <p>{{{quote.technicalProposal}}}</p>
+  </div>
+  {{/if}}
+
+  {{#if quote.teamComposition}}
+  <div class="section">
+    <h2>Team Composition</h2>
+    <p>{{{quote.teamComposition}}}</p>
+  </div>
+  {{/if}}
+
+  {{#if quote.milestones}}
+  <div class="section">
+    <h2>Milestones</h2>
+    <div>{{{quote.milestones}}}</div>
+  </div>
+  {{/if}}
+
+  {{#if quote.paymentTerms}}
+  <div class="section">
+    <h2>Payment Terms</h2>
+    <p>{{{quote.paymentTerms}}}</p>
+  </div>
+  {{/if}}
+
+  {{#if quote.warrantyPeriod}}
+  <div class="section">
+    <h2>Warranty Period</h2>
+    <p>{{quote.warrantyPeriod}}</p>
+  </div>
+  {{/if}}
+
+  {{#if quote.totalValue}}
+  <div class="total-value">
+    Total Value: {{formatCurrency quote.totalValue quote.currency}}
+  </div>
+  {{/if}}
+
+  <div class="footer">
+    <p>Thank you for your consideration.</p>
+    <p>Division 5 Team</p>
+  </div>
+</body>
+</html>`,
+      variables: [
+        { key: 'quote.quoteNumber', description: 'Quote number' },
+        { key: 'quote.title', description: 'Quote title' },
+        { key: 'quote.description', description: 'Quote description' },
+        { key: 'quote.overview', description: 'Overview of the proposal' },
+        { key: 'quote.functionalProposal', description: 'Functional proposal' },
+        { key: 'quote.technicalProposal', description: 'Technical proposal' },
+        { key: 'quote.teamComposition', description: 'Team composition' },
+        { key: 'quote.milestones', description: 'Milestones (formatted text with HTML)' },
+        { key: 'quote.paymentTerms', description: 'Payment terms' },
+        { key: 'quote.warrantyPeriod', description: 'Warranty period' },
+        { key: 'quote.totalValue', description: 'Total quote value' },
+        { key: 'quote.currency', description: 'Currency code' },
+        { key: 'quote.contact', description: 'Contact information' },
+      ],
+    },
+  });
+
+  console.log('  ✅ Default quote template created');
+
+  // ============================================
   // SUMMARY
   // ============================================
   console.log('\n\n🎉 Seeding completed successfully!\n');
@@ -1277,7 +1458,7 @@ async function main() {
   console.log('  • 3 Activities');
   console.log('  • 1 Feedback Report (Draft)');
   console.log('  • 13 Albanian National Holidays (2025)');
-  console.log('  • 10 Default Templates (Invoice, Customer Report, Feedback Report & 7 Email Templates)');
+  console.log('  • 11 Default Templates (Invoice, Customer Report, Feedback Report, Quote & 7 Email Templates)');
   console.log('');
   console.log('⚙️  Company Settings Configured');
   console.log('');

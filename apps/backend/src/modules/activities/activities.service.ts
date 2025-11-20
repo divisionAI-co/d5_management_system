@@ -49,6 +49,7 @@ export class ActivitiesService {
       employee: targets.employeeId ? { connect: { id: targets.employeeId } } : undefined,
       contact: targets.contactId ? { connect: { id: targets.contactId } } : undefined,
       task: targets.taskId ? { connect: { id: targets.taskId } } : undefined,
+      quote: targets.quoteId ? { connect: { id: targets.quoteId } } : undefined,
     };
 
     const activity = await this.prisma.activity.create({
@@ -206,6 +207,11 @@ export class ActivitiesService {
           ? { connect: { id: updateActivityDto.targets.taskId } }
           : { disconnect: true },
       }),
+      ...(updateActivityDto.targets?.quoteId !== undefined && {
+        quote: updateActivityDto.targets.quoteId
+          ? { connect: { id: updateActivityDto.targets.quoteId } }
+          : { disconnect: true },
+      }),
     };
 
     const activity = await this.prisma.activity.update({
@@ -352,6 +358,7 @@ export class ActivitiesService {
       employeeId?: string | null;
       contactId?: string | null;
       taskId?: string | null;
+      quoteId?: string | null;
     },
     allowEmpty = false,
   ) {
@@ -367,13 +374,14 @@ export class ActivitiesService {
       { id: targets.employeeId, label: 'Employee', lookup: 'employee' },
       { id: targets.contactId, label: 'Contact', lookup: 'contact' },
       { id: targets.taskId, label: 'Task', lookup: 'task' },
+      { id: targets.quoteId, label: 'Quote', lookup: 'quote' },
     ];
 
     const provided = targetEntries.filter((entry) => Boolean(entry.id));
 
     if (!allowEmpty && provided.length === 0) {
       throw new BadRequestException(
-        'At least one target (customer, lead, opportunity, candidate, employee, contact, or task) must be specified',
+        'At least one target (customer, lead, opportunity, candidate, employee, contact, task, or quote) must be specified',
       );
     }
 
@@ -416,6 +424,7 @@ export class ActivitiesService {
     if (filters.employeeId) where.employeeId = filters.employeeId;
     if (filters.contactId) where.contactId = filters.contactId;
     if (filters.taskId) where.taskId = filters.taskId;
+    if (filters.quoteId) where.quoteId = filters.quoteId;
     if (filters.assignedToId) where.assignedToId = filters.assignedToId;
     if (filters.isPinned !== undefined) where.isPinned = filters.isPinned;
     if (filters.isCompleted !== undefined) where.isCompleted = filters.isCompleted;

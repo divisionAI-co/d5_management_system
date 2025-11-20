@@ -3,9 +3,13 @@ import { AiEntityType } from '@prisma/client';
 import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class ExecuteAiActionDto {
-  @ApiProperty({ description: 'Entity instance to execute the action against', format: 'uuid' })
+  @ApiPropertyOptional({
+    description: 'Entity instance to execute the action against. Omit to run on all records of the entity type.',
+    format: 'uuid',
+  })
   @IsUUID()
-  entityId!: string;
+  @IsOptional()
+  entityId?: string;
 
   @ApiPropertyOptional({
     description: 'Override the stored prompt template with a custom prompt for this execution',
@@ -38,9 +42,13 @@ export class ExecuteAdhocAiActionDto {
   @IsEnum(AiEntityType)
   entityType!: AiEntityType;
 
-  @ApiProperty({ description: 'Entity identifier the ad-hoc prompt should use', format: 'uuid' })
+  @ApiPropertyOptional({
+    description: 'Entity identifier the ad-hoc prompt should use. Omit to run on all records of the entity type.',
+    format: 'uuid',
+  })
   @IsUUID()
-  entityId!: string;
+  @IsOptional()
+  entityId?: string;
 
   @ApiProperty({ description: 'Prompt to execute', type: String })
   @IsString()

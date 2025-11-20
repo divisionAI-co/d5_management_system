@@ -12,6 +12,7 @@ import type {
   OpenPosition,
   UpdatePositionDto,
 } from '@/types/recruitment';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 
 interface CreatePositionModalProps {
   onClose: () => void;
@@ -258,22 +259,22 @@ export function CreatePositionModal({
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Description
               </label>
-              <textarea
-                rows={4}
-                {...register('description')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              <RichTextEditor
+                value={watch('description') || ''}
+                onChange={(html) => setValue('description', html)}
                 placeholder="Overview of responsibilities and context."
+                minHeight="200px"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Requirements
               </label>
-              <textarea
-                rows={4}
-                {...register('requirements')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              <RichTextEditor
+                value={watch('requirements') || ''}
+                onChange={(html) => setValue('requirements', html)}
                 placeholder="Key skills, location/timezone expectations, availability, etc."
+                minHeight="200px"
               />
             </div>
             </div>

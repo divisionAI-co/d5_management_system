@@ -14,7 +14,7 @@ import type {
 } from '@/types/ai-actions';
 
 export interface ExecuteSavedActionPayload {
-  entityId: string;
+  entityId?: string; // Optional: omit to run on all records
   fieldKeys?: string[];
   promptOverride?: string;
   extraInstructions?: string;
@@ -22,7 +22,7 @@ export interface ExecuteSavedActionPayload {
 
 export interface ExecuteAdhocActionPayload {
   entityType: AiEntityType;
-  entityId: string;
+  entityId?: string; // Optional: omit to run on all records
   prompt: string;
   fieldKeys: string[];
   model?: string;

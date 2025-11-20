@@ -94,9 +94,37 @@ export class SystemExportController {
     }
 
     try {
-      // Parse JSON file
-      const fileContent = file.buffer.toString('utf-8');
-      const exportData = JSON.parse(fileContent);
+      // Parse JSON file with better error handling
+      let fileContent: string;
+      let exportData: any;
+
+      try {
+        fileContent = file.buffer.toString('utf-8');
+      } catch (error: any) {
+        throw new BadRequestException(`Failed to read file: ${error.message}`);
+      }
+
+      try {
+        exportData = JSON.parse(fileContent);
+      } catch (error: any) {
+        if (error instanceof SyntaxError) {
+          throw new BadRequestException(
+            `Invalid JSON file format: ${error.message}. Please ensure the file is valid JSON.`,
+          );
+        }
+        throw new BadRequestException(`Failed to parse JSON: ${error.message}`);
+      }
+
+      // Validate export data structure
+      if (!exportData || typeof exportData !== 'object') {
+        throw new BadRequestException('Invalid export data: file must contain a JSON object');
+      }
+
+      if (!exportData.data || typeof exportData.data !== 'object') {
+        throw new BadRequestException(
+          'Invalid export data: missing or invalid "data" property',
+        );
+      }
 
       // Get clearExisting option from form data (if provided)
       // Note: FileInterceptor doesn't parse form fields, so we'll need to handle this differently
@@ -115,8 +143,8 @@ export class SystemExportController {
         errors: result.errors,
       });
     } catch (error: any) {
-      if (error instanceof SyntaxError) {
-        throw new BadRequestException('Invalid JSON file format');
+      if (error instanceof BadRequestException) {
+        throw error;
       }
       throw new BadRequestException(`Failed to import system data: ${error.message}`);
     }
@@ -156,9 +184,37 @@ export class SystemExportController {
     }
 
     try {
-      // Parse JSON file
-      const fileContent = file.buffer.toString('utf-8');
-      const exportData = JSON.parse(fileContent);
+      // Parse JSON file with better error handling
+      let fileContent: string;
+      let exportData: any;
+
+      try {
+        fileContent = file.buffer.toString('utf-8');
+      } catch (error: any) {
+        throw new BadRequestException(`Failed to read file: ${error.message}`);
+      }
+
+      try {
+        exportData = JSON.parse(fileContent);
+      } catch (error: any) {
+        if (error instanceof SyntaxError) {
+          throw new BadRequestException(
+            `Invalid JSON file format: ${error.message}. Please ensure the file is valid JSON.`,
+          );
+        }
+        throw new BadRequestException(`Failed to parse JSON: ${error.message}`);
+      }
+
+      // Validate export data structure
+      if (!exportData || typeof exportData !== 'object') {
+        throw new BadRequestException('Invalid export data: file must contain a JSON object');
+      }
+
+      if (!exportData.data || typeof exportData.data !== 'object') {
+        throw new BadRequestException(
+          'Invalid export data: missing or invalid "data" property',
+        );
+      }
 
       // Import with clearExisting = true
       const result = await this.systemExportService.importSystemData(exportData, {
@@ -172,8 +228,8 @@ export class SystemExportController {
         errors: result.errors,
       });
     } catch (error: any) {
-      if (error instanceof SyntaxError) {
-        throw new BadRequestException('Invalid JSON file format');
+      if (error instanceof BadRequestException) {
+        throw error;
       }
       throw new BadRequestException(`Failed to import system data: ${error.message}`);
     }

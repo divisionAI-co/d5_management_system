@@ -273,40 +273,34 @@ export class SystemExportService {
         throw new BadRequestException('Invalid export data format');
       }
 
-      // Use a transaction for the entire import
-      await this.prisma.$transaction(
-        async (tx) => {
-          // If clearExisting is true, delete all data first
-          if (options?.clearExisting) {
-            this.logger.log('Clearing existing data...');
-            await this.clearAllData(tx);
-          }
+      // If clearExisting is true, delete all data first in a separate transaction
+      if (options?.clearExisting) {
+        this.logger.log('Clearing existing data...');
+        await this.prisma.$transaction(async (tx) => {
+          await this.clearAllData(tx);
+        });
+      }
 
-          // Import in same order as export (dependencies first, then dependents)
-          const importOrder = [...this.exportOrder];
+      // Import in same order as export (dependencies first, then dependents)
+      // Process each model separately so one failure doesn't abort everything
+      const importOrder = [...this.exportOrder];
 
-          for (const modelName of importOrder) {
-            if (!exportData.data[modelName] || exportData.data[modelName].length === 0) {
-              continue;
-            }
+      for (const modelName of importOrder) {
+        if (!exportData.data[modelName] || exportData.data[modelName].length === 0) {
+          continue;
+        }
 
-            try {
-              const count = await this.importModel(tx, modelName, exportData.data[modelName]);
-              imported += count;
-              this.logger.log(`Imported ${count} records into ${modelName}`);
-            } catch (error: any) {
-              const errorMsg = `Error importing ${modelName}: ${error.message}`;
-              this.logger.error(errorMsg, error);
-              errors.push(errorMsg);
-              // Continue with other models
-            }
-          }
-        },
-        {
-          maxWait: 60000, // 60 seconds
-          timeout: 300000, // 5 minutes
-        },
-      );
+        try {
+          const count = await this.importModel(modelName, exportData.data[modelName]);
+          imported += count;
+          this.logger.log(`Imported ${count} records into ${modelName}`);
+        } catch (error: any) {
+          const errorMsg = `Error importing ${modelName}: ${error.message}`;
+          this.logger.error(errorMsg, error);
+          errors.push(errorMsg);
+          // Continue with other models
+        }
+      }
 
       this.logger.log(`System import completed. Imported: ${imported}, Errors: ${errors.length}`);
 
@@ -323,31 +317,76 @@ export class SystemExportService {
 
   /**
    * Import a single model
+   * Processes each record in its own transaction to allow individual failures
    */
-  private async importModel(tx: any, modelName: string, records: any[]): Promise<number> {
-    const prismaModel = this.getPrismaModelFromTx(tx, modelName);
+  private async importModel(modelName: string, records: any[]): Promise<number> {
+    const prismaModel = this.getPrismaModel(modelName);
     if (!prismaModel) {
       return 0;
     }
 
     let imported = 0;
 
+    // Process each record in its own transaction
+    // This ensures that one record failure doesn't abort the entire model import
     for (const record of records) {
       try {
-        // Remove relations that might be included in the export
-        const cleanRecord = this.cleanRecordForImport(record);
+        await this.prisma.$transaction(
+          async (tx) => {
+            const txPrismaModel = this.getPrismaModelFromTx(tx, modelName);
+            if (!txPrismaModel) {
+              throw new Error(`Model ${modelName} not found in transaction client`);
+            }
 
-        // Use upsert to handle existing records
-        await prismaModel.upsert({
-          where: { id: record.id },
-          create: cleanRecord,
-          update: cleanRecord,
-        });
+            // Validate record has required id field
+            if (!record.id || typeof record.id !== 'string') {
+              throw new Error(`Record missing required 'id' field or invalid id type`);
+            }
+
+            // Remove relations that might be included in the export
+            const cleanRecord = this.cleanRecordForImport(record);
+
+            // Remove any relation objects (keep only scalar fields and foreign key IDs)
+            // Prisma exports shouldn't include relations, but we'll be defensive
+            const finalRecord = this.removeRelationFields(cleanRecord);
+
+            // Use upsert to handle existing records
+            await txPrismaModel.upsert({
+              where: { id: record.id },
+              create: finalRecord,
+              update: finalRecord,
+            });
+          },
+          {
+            timeout: 10000, // 10 seconds per record
+          },
+        );
 
         imported++;
       } catch (error: any) {
-        this.logger.warn(`Failed to import record ${record.id} in ${modelName}: ${error.message}`);
-        // Continue with next record
+        // Log detailed error information
+        const errorDetails = {
+          model: modelName,
+          recordId: record.id,
+          errorCode: error?.code,
+          errorMessage: error?.message,
+          meta: error?.meta,
+        };
+        
+        this.logger.warn(
+          `Failed to import record ${record.id} in ${modelName}: ${error.message}`,
+          JSON.stringify(errorDetails, null, 2),
+        );
+        
+        // Check if it's a transaction abort error (shouldn't happen with individual transactions)
+        if (error?.code === '25P02' || error?.message?.includes('current transaction is aborted')) {
+          this.logger.error(`Transaction aborted for record ${record.id} in ${modelName}. This shouldn't happen with individual transactions.`);
+        }
+        
+        // Check for Prisma-specific errors
+        if (error?.code && error.code.startsWith('P')) {
+          this.logger.error(`Prisma error ${error.code} for record ${record.id} in ${modelName}:`, error.meta);
+        }
       }
     }
 
@@ -416,6 +455,22 @@ export class SystemExportService {
    * Note: Prisma exports don't include relations by default, so we only need to handle type conversions
    */
   private cleanRecordForImport(record: any): any {
+    // Handle null/undefined
+    if (record === null || record === undefined) {
+      return record;
+    }
+
+    // Handle arrays - recursively clean each element
+    if (Array.isArray(record)) {
+      return record.map((item) => this.cleanRecordForImport(item));
+    }
+
+    // Handle primitive types
+    if (typeof record !== 'object') {
+      return record;
+    }
+
+    // Handle objects - recursively clean each property
     const cleaned: any = {};
 
     for (const [key, value] of Object.entries(record)) {
@@ -425,40 +480,36 @@ export class SystemExportService {
         continue;
       }
 
+      // Handle empty objects for date fields - convert to null
+      // Empty objects often occur when date fields are null/undefined in exports
+      if (
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Object.keys(value).length === 0 &&
+        this.isDateField(key)
+      ) {
+        cleaned[key] = null;
+        continue;
+      }
+
       // Convert date strings back to Date objects
       if (typeof value === 'string' && this.isDateString(value)) {
         cleaned[key] = new Date(value);
       } 
-      // Convert decimal strings back to Prisma.Decimal for known decimal fields
+      // Convert decimal values (numbers or strings) back to Prisma.Decimal for known decimal fields
+      // Note: Export converts Prisma.Decimal to numbers, so we need to handle both numbers and strings
       else if (
-        typeof value === 'string' && 
-        this.isDecimalString(value) && 
-        (key.includes('Amount') || 
-         key.includes('Value') || 
-         key.includes('Salary') || 
-         key.includes('Price') || 
-         key.includes('Rate') || 
-         key.includes('Total') || 
-         key.includes('Subtotal') || 
-         key.includes('Tax') || 
-         key.includes('Hours') || 
-         key.includes('Rating') ||
-         key === 'monthlyValue' ||
-         key === 'expectedSalary' ||
-         key === 'salary' ||
-         key === 'subtotal' ||
-         key === 'taxAmount' ||
-         key === 'taxRate' ||
-         key === 'total' ||
-         key === 'value' ||
-         key === 'hoursWorked' ||
-         key === 'estimatedHours' ||
-         key === 'actualHours' ||
-         key === 'overallRating')
+        this.isDecimalField(key) &&
+        ((typeof value === 'number') || 
+         (typeof value === 'string' && this.isDecimalString(value)))
       ) {
         cleaned[key] = new Prisma.Decimal(value);
       } 
-      // Keep arrays and other types as-is
+      // Recursively handle nested objects and arrays
+      else if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+        cleaned[key] = this.cleanRecordForImport(value);
+      }
+      // Keep other primitive types as-is
       else {
         cleaned[key] = value;
       }
@@ -479,6 +530,97 @@ export class SystemExportService {
    */
   private isDecimalString(str: string): boolean {
     return /^-?\d+\.?\d*$/.test(str);
+  }
+
+  /**
+   * Check if a field name indicates it should be a DateTime type
+   */
+  private isDateField(key: string): boolean {
+    return (
+      key.endsWith('At') || // createdAt, updatedAt, startedAt, completedAt, etc.
+      key.endsWith('Date') || // startDate, endDate, etc.
+      key === 'date' ||
+      key === 'reminderAt' ||
+      key === 'activityDate' ||
+      key === 'expectedCloseDate' ||
+      key === 'actualCloseDate' ||
+      key === 'lastGeneratedDate'
+    );
+  }
+
+  /**
+   * Check if a field name indicates it should be a Decimal type
+   */
+  private isDecimalField(key: string): boolean {
+    return (
+      key.includes('Amount') || 
+      key.includes('Value') || 
+      key.includes('Salary') || 
+      key.includes('Price') || 
+      key.includes('Rate') || 
+      key.includes('Total') || 
+      key.includes('Subtotal') || 
+      key.includes('Tax') || 
+      key.includes('Hours') || 
+      key.includes('Rating') ||
+      key === 'monthlyValue' ||
+      key === 'expectedSalary' ||
+      key === 'salary' ||
+      key === 'subtotal' ||
+      key === 'taxAmount' ||
+      key === 'taxRate' ||
+      key === 'total' ||
+      key === 'value' ||
+      key === 'hoursWorked' ||
+      key === 'estimatedHours' ||
+      key === 'actualHours' ||
+      key === 'overallRating'
+    );
+  }
+
+  /**
+   * Remove relation fields from record (keep only scalar fields and foreign key IDs)
+   * This is a safety measure in case the export includes relation objects
+   */
+  private removeRelationFields(record: any): any {
+    if (record === null || record === undefined) {
+      return record;
+    }
+
+    if (Array.isArray(record)) {
+      return record.map((item) => this.removeRelationFields(item));
+    }
+
+    if (typeof record !== 'object') {
+      return record;
+    }
+
+    const cleaned: any = {};
+
+    for (const [key, value] of Object.entries(record)) {
+      // Skip relation objects (objects with 'id' and other relation-like properties)
+      // Keep scalar values, arrays of scalars, and foreign key IDs (strings)
+      if (
+        value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        !(value instanceof Date) &&
+        !(value instanceof Prisma.Decimal)
+      ) {
+        // This looks like a relation object - skip it
+        // Foreign keys should be stored as simple string IDs, not objects
+        continue;
+      }
+
+      // Recursively clean nested structures
+      if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+        cleaned[key] = this.removeRelationFields(value);
+      } else {
+        cleaned[key] = value;
+      }
+    }
+
+    return cleaned;
   }
 
   /**

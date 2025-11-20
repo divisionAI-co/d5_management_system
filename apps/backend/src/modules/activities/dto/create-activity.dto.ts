@@ -52,6 +52,11 @@ class ActivityTargetDto {
   @IsUUID()
   @IsOptional()
   taskId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Quote ID to attach the activity to' })
+  @IsUUID()
+  @IsOptional()
+  quoteId?: string;
 }
 
 @ValidatorConstraint({ name: 'atLeastOneActivityTarget', async: false })
@@ -62,7 +67,7 @@ export class AtLeastOneTargetConstraint implements ValidatorConstraintInterface 
   }
 
   defaultMessage() {
-    return 'At least one target (customerId, leadId, opportunityId, candidateId, employeeId, contactId, taskId) must be provided';
+    return 'At least one target (customerId, leadId, opportunityId, candidateId, employeeId, contactId, taskId, quoteId) must be provided';
   }
 }
 
