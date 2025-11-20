@@ -6,8 +6,6 @@ import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { Plus, Edit, Trash2, Download, FileText, X, Eye, Send } from 'lucide-react';
 import type {
   SalesPerformanceReport,
-  CreateSalesPerformanceReportDto,
-  UpdateSalesPerformanceReportDto,
 } from '@/types/sales-performance-reports';
 import { format } from 'date-fns';
 import { SalesPerformanceReportForm } from '@/components/crm/sales-performance-reports/SalesPerformanceReportForm';
@@ -304,7 +302,7 @@ export default function SalesPerformanceReportsPage() {
         <FeedbackToast
           message={feedback.message}
           tone={feedback.tone}
-          onClose={() => setFeedback(null)}
+          onDismiss={() => setFeedback(null)}
         />
       )}
 
@@ -319,7 +317,7 @@ export default function SalesPerformanceReportsPage() {
         <SalesPerformanceReportSendDialog
           report={sendReport}
           onClose={() => setSendReport(null)}
-          onSent={(updated) => {
+          onSent={() => {
             setSendReport(null);
             setFeedback({
               message: 'Report sent successfully',

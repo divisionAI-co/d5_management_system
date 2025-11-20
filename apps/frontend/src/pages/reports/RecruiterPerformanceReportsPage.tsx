@@ -8,8 +8,6 @@ import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { Plus, Edit, Trash2, Download, FileText, X, Eye } from 'lucide-react';
 import type {
   RecruiterPerformanceReport,
-  CreateRecruiterPerformanceReportDto,
-  UpdateRecruiterPerformanceReportDto,
 } from '@/types/recruiter-performance-reports';
 import { format } from 'date-fns';
 import { RecruiterPerformanceReportForm } from '@/components/hr/recruiter-performance-reports/RecruiterPerformanceReportForm';

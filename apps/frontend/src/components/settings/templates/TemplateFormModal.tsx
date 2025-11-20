@@ -322,6 +322,125 @@ const DATA_CONTEXT_HELP: Record<
     ],
     note: 'Use triple braces ({{{...}}}) to render HTML content for formatted fields like overview, proposals, milestones, etc.',
   },
+  RECRUITER_PERFORMANCE_REPORT_INTERNAL: {
+    heading: 'Recruiter Performance Report (Internal) data context',
+    description:
+      'Internal recruiter performance reports include detailed metrics, efficiency ratios, wins, challenges, priorities, top performing sources, and pipeline status. Internal reports also include position descriptions.',
+    groups: [
+      {
+        title: 'Basic Information',
+        items: [
+          '{{recruiterName}}',
+          '{{positionTitle}}',
+          '{{weekEnding}}',
+          '{{weekEndingFull}}',
+          '{{positionDescription}}',
+        ],
+      },
+      {
+        title: 'Performance Metrics',
+        items: [
+          '{{candidatesContactedActual}}',
+          '{{candidatesContactedTarget}}',
+          '{{culturalCallsActual}}',
+          '{{culturalCallsTarget}}',
+          '{{culturalCallsEfficiencyRatio}}',
+          '{{technicalCallsActual}}',
+          '{{technicalCallsTarget}}',
+          '{{technicalCallsEfficiencyRatio}}',
+          '{{clientInterviewsScheduledActual}}',
+          '{{clientInterviewsScheduledTarget}}',
+          '{{submissionToInterviewRatio}}',
+          '{{placementsThisWeek}}',
+        ],
+      },
+      {
+        title: 'Wins (array - use {{#each wins}} ... {{/each}})',
+        items: ['{{this.description}}'],
+      },
+      {
+        title: 'Challenges (array - use {{#each challenges}} ... {{/each}})',
+        items: ['{{this.description}}'],
+      },
+      {
+        title: 'Priorities (array - use {{#each priorities}} ... {{/each}})',
+        items: ['{{this.description}}'],
+      },
+      {
+        title: 'Top Performing Sources (array - use {{#each topPerformingSources}} ... {{/each}})',
+        items: ['{{this.source}}', '{{this.count}}'],
+      },
+      {
+        title: 'Pipeline Status',
+        items: [
+          '{{pipelineStatus.role}}',
+          '{{pipelineStatus.pipeline}}',
+          '{{pipelineStatus.confidenceLevel}}',
+          '{{pipelineStatus.notes}}',
+        ],
+      },
+    ],
+    note: 'Internal reports include additional details like position descriptions. Use {{isInternal}} to conditionally show internal-only content.',
+  },
+  RECRUITER_PERFORMANCE_REPORT_CUSTOMER: {
+    heading: 'Recruiter Performance Report (Customer) data context',
+    description:
+      'Customer-facing recruiter performance reports include key metrics, wins, and pipeline status. Customer reports exclude internal details like position descriptions.',
+    groups: [
+      {
+        title: 'Basic Information',
+        items: [
+          '{{recruiterName}}',
+          '{{positionTitle}}',
+          '{{weekEnding}}',
+          '{{weekEndingFull}}',
+        ],
+      },
+      {
+        title: 'Performance Metrics',
+        items: [
+          '{{candidatesContactedActual}}',
+          '{{candidatesContactedTarget}}',
+          '{{culturalCallsActual}}',
+          '{{culturalCallsTarget}}',
+          '{{culturalCallsEfficiencyRatio}}',
+          '{{technicalCallsActual}}',
+          '{{technicalCallsTarget}}',
+          '{{technicalCallsEfficiencyRatio}}',
+          '{{clientInterviewsScheduledActual}}',
+          '{{clientInterviewsScheduledTarget}}',
+          '{{submissionToInterviewRatio}}',
+          '{{placementsThisWeek}}',
+        ],
+      },
+      {
+        title: 'Wins (array - use {{#each wins}} ... {{/each}})',
+        items: ['{{this.description}}'],
+      },
+      {
+        title: 'Challenges (array - use {{#each challenges}} ... {{/each}})',
+        items: ['{{this.description}}'],
+      },
+      {
+        title: 'Priorities (array - use {{#each priorities}} ... {{/each}})',
+        items: ['{{this.description}}'],
+      },
+      {
+        title: 'Top Performing Sources (array - use {{#each topPerformingSources}} ... {{/each}})',
+        items: ['{{this.source}}', '{{this.count}}'],
+      },
+      {
+        title: 'Pipeline Status',
+        items: [
+          '{{pipelineStatus.role}}',
+          '{{pipelineStatus.pipeline}}',
+          '{{pipelineStatus.confidenceLevel}}',
+          '{{pipelineStatus.notes}}',
+        ],
+      },
+    ],
+    note: 'Customer reports exclude internal details. Use {{isInternal}} to conditionally show content (will be false for customer reports).',
+  },
 };
 
 const generateId = () => {

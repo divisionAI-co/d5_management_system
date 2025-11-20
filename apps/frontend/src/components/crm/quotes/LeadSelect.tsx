@@ -9,10 +9,9 @@ interface LeadSelectProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   error?: string;
-  required?: boolean;
 }
 
-export function LeadSelect({ value, onChange, disabled, error, required }: LeadSelectProps) {
+export function LeadSelect({ value, onChange, disabled, error }: LeadSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -156,9 +155,6 @@ export function LeadSelect({ value, onChange, disabled, error, required }: LeadS
                 const contactName = lead.contacts && lead.contacts.length > 0
                   ? `${lead.contacts[0].firstName} ${lead.contacts[0].lastName}`
                   : '';
-                const displayText = contactName 
-                  ? `${lead.title} - ${contactName}`
-                  : lead.title;
                 
                 return (
                   <li key={lead.id}>

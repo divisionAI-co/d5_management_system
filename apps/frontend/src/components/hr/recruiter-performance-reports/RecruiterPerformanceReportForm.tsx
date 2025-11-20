@@ -12,7 +12,6 @@ import type {
   Challenge,
   Priority,
   TopPerformingSource,
-  PipelineStatus,
 } from '@/types/recruiter-performance-reports';
 import { Plus, X, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';

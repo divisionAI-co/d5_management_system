@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { quotesApi, leadsApi, opportunitiesApi } from '@/lib/api/crm';
+import { quotesApi, opportunitiesApi } from '@/lib/api/crm';
 import { templatesApi } from '@/lib/api/templates';
 import type { CreateQuotePayload, Quote, QuoteStatus } from '@/types/crm';
 import { X } from 'lucide-react';
@@ -231,7 +231,6 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
                     onChange={field.onChange}
                     disabled={isEdit}
                     error={errors.leadId?.message}
-                    required
                   />
                 )}
               />
