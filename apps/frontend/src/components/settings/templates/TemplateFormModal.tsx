@@ -112,6 +112,16 @@ const TEMPLATE_TYPE_OPTIONS: Array<{ value: TemplateType; label: string; descrip
     label: 'Quote',
     description: 'HTML template used when generating quote PDFs or sending quote emails to customers.',
   },
+  {
+    value: 'RECRUITER_PERFORMANCE_REPORT_INTERNAL',
+    label: 'Recruiter Performance Report (Internal)',
+    description: 'Internal template for weekly recruiter performance reports with detailed metrics.',
+  },
+  {
+    value: 'RECRUITER_PERFORMANCE_REPORT_CUSTOMER',
+    label: 'Recruiter Performance Report (Customer)',
+    description: 'Customer-facing template for weekly recruiter performance reports.',
+  },
 ];
 
 const INPUT_BASE_CLASS =

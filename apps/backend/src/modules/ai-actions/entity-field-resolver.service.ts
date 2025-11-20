@@ -193,6 +193,48 @@ type QuoteSnapshot = {
   } | null;
 };
 
+type RecruiterPerformanceReportSnapshot = {
+  positionTitle: string;
+  weekEnding: Date;
+  recruiterName: string | null;
+  recruiterEmail: string | null;
+  candidatesContactedActual: number;
+  candidatesContactedTarget: number;
+  culturalCallsActual: number;
+  culturalCallsTarget: number;
+  culturalCallsEfficiencyRatio?: Prisma.Decimal | null;
+  technicalCallsActual: number;
+  technicalCallsTarget: number;
+  technicalCallsEfficiencyRatio?: Prisma.Decimal | null;
+  clientInterviewsScheduledActual: number;
+  clientInterviewsScheduledTarget: number;
+  submissionToInterviewRatio?: Prisma.Decimal | null;
+  placementsThisWeek: number;
+  wins?: Prisma.JsonValue | null;
+  challenges?: Prisma.JsonValue | null;
+  priorities?: Prisma.JsonValue | null;
+  topPerformingSources?: Prisma.JsonValue | null;
+  pipelineStatus?: Prisma.JsonValue | null;
+};
+
+type SalesPerformanceReportSnapshot = {
+  weekEnding: Date;
+  salespersonName: string | null;
+  salespersonEmail: string | null;
+  linkedinConnectionRequests: number;
+  linkedinAccepted: number;
+  linkedinAcceptedPercentage?: Prisma.Decimal | null;
+  linkedinMeetingsScheduled: number;
+  linkedinMeetingsScheduledPercentage?: Prisma.Decimal | null;
+  linkedinAccountsCount: number;
+  linkedinMarketsTargeted?: string | null;
+  inmailSent: number;
+  inmailReplies: number;
+  inmailRepliesPercentage?: Prisma.Decimal | null;
+  inmailMeetingsScheduled: number;
+  inmailMeetingsScheduledPercentage?: Prisma.Decimal | null;
+};
+
 type EntitySnapshot =
   | CandidateSnapshot
   | OpportunitySnapshot
@@ -201,7 +243,11 @@ type EntitySnapshot =
   | ContactSnapshot
   | LeadSnapshot
   | TaskSnapshot
-  | QuoteSnapshot;
+  | QuoteSnapshot
+  | RecruiterPerformanceReportSnapshot
+  | SalesPerformanceReportSnapshot
+  | RecruiterPerformanceReportSnapshot
+  | SalesPerformanceReportSnapshot;
 
 @Injectable()
 export class EntityFieldResolver {
@@ -797,6 +843,197 @@ export class EntityFieldResolver {
     },
   ];
 
+  private readonly recruiterPerformanceReportFields: FieldSelector<RecruiterPerformanceReportSnapshot>[] = [
+    {
+      key: 'positionTitle',
+      label: 'Position title',
+      select: (report) => report.positionTitle,
+    },
+    {
+      key: 'weekEnding',
+      label: 'Week ending',
+      select: (report) => report.weekEnding.toISOString().split('T')[0],
+    },
+    {
+      key: 'recruiterName',
+      label: 'Recruiter name',
+      select: (report) => report.recruiterName,
+    },
+    {
+      key: 'recruiterEmail',
+      label: 'Recruiter email',
+      select: (report) => report.recruiterEmail,
+    },
+    {
+      key: 'candidatesContactedActual',
+      label: 'Candidates contacted (actual)',
+      select: (report) => report.candidatesContactedActual,
+    },
+    {
+      key: 'candidatesContactedTarget',
+      label: 'Candidates contacted (target)',
+      select: (report) => report.candidatesContactedTarget,
+    },
+    {
+      key: 'culturalCallsActual',
+      label: 'Cultural calls (actual)',
+      select: (report) => report.culturalCallsActual,
+    },
+    {
+      key: 'culturalCallsTarget',
+      label: 'Cultural calls (target)',
+      select: (report) => report.culturalCallsTarget,
+    },
+    {
+      key: 'culturalCallsEfficiencyRatio',
+      label: 'Cultural calls efficiency ratio',
+      select: (report) => (report.culturalCallsEfficiencyRatio ? report.culturalCallsEfficiencyRatio.toString() : null),
+    },
+    {
+      key: 'technicalCallsActual',
+      label: 'Technical calls (actual)',
+      select: (report) => report.technicalCallsActual,
+    },
+    {
+      key: 'technicalCallsTarget',
+      label: 'Technical calls (target)',
+      select: (report) => report.technicalCallsTarget,
+    },
+    {
+      key: 'technicalCallsEfficiencyRatio',
+      label: 'Technical calls efficiency ratio',
+      select: (report) => (report.technicalCallsEfficiencyRatio ? report.technicalCallsEfficiencyRatio.toString() : null),
+    },
+    {
+      key: 'clientInterviewsScheduledActual',
+      label: 'Client interviews scheduled (actual)',
+      select: (report) => report.clientInterviewsScheduledActual,
+    },
+    {
+      key: 'clientInterviewsScheduledTarget',
+      label: 'Client interviews scheduled (target)',
+      select: (report) => report.clientInterviewsScheduledTarget,
+    },
+    {
+      key: 'submissionToInterviewRatio',
+      label: 'Submission to interview ratio',
+      select: (report) => (report.submissionToInterviewRatio ? report.submissionToInterviewRatio.toString() : null),
+    },
+    {
+      key: 'placementsThisWeek',
+      label: 'Placements this week',
+      select: (report) => report.placementsThisWeek,
+    },
+    {
+      key: 'wins',
+      label: 'Key wins & accomplishments',
+      description: 'JSON array of wins',
+      select: (report) => (report.wins ? JSON.stringify(report.wins) : null),
+    },
+    {
+      key: 'challenges',
+      label: 'Challenges & proposed solutions',
+      description: 'JSON array of challenges',
+      select: (report) => (report.challenges ? JSON.stringify(report.challenges) : null),
+    },
+    {
+      key: 'priorities',
+      label: 'S.M.A.R.T. priorities for next week',
+      description: 'JSON array of priorities',
+      select: (report) => (report.priorities ? JSON.stringify(report.priorities) : null),
+    },
+    {
+      key: 'topPerformingSources',
+      label: 'Top performing sources',
+      description: 'JSON array of sources',
+      select: (report) => (report.topPerformingSources ? JSON.stringify(report.topPerformingSources) : null),
+    },
+    {
+      key: 'pipelineStatus',
+      label: 'Key role pipeline status',
+      description: 'JSON object with pipeline status',
+      select: (report) => (report.pipelineStatus ? JSON.stringify(report.pipelineStatus) : null),
+    },
+  ];
+
+  private readonly salesPerformanceReportFields: FieldSelector<SalesPerformanceReportSnapshot>[] = [
+    {
+      key: 'weekEnding',
+      label: 'Week ending',
+      select: (report) => report.weekEnding.toISOString().split('T')[0],
+    },
+    {
+      key: 'salespersonName',
+      label: 'Salesperson name',
+      select: (report) => report.salespersonName,
+    },
+    {
+      key: 'salespersonEmail',
+      label: 'Salesperson email',
+      select: (report) => report.salespersonEmail,
+    },
+    {
+      key: 'linkedinConnectionRequests',
+      label: 'LinkedIn connection requests',
+      select: (report) => report.linkedinConnectionRequests,
+    },
+    {
+      key: 'linkedinAccepted',
+      label: 'LinkedIn accepted',
+      select: (report) => report.linkedinAccepted,
+    },
+    {
+      key: 'linkedinAcceptedPercentage',
+      label: 'LinkedIn accepted percentage',
+      select: (report) => (report.linkedinAcceptedPercentage ? report.linkedinAcceptedPercentage.toString() : null),
+    },
+    {
+      key: 'linkedinMeetingsScheduled',
+      label: 'LinkedIn meetings scheduled',
+      select: (report) => report.linkedinMeetingsScheduled,
+    },
+    {
+      key: 'linkedinMeetingsScheduledPercentage',
+      label: 'LinkedIn meetings scheduled percentage',
+      select: (report) => (report.linkedinMeetingsScheduledPercentage ? report.linkedinMeetingsScheduledPercentage.toString() : null),
+    },
+    {
+      key: 'linkedinAccountsCount',
+      label: 'LinkedIn accounts count',
+      select: (report) => report.linkedinAccountsCount,
+    },
+    {
+      key: 'linkedinMarketsTargeted',
+      label: 'LinkedIn markets targeted',
+      select: (report) => report.linkedinMarketsTargeted,
+    },
+    {
+      key: 'inmailSent',
+      label: 'InMail sent',
+      select: (report) => report.inmailSent,
+    },
+    {
+      key: 'inmailReplies',
+      label: 'InMail replies',
+      select: (report) => report.inmailReplies,
+    },
+    {
+      key: 'inmailRepliesPercentage',
+      label: 'InMail replies percentage',
+      select: (report) => (report.inmailRepliesPercentage ? report.inmailRepliesPercentage.toString() : null),
+    },
+    {
+      key: 'inmailMeetingsScheduled',
+      label: 'InMail meetings scheduled',
+      select: (report) => report.inmailMeetingsScheduled,
+    },
+    {
+      key: 'inmailMeetingsScheduledPercentage',
+      label: 'InMail meetings scheduled percentage',
+      select: (report) => (report.inmailMeetingsScheduledPercentage ? report.inmailMeetingsScheduledPercentage.toString() : null),
+    },
+  ];
+
   private readonly opportunityFields: FieldSelector<OpportunitySnapshot>[] = [
     {
       key: 'title',
@@ -946,6 +1183,20 @@ export class EntityFieldResolver {
         }
         return;
       }
+      case AiEntityType.RECRUITER_PERFORMANCE_REPORT: {
+        const entity = await this.findRecruiterPerformanceReport(entityId);
+        if (!entity) {
+          throw new NotFoundException(`RECRUITER_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+        }
+        return;
+      }
+      case AiEntityType.SALES_PERFORMANCE_REPORT: {
+        const entity = await this.findSalesPerformanceReport(entityId);
+        if (!entity) {
+          throw new NotFoundException(`SALES_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+        }
+        return;
+      }
       default:
         throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
     }
@@ -1009,6 +1260,20 @@ export class EntityFieldResolver {
         }
         return this.mapFieldValues(fieldKeys, entity, this.quoteFields);
       }
+      case AiEntityType.RECRUITER_PERFORMANCE_REPORT: {
+        const entity = await this.findRecruiterPerformanceReport(entityId);
+        if (!entity) {
+          throw new NotFoundException(`RECRUITER_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.recruiterPerformanceReportFields);
+      }
+      case AiEntityType.SALES_PERFORMANCE_REPORT: {
+        const entity = await this.findSalesPerformanceReport(entityId);
+        if (!entity) {
+          throw new NotFoundException(`SALES_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+        }
+        return this.mapFieldValues(fieldKeys, entity, this.salesPerformanceReportFields);
+      }
       default:
         throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
     }
@@ -1032,6 +1297,10 @@ export class EntityFieldResolver {
         return this.taskFields as FieldSelector<EntitySnapshot>[];
       case AiEntityType.QUOTE:
         return this.quoteFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.RECRUITER_PERFORMANCE_REPORT:
+        return this.recruiterPerformanceReportFields as FieldSelector<EntitySnapshot>[];
+      case AiEntityType.SALES_PERFORMANCE_REPORT:
+        return this.salesPerformanceReportFields as FieldSelector<EntitySnapshot>[];
       default:
         return [];
     }
@@ -1369,6 +1638,126 @@ export class EntityFieldResolver {
     }
 
     return record;
+  }
+
+  private async findRecruiterPerformanceReport(entityId: string): Promise<RecruiterPerformanceReportSnapshot | null> {
+    const record = await this.prisma.recruiterPerformanceReport.findUnique({
+      where: { id: entityId },
+      select: {
+        positionTitle: true,
+        weekEnding: true,
+        candidatesContactedActual: true,
+        candidatesContactedTarget: true,
+        culturalCallsActual: true,
+        culturalCallsTarget: true,
+        culturalCallsEfficiencyRatio: true,
+        technicalCallsActual: true,
+        technicalCallsTarget: true,
+        technicalCallsEfficiencyRatio: true,
+        clientInterviewsScheduledActual: true,
+        clientInterviewsScheduledTarget: true,
+        submissionToInterviewRatio: true,
+        placementsThisWeek: true,
+        wins: true,
+        challenges: true,
+        priorities: true,
+        topPerformingSources: true,
+        pipelineStatus: true,
+        recruiter: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    const recruiterFirstName = record.recruiter?.firstName ?? '';
+    const recruiterLastName = record.recruiter?.lastName ?? '';
+    const recruiterFullName = `${recruiterFirstName} ${recruiterLastName}`.trim() || null;
+
+    return {
+      positionTitle: record.positionTitle,
+      weekEnding: record.weekEnding,
+      recruiterName: recruiterFullName,
+      recruiterEmail: record.recruiter?.email ?? null,
+      candidatesContactedActual: record.candidatesContactedActual,
+      candidatesContactedTarget: record.candidatesContactedTarget,
+      culturalCallsActual: record.culturalCallsActual,
+      culturalCallsTarget: record.culturalCallsTarget,
+      culturalCallsEfficiencyRatio: record.culturalCallsEfficiencyRatio,
+      technicalCallsActual: record.technicalCallsActual,
+      technicalCallsTarget: record.technicalCallsTarget,
+      technicalCallsEfficiencyRatio: record.technicalCallsEfficiencyRatio,
+      clientInterviewsScheduledActual: record.clientInterviewsScheduledActual,
+      clientInterviewsScheduledTarget: record.clientInterviewsScheduledTarget,
+      submissionToInterviewRatio: record.submissionToInterviewRatio,
+      placementsThisWeek: record.placementsThisWeek,
+      wins: record.wins,
+      challenges: record.challenges,
+      priorities: record.priorities,
+      topPerformingSources: record.topPerformingSources,
+      pipelineStatus: record.pipelineStatus,
+    };
+  }
+
+  private async findSalesPerformanceReport(entityId: string): Promise<SalesPerformanceReportSnapshot | null> {
+    const record = await this.prisma.salesPerformanceReport.findUnique({
+      where: { id: entityId },
+      select: {
+        weekEnding: true,
+        linkedinConnectionRequests: true,
+        linkedinAccepted: true,
+        linkedinAcceptedPercentage: true,
+        linkedinMeetingsScheduled: true,
+        linkedinMeetingsScheduledPercentage: true,
+        linkedinAccountsCount: true,
+        linkedinMarketsTargeted: true,
+        inmailSent: true,
+        inmailReplies: true,
+        inmailRepliesPercentage: true,
+        inmailMeetingsScheduled: true,
+        inmailMeetingsScheduledPercentage: true,
+        salesperson: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    const salespersonFirstName = record.salesperson?.firstName ?? '';
+    const salespersonLastName = record.salesperson?.lastName ?? '';
+    const salespersonFullName = `${salespersonFirstName} ${salespersonLastName}`.trim() || null;
+
+    return {
+      weekEnding: record.weekEnding,
+      salespersonName: salespersonFullName,
+      salespersonEmail: record.salesperson?.email ?? null,
+      linkedinConnectionRequests: record.linkedinConnectionRequests,
+      linkedinAccepted: record.linkedinAccepted,
+      linkedinAcceptedPercentage: record.linkedinAcceptedPercentage,
+      linkedinMeetingsScheduled: record.linkedinMeetingsScheduled,
+      linkedinMeetingsScheduledPercentage: record.linkedinMeetingsScheduledPercentage,
+      linkedinAccountsCount: record.linkedinAccountsCount,
+      linkedinMarketsTargeted: record.linkedinMarketsTargeted,
+      inmailSent: record.inmailSent,
+      inmailReplies: record.inmailReplies,
+      inmailRepliesPercentage: record.inmailRepliesPercentage,
+      inmailMeetingsScheduled: record.inmailMeetingsScheduled,
+      inmailMeetingsScheduledPercentage: record.inmailMeetingsScheduledPercentage,
+    };
   }
 
   private mapFieldValues<T extends EntitySnapshot>(

@@ -65,7 +65,11 @@ const NAVIGATION_GROUPS: NavGroup[] = [
   },
   {
     label: 'Reports',
-    items: [{ name: 'Feedback Reports', href: '/reports/feedback-reports', roles: ROLE_PERMISSIONS.FEEDBACK_REPORTS }],
+    items: [
+      { name: 'Feedback Reports', href: '/reports/feedback-reports', roles: ROLE_PERMISSIONS.FEEDBACK_REPORTS },
+      { name: 'Recruiter Performance', href: '/reports/recruiter-performance', roles: ROLE_PERMISSIONS.RECRUITMENT },
+      { name: 'Sales Performance', href: '/reports/sales-performance', roles: ROLE_PERMISSIONS.SALES_PERFORMANCE_REPORTS },
+    ],
   },
   {
     label: 'Documents',

@@ -5,4 +5,5 @@ export * from './holidays';
 export * from './eod-reports';
 export * from './remote-work';
 export * from './check-in-outs';
+export * from './recruiter-performance-reports';
 

@@ -541,6 +541,10 @@ export class AiActionExecutor {
         return { taskId: entityId };
       case 'QUOTE':
         return { quoteId: entityId };
+      case 'RECRUITER_PERFORMANCE_REPORT':
+      case 'SALES_PERFORMANCE_REPORT':
+        // Reports don't have specific activity targets, return undefined
+        return undefined;
       default:
         throw new BadRequestException(`Unsupported entity type ${entityType} for activity creation`);
     }

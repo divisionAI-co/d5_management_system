@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { quotesApi, leadsApi, opportunitiesApi } from '@/lib/api/crm';
@@ -7,6 +7,7 @@ import { templatesApi } from '@/lib/api/templates';
 import type { CreateQuotePayload, Quote, QuoteStatus } from '@/types/crm';
 import { X } from 'lucide-react';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
+import { LeadSelect } from './LeadSelect';
 
 interface QuoteFormProps {
   quote?: Quote;
@@ -40,10 +41,6 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
   const [searchParams] = useSearchParams();
   const isEdit = Boolean(quote);
 
-  const leadsQuery = useQuery({
-    queryKey: ['leads', 'quote-select'],
-    queryFn: () => leadsApi.list({ page: 1, pageSize: 100 }),
-  });
 
   const templatesQuery = useQuery({
     queryKey: ['templates', 'QUOTE'],
@@ -92,87 +89,67 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
     watch,
     setValue,
     reset,
+    control,
   } = useForm<FormValues>({
     defaultValues,
   });
 
   const selectedLeadId = watch('leadId');
-  const leads = leadsQuery.data?.data ?? [];
-  const leadsLoaded = leadsQuery.isSuccess;
   const lastResetRef = useRef<string | null>(null);
 
-  // Reset form when quote changes or when leads are loaded (to ensure leadId is set correctly)
+  // Reset form when quote changes or when templates are loaded
   useEffect(() => {
     const quoteId = quote?.id || 'new';
-    const resetKey = `${quoteId}-${leadsLoaded}`;
+    const resetKey = `${quoteId}-${templatesQuery.isSuccess}`;
     
-    // Skip if we've already reset for this quote and leads state
+    // Skip if we've already reset for this quote and templates state
     if (lastResetRef.current === resetKey) {
       return;
     }
 
-    if (quote && leadsLoaded) {
-      // Verify the lead exists in the leads list before setting
-      const leadExists = leads.some((lead) => lead.id === quote.leadId);
-      
-      if (leadExists) {
-        // Only reset if we have both the quote and leads loaded, and the lead exists
-        const newDefaultValues: FormValues = {
-          leadId: quote.leadId,
-          opportunityId: quote.opportunityId ?? '',
-          quoteNumber: quote.quoteNumber,
-          title: quote.title,
-          description: quote.description ?? '',
-          overview: quote.overview ?? '',
-          functionalProposal: quote.functionalProposal ?? '',
-          technicalProposal: quote.technicalProposal ?? '',
-          teamComposition: quote.teamComposition ?? '',
-          paymentTerms: quote.paymentTerms ?? '',
-          warrantyPeriod: quote.warrantyPeriod ?? '',
-          totalValue: quote.totalValue ?? undefined,
-          currency: quote.currency || 'USD',
-          status: quote.status,
-          milestones: quote.milestones ?? '',
-          templateId: quote.templateId ?? '',
-        };
-        reset(newDefaultValues);
-        lastResetRef.current = resetKey;
-      }
-    } else if (!quote && leadsLoaded && templatesQuery.isSuccess) {
-      // Reset to create mode defaults when leads and templates are loaded
+    if (quote && templatesQuery.isSuccess) {
+      // Only reset if we have both the quote and templates loaded
+      const newDefaultValues: FormValues = {
+        leadId: quote.leadId,
+        opportunityId: quote.opportunityId ?? '',
+        quoteNumber: quote.quoteNumber,
+        title: quote.title,
+        description: quote.description ?? '',
+        overview: quote.overview ?? '',
+        functionalProposal: quote.functionalProposal ?? '',
+        technicalProposal: quote.technicalProposal ?? '',
+        teamComposition: quote.teamComposition ?? '',
+        paymentTerms: quote.paymentTerms ?? '',
+        warrantyPeriod: quote.warrantyPeriod ?? '',
+        totalValue: quote.totalValue ?? undefined,
+        currency: quote.currency || 'USD',
+        status: quote.status,
+        milestones: quote.milestones ?? '',
+        templateId: quote.templateId ?? '',
+      };
+      reset(newDefaultValues);
+      lastResetRef.current = resetKey;
+    } else if (!quote && templatesQuery.isSuccess) {
+      // Reset to create mode defaults when templates are loaded
       const urlLeadId = searchParams.get('leadId');
       const urlOpportunityId = searchParams.get('opportunityId');
-      const urlLeadExists = urlLeadId ? leads.some((lead) => lead.id === urlLeadId) : true;
       
       // Find default template
       const defaultTemplate = templatesQuery.data?.find((t) => t.isDefault);
       const defaultTemplateId = defaultTemplate?.id || '';
       
-      if (urlLeadId && !urlLeadExists) {
-        // If URL has leadId but it doesn't exist in leads, clear it
-        reset({
-          leadId: '',
-          opportunityId: '',
-          title: '',
-          status: 'DRAFT',
-          currency: 'USD',
-          milestones: '',
-          templateId: defaultTemplateId,
-        } as FormValues);
-      } else {
-        reset({
-          leadId: urlLeadId || '',
-          opportunityId: urlOpportunityId || '',
-          title: '',
-          status: 'DRAFT',
-          currency: 'USD',
-          milestones: '',
-          templateId: defaultTemplateId,
-        } as FormValues);
-      }
+      reset({
+        leadId: urlLeadId || '',
+        opportunityId: urlOpportunityId || '',
+        title: '',
+        status: 'DRAFT',
+        currency: 'USD',
+        milestones: '',
+        templateId: defaultTemplateId,
+      } as FormValues);
       lastResetRef.current = resetKey;
     }
-  }, [quote?.id, leadsLoaded, templatesQuery.isSuccess, templatesQuery.data, leads, reset, searchParams]);
+  }, [quote?.id, templatesQuery.isSuccess, templatesQuery.data, reset, searchParams]);
   const opportunitiesQuery = useQuery({
     queryKey: ['opportunities', 'quote-select', selectedLeadId],
     queryFn: () => opportunitiesApi.list({ leadId: selectedLeadId, page: 1, pageSize: 100 }),
@@ -244,21 +221,20 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
               <label className="mb-1 block text-sm font-medium text-foreground">
                 Lead <span className="text-red-500">*</span>
               </label>
-              <select
-                {...register('leadId', { required: 'Lead is required' })}
-                disabled={isEdit}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                <option value="">Select a lead</option>
-                {leads.map((lead) => (
-                  <option key={lead.id} value={lead.id}>
-                    {lead.title} {lead.contacts && lead.contacts.length > 0 && `- ${lead.contacts[0].firstName} ${lead.contacts[0].lastName}`}
-                  </option>
-                ))}
-              </select>
-              {errors.leadId && (
-                <p className="mt-1 text-xs text-red-500">{errors.leadId.message}</p>
-              )}
+              <Controller
+                name="leadId"
+                control={control}
+                rules={{ required: 'Lead is required' }}
+                render={({ field }) => (
+                  <LeadSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={isEdit}
+                    error={errors.leadId?.message}
+                    required
+                  />
+                )}
+              />
             </div>
 
             <div>

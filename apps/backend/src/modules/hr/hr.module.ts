@@ -7,6 +7,7 @@ import { EodReportsModule } from './eod-reports/eod-reports.module';
 import { RemoteWorkModule } from './remote-work/remote-work.module';
 import { FeedbackReportsModule } from './feedback-reports/feedback-reports.module';
 import { CheckInOutsModule } from './check-in-outs/check-in-outs.module';
+import { RecruiterPerformanceReportsModule } from './recruiter-performance-reports/recruiter-performance-reports.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CheckInOutsModule } from './check-in-outs/check-in-outs.module';
     RemoteWorkModule,
     FeedbackReportsModule,
     CheckInOutsModule,
+    RecruiterPerformanceReportsModule,
   ],
   exports: [
     EmployeesModule,
@@ -28,6 +30,7 @@ import { CheckInOutsModule } from './check-in-outs/check-in-outs.module';
     RemoteWorkModule,
     FeedbackReportsModule,
     CheckInOutsModule,
+    RecruiterPerformanceReportsModule,
   ],
 })
 export class HrModule {}

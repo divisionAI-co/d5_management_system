@@ -420,11 +420,11 @@ export default function FeedbackReportsPage() {
 
       {/* Preview Modal */}
       {showPreviewModal && selectedReport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="flex flex-col bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="border-b border-border p-6 flex justify-between items-center flex-shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 py-6">
+          <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card-elevated shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
-                <h2 className="text-xl font-semibold">Report Preview</h2>
+                <h2 className="text-xl font-semibold text-foreground">Feedback Report Preview (A4 Format)</h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   {selectedReport.employee?.user?.firstName} {selectedReport.employee?.user?.lastName} - {formatReportPeriod(selectedReport.month, selectedReport.year)}
                 </p>
@@ -433,20 +433,36 @@ export default function FeedbackReportsPage() {
                 onClick={() => {
                   setShowPreviewModal(false);
                   setSelectedReport(null);
+                  setPreviewHtml('');
                 }}
-                className="p-2 rounded-lg hover:bg-muted transition-colors"
+                className="rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <iframe
-                title="Report preview"
-                className="h-full w-full border-0 bg-white"
-                srcDoc={`<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"></head><body>${previewHtml}</body></html>`}
-                sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
-                referrerPolicy="no-referrer"
-              />
+            <div className="flex-1 min-h-0 overflow-auto rounded-b-lg border-t border-border bg-gray-100 p-4 md:p-6">
+              {/* A4 Container - 210mm × 297mm (794px × 1123px at 96 DPI) matching Puppeteer PDF output */}
+              <div 
+                className="mx-auto bg-white shadow-lg"
+                style={{ 
+                  width: '794px', 
+                  minHeight: '1123px',
+                  maxWidth: 'calc(100% - 32px)'
+                }}
+              >
+                <iframe
+                  title="Report preview"
+                  className="border-0 bg-white"
+                  style={{ 
+                    width: '794px', 
+                    minHeight: '1123px',
+                    display: 'block'
+                  }}
+                  srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=794"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"><style>html, body { margin: 0; padding: 0; width: 794px; box-sizing: border-box; font-family: Arial, sans-serif; } body { padding: 20px; width: 794px; min-height: calc(1123px - 40px); } * { box-sizing: border-box; }</style></head><body>${previewHtml}</body></html>`}
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
           </div>
         </div>

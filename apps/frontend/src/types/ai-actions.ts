@@ -6,9 +6,11 @@ export type AiEntityType =
   | 'EMPLOYEE'
   | 'CONTACT'
   | 'TASK'
-  | 'QUOTE';
+  | 'QUOTE'
+  | 'RECRUITER_PERFORMANCE_REPORT'
+  | 'SALES_PERFORMANCE_REPORT';
 
-export type AiCollectionKey = 'EOD_REPORTS' | 'OPPORTUNITIES' | 'LEADS' | 'QUOTES' | 'TASKS' | 'ACTIVITIES' | 'FEEDBACK_REPORTS' | 'CHECK_IN_OUTS';
+export type AiCollectionKey = 'EOD_REPORTS' | 'OPPORTUNITIES' | 'LEADS' | 'QUOTES' | 'TASKS' | 'ACTIVITIES' | 'FEEDBACK_REPORTS' | 'CHECK_IN_OUTS' | 'RECRUITER_PERFORMANCE_REPORTS' | 'SALES_PERFORMANCE_REPORTS';
 export type AiCollectionFormat = 'TABLE' | 'BULLET_LIST' | 'PLAIN_TEXT';
 
 export interface AiCollectionFilterDefinition {
