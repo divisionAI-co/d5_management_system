@@ -81,6 +81,8 @@ const ENTITY_OPTIONS: Array<{ label: string; value: AiEntityType }> = [
   { label: 'Contact', value: 'CONTACT' },
   { label: 'Task', value: 'TASK' },
   { label: 'Quote', value: 'QUOTE' },
+  { label: 'Recruitment Report', value: 'RECRUITER_PERFORMANCE_REPORT' },
+  { label: 'Sales Report', value: 'SALES_PERFORMANCE_REPORT' },
 ];
 
 export function AiActionsManager() {

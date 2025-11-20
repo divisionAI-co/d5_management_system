@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { quotesApi } from '@/lib/api/crm';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ const statusColors: Record<string, string> = {
 export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [showEditForm, setShowEditForm] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -28,10 +29,26 @@ export default function QuoteDetailPage() {
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [showActivities, setShowActivities] = useState(false);
 
+  // Redirect to quotes page with query params if id is "new"
+  // Do this immediately before any queries run
+  useEffect(() => {
+    if (id === 'new') {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.set('new', 'true');
+      navigate(`/crm/quotes?${newSearchParams.toString()}`, { replace: true });
+      return;
+    }
+  }, [id, navigate, searchParams]);
+
+  // Return null early if id is "new" to prevent any queries or rendering
+  if (id === 'new') {
+    return null;
+  }
+
   const quoteQuery = useQuery({
     queryKey: ['quotes', id],
     queryFn: () => quotesApi.getById(id!),
-    enabled: !!id,
+    enabled: !!id && id !== 'new',
   });
 
   const deleteMutation = useMutation({

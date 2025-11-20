@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { quotesApi } from '@/lib/api/crm';
 import type { Quote, QuoteFilters, QuoteStatus, QuotesListResponse } from '@/types/crm';
@@ -27,7 +27,8 @@ const SORT_OPTIONS: Array<{ label: string; value: QuoteFilters['sortBy'] }> = [
 export default function QuotesPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialize filters from URL params
   const initialFilters: QuoteFilters = {
@@ -39,6 +40,7 @@ export default function QuotesPage() {
 
   const leadIdParam = searchParams.get('leadId');
   const opportunityIdParam = searchParams.get('opportunityId');
+  const shouldOpenForm = searchParams.get('new') === 'true' || location.pathname === '/crm/quotes/new';
   
   if (leadIdParam) {
     initialFilters.leadId = leadIdParam;
@@ -53,6 +55,25 @@ export default function QuotesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+
+  // Open form if on "/quotes/new" route or "new=true" query param is present
+  useEffect(() => {
+    if (shouldOpenForm) {
+      setEditingQuote(undefined);
+      setFormOpen(true);
+      // Redirect to /quotes if on /quotes/new route
+      if (location.pathname === '/crm/quotes/new') {
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('new');
+        navigate(`/crm/quotes?${newSearchParams.toString()}`, { replace: true });
+      } else {
+        // Remove the "new" query param from URL
+        const newSearchParams = new URLSearchParams(searchParams);
+        newSearchParams.delete('new');
+        setSearchParams(newSearchParams, { replace: true });
+      }
+    }
+  }, [shouldOpenForm, location.pathname, searchParams, navigate, setSearchParams]);
 
   const quotesQuery = useQuery<QuotesListResponse>({
     queryKey: ['quotes', filters],

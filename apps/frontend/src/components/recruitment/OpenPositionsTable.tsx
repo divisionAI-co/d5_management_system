@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { UserRound, Users, ExternalLink } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { UserRound, Users, ExternalLink, FileText } from 'lucide-react';
 import type { OpenPositionSummary, PositionStatus } from '@/types/recruitment';
 
 const STATUS_COLORS: Record<PositionStatus, string> = {
@@ -31,11 +31,18 @@ export function OpenPositionsTable({
   onArchive,
   onUnarchive,
 }: OpenPositionsTableProps) {
+  const navigate = useNavigate();
   const totalCandidates = useMemo(
     () =>
       positions.reduce((acc, position) => acc + (position.candidates?.length ?? 0), 0),
     [positions],
   );
+
+  const handleCreateReport = (position: OpenPositionSummary) => {
+    navigate('/reports/recruiter-performance', {
+      state: { positionId: position.id, positionTitle: position.title },
+    });
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -244,6 +251,15 @@ export function OpenPositionsTable({
                           Delete
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleCreateReport(position)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                        title="Create Performance Report"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        Create Report
+                      </button>
                     </div>
                   </td>
                 </tr>

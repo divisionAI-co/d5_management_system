@@ -48,6 +48,9 @@ import TasksPage from '@/pages/tasks/TasksPage';
 
 // Reports
 import FeedbackReportsPage from '@/pages/reports/FeedbackReportsPage';
+import RecruiterPerformanceReportsPage from '@/pages/reports/RecruiterPerformanceReportsPage';
+import RecruiterPerformanceReportDetailPage from '@/pages/reports/RecruiterPerformanceReportDetailPage';
+import SalesPerformanceReportsPage from '@/pages/reports/SalesPerformanceReportsPage';
 
 // Invoices
 import InvoicesPage from '@/pages/invoices/InvoicesPage';
@@ -115,6 +118,7 @@ function App() {
             <Route path="opportunities" element={<OpportunitiesPage />} />
             <Route path="opportunities/:id" element={<OpportunityDetailPage />} />
             <Route path="quotes" element={<QuotesPage />} />
+            <Route path="quotes/new" element={<QuotesPage />} />
             <Route path="quotes/:id" element={<QuoteDetailPage />} />
             <Route path="campaigns" element={<CampaignsPage />} />
           </Route>
@@ -143,6 +147,9 @@ function App() {
 
           {/* Reports */}
           <Route path="reports/feedback-reports" element={<FeedbackReportsPage />} />
+          <Route path="reports/recruiter-performance" element={<RecruiterPerformanceReportsPage />} />
+          <Route path="reports/recruiter-performance/:id" element={<RecruiterPerformanceReportDetailPage />} />
+          <Route path="reports/sales-performance" element={<SalesPerformanceReportsPage />} />
 
           {/* Documents */}
           <Route path="documents" element={<DocumentsPage />} />

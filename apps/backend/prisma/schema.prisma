@@ -65,6 +65,7 @@ model User {
   calendarIntegrations  UserCalendarIntegration[]
   sentCampaigns         EmailCampaign[]
   passwordResetTokens   PasswordResetToken[]
+  recruiterPerformanceReports RecruiterPerformanceReport[]
   createdActivityTypes  ActivityType[]            @relation("ActivityTypeCreatedBy")
   aiActions             AiAction[]                @relation("AiActionsCreatedBy")
   feedbackReportsAsHR   FeedbackReport[]          @relation("FeedbackReportHRUpdater")
@@ -77,6 +78,7 @@ model User {
   accountLockout        AccountLockout?
   sentQuotes            Quote[]
   importedCheckInOuts   CheckInOut[]              @relation("CheckInOutImportedBy")
+  salesPerformanceReports SalesPerformanceReport[] @relation("SalesPerformanceReports")
 
   @@map("users")
 }
@@ -640,6 +642,7 @@ model OpenPosition {
 
   // Relations
   candidates CandidatePosition[]
+  recruiterPerformanceReports RecruiterPerformanceReport[]
 
   @@index([status])
   @@index([isArchived])
@@ -662,6 +665,107 @@ model CandidatePosition {
   @@index([candidateId])
   @@index([positionId])
   @@map("candidate_positions")
+}
+
+model RecruiterPerformanceReport {
+  id String @id @default(uuid())
+
+  // Relations
+  positionId String
+  position   OpenPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  
+  recruiterId String
+  recruiter   User @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+
+  // Reporting period
+  weekEnding DateTime // Week ending date (e.g., 24/10/2025)
+
+  // Performance Funnel & Efficiency Ratios
+  positionTitle String // e.g., "ServiceNow Developer"
+  
+  // Metrics
+  candidatesContactedActual Int @default(0)
+  candidatesContactedTarget Int @default(0)
+  
+  culturalCallsActual Int @default(0)
+  culturalCallsTarget Int @default(0)
+  culturalCallsEfficiencyRatio Decimal? @db.Decimal(5, 2) // e.g., 66.7%
+  
+  technicalCallsActual Int @default(0)
+  technicalCallsTarget Int @default(0)
+  technicalCallsEfficiencyRatio Decimal? @db.Decimal(5, 2) // e.g., 75%
+  
+  clientInterviewsScheduledActual Int @default(0)
+  clientInterviewsScheduledTarget Int @default(0)
+  submissionToInterviewRatio Decimal? @db.Decimal(5, 2) // e.g., 40-60%
+  
+  placementsThisWeek Int @default(0)
+
+  // Key Wins & Accomplishments (JSON array of wins)
+  wins Json? // Array of { description: string }
+
+  // Challenges & Proposed Solutions (JSON array)
+  challenges Json? // Array of { challenge: string, proposedSolution: string }
+
+  // S.M.A.R.T. Priorities for Next Week (JSON array)
+  priorities Json? // Array of { description: string }
+
+  // Pipeline Health & Source Analysis
+  topPerformingSources Json? // Array of { source: string, count: number }
+  
+  // Key Role Pipeline Status
+  pipelineStatus Json? // { role: string, pipeline: string, confidenceLevel: string, notes?: string }
+
+  // PDF Export
+  internalPdfUrl String?
+  customerPdfUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([positionId])
+  @@index([recruiterId])
+  @@index([weekEnding])
+  @@unique([positionId, recruiterId, weekEnding])
+  @@map("recruiter_performance_reports")
+}
+
+model SalesPerformanceReport {
+  id String @id @default(uuid())
+
+  // Relations
+  salespersonId String
+  salesperson   User @relation("SalesPerformanceReports", fields: [salespersonId], references: [id], onDelete: Cascade)
+
+  // Reporting period
+  weekEnding DateTime // Week ending date (e.g., 24/10/2025)
+
+  // LinkedIn Campaigns
+  linkedinConnectionRequests Int @default(0)
+  linkedinAccepted Int @default(0)
+  linkedinAcceptedPercentage Decimal? @db.Decimal(5, 2) // Calculated: (accepted / requests) * 100
+  linkedinMeetingsScheduled Int @default(0)
+  linkedinMeetingsScheduledPercentage Decimal? @db.Decimal(5, 2) // Calculated: (meetings / accepted) * 100
+  linkedinAccountsCount Int @default(0)
+  linkedinMarketsTargeted String? // Comma-separated or JSON array
+
+  // InMail Campaigns
+  inmailSent Int @default(0)
+  inmailReplies Int @default(0)
+  inmailRepliesPercentage Decimal? @db.Decimal(5, 2) // Calculated: (replies / sent) * 100
+  inmailMeetingsScheduled Int @default(0)
+  inmailMeetingsScheduledPercentage Decimal? @db.Decimal(5, 2) // Calculated: (meetings / replies) * 100
+
+  // PDF Export
+  pdfUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salespersonId])
+  @@index([weekEnding])
+  @@unique([salespersonId, weekEnding])
+  @@map("sales_performance_reports")
 }
 
 // ============================================
@@ -1249,6 +1353,8 @@ enum AiEntityType {
   EMPLOYEE
   CONTACT
   TASK
+  RECRUITER_PERFORMANCE_REPORT
+  SALES_PERFORMANCE_REPORT
 }
 
 enum AiActionExecutionStatus {
@@ -1266,6 +1372,8 @@ enum AiCollectionKey {
   ACTIVITIES
   FEEDBACK_REPORTS
   CHECK_IN_OUTS
+  RECRUITER_PERFORMANCE_REPORTS
+  SALES_PERFORMANCE_REPORTS
 }
 
 enum AiCollectionFormat {
@@ -1523,6 +1631,9 @@ enum TemplateType {
   MENTION_NOTIFICATION
   REMOTE_WORK_WINDOW_OPENED
   QUOTE
+  RECRUITER_PERFORMANCE_REPORT_INTERNAL
+  RECRUITER_PERFORMANCE_REPORT_CUSTOMER
+  SALES_PERFORMANCE_REPORT
 }
 
 model Template {

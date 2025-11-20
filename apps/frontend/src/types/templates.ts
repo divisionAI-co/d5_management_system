@@ -11,7 +11,9 @@ export type TemplateType =
   | 'TASK_ASSIGNED'
   | 'MENTION_NOTIFICATION'
   | 'REMOTE_WORK_WINDOW_OPENED'
-  | 'QUOTE';
+  | 'QUOTE'
+  | 'RECRUITER_PERFORMANCE_REPORT_INTERNAL'
+  | 'RECRUITER_PERFORMANCE_REPORT_CUSTOMER';
 
 export interface TemplateVariable {
   key: string;

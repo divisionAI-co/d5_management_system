@@ -25,6 +25,8 @@ const TEMPLATE_TYPE_LABEL: Record<TemplateType, string> = {
   MENTION_NOTIFICATION: 'Mention Notification',
   REMOTE_WORK_WINDOW_OPENED: 'Remote Work Window Opened',
   QUOTE: 'Quote',
+  RECRUITER_PERFORMANCE_REPORT_INTERNAL: 'Recruiter Performance Report (Internal)',
+  RECRUITER_PERFORMANCE_REPORT_CUSTOMER: 'Recruiter Performance Report (Customer)',
 };
 
 const FILTER_TYPE_OPTIONS: Array<{ label: string; value?: TemplateType }> = [
@@ -42,6 +44,8 @@ const FILTER_TYPE_OPTIONS: Array<{ label: string; value?: TemplateType }> = [
   { label: 'Mention Notification', value: 'MENTION_NOTIFICATION' },
   { label: 'Remote Work Window Opened', value: 'REMOTE_WORK_WINDOW_OPENED' },
   { label: 'Quote', value: 'QUOTE' },
+  { label: 'Recruiter Performance Report (Internal)', value: 'RECRUITER_PERFORMANCE_REPORT_INTERNAL' },
+  { label: 'Recruiter Performance Report (Customer)', value: 'RECRUITER_PERFORMANCE_REPORT_CUSTOMER' },
 ];
 
 export function TemplatesManager() {

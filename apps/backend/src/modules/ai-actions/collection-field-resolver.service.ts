@@ -195,6 +195,49 @@ type CheckInOutWithEmployeePayload = CheckInOutPayload & {
   } | null;
 };
 
+type RecruiterPerformanceReportPayload = Prisma.RecruiterPerformanceReportGetPayload<{
+  select: {
+    id: true;
+    positionTitle: true;
+    weekEnding: true;
+    candidatesContactedActual: true;
+    candidatesContactedTarget: true;
+    culturalCallsActual: true;
+    culturalCallsTarget: true;
+    technicalCallsActual: true;
+    technicalCallsTarget: true;
+    clientInterviewsScheduledActual: true;
+    placementsThisWeek: true;
+    recruiter: {
+      select: {
+        firstName: true;
+        lastName: true;
+        email: true;
+      };
+    };
+  };
+}>;
+
+type SalesPerformanceReportPayload = Prisma.SalesPerformanceReportGetPayload<{
+  select: {
+    id: true;
+    weekEnding: true;
+    linkedinConnectionRequests: true;
+    linkedinAccepted: true;
+    linkedinMeetingsScheduled: true;
+    inmailSent: true;
+    inmailReplies: true;
+    inmailMeetingsScheduled: true;
+    salesperson: {
+      select: {
+        firstName: true;
+        lastName: true;
+        email: true;
+      };
+    };
+  };
+}>;
+
 @Injectable()
 export class CollectionFieldResolver {
   constructor(private readonly prisma: PrismaService) {}
@@ -1811,6 +1854,281 @@ export class CollectionFieldResolver {
               activityType: { select: { name: true } },
             },
           });
+        },
+      },
+    },
+    RECRUITER_PERFORMANCE_REPORT: {
+      [AiCollectionKey.RECRUITER_PERFORMANCE_REPORTS]: {
+        key: AiCollectionKey.RECRUITER_PERFORMANCE_REPORTS,
+        label: 'Recruitment Reports',
+        description: 'All recruitment performance reports. Use in bulk mode to analyze all reports.',
+        defaultLimit: 20,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Week ending on/after',
+            type: 'date',
+            description: 'Include reports with week ending on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Week ending on/before',
+            type: 'date',
+            description: 'Include reports with week ending on or before this date',
+          },
+          {
+            key: 'recruiterId',
+            label: 'Recruiter ID',
+            type: 'text',
+            description: 'Filter by specific recruiter user ID',
+          },
+        ],
+        fields: [
+          {
+            key: 'recruiterName',
+            label: 'Recruiter',
+            description: 'Recruiter name',
+            select: (report: RecruiterPerformanceReportPayload) =>
+              report.recruiter
+                ? `${report.recruiter.firstName} ${report.recruiter.lastName}`.trim()
+                : null,
+          },
+          {
+            key: 'positionTitle',
+            label: 'Position',
+            description: 'Position title',
+            select: (report: RecruiterPerformanceReportPayload) => report.positionTitle,
+          },
+          {
+            key: 'weekEnding',
+            label: 'Week Ending',
+            description: 'Week ending date',
+            select: (report: RecruiterPerformanceReportPayload) => report.weekEnding.toISOString().split('T')[0],
+          },
+          {
+            key: 'candidatesContactedActual',
+            label: 'Candidates Contacted',
+            description: 'Actual candidates contacted',
+            select: (report: RecruiterPerformanceReportPayload) => report.candidatesContactedActual,
+          },
+          {
+            key: 'culturalCallsActual',
+            label: 'Cultural Calls',
+            description: 'Actual cultural calls',
+            select: (report: RecruiterPerformanceReportPayload) => report.culturalCallsActual,
+          },
+          {
+            key: 'technicalCallsActual',
+            label: 'Technical Calls',
+            description: 'Actual technical calls',
+            select: (report: RecruiterPerformanceReportPayload) => report.technicalCallsActual,
+          },
+          {
+            key: 'clientInterviewsScheduledActual',
+            label: 'Client Interviews',
+            description: 'Actual client interviews scheduled',
+            select: (report: RecruiterPerformanceReportPayload) => report.clientInterviewsScheduledActual,
+          },
+          {
+            key: 'placementsThisWeek',
+            label: 'Placements',
+            description: 'Placements this week',
+            select: (report: RecruiterPerformanceReportPayload) => report.placementsThisWeek,
+          },
+        ],
+        resolve: async ({ entityId, limit, filters }: { entityId: string; limit: number; filters?: Record<string, unknown> }) => {
+          // For individual report, return empty (reports don't have sub-collections)
+          return [];
+        },
+        // Bulk mode: query all recruitment reports
+        resolveBulk: async ({ limit, filters }: { limit: number; filters?: Record<string, unknown> }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const recruiterId = typeof filters?.recruiterId === 'string' && filters.recruiterId.trim().length > 0
+            ? filters.recruiterId.trim()
+            : undefined;
+
+          const where: Prisma.RecruiterPerformanceReportWhereInput = {
+            ...(recruiterId ? { recruiterId } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.weekEnding = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          const reports = await this.prisma.recruiterPerformanceReport.findMany({
+            where,
+            orderBy: { weekEnding: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              positionTitle: true,
+              weekEnding: true,
+              candidatesContactedActual: true,
+              candidatesContactedTarget: true,
+              culturalCallsActual: true,
+              culturalCallsTarget: true,
+              technicalCallsActual: true,
+              technicalCallsTarget: true,
+              clientInterviewsScheduledActual: true,
+              placementsThisWeek: true,
+              recruiter: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+
+          return reports.map((report) => ({
+            ...report,
+            recruiterName: report.recruiter
+              ? `${report.recruiter.firstName} ${report.recruiter.lastName}`.trim()
+              : null,
+            recruiterEmail: report.recruiter?.email ?? null,
+          }));
+        },
+      },
+    },
+    SALES_PERFORMANCE_REPORT: {
+      [AiCollectionKey.SALES_PERFORMANCE_REPORTS]: {
+        key: AiCollectionKey.SALES_PERFORMANCE_REPORTS,
+        label: 'Sales Reports',
+        description: 'All sales performance reports. Use in bulk mode to analyze all reports.',
+        defaultLimit: 20,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Week ending on/after',
+            type: 'date',
+            description: 'Include reports with week ending on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'Week ending on/before',
+            type: 'date',
+            description: 'Include reports with week ending on or before this date',
+          },
+          {
+            key: 'salespersonId',
+            label: 'Salesperson ID',
+            type: 'text',
+            description: 'Filter by specific salesperson user ID',
+          },
+        ],
+        fields: [
+          {
+            key: 'salespersonName',
+            label: 'Salesperson',
+            description: 'Salesperson name',
+            select: (report: SalesPerformanceReportPayload) =>
+              report.salesperson
+                ? `${report.salesperson.firstName} ${report.salesperson.lastName}`.trim()
+                : null,
+          },
+          {
+            key: 'weekEnding',
+            label: 'Week Ending',
+            description: 'Week ending date',
+            select: (report: SalesPerformanceReportPayload) => report.weekEnding.toISOString().split('T')[0],
+          },
+          {
+            key: 'linkedinConnectionRequests',
+            label: 'LinkedIn Requests',
+            description: 'LinkedIn connection requests',
+            select: (report: SalesPerformanceReportPayload) => report.linkedinConnectionRequests,
+          },
+          {
+            key: 'linkedinAccepted',
+            label: 'LinkedIn Accepted',
+            description: 'LinkedIn connections accepted',
+            select: (report: SalesPerformanceReportPayload) => report.linkedinAccepted,
+          },
+          {
+            key: 'linkedinMeetingsScheduled',
+            label: 'LinkedIn Meetings',
+            description: 'LinkedIn meetings scheduled',
+            select: (report: SalesPerformanceReportPayload) => report.linkedinMeetingsScheduled,
+          },
+          {
+            key: 'inmailSent',
+            label: 'InMail Sent',
+            description: 'InMail messages sent',
+            select: (report: SalesPerformanceReportPayload) => report.inmailSent,
+          },
+          {
+            key: 'inmailReplies',
+            label: 'InMail Replies',
+            description: 'InMail replies received',
+            select: (report: SalesPerformanceReportPayload) => report.inmailReplies,
+          },
+          {
+            key: 'inmailMeetingsScheduled',
+            label: 'InMail Meetings',
+            description: 'InMail meetings scheduled',
+            select: (report: SalesPerformanceReportPayload) => report.inmailMeetingsScheduled,
+          },
+        ],
+        resolve: async ({ entityId, limit, filters }: { entityId: string; limit: number; filters?: Record<string, unknown> }) => {
+          // For individual report, return empty (reports don't have sub-collections)
+          return [];
+        },
+        // Bulk mode: query all sales reports
+        resolveBulk: async ({ limit, filters }: { limit: number; filters?: Record<string, unknown> }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const salespersonId = typeof filters?.salespersonId === 'string' && filters.salespersonId.trim().length > 0
+            ? filters.salespersonId.trim()
+            : undefined;
+
+          const where: Prisma.SalesPerformanceReportWhereInput = {
+            ...(salespersonId ? { salespersonId } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.weekEnding = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          const reports = await this.prisma.salesPerformanceReport.findMany({
+            where,
+            orderBy: { weekEnding: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              weekEnding: true,
+              linkedinConnectionRequests: true,
+              linkedinAccepted: true,
+              linkedinMeetingsScheduled: true,
+              inmailSent: true,
+              inmailReplies: true,
+              inmailMeetingsScheduled: true,
+              salesperson: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+
+          return reports.map((report) => ({
+            ...report,
+            salespersonName: report.salesperson
+              ? `${report.salesperson.firstName} ${report.salesperson.lastName}`.trim()
+              : null,
+            salespersonEmail: report.salesperson?.email ?? null,
+          }));
         },
       },
     },

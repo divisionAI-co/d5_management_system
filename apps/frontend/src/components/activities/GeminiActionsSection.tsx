@@ -33,10 +33,18 @@ type ActivityEntityType =
   | 'employee'
   | 'contact'
   | 'task'
-  | 'quote';
+  | 'quote'
+  | 'recruiter-performance-report'
+  | 'sales-performance-report';
 
 function toAiEntityType(entityType: ActivityEntityType): AiEntityType {
-  return entityType.toUpperCase() as AiEntityType;
+  if (entityType === 'recruiter-performance-report') {
+    return 'RECRUITER_PERFORMANCE_REPORT';
+  }
+  if (entityType === 'sales-performance-report') {
+    return 'SALES_PERFORMANCE_REPORT';
+  }
+  return entityType.toUpperCase().replace(/-/g, '_') as AiEntityType;
 }
 
 interface GeminiActionsSectionProps {
