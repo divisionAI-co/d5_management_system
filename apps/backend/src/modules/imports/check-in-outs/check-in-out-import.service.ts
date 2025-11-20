@@ -9,6 +9,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
@@ -83,7 +85,7 @@ const CHECK_IN_OUT_FIELD_DEFINITIONS: CheckInOutImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class CheckInOutImportService {
+export class CheckInOutImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -92,7 +94,9 @@ export class CheckInOutImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -212,7 +216,7 @@ export class CheckInOutImportService {
     });
 
     if (!importRecord || importRecord.type !== 'check_in_outs') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -260,19 +264,19 @@ export class CheckInOutImportService {
     });
 
     if (!fieldMapping[CheckInOutImportField.FIRST_NAME]) {
-      throw new BadRequestException('First name must be mapped for check-in/out import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('first name mapping'));
     }
 
     if (!fieldMapping[CheckInOutImportField.LAST_NAME]) {
-      throw new BadRequestException('Last name must be mapped for check-in/out import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('last name mapping'));
     }
 
     if (!fieldMapping[CheckInOutImportField.DATE_TIME]) {
-      throw new BadRequestException('Date and time must be mapped for check-in/out import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('date and time mapping'));
     }
 
     if (!fieldMapping[CheckInOutImportField.STATUS]) {
-      throw new BadRequestException('Status must be mapped for check-in/out import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('status mapping'));
     }
 
     return fieldMapping;
@@ -284,7 +288,7 @@ export class CheckInOutImportService {
     });
 
     if (!importRecord || importRecord.type !== 'check_in_outs') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -381,7 +385,7 @@ export class CheckInOutImportService {
     });
 
     if (!importRecord || importRecord.type !== 'check_in_outs') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as
@@ -439,7 +443,7 @@ export class CheckInOutImportService {
     });
 
     if (!importRecord || importRecord.type !== 'check_in_outs') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

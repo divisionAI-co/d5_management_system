@@ -9,6 +9,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
@@ -142,7 +144,7 @@ const EOD_FIELD_DEFINITIONS: EodImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class EodImportService {
+export class EodImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -152,9 +154,11 @@ export class EodImportService {
   );
 
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly legacyEodImportService: LegacyEodImportService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -280,7 +284,7 @@ export class EodImportService {
     });
 
     if (!importRecord || importRecord.type !== 'eod_reports') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -328,11 +332,11 @@ export class EodImportService {
     });
 
     if (!fieldMapping[EodImportField.EMAIL]) {
-      throw new BadRequestException('Email must be mapped for EOD import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('email mapping'));
     }
 
     if (!fieldMapping[EodImportField.DATE]) {
-      throw new BadRequestException('Date must be mapped for EOD import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('date mapping'));
     }
 
     return fieldMapping;
@@ -344,7 +348,7 @@ export class EodImportService {
     });
 
     if (!importRecord || importRecord.type !== 'eod_reports') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -427,7 +431,7 @@ export class EodImportService {
     });
 
     if (!importRecord || importRecord.type !== 'eod_reports') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as
@@ -484,7 +488,7 @@ export class EodImportService {
     });
 
     if (!importRecord || importRecord.type !== 'eod_reports') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

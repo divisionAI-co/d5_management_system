@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -29,6 +30,8 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
+  private readonly logger = new Logger(UsersController.name);
+
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
@@ -47,13 +50,13 @@ export class UsersController {
   @Get('options')
   @ApiOperation({ summary: 'Get list of users for assignment (available to all authenticated users, excludes EMPLOYEE role)' })
   getOptions(@Query() filters: FilterUsersDto) {
-    console.log('[UsersController] getOptions called with filters:', filters);
+    this.logger.log('[UsersController] getOptions called with filters:', filters);
     // Ensure we only show active users and exclude EMPLOYEE role
     const result = this.usersService.findAll(
       { ...filters, isActive: filters.isActive ?? true },
       [UserRole.EMPLOYEE],
     );
-    console.log('[UsersController] getOptions returning result');
+    this.logger.log('[UsersController] getOptions returning result');
     return result;
   }
 

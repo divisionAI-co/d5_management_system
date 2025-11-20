@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { CompanySettings, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
 
 @Injectable()
-export class CompanySettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class CompanySettingsService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureSettings(): Promise<CompanySettings> {
     let settings = await this.prisma.companySettings.findFirst();

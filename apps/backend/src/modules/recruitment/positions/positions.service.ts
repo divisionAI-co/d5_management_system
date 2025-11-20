@@ -1,24 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { FilterPositionsDto } from './dto/filter-positions.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { ClosePositionDto } from './dto/close-position.dto';
 import { CreatePositionDto } from './dto/create-position.dto';
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
-
 @Injectable()
-export class OpenPositionsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class OpenPositionsService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private formatPosition(position: any) {
     if (!position) {
@@ -66,13 +61,13 @@ export class OpenPositionsService {
 
       if (!opportunity) {
         throw new NotFoundException(
-          `Opportunity with ID ${createDto.opportunityId} not found`,
+          ErrorMessages.NOT_FOUND('Opportunity', createDto.opportunityId),
         );
       }
 
       if (opportunity.openPosition) {
         throw new BadRequestException(
-          'This opportunity already has a linked job position.',
+          ErrorMessages.ALREADY_EXISTS('Opportunity', 'linked job position'),
         );
       }
     }
@@ -130,31 +125,37 @@ export class OpenPositionsService {
   }
 
   private validateSortField(sortBy?: string) {
-    if (!sortBy) {
-      return;
-    }
-
-    const allowed = ['createdAt', 'updatedAt', 'title', 'status'];
-    if (!allowed.includes(sortBy)) {
-      throw new BadRequestException(`Unsupported sort field: ${sortBy}`);
+    try {
+      QueryBuilder.validateSortField(sortBy, ['createdAt', 'updatedAt', 'title', 'status']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
     }
   }
 
   private buildWhereClause(
     filters: FilterPositionsDto,
   ): Prisma.OpenPositionWhereInput {
-    const where: Prisma.OpenPositionWhereInput = {};
+    // Exclude complex filters from QueryBuilder
+    const { search, customerId, candidateId, keywords, ...baseFilters } = filters;
+    
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.OpenPositionWhereInput>(
+      baseFilters,
+      {
+        searchFields: ['title', 'description', 'requirements'],
+      },
+    );
 
     // Filter by archived status - default to non-archived if not specified
     if (filters.isArchived !== undefined) {
-      where.isArchived = filters.isArchived;
+      baseWhere.isArchived = filters.isArchived;
     } else {
-      where.isArchived = false;
+      baseWhere.isArchived = false;
     }
 
-    if (filters.search) {
-      const searchTerm = filters.search.trim();
-      where.OR = [
+    // Handle complex search across title, description, requirements, and customer name
+    if (search) {
+      const searchTerm = search.trim();
+      baseWhere.OR = [
         {
           title: {
             contains: searchTerm,
@@ -190,45 +191,44 @@ export class OpenPositionsService {
       ];
     }
 
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
-    if (filters.customerId) {
+    // Handle customerId filter (complex relation filtering)
+    if (customerId) {
       const relationFilter =
-        (where.opportunity as Prisma.OpportunityNullableRelationFilter | undefined) ?? {};
+        (baseWhere.opportunity as Prisma.OpportunityNullableRelationFilter | undefined) ?? {};
       const currentIs = relationFilter.is ?? {};
-      where.opportunity = {
+      baseWhere.opportunity = {
         ...relationFilter,
         is: {
           ...currentIs,
-          customerId: filters.customerId,
+          customerId: customerId,
         },
       };
     }
 
-    if (filters.opportunityId) {
-      where.opportunityId = filters.opportunityId;
-    }
-
-    if (filters.candidateId) {
-      where.candidates = {
+    // Handle candidateId filter (relation filtering)
+    if (candidateId) {
+      baseWhere.candidates = {
         some: {
-          candidateId: filters.candidateId,
+          candidateId: candidateId,
         },
       };
     }
 
-    if (filters.keywords && filters.keywords.length > 0) {
-      where.AND = filters.keywords.map((keyword) => ({
-        requirements: {
-          contains: keyword,
-          mode: Prisma.QueryMode.insensitive,
-        },
-      }));
+    // Handle keywords array filter (AND condition)
+    if (keywords && keywords.length > 0) {
+      const existingAnd = Array.isArray(baseWhere.AND) ? baseWhere.AND : baseWhere.AND ? [baseWhere.AND] : [];
+      baseWhere.AND = [
+        ...existingAnd,
+        ...keywords.map((keyword) => ({
+          requirements: {
+            contains: keyword,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        })),
+      ];
     }
 
-    return where;
+    return baseWhere;
   }
 
   private async ensurePositionExists(id: string) {
@@ -256,18 +256,15 @@ export class OpenPositionsService {
     });
 
     if (!position) {
-      throw new NotFoundException(`Open position with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', id));
     }
 
     return position;
   }
 
-  async findAll(
-    filters: FilterPositionsDto,
-  ): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterPositionsDto) {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
-    const skip = (page - 1) * pageSize;
 
     const sortBy = filters.sortBy ?? 'createdAt';
     const sortOrder = filters.sortOrder ?? 'desc';
@@ -275,12 +272,12 @@ export class OpenPositionsService {
 
     const where = this.buildWhereClause(filters);
 
-    const [total, positions] = await this.prisma.$transaction([
-      this.prisma.openPosition.count({ where }),
-      this.prisma.openPosition.findMany({
-        where,
-        skip,
-        take: pageSize,
+    const result = await this.paginate(
+      this.prisma.openPosition,
+      where,
+      {
+        page,
+        pageSize,
         orderBy: {
           [sortBy]: sortOrder,
         },
@@ -322,17 +319,12 @@ export class OpenPositionsService {
             },
           },
         },
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: positions.map((position) => this.formatPosition(position)),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+      ...result,
+      data: result.data.map((position) => this.formatPosition(position)),
     };
   }
 
@@ -371,7 +363,7 @@ export class OpenPositionsService {
     });
 
     if (!position) {
-      throw new NotFoundException(`Open position with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', id));
     }
 
     return this.formatPosition(position);
@@ -400,14 +392,14 @@ export class OpenPositionsService {
 
         if (!opportunity) {
           throw new NotFoundException(
-            `Opportunity with ID ${updateDto.opportunityId} not found`,
+            ErrorMessages.NOT_FOUND('Opportunity', updateDto.opportunityId),
           );
         }
 
         // If opportunity is already linked to a different position, prevent the update
         if (opportunity.openPosition && opportunity.openPosition.id !== id) {
           throw new BadRequestException(
-            'This opportunity is already linked to another job position.',
+            ErrorMessages.ALREADY_EXISTS('Opportunity', 'linked job position'),
           );
         }
       }
@@ -550,7 +542,7 @@ export class OpenPositionsService {
     const position = await this.ensurePositionExists(id);
 
     if (position.isArchived) {
-      throw new BadRequestException('Position is already archived.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('archive position', 'position is already archived'));
     }
 
     const updated = await this.prisma.openPosition.update({
@@ -605,7 +597,7 @@ export class OpenPositionsService {
     const position = await this.ensurePositionExists(id);
 
     if (!position.isArchived) {
-      throw new BadRequestException('Position is not archived.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('unarchive position', 'position is not archived'));
     }
 
     const updated = await this.prisma.openPosition.update({
@@ -666,7 +658,7 @@ export class OpenPositionsService {
 
     if (candidateCount > 0) {
       throw new BadRequestException(
-        `Cannot delete position with ${candidateCount} linked candidate(s). Please unlink candidates first or archive the position.`,
+        ErrorMessages.OPERATION_NOT_ALLOWED('delete position', `position has ${candidateCount} linked candidate(s). Please unlink candidates first or archive the position`),
       );
     }
 

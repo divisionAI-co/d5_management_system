@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 
 interface GenerateTextOptions {
   prompt: string;
@@ -73,14 +74,14 @@ export class GeminiService {
       };
     } catch (error) {
       this.logger.error('Gemini request failed', error as Error);
-      throw new InternalServerErrorException('Gemini request failed');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('Gemini response'));
     }
   }
 
   private ensureConfigured() {
     if (!this.client) {
       throw new InternalServerErrorException(
-        'Gemini API key is not configured. Set GEMINI_API_KEY to enable Gemini actions.',
+        ErrorMessages.MISSING_REQUIRED_FIELD('GEMINI_API_KEY') + '. Set GEMINI_API_KEY to enable Gemini actions.',
       );
     }
   }

@@ -7,6 +7,9 @@ import {
 } from '@nestjs/common';
 import { UserRole, Prisma, TemplateType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateRecruiterPerformanceReportDto } from './dto/create-recruiter-performance-report.dto';
 import { UpdateRecruiterPerformanceReportDto } from './dto/update-recruiter-performance-report.dto';
 import { FilterRecruiterPerformanceReportsDto } from './dto/filter-recruiter-performance-reports.dto';
@@ -16,13 +19,15 @@ import { TemplatesService } from '../../templates/templates.service';
 import { EmailService } from '../../../common/email/email.service';
 
 @Injectable()
-export class RecruiterPerformanceReportsService {
+export class RecruiterPerformanceReportsService extends BaseService {
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private pdfService: PdfService,
     private templatesService: TemplatesService,
     private emailService: EmailService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly reportInclude = {
     position: {
@@ -54,7 +59,7 @@ export class RecruiterPerformanceReportsService {
     });
 
     if (!position) {
-      throw new NotFoundException(`Position with ID ${createDto.positionId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Position', createDto.positionId));
     }
 
     // Check if recruiter exists and has RECRUITER role
@@ -63,7 +68,7 @@ export class RecruiterPerformanceReportsService {
     });
 
     if (!recruiter) {
-      throw new NotFoundException(`Recruiter with ID ${recruiterId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter', recruiterId));
     }
 
     if (recruiter.role !== UserRole.RECRUITER && recruiter.role !== UserRole.ADMIN) {
@@ -152,53 +157,53 @@ export class RecruiterPerformanceReportsService {
     userId: string,
     userRole: UserRole,
   ) {
-    const where: Prisma.RecruiterPerformanceReportWhereInput = {};
+    // Build base where clause using QueryBuilder
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.RecruiterPerformanceReportWhereInput>(
+      filters,
+      {
+        dateFields: ['weekEnding'],
+        fieldMappings: {
+          weekEndingFrom: 'weekEnding',
+          weekEndingTo: 'weekEnding',
+        },
+      },
+    );
 
     // If user is a recruiter, only show their own reports
     if (userRole === UserRole.RECRUITER) {
-      where.recruiterId = userId;
+      baseWhere.recruiterId = userId;
     } else if (filters.recruiterId) {
-      where.recruiterId = filters.recruiterId;
+      baseWhere.recruiterId = filters.recruiterId;
     }
 
-    if (filters.positionId) {
-      where.positionId = filters.positionId;
-    }
-
+    // Handle date range filtering
     if (filters.weekEndingFrom || filters.weekEndingTo) {
-      where.weekEnding = {};
+      const weekEndingFilter: Prisma.DateTimeFilter = {};
       if (filters.weekEndingFrom) {
-        where.weekEnding.gte = new Date(filters.weekEndingFrom);
+        weekEndingFilter.gte = new Date(filters.weekEndingFrom);
       }
       if (filters.weekEndingTo) {
-        where.weekEnding.lte = new Date(filters.weekEndingTo);
+        weekEndingFilter.lte = new Date(filters.weekEndingTo);
       }
+      baseWhere.weekEnding = weekEndingFilter;
     }
 
+    const where = baseWhere;
     const page = filters.page || 1;
     const pageSize = filters.pageSize || 10;
-    const skip = (page - 1) * pageSize;
 
-    const [data, total] = await Promise.all([
-      this.prisma.recruiterPerformanceReport.findMany({
-        where,
-        include: this.reportInclude,
-        orderBy: { weekEnding: 'desc' },
-        skip,
-        take: pageSize,
-      }),
-      this.prisma.recruiterPerformanceReport.count({ where }),
-    ]);
-
-    return {
-      data,
-      meta: {
+    const result = await this.paginate(
+      this.prisma.recruiterPerformanceReport,
+      where,
+      {
         page,
         pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
+        include: this.reportInclude,
+        orderBy: { weekEnding: 'desc' },
       },
-    };
+    );
+
+    return result;
   }
 
   /**
@@ -211,7 +216,7 @@ export class RecruiterPerformanceReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Recruiter performance report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter performance report', id));
     }
 
     // If user is a recruiter, only allow access to their own reports
@@ -236,7 +241,7 @@ export class RecruiterPerformanceReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Recruiter performance report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter performance report', id));
     }
 
     // If user is a recruiter, only allow updates to their own reports
@@ -352,7 +357,7 @@ export class RecruiterPerformanceReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Recruiter performance report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter performance report', id));
     }
 
     // Only admins and HR can delete reports
@@ -730,7 +735,7 @@ export class RecruiterPerformanceReportsService {
         });
 
         if (!template) {
-          throw new NotFoundException(`Template with ID ${templateId} not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Template', templateId));
         }
 
         html = await this.renderTemplate(template.htmlContent, templateData);

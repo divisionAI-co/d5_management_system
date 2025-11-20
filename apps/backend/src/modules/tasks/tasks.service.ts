@@ -2,10 +2,14 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, NotificationType, TaskPriority, TaskStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { QueryBuilder } from '../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { FilterTasksDto } from './dto/filter-tasks.dto';
@@ -20,13 +24,15 @@ import { TasksSchedulerService } from './tasks-scheduler.service';
 import { startOfDay } from 'date-fns';
 
 @Injectable()
-export class TasksService {
+export class TasksService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
     private readonly tasksSchedulerService: TasksSchedulerService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly taskInclude = {
     assignedTo: {
@@ -81,79 +87,38 @@ export class TasksService {
   }
 
   private buildWhereClause(filters: FilterTasksDto): Prisma.TaskWhereInput {
-    const where: Prisma.TaskWhereInput = {};
-
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
-    if (filters.priority) {
-      where.priority = filters.priority;
-    }
+    // Use QueryBuilder for standard filters
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.TaskWhereInput>(
+      filters,
+      {
+        searchFields: ['title', 'description'],
+        dateFields: ['dueDate'],
+      },
+    );
 
     // Build assignment filter - check both legacy assignedToId and new assignees relation
+    // This is complex OR logic that QueryBuilder doesn't handle, so we do it manually
     if (filters.assignedToId) {
-      where.OR = [
-        { assignedToId: filters.assignedToId },
-        { assignees: { some: { userId: filters.assignedToId } } },
-      ];
-    }
-
-    if (filters.search) {
-      const searchCondition = {
+      const assignmentCondition = {
         OR: [
-          {
-            title: {
-              contains: filters.search,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-          {
-            description: {
-              contains: filters.search,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
+          { assignedToId: filters.assignedToId },
+          { assignees: { some: { userId: filters.assignedToId } } },
         ],
       };
 
-      // If we already have an OR condition (from assignedToId), combine them with AND
-      if (where.OR) {
-        where.AND = [
-          { OR: where.OR },
-          searchCondition,
+      // If we already have an OR condition (from search), combine them with AND
+      if (baseWhere.OR) {
+        baseWhere.AND = [
+          { OR: baseWhere.OR },
+          assignmentCondition,
         ];
-        delete where.OR;
+        delete baseWhere.OR;
       } else {
-        where.OR = searchCondition.OR;
+        baseWhere.OR = assignmentCondition.OR;
       }
     }
 
-    if (filters.createdById) {
-      where.createdById = filters.createdById;
-    }
-
-    if (filters.customerId) {
-      where.customerId = filters.customerId;
-    }
-
-    if (filters.dueBefore || filters.dueAfter) {
-      where.dueDate = {};
-
-      if (filters.dueAfter) {
-        (where.dueDate as Prisma.DateTimeNullableFilter).gte = new Date(
-          filters.dueAfter,
-        );
-      }
-
-      if (filters.dueBefore) {
-        (where.dueDate as Prisma.DateTimeNullableFilter).lte = new Date(
-          filters.dueBefore,
-        );
-      }
-    }
-
-    return where;
+    return baseWhere;
   }
 
   async create(createTaskDto: CreateTaskDto) {
@@ -185,7 +150,7 @@ export class TasksService {
 
     if (!creator) {
       throw new NotFoundException(
-        `User with ID ${createTaskDto.createdById} not found`,
+        ErrorMessages.NOT_FOUND('User', createTaskDto.createdById)
       );
     }
 
@@ -193,13 +158,13 @@ export class TasksService {
       const foundIds = new Set(assignees.map((u) => u.id));
       const missingIds = assigneeIds.filter((id) => !foundIds.has(id));
       throw new NotFoundException(
-        `Assignees with IDs ${missingIds.join(', ')} not found`,
+        ErrorMessages.NOT_FOUND_BY_FIELD('Assignees', 'id', missingIds.join(', '))
       );
     }
 
     if (createTaskDto.customerId && !customerExists) {
       throw new NotFoundException(
-        `Customer with ID ${createTaskDto.customerId} not found`,
+        ErrorMessages.NOT_FOUND('Customer', createTaskDto.customerId)
       );
     }
 
@@ -246,7 +211,7 @@ export class TasksService {
     // Process @mentions in title and description and create notifications
     // Don't await - let it run in background to not slow down task creation
     this.processMentions(task.id, createTaskDto.title, createTaskDto.description, createTaskDto.createdById).catch((error) => {
-      console.error(`[Mentions] Failed to process mentions for task ${task.id}:`, error);
+      this.logger.error(`[Mentions] Failed to process mentions for task ${task.id}:`, error);
     });
 
     return TasksService.formatTask(task);
@@ -291,7 +256,7 @@ export class TasksService {
     });
 
     if (!task) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', id));
     }
 
     return TasksService.formatTask(task);
@@ -300,7 +265,7 @@ export class TasksService {
   async update(id: string, updateTaskDto: UpdateTaskDto, userId: string) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', id));
     }
 
     // Determine assignee IDs: prefer new array, fall back to legacy single assignee
@@ -336,7 +301,7 @@ export class TasksService {
       }))
     ) {
       throw new NotFoundException(
-        `Customer with ID ${updateTaskDto.customerId} not found`,
+        ErrorMessages.NOT_FOUND('Customer', updateTaskDto.customerId)
       );
     }
 
@@ -426,7 +391,7 @@ export class TasksService {
     if (updateTaskDto.title !== undefined || updateTaskDto.description !== undefined) {
       // Use the current user (person updating) for mentions
       this.processMentions(id, title, description, userId).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for task ${id}:`, error);
+        this.logger.error(`[Mentions] Failed to process mentions for task ${id}:`, error);
       });
     }
 
@@ -436,7 +401,7 @@ export class TasksService {
   async logTime(id: string, logTimeDto: LogTimeDto, userId: string) {
     const existing = await this.prisma.task.findUnique({ where: { id } });
     if (!existing) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', id));
     }
 
     // Calculate new actual hours (add to existing)
@@ -466,7 +431,7 @@ export class TasksService {
     // Use the current user's ID (person logging time) for mentions
     if (logTimeDto.description) {
       this.processMentions(id, existing.title, logTimeDto.description, userId).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for task ${id} in logTime:`, error);
+        this.logger.error(`[Mentions] Failed to process mentions for task ${id} in logTime:`, error);
       });
     }
 
@@ -477,7 +442,7 @@ export class TasksService {
     const existing = await this.prisma.task.findUnique({ where: { id } });
 
     if (!existing) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', id));
     }
 
     const data: Prisma.TaskUncheckedUpdateInput = {
@@ -508,7 +473,7 @@ export class TasksService {
     });
 
     if (!taskRecord) {
-      throw new NotFoundException(`Task with ID ${taskId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', taskId));
     }
 
     const task = TasksService.formatTask(taskRecord);
@@ -524,9 +489,9 @@ export class TasksService {
       role === UserRole.ACCOUNT_MANAGER;
 
     if (!isOwner && !isPrivileged) {
-      throw new ForbiddenException(
-        'You do not have permission to add this task to your EOD report',
-      );
+        throw new ForbiddenException(
+          ErrorMessages.FORBIDDEN('adding this task to your EOD report')
+        );
     }
 
     const now = new Date();
@@ -578,7 +543,7 @@ export class TasksService {
 
         if (currentReport.submittedAt) {
           throw new BadRequestException(
-            `The EOD report for ${reportDateString} has already been submitted.`,
+            ErrorMessages.OPERATION_NOT_ALLOWED('add task', `EOD report for ${reportDateString} has already been submitted`)
           );
         }
 
@@ -667,7 +632,7 @@ export class TasksService {
       }
 
       throw new BadRequestException(
-        'Unable to add the task to your EOD report due to a concurrent update. Please try again.',
+        ErrorMessages.OPERATION_NOT_ALLOWED('add task', 'concurrent update detected. Please try again')
       );
     }
 
@@ -698,7 +663,7 @@ export class TasksService {
     const existing = await this.prisma.task.findUnique({ where: { id } });
 
     if (!existing) {
-      throw new NotFoundException(`Task with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', id));
     }
 
     await this.prisma.task.delete({
@@ -730,7 +695,7 @@ export class TasksService {
         return;
       }
 
-      console.log(`[Mentions] Processing mentions for task ${taskId}:`, {
+      this.logger.log(`[Mentions] Processing mentions for task ${taskId}:`, {
         identifiers,
         textPreview: text.substring(0, 100),
       });
@@ -738,13 +703,13 @@ export class TasksService {
       // Find users by mentions
       const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
       
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      this.logger.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
       
       // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
       const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
       
       if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        this.logger.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
         return;
       }
 
@@ -770,10 +735,10 @@ export class TasksService {
         taskId,
       );
 
-      console.log(`[Mentions] Created ${notifications.length} notifications for task ${taskId}`);
+      this.logger.log(`[Mentions] Created ${notifications.length} notifications for task ${taskId}`);
     } catch (error) {
       // Log error but don't fail the task creation/update
-      console.error(`[Mentions] Error processing mentions for task ${taskId}:`, error);
+      this.logger.error(`[Mentions] Error processing mentions for task ${taskId}:`, error);
     }
   }
 
@@ -790,7 +755,7 @@ export class TasksService {
 
     if (!creator) {
       throw new NotFoundException(
-        `User with ID ${createTemplateDto.createdById} not found`,
+        ErrorMessages.NOT_FOUND('User', createTemplateDto.createdById)
       );
     }
 
@@ -817,7 +782,7 @@ export class TasksService {
       });
       if (!customer) {
         throw new NotFoundException(
-          `Customer with ID ${createTemplateDto.defaultCustomerId} not found`,
+          ErrorMessages.NOT_FOUND('Customer', createTemplateDto.defaultCustomerId)
         );
       }
     }
@@ -862,7 +827,7 @@ export class TasksService {
     const shouldGenerateImmediately = template.isActive && startDate.getTime() <= today.getTime();
     
     if (shouldGenerateImmediately) {
-      console.log(`[TasksService] Attempting immediate task generation for template ${template.id}, startDate: ${startDate.toISOString()}, today: ${today.toISOString()}`);
+      this.logger.log(`[TasksService] Attempting immediate task generation for template ${template.id}, startDate: ${startDate.toISOString()}, today: ${today.toISOString()}`);
       // Generate task asynchronously (don't wait for it to complete)
       // This will check if today matches the recurrence pattern and generate if it does
       this.tasksSchedulerService.generateTaskForTemplateAndDate(
@@ -870,16 +835,16 @@ export class TasksService {
         today,
       ).then((generated) => {
         if (generated) {
-          console.log(`[TasksService] Successfully generated immediate task for template ${template.id}`);
+          this.logger.log(`[TasksService] Successfully generated immediate task for template ${template.id}`);
         } else {
-          console.log(`[TasksService] Task generation skipped for template ${template.id} (doesn't match recurrence pattern)`);
+          this.logger.log(`[TasksService] Task generation skipped for template ${template.id} (doesn't match recurrence pattern)`);
         }
       }).catch((error) => {
         // Log error but don't fail the template creation
-        console.error(`[TasksService] Failed to generate initial task for template ${template.id}:`, error);
+        this.logger.error(`[TasksService] Failed to generate initial task for template ${template.id}:`, error);
       });
     } else {
-      console.log(`[TasksService] Skipping immediate task generation for template ${template.id}, isActive: ${template.isActive}, startDate: ${startDate.toISOString()}, today: ${today.toISOString()}`);
+      this.logger.log(`[TasksService] Skipping immediate task generation for template ${template.id}, isActive: ${template.isActive}, startDate: ${startDate.toISOString()}, today: ${today.toISOString()}`);
     }
 
     return template;
@@ -952,7 +917,7 @@ export class TasksService {
     });
 
     if (!template) {
-      throw new NotFoundException(`Task template with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task template', id));
     }
 
     return template;
@@ -961,7 +926,7 @@ export class TasksService {
   async updateTemplate(id: string, updateTemplateDto: UpdateTaskTemplateDto) {
     const existing = await this.prisma.taskTemplate.findUnique({ where: { id } });
     if (!existing) {
-      throw new NotFoundException(`Task template with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task template', id));
     }
 
     // Validate assignees if provided
@@ -988,9 +953,9 @@ export class TasksService {
         select: { id: true },
       });
       if (!customer) {
-        throw new NotFoundException(
-          `Customer with ID ${updateTemplateDto.defaultCustomerId} not found`,
-        );
+          throw new NotFoundException(
+            ErrorMessages.NOT_FOUND('Customer', updateTemplateDto.defaultCustomerId)
+          );
       }
     }
 
@@ -1079,7 +1044,7 @@ export class TasksService {
         today,
       ).catch((error) => {
         // Log error but don't fail the template update
-        console.error(`Failed to generate initial task for template ${template.id}:`, error);
+        this.logger.error(`Failed to generate initial task for template ${template.id}:`, error);
       });
     }
 
@@ -1090,7 +1055,7 @@ export class TasksService {
     const template = await this.prisma.taskTemplate.findUnique({ where: { id } });
 
     if (!template) {
-      throw new NotFoundException(`Task template with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Task template', id));
     }
 
     await this.prisma.taskTemplate.delete({ where: { id } });

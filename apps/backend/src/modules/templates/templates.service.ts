@@ -3,38 +3,32 @@ import { Prisma, Template, TemplateType } from '@prisma/client';
 import { format } from 'date-fns';
 import * as Handlebars from 'handlebars';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { QueryBuilder } from '../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { CreateTemplateDto, TemplateVariableDto } from './dto/create-template.dto';
 import { ListTemplatesDto } from './dto/list-templates.dto';
 import { PreviewTemplateDto } from './dto/preview-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 
 @Injectable()
-export class TemplatesService {
+export class TemplatesService extends BaseService {
   private readonly handlebars = Handlebars.create();
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(prisma: PrismaService) {
+    super(prisma);
     this.registerDefaultHelpers();
   }
 
   async findAll(query: ListTemplatesDto) {
     const { type, onlyActive, search } = query;
 
-    const where: Prisma.TemplateWhereInput = {};
-
-    if (type) {
-      where.type = type;
-    }
-
-    if (onlyActive) {
-      where.isActive = true;
-    }
-
-    if (search) {
-      where.name = {
-        contains: search,
-        mode: 'insensitive',
-      };
-    }
+    const where = QueryBuilder.buildWhereClause<Prisma.TemplateWhereInput>(
+      { type, isActive: onlyActive ? true : undefined, search },
+      {
+        searchFields: ['name'],
+      },
+    );
 
     return this.prisma.template.findMany({
       where,
@@ -51,7 +45,7 @@ export class TemplatesService {
     });
 
     if (!template) {
-      throw new NotFoundException(`Template with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Template', id));
     }
 
     return template;
@@ -94,7 +88,7 @@ export class TemplatesService {
 
     // Prevent deletion of default templates
     if (template.isDefault) {
-      throw new BadRequestException('Cannot delete a default template. Please set another template as default first.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('delete template', 'cannot delete a default template. Please set another template as default first'));
     }
 
     await this.prisma.template.delete({
@@ -186,7 +180,7 @@ export class TemplatesService {
     });
 
     if (!template) {
-      throw new NotFoundException(`Default template for type ${type} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('Default template', 'type', type));
     }
 
     const html = this.renderTemplate(template, data);
@@ -290,7 +284,7 @@ export class TemplatesService {
       // Convert Google Drive URLs to direct image URLs
       return this.convertGoogleDriveUrls(htmlWithCss);
     } catch (error: any) {
-      throw new BadRequestException(`Failed to render template: ${error?.message ?? 'Unknown error'}`);
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('render template', error?.message ?? 'Unknown error'));
     }
   }
 

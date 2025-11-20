@@ -1,11 +1,15 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { LeaveType, LeaveRequestStatus, NotificationType, UserRole } from '@prisma/client';
+import { LeaveType, LeaveRequestStatus, NotificationType, UserRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { HolidaysService } from '../holidays/holidays.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
@@ -13,12 +17,14 @@ import { UpdateLeaveRequestDto } from './dto/update-leave-request.dto';
 import { ApproveLeaveDto } from './dto/approve-leave.dto';
 
 @Injectable()
-export class LeaveRequestsService {
+export class LeaveRequestsService extends BaseService {
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private notificationsService: NotificationsService,
     private holidaysService: HolidaysService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly FALLBACK_ANNUAL_LEAVE_ALLOWANCE = 20;
 
@@ -126,7 +132,7 @@ export class LeaveRequestsService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', employeeId));
     }
 
     const startDate = new Date(createLeaveDto.startDate);
@@ -136,7 +142,7 @@ export class LeaveRequestsService {
 
     // Validate dates
     if (startDate > endDate) {
-      throw new BadRequestException('Start date must be before end date');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('date range', 'start date must be before end date'));
     }
 
     if (startDate < today) {
@@ -232,7 +238,7 @@ export class LeaveRequestsService {
 
     // Notify HR when a leave request is created
     this.notifyHrOfLeaveRequest(leaveRequest).catch((error) => {
-      console.error('[LeaveRequests] Failed to notify HR:', error);
+      this.logger.error('[LeaveRequests] Failed to notify HR:', error);
     });
 
     return leaveRequest;
@@ -277,26 +283,34 @@ export class LeaveRequestsService {
   }
 
   async findAll(filters?: { employeeId?: string; status?: string; startDate?: string; endDate?: string }) {
-    const where: any = {};
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.LeaveRequestWhereInput>(
+      filters || {},
+      {
+        dateFields: ['startDate', 'endDate'],
+      },
+    );
 
-    if (filters?.employeeId) {
-      where.employeeId = filters.employeeId;
-    }
-
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-
+    // Handle date range filtering for leave requests (check if dates overlap)
     if (filters?.startDate || filters?.endDate) {
-      where.OR = [
+      const dateFilter: Prisma.DateTimeNullableFilter = {};
+      if (filters?.startDate) {
+        dateFilter.gte = new Date(filters.startDate);
+      }
+      if (filters?.endDate) {
+        dateFilter.lte = new Date(filters.endDate);
+      }
+      // Check if leave request overlaps with the date range
+      baseWhere.OR = [
         {
-          startDate: {
-            gte: filters?.startDate ? new Date(filters.startDate) : undefined,
-            lte: filters?.endDate ? new Date(filters.endDate) : undefined,
-          },
+          AND: [
+            { startDate: { lte: filters?.endDate ? new Date(filters.endDate) : undefined } },
+            { endDate: { gte: filters?.startDate ? new Date(filters.startDate) : undefined } },
+          ],
         },
       ];
     }
+
+    const where = baseWhere;
 
     return this.prisma.leaveRequest.findMany({
       where,
@@ -356,7 +370,7 @@ export class LeaveRequestsService {
     });
 
     if (!leaveRequest) {
-      throw new NotFoundException(`Leave request with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Leave request', id));
     }
 
     return leaveRequest;
@@ -371,7 +385,7 @@ export class LeaveRequestsService {
     }
 
     if (leaveRequest.status !== 'PENDING') {
-      throw new BadRequestException('Can only update pending leave requests');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('update leave request', 'can only update pending leave requests'));
     }
 
     const data: any = {};
@@ -400,7 +414,7 @@ export class LeaveRequestsService {
     today.setHours(0, 0, 0, 0);
 
     if (nextStartDate > nextEndDate) {
-      throw new BadRequestException('Start date must be before end date');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('date range', 'start date must be before end date'));
     }
 
     // Recalculate working days if dates changed (excluding weekends and holidays)
@@ -549,7 +563,7 @@ export class LeaveRequestsService {
 
     // Notify the employee about the approval/rejection
     this.notifyEmployeeOfLeaveDecision(updatedRequest, approveDto.status).catch((error) => {
-      console.error('[LeaveRequests] Failed to notify employee:', error);
+      this.logger.error('[LeaveRequests] Failed to notify employee:', error);
     });
 
     return updatedRequest;

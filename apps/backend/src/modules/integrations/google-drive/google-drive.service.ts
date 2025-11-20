@@ -2,13 +2,14 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { google, drive_v3 } from 'googleapis';
 import { Readable } from 'stream';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { GoogleOAuthService, type GoogleOAuthConfig } from '../google-oauth.service';
 
 export interface DriveFile {
@@ -74,16 +75,17 @@ const OAUTH_CONFIG: GoogleOAuthConfig = {
 };
 
 @Injectable()
-export class GoogleDriveService {
-  private readonly logger = new Logger(GoogleDriveService.name);
+export class GoogleDriveService extends BaseService {
   private driveClient?: drive_v3.Drive;
   private configuredSharedDriveId?: string | null;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly googleOAuth: GoogleOAuthService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private getSharedDriveId(): string | undefined {
     if (this.configuredSharedDriveId === undefined) {
@@ -352,7 +354,7 @@ export class GoogleDriveService {
       };
     } catch (error) {
       this.logger.error(`Failed to list Google Drive files`, error as Error);
-      throw new InternalServerErrorException('Unable to list Google Drive files at this time.');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('Google Drive files'));
     }
   }
 
@@ -368,17 +370,17 @@ export class GoogleDriveService {
       });
 
       if (!data) {
-        throw new NotFoundException('File not found in Google Drive.');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('File', 'id', 'in Google Drive'));
       }
 
       return this.mapFile(data);
     } catch (error: any) {
       if (error?.code === 404) {
-        throw new NotFoundException('File not found in Google Drive.');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('File', 'id', 'in Google Drive'));
       }
 
       this.logger.error(`Failed to fetch Google Drive file ${fileId}`, error as Error);
-      throw new InternalServerErrorException('Unable to load file metadata from Google Drive.');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('file metadata from Google Drive'));
     }
   }
 
@@ -405,17 +407,17 @@ export class GoogleDriveService {
       return { stream, file };
     } catch (error: any) {
       if (error?.code === 404) {
-        throw new NotFoundException('File not found in Google Drive.');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('File', 'id', 'in Google Drive'));
       }
 
       this.logger.error(`Failed to download Google Drive file ${fileId}`, error as Error);
-      throw new InternalServerErrorException('Unable to download file from Google Drive.');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('file from Google Drive'));
     }
   }
 
   async uploadFile(file: Express.Multer.File, parentId?: string, userId?: string): Promise<DriveFile> {
     if (!file) {
-      throw new BadRequestException('No file provided for upload.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('file'));
     }
 
     const drive = await this.getDriveClient(userId);
@@ -440,13 +442,13 @@ export class GoogleDriveService {
       return this.mapFile(data);
     } catch (error) {
       this.logger.error('Failed to upload file to Google Drive', error as Error);
-      throw new InternalServerErrorException('Unable to upload file to Google Drive.');
+      throw new InternalServerErrorException(ErrorMessages.CREATE_FAILED('file in Google Drive'));
     }
   }
 
   async renameFile(fileId: string, name: string, userId?: string): Promise<DriveFile> {
     if (!name || !name.trim()) {
-      throw new BadRequestException('File name cannot be empty.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('file name', 'cannot be empty'));
     }
 
     const drive = await this.getDriveClient(userId);
@@ -465,11 +467,11 @@ export class GoogleDriveService {
       return this.mapFile(data);
     } catch (error: any) {
       if (error?.code === 404) {
-        throw new NotFoundException('File not found in Google Drive.');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('File', 'id', 'in Google Drive'));
       }
 
       this.logger.error(`Failed to rename Google Drive file ${fileId}`, error as Error);
-      throw new InternalServerErrorException('Unable to rename file in Google Drive.');
+      throw new InternalServerErrorException(ErrorMessages.UPDATE_FAILED('file name in Google Drive'));
     }
   }
 
@@ -483,11 +485,11 @@ export class GoogleDriveService {
       });
     } catch (error: any) {
       if (error?.code === 404) {
-        throw new NotFoundException('File not found in Google Drive.');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('File', 'id', 'in Google Drive'));
       }
 
       this.logger.error(`Failed to delete Google Drive file ${fileId}`, error as Error);
-      throw new InternalServerErrorException('Unable to delete file from Google Drive.');
+      throw new InternalServerErrorException(ErrorMessages.DELETE_FAILED('file from Google Drive'));
     }
   }
 
@@ -515,11 +517,11 @@ export class GoogleDriveService {
       }));
     } catch (error: any) {
       if (error?.code === 404) {
-        throw new NotFoundException('File not found in Google Drive.');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('File', 'id', 'in Google Drive'));
       }
 
       this.logger.error(`Failed to get permissions for file ${fileId}`, error as Error);
-      throw new InternalServerErrorException('Unable to retrieve file permissions from Google Drive.');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('file permissions from Google Drive'));
     }
   }
 

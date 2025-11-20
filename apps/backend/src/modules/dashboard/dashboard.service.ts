@@ -6,6 +6,8 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 
 interface MissingReportContext {
   start: string | null;
@@ -34,11 +36,13 @@ export interface ActivityReminder {
 }
 
 @Injectable()
-export class DashboardService {
+export class DashboardService extends BaseService {
   private readonly DAYS_LOOKBACK_FOR_TASKS = 7;
   private readonly DAYS_LOOKBACK_FOR_ACTIVITIES = 7;
   private readonly DAYS_OVERDUE_WINDOW = 7;
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   async getMyDashboard(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -56,7 +60,7 @@ export class DashboardService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
     }
 
     if (user.role === UserRole.ADMIN) {

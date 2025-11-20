@@ -1,6 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, ActivityVisibility, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { QueryBuilder } from '../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { FilterActivitiesDto } from './dto/filter-activities.dto';
@@ -12,19 +15,21 @@ import { UsersService } from '../users/users.service';
 import { extractMentionIdentifiers } from '../../common/utils/mention-parser';
 
 @Injectable()
-export class ActivitiesService {
+export class ActivitiesService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async create(createActivityDto: CreateActivityDto, createdById: string) {
     const { activityTypeId, targets, metadata, isCompleted, notifyAssignee, ...rest } =
       createActivityDto;
 
     if (!rest.subject || !rest.subject.trim()) {
-      throw new BadRequestException('Subject is required');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('subject'));
     }
 
     await this.ensureActivityType(activityTypeId);
@@ -60,7 +65,7 @@ export class ActivitiesService {
     // Process @mentions and create notifications
     // Don't await - let it run in background to not slow down activity creation
     this.processMentions(activity.id, rest.subject, rest.body, createdById).catch((error) => {
-      console.error(`[Mentions] Failed to process mentions for activity ${activity.id}:`, error);
+      this.logger.error(`[Mentions] Failed to process mentions for activity ${activity.id}:`, error);
     });
 
     // TODO: Queue reminder/notification jobs when background workers are available
@@ -78,24 +83,23 @@ export class ActivitiesService {
       [filters.sortBy ?? 'createdAt']: filters.sortOrder ?? 'desc',
     } as Prisma.ActivityOrderByWithRelationInput;
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.activity.findMany({
-        where,
-        orderBy,
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        include: ACTIVITY_SUMMARY_INCLUDE,
-      }),
-      this.prisma.activity.count({ where }),
-    ]);
-
-    return {
-      data: items.map((item) => mapActivitySummary(item as any)),
-      meta: {
-        total,
+    const result = await this.paginate(
+      this.prisma.activity,
+      where,
+      {
         page,
         pageSize,
-        totalPages: Math.ceil(total / pageSize),
+        orderBy,
+        include: ACTIVITY_SUMMARY_INCLUDE,
+      }
+    );
+
+    return {
+      ...result,
+      data: result.data.map((item) => mapActivitySummary(item as any)),
+      meta: {
+        ...result.meta,
+        totalPages: result.meta.pageCount, // Keep backward compatibility
       },
     };
   }
@@ -107,7 +111,7 @@ export class ActivitiesService {
     });
 
     if (!activity) {
-      throw new NotFoundException(`Activity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Activity', id));
     }
 
     return mapActivitySummary(activity as any);
@@ -128,7 +132,7 @@ export class ActivitiesService {
       updateActivityDto.subject !== undefined ? updateActivityDto.subject.trim() : undefined;
 
     if (trimmedSubject !== undefined && !trimmedSubject) {
-      throw new BadRequestException('Subject cannot be empty');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('subject', 'cannot be empty'));
     }
 
     const data: Prisma.ActivityUpdateInput = {
@@ -226,7 +230,7 @@ export class ActivitiesService {
       const body = updateActivityDto.body ?? activity.body;
       // Don't await - let it run in background to not slow down activity update
       this.processMentions(activity.id, subject, body, activity.createdById).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for activity ${activity.id}:`, error);
+        this.logger.error(`[Mentions] Failed to process mentions for activity ${activity.id}:`, error);
       });
     }
 
@@ -326,7 +330,7 @@ export class ActivitiesService {
   async deleteActivityType(id: string) {
     const usage = await this.prisma.activity.count({ where: { activityTypeId: id } });
     if (usage > 0) {
-      throw new BadRequestException('Cannot delete activity type that is in use');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('delete', 'Activity type is in use'));
     }
 
     await this.prisma.activityType.delete({ where: { id } });
@@ -336,7 +340,7 @@ export class ActivitiesService {
   private async ensureActivityType(id: string) {
     const exists = await this.prisma.activityType.findUnique({ where: { id } });
     if (!exists || !exists.isActive) {
-      throw new BadRequestException('Invalid activity type selected');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('activity type', 'not found or inactive'));
     }
   }
 
@@ -345,7 +349,7 @@ export class ActivitiesService {
       where: { key: key.trim().toUpperCase() },
     });
     if (exists) {
-      throw new BadRequestException('Activity type key is already in use');
+      throw new BadRequestException(ErrorMessages.ALREADY_EXISTS('Activity type', 'key'));
     }
   }
 
@@ -381,7 +385,7 @@ export class ActivitiesService {
 
     if (!allowEmpty && provided.length === 0) {
       throw new BadRequestException(
-        'At least one target (customer, lead, opportunity, candidate, employee, contact, task, or quote) must be specified',
+        ErrorMessages.MISSING_REQUIRED_FIELD('target (customer, lead, opportunity, candidate, employee, contact, task, or quote)')
       );
     }
 
@@ -390,66 +394,45 @@ export class ActivitiesService {
         if (!id) return;
         const entity = await (this.prisma[lookup] as any).findUnique({ where: { id } });
         if (!entity) {
-          throw new BadRequestException(`${label} with ID ${id} not found`);
+          throw new BadRequestException(ErrorMessages.NOT_FOUND(label, id));
         }
       }),
     );
   }
 
   private async buildWhereClause(filters: FilterActivitiesDto) {
-    const where: Prisma.ActivityWhereInput = {};
+    // Exclude date range fields from QueryBuilder to handle them manually
+    const { activityDateFrom, activityDateTo, createdFrom, createdTo, ...baseFilters } = filters;
+    
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.ActivityWhereInput>(
+      baseFilters,
+      {
+        searchFields: ['subject', 'body'],
+      },
+    );
 
-    if (filters.search) {
-      const searchTerm = filters.search.trim();
-      if (searchTerm) {
-        where.OR = [
-          { subject: { contains: searchTerm, mode: 'insensitive' } },
-          { body: { contains: searchTerm, mode: 'insensitive' } },
-        ];
+    // Handle date range filters (activityDateFrom/To, createdFrom/To)
+    if (activityDateFrom || activityDateTo) {
+      baseWhere.activityDate = {} as Prisma.DateTimeNullableFilter;
+      if (activityDateFrom) {
+        baseWhere.activityDate.gte = new Date(activityDateFrom);
+      }
+      if (activityDateTo) {
+        baseWhere.activityDate.lte = new Date(activityDateTo);
       }
     }
 
-    if (filters.activityTypeId) {
-      where.activityTypeId = filters.activityTypeId;
-    }
-
-    if (filters.visibility) {
-      where.visibility = filters.visibility;
-    }
-
-    if (filters.customerId) where.customerId = filters.customerId;
-    if (filters.leadId) where.leadId = filters.leadId;
-    if (filters.opportunityId) where.opportunityId = filters.opportunityId;
-    if (filters.candidateId) where.candidateId = filters.candidateId;
-    if (filters.employeeId) where.employeeId = filters.employeeId;
-    if (filters.contactId) where.contactId = filters.contactId;
-    if (filters.taskId) where.taskId = filters.taskId;
-    if (filters.quoteId) where.quoteId = filters.quoteId;
-    if (filters.assignedToId) where.assignedToId = filters.assignedToId;
-    if (filters.isPinned !== undefined) where.isPinned = filters.isPinned;
-    if (filters.isCompleted !== undefined) where.isCompleted = filters.isCompleted;
-
-    if (filters.activityDateFrom || filters.activityDateTo) {
-      where.activityDate = {};
-      if (filters.activityDateFrom) {
-        where.activityDate.gte = new Date(filters.activityDateFrom);
+    if (createdFrom || createdTo) {
+      baseWhere.createdAt = {} as Prisma.DateTimeFilter;
+      if (createdFrom) {
+        baseWhere.createdAt.gte = new Date(createdFrom);
       }
-      if (filters.activityDateTo) {
-        where.activityDate.lte = new Date(filters.activityDateTo);
+      if (createdTo) {
+        baseWhere.createdAt.lte = new Date(createdTo);
       }
     }
 
-    if (filters.createdFrom || filters.createdTo) {
-      where.createdAt = {};
-      if (filters.createdFrom) {
-        where.createdAt.gte = new Date(filters.createdFrom);
-      }
-      if (filters.createdTo) {
-        where.createdAt.lte = new Date(filters.createdTo);
-      }
-    }
-
-    return where;
+    return baseWhere;
   }
 
   /**
@@ -474,7 +457,7 @@ export class ActivitiesService {
         return;
       }
 
-      console.log(`[Mentions] Processing mentions for activity ${activityId}:`, {
+      this.logger.log(`[Mentions] Processing mentions for activity ${activityId}:`, {
         identifiers,
         textPreview: text.substring(0, 100),
       });
@@ -482,13 +465,13 @@ export class ActivitiesService {
       // Find users by mentions
       const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
       
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      this.logger.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
       
       // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
       const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
       
       if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        this.logger.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
         return;
       }
 
@@ -514,10 +497,10 @@ export class ActivitiesService {
         activityId,
       );
 
-      console.log(`[Mentions] Created ${notifications.length} notifications for activity ${activityId}`);
+      this.logger.log(`[Mentions] Created ${notifications.length} notifications for activity ${activityId}`);
     } catch (error) {
       // Log error but don't fail the activity creation/update
-      console.error(`[Mentions] Error processing mentions for activity ${activityId}:`, error);
+      this.logger.error(`[Mentions] Error processing mentions for activity ${activityId}:`, error);
     }
   }
 }

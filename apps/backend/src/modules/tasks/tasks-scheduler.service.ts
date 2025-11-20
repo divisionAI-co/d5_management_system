@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { Prisma } from '@prisma/client';
 import { addDays, addWeeks, addMonths, addYears, startOfDay, isBefore, isAfter } from 'date-fns';
 // Note: TaskRecurrenceType will be available from @prisma/client after running `prisma generate`
@@ -8,10 +10,10 @@ import { addDays, addWeeks, addMonths, addYears, startOfDay, isBefore, isAfter }
 type TaskRecurrenceType = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
 
 @Injectable()
-export class TasksSchedulerService {
-  private readonly logger = new Logger(TasksSchedulerService.name);
-
-  constructor(private readonly prisma: PrismaService) {}
+export class TasksSchedulerService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   /**
    * Generate recurring tasks daily at 00:00 UTC
@@ -325,7 +327,7 @@ export class TasksSchedulerService {
       });
 
       if (assignees.length !== assigneeIds.length) {
-        throw new Error(`Some assignees not found for template ${template.id}`);
+        throw new BadRequestException(ErrorMessages.NOT_FOUND_BY_FIELD('Assignees', 'id', 'for template'));
       }
     }
 
@@ -387,7 +389,7 @@ export class TasksSchedulerService {
 
     const taskId = taskResult[0]?.id;
     if (!taskId) {
-      throw new Error(`Failed to create task from template ${template.id}`);
+      throw new BadRequestException(ErrorMessages.CREATE_FAILED(`task from template ${template.id}`));
     }
 
     // Create assignees if any

@@ -9,6 +9,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
@@ -117,7 +119,7 @@ const CONTACT_FIELD_DEFINITIONS: ContactImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class ContactsImportService {
+export class ContactsImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -126,7 +128,9 @@ export class ContactsImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -255,7 +259,7 @@ export class ContactsImportService {
       where: { id },
     });
     if (!importRecord || importRecord.type !== 'contacts') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -314,7 +318,7 @@ export class ContactsImportService {
     });
 
     if (!importRecord || importRecord.type !== 'contacts') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -407,7 +411,7 @@ export class ContactsImportService {
   ) {
     const email = this.extractValue(row, mapping, ContactImportField.EMAIL);
     if (!email) {
-      throw new BadRequestException('Email is required for each contact row.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('email'));
     }
 
     let firstName =
@@ -484,7 +488,7 @@ export class ContactsImportService {
     });
 
     if (!importRecord || importRecord.type !== 'contacts') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

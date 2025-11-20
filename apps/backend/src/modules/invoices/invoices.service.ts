@@ -12,6 +12,9 @@ import {
   TemplateType,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { QueryBuilder } from '../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { EmailService } from '../../common/email/email.service';
 import { PdfService } from '../../common/pdf/pdf.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
@@ -20,15 +23,6 @@ import { FilterInvoicesDto } from './dto/filter-invoices.dto';
 import { SendInvoiceDto } from './dto/send-invoice.dto';
 import { MarkInvoicePaidDto } from './dto/mark-invoice-paid.dto';
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
 
 interface InvoiceLineItem {
   description: string;
@@ -39,15 +33,15 @@ interface InvoiceLineItem {
 }
 
 @Injectable()
-export class InvoicesService {
-  private readonly logger = new Logger(InvoicesService.name);
+export class InvoicesService extends BaseService {
   private readonly reminderSchedule = [3, 15, 30];
 
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly pdfService: PdfService,
   ) {
+    super(prisma);
     this.pdfService.registerHelpers();
   }
 
@@ -145,20 +139,29 @@ export class InvoicesService {
   }
 
   private buildInvoiceWhere(filters: FilterInvoicesDto): Prisma.InvoiceWhereInput {
-    const where: Prisma.InvoiceWhereInput = {};
+    // Exclude date range and special filters from QueryBuilder
+    const { search, overdue, issueDateFrom, issueDateTo, dueDateFrom, dueDateTo, ...baseFilters } = filters;
+    
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.InvoiceWhereInput>(
+      baseFilters,
+      {
+        searchFields: ['invoiceNumber'], // Customer name search handled manually
+      },
+    );
 
-    if (filters.search) {
-      where.OR = [
+    // Handle complex search across invoiceNumber and customer name
+    if (search) {
+      baseWhere.OR = [
         {
           invoiceNumber: {
-            contains: filters.search,
+            contains: search,
             mode: Prisma.QueryMode.insensitive,
           },
         },
         {
           customer: {
             name: {
-              contains: filters.search,
+              contains: search,
               mode: Prisma.QueryMode.insensitive,
             },
           },
@@ -166,25 +169,14 @@ export class InvoicesService {
       ];
     }
 
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
-    if (filters.customerId) {
-      where.customerId = filters.customerId;
-    }
-
-    if (filters.isRecurring !== undefined) {
-      where.isRecurring = filters.isRecurring;
-    }
-
-    if (filters.overdue) {
-      const currentAnd = Array.isArray(where.AND)
-        ? where.AND
-        : where.AND
-        ? [where.AND]
+    // Handle overdue filter (complex AND condition)
+    if (overdue) {
+      const currentAnd = Array.isArray(baseWhere.AND)
+        ? baseWhere.AND
+        : baseWhere.AND
+        ? [baseWhere.AND]
         : [];
-      where.AND = [
+      baseWhere.AND = [
         ...currentAnd,
         {
           dueDate: {
@@ -199,40 +191,54 @@ export class InvoicesService {
       ];
     }
 
-    if (filters.issueDateFrom || filters.issueDateTo) {
-      where.issueDate = {
-        gte: filters.issueDateFrom ? new Date(filters.issueDateFrom) : undefined,
-        lte: filters.issueDateTo ? new Date(filters.issueDateTo) : undefined,
-      };
+    // Handle date range filters
+    if (issueDateFrom || issueDateTo) {
+      baseWhere.issueDate = {} as Prisma.DateTimeFilter;
+      if (issueDateFrom) {
+        baseWhere.issueDate.gte = new Date(issueDateFrom);
+      }
+      if (issueDateTo) {
+        baseWhere.issueDate.lte = new Date(issueDateTo);
+      }
     }
 
-    if (filters.dueDateFrom || filters.dueDateTo) {
-      where.dueDate = {
-        gte: filters.dueDateFrom ? new Date(filters.dueDateFrom) : undefined,
-        lte: filters.dueDateTo ? new Date(filters.dueDateTo) : undefined,
-      };
+    if (dueDateFrom || dueDateTo) {
+      const dueDateFilter: Prisma.DateTimeFilter = {};
+      if (dueDateFrom) {
+        dueDateFilter.gte = new Date(dueDateFrom);
+      }
+      if (dueDateTo) {
+        dueDateFilter.lte = new Date(dueDateTo);
+      }
+      baseWhere.dueDate = dueDateFilter;
     }
 
-    return where;
+    return baseWhere;
   }
 
-  async findAll(filters: FilterInvoicesDto): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterInvoicesDto) {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
-    const skip = (page - 1) * pageSize;
     const sortBy = filters.sortBy ?? 'issueDate';
     const sortOrder = filters.sortOrder ?? 'desc';
 
-    if (!['issueDate', 'dueDate', 'total', 'invoiceNumber', 'createdAt', 'status'].includes(sortBy)) {
-      throw new BadRequestException(`Unsupported sort field: ${sortBy}`);
+    try {
+      QueryBuilder.validateSortField(sortBy, ['issueDate', 'dueDate', 'total', 'invoiceNumber', 'createdAt', 'status']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
     }
 
     const where = this.buildInvoiceWhere(filters);
 
-    const [total, invoices] = await this.prisma.$transaction([
-      this.prisma.invoice.count({ where }),
-      this.prisma.invoice.findMany({
-        where,
+    const result = await this.paginate(
+      this.prisma.invoice,
+      where,
+      {
+        page,
+        pageSize,
+        orderBy: {
+          [sortBy]: sortOrder,
+        },
         include: {
           customer: {
             select: {
@@ -258,22 +264,12 @@ export class InvoicesService {
             },
           },
         },
-        skip,
-        take: pageSize,
-        orderBy: {
-          [sortBy]: sortOrder,
-        },
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: invoices.map((invoice) => this.formatInvoice(invoice)),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+      ...result,
+      data: result.data.map((invoice) => this.formatInvoice(invoice)),
     };
   }
 
@@ -289,7 +285,7 @@ export class InvoicesService {
     });
 
     if (!customer) {
-      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', customerId));
     }
 
     return customer;
@@ -366,7 +362,7 @@ export class InvoicesService {
     } catch (error: any) {
       if (error?.code === 'P2002') {
         throw new BadRequestException(
-          'Invoice number already exists. Please provide a unique invoice number.',
+          ErrorMessages.ALREADY_EXISTS('Invoice', 'invoice number'),
         );
       }
 
@@ -406,7 +402,7 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Invoice', id));
     }
 
     return this.formatInvoice(invoice);
@@ -418,11 +414,11 @@ export class InvoicesService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Invoice with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Invoice', id));
     }
 
     if (existing.status === InvoiceStatus.PAID && updateDto.status && updateDto.status !== InvoiceStatus.PAID) {
-      throw new BadRequestException('Cannot change status of a paid invoice');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('change status', 'invoice is already paid'));
     }
 
     const data: Prisma.InvoiceUpdateInput = {};
@@ -529,7 +525,7 @@ export class InvoicesService {
     } catch (error: any) {
       if (error?.code === 'P2002') {
         throw new BadRequestException(
-          'Invoice number already exists. Please provide a unique invoice number.',
+          ErrorMessages.ALREADY_EXISTS('Invoice', 'invoice number'),
         );
       }
 
@@ -544,11 +540,11 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Invoice', id));
     }
 
     if (invoice.status === InvoiceStatus.PAID) {
-      throw new BadRequestException('Cannot delete a paid invoice');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('delete', 'cannot delete a paid invoice'));
     }
 
     await this.prisma.invoice.delete({
@@ -569,11 +565,11 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Invoice', id));
     }
 
     if (invoice.status === InvoiceStatus.CANCELLED) {
-      throw new BadRequestException('Cannot mark a cancelled invoice as paid');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('mark as paid', 'cannot mark a cancelled invoice as paid'));
     }
 
     if (invoice.status === InvoiceStatus.PAID) {
@@ -631,7 +627,7 @@ export class InvoicesService {
 
       if (!template) {
         throw new NotFoundException(
-          `Invoice template with ID ${templateId} not found or inactive`,
+          ErrorMessages.NOT_FOUND('Invoice template', templateId) + ' or inactive',
         );
       }
 
@@ -931,7 +927,7 @@ export class InvoicesService {
     });
 
     if (!invoice) {
-      throw new NotFoundException(`Invoice with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Invoice', id));
     }
 
     const recipients = sendDto.to?.length
@@ -942,7 +938,7 @@ export class InvoicesService {
 
     if (!recipients.length) {
       throw new BadRequestException(
-        'No recipient email addresses provided and customer has no billing email.',
+        ErrorMessages.MISSING_REQUIRED_FIELD('recipient email addresses (no email provided and customer has no billing email)'),
       );
     }
 

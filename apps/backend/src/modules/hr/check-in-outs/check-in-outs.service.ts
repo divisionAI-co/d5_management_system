@@ -1,13 +1,18 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma, CheckInOutStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateCheckInOutDto } from './dto/create-check-in-out.dto';
 import { UpdateCheckInOutDto } from './dto/update-check-in-out.dto';
 import { FilterCheckInOutsDto } from './dto/filter-check-in-outs.dto';
 
 @Injectable()
-export class CheckInOutsService {
-  constructor(private prisma: PrismaService) {}
+export class CheckInOutsService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   async create(createDto: CreateCheckInOutDto, userId: string) {
     // Verify employee exists
@@ -17,7 +22,7 @@ export class CheckInOutsService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${createDto.employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', createDto.employeeId));
     }
 
     return this.prisma.checkInOut.create({
@@ -44,12 +49,15 @@ export class CheckInOutsService {
   }
 
   async findAll(filters: FilterCheckInOutsDto, requestingUserId: string, canManageOthers: boolean) {
-    const { employeeId, startDate, endDate, status } = filters;
+    const { startDate, endDate, ...baseFilters } = filters;
     const page = Math.max(filters.page ?? 1, 1);
     const rawPageSize = filters.pageSize ?? 25;
     const pageSize = Math.min(Math.max(rawPageSize, 1), 100);
 
-    const where: Prisma.CheckInOutWhereInput = {};
+    // Build base where clause using QueryBuilder
+    const where = QueryBuilder.buildWhereClause<Prisma.CheckInOutWhereInput>(
+      baseFilters,
+    );
 
     // If user can't manage others, only show their own records
     if (!canManageOthers) {
@@ -58,15 +66,14 @@ export class CheckInOutsService {
         select: { id: true },
       });
       if (!employee) {
-        throw new NotFoundException('Employee record not found for current user');
+        throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('Employee', 'userId', requestingUserId));
       }
       where.employeeId = employee.id;
-    } else if (employeeId) {
-      where.employeeId = employeeId;
     }
 
+    // Handle date range with special end date logic (set to end of day)
     if (startDate || endDate) {
-      where.dateTime = {};
+      where.dateTime = {} as Prisma.DateTimeFilter;
       if (startDate) {
         where.dateTime.gte = new Date(startDate);
       }
@@ -75,10 +82,6 @@ export class CheckInOutsService {
         endDateTime.setHours(23, 59, 59, 999);
         where.dateTime.lte = endDateTime;
       }
-    }
-
-    if (status) {
-      where.status = status;
     }
 
     const total = await this.prisma.checkInOut.count({ where });
@@ -154,7 +157,7 @@ export class CheckInOutsService {
     });
 
     if (!checkInOut) {
-      throw new NotFoundException(`Check-in/out record with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Check-in/out record', id));
     }
 
     // Check permissions
@@ -185,7 +188,7 @@ export class CheckInOutsService {
         where: { id: updateDto.employeeId },
       });
       if (!employee) {
-        throw new NotFoundException(`Employee with ID ${updateDto.employeeId} not found`);
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', updateDto.employeeId));
       }
       updateData.employee = { connect: { id: updateDto.employeeId } };
     }

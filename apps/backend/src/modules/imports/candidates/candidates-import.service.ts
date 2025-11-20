@@ -9,6 +9,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
@@ -214,7 +216,7 @@ const CANDIDATE_FIELD_DEFINITIONS: CandidateImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class CandidatesImportService {
+export class CandidatesImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -223,7 +225,9 @@ export class CandidatesImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -350,7 +354,7 @@ export class CandidatesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'candidates') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -398,7 +402,7 @@ export class CandidatesImportService {
     });
 
     if (!fieldMapping[CandidateImportField.EMAIL]) {
-      throw new BadRequestException('Email must be mapped for candidate import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('email mapping'));
     }
 
     const hasFirstName = !!fieldMapping[CandidateImportField.FIRST_NAME];
@@ -420,7 +424,7 @@ export class CandidatesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'candidates') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -1069,7 +1073,7 @@ export class CandidatesImportService {
 
     const email = this.extractValue(row, mapping, CandidateImportField.EMAIL, isOdooImport);
     if (!email) {
-      throw new BadRequestException('Email is required for each candidate row.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('email'));
     }
 
     let firstName =
@@ -1225,7 +1229,7 @@ export class CandidatesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'candidates') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as
@@ -1316,7 +1320,7 @@ export class CandidatesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'candidates') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -10,6 +11,9 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -22,25 +26,17 @@ import { CloseOpportunityDto } from './dto/close-opportunity.dto';
 import { SendOpportunityEmailDto } from './dto/send-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
-
 @Injectable()
-export class OpportunitiesService {
+export class OpportunitiesService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private formatOpportunity(opportunity: any) {
     if (!opportunity) {
@@ -71,26 +67,32 @@ export class OpportunitiesService {
   private buildWhereClause(
     filters: FilterOpportunitiesDto,
   ): Prisma.OpportunityWhereInput {
-    const where: Prisma.OpportunityWhereInput = {};
+    // Use QueryBuilder for standard filters, but handle complex search manually
+    const { search, ...baseFilters } = filters;
+    
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.OpportunityWhereInput>(
+      baseFilters,
+    );
 
-    if (filters.search) {
-      where.OR = [
+    // Handle complex search across relations (manual implementation)
+    if (search) {
+      baseWhere.OR = [
         {
           title: {
-            contains: filters.search,
+            contains: search,
             mode: Prisma.QueryMode.insensitive,
           },
         },
         {
           description: {
-            contains: filters.search,
+            contains: search,
             mode: Prisma.QueryMode.insensitive,
           },
         },
         {
           lead: {
             title: {
-              contains: filters.search,
+              contains: search,
               mode: Prisma.QueryMode.insensitive,
             },
           },
@@ -103,19 +105,19 @@ export class OpportunitiesService {
                   OR: [
                     {
                       firstName: {
-                        contains: filters.search,
+                        contains: search,
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
                     {
                       lastName: {
-                        contains: filters.search,
+                        contains: search,
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
                     {
                       companyName: {
-                        contains: filters.search,
+                        contains: search,
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
@@ -128,7 +130,7 @@ export class OpportunitiesService {
         {
           customer: {
             name: {
-              contains: filters.search,
+              contains: search,
               mode: Prisma.QueryMode.insensitive,
             },
           },
@@ -136,57 +138,28 @@ export class OpportunitiesService {
       ];
     }
 
-    if (filters.customerId) {
-      where.customerId = filters.customerId;
-    }
-
-    if (filters.assignedToId) {
-      where.assignedToId = filters.assignedToId;
-    }
-
-    if (filters.leadId) {
-      where.leadId = filters.leadId;
-    }
-
-    if (filters.type) {
-      where.type = filters.type;
-    }
-
+    // Handle stage filter with case-insensitive matching
     if (filters.stage) {
-      where.stage = {
+      baseWhere.stage = {
         equals: filters.stage,
         mode: Prisma.QueryMode.insensitive,
       };
     }
 
-    if (filters.isClosed !== undefined) {
-      where.isClosed = filters.isClosed;
-    }
-
-    if (filters.isWon !== undefined) {
-      where.isWon = filters.isWon;
-    }
-
-    return where;
+    return baseWhere;
   }
 
   private validateSortField(sortBy?: string) {
-    if (!sortBy) {
-      return;
-    }
-
-    const allowed = ['createdAt', 'updatedAt', 'value', 'stage', 'title'];
-    if (!allowed.includes(sortBy)) {
-      throw new BadRequestException(`Unsupported sort field: ${sortBy}`);
+    try {
+      QueryBuilder.validateSortField(sortBy, ['createdAt', 'updatedAt', 'value', 'stage', 'title']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
     }
   }
 
-  async findAll(
-    filters: FilterOpportunitiesDto,
-  ): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterOpportunitiesDto) {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
-    const skip = (page - 1) * pageSize;
 
     const sortBy = filters.sortBy ?? 'createdAt';
     const sortOrder = filters.sortOrder ?? 'desc';
@@ -194,12 +167,12 @@ export class OpportunitiesService {
 
     const where = this.buildWhereClause(filters);
 
-    const [total, opportunities] = await this.prisma.$transaction([
-      this.prisma.opportunity.count({ where }),
-      this.prisma.opportunity.findMany({
-        where,
-        skip,
-        take: pageSize,
+    const result = await this.paginate(
+      this.prisma.opportunity,
+      where,
+      {
+        page,
+        pageSize,
         orderBy: {
           [sortBy]: sortOrder,
         },
@@ -245,19 +218,14 @@ export class OpportunitiesService {
             },
           },
         },
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: opportunities.map((opportunity) =>
+      ...result,
+      data: result.data.map((opportunity) =>
         this.formatOpportunity(opportunity),
       ),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
     };
   }
 
@@ -308,7 +276,7 @@ export class OpportunitiesService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     return this.formatOpportunity(opportunity);
@@ -328,7 +296,7 @@ export class OpportunitiesService {
     });
 
     if (!customer) {
-      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', customerId));
     }
 
     return customer;
@@ -357,7 +325,7 @@ export class OpportunitiesService {
     });
 
     if (!lead) {
-      throw new NotFoundException(`Lead with ID ${leadId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', leadId));
     }
 
     return lead;
@@ -375,16 +343,16 @@ export class OpportunitiesService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
     }
 
     if (!user.isActive) {
-      throw new BadRequestException('Opportunities can only be assigned to active users.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('assign opportunity', 'user must be active'));
     }
 
     if (!this.allowedAssigneeRoles.has(user.role)) {
       throw new BadRequestException(
-        'Opportunities can only be assigned to admins or salespeople.',
+        ErrorMessages.OPERATION_NOT_ALLOWED('assign opportunity', 'only admins or salespeople can be assigned')
       );
     }
   }
@@ -444,7 +412,7 @@ export class OpportunitiesService {
         resolvedCustomerId !== lead.convertedCustomerId
       ) {
         throw new BadRequestException(
-          'Lead is already converted to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead is already converted to a different customer')
         );
       }
       resolvedCustomerId = lead.convertedCustomerId ?? undefined;
@@ -457,7 +425,7 @@ export class OpportunitiesService {
       );
       if (contactWithDifferentCustomer) {
         throw new BadRequestException(
-          'Lead contact belongs to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead contact belongs to a different customer')
         );
       }
     }
@@ -561,7 +529,7 @@ export class OpportunitiesService {
       // Do this outside the transaction to avoid scoping issues
       if (createDto.title || createDto.description) {
         this.processMentions(formatted.id, createDto.title, createDto.description, createdById).catch((error) => {
-          console.error(`[Mentions] Failed to process mentions for opportunity ${formatted.id}:`, error);
+          this.logger.error(`[Mentions] Failed to process mentions for opportunity ${formatted.id}:`, error);
         });
       }
       return formatted;
@@ -577,12 +545,12 @@ export class OpportunitiesService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     const targetLeadId = updateDto.leadId ?? existing.leadId;
     if (!targetLeadId) {
-      throw new BadRequestException('Opportunity must be associated with a lead');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('lead (opportunity must be associated with a lead)'));
     }
 
     const lead = await this.findLeadContext(targetLeadId);
@@ -598,7 +566,7 @@ export class OpportunitiesService {
         resolvedCustomerId !== lead.convertedCustomerId
       ) {
         throw new BadRequestException(
-          'Lead is already converted to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead is already converted to a different customer')
         );
       }
       resolvedCustomerId = lead.convertedCustomerId ?? undefined;
@@ -611,7 +579,7 @@ export class OpportunitiesService {
       );
       if (contactWithDifferentCustomer) {
         throw new BadRequestException(
-          'Lead contact belongs to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead contact belongs to a different customer')
         );
       }
     }
@@ -760,7 +728,7 @@ export class OpportunitiesService {
       });
 
       if (!result) {
-        throw new NotFoundException(`Opportunity with ID ${id} not found after update`);
+        throw new NotFoundException(ErrorMessages.UPDATE_FAILED('Opportunity'));
       }
 
       return this.formatOpportunity(result);
@@ -770,7 +738,7 @@ export class OpportunitiesService {
         const title = updateDto.title ?? formatted.title;
         const description = updateDto.description ?? formatted.description;
         this.processMentions(id, title, description, updatedById).catch((error) => {
-          console.error(`[Mentions] Failed to process mentions for opportunity ${id}:`, error);
+          this.logger.error(`[Mentions] Failed to process mentions for opportunity ${id}:`, error);
         });
       }
       return formatted;
@@ -786,7 +754,7 @@ export class OpportunitiesService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -911,7 +879,7 @@ export class OpportunitiesService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     let htmlContent = dto.htmlContent;
@@ -983,7 +951,7 @@ export class OpportunitiesService {
         htmlContent = rendered.html;
         textContent = rendered.text;
       } catch (templateError) {
-        console.warn(
+        this.logger.warn(
           `[Opportunities] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
           templateError,
         );
@@ -992,9 +960,7 @@ export class OpportunitiesService {
         textContent = this.getDefaultOpportunityEmailText(opportunity, templateData);
       }
     } else if (!htmlContent) {
-      throw new BadRequestException(
-        'Either templateId or htmlContent must be provided',
-      );
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('templateId or htmlContent'));
     }
 
     // Parse CC and BCC
@@ -1011,7 +977,7 @@ export class OpportunitiesService {
     });
 
     if (!success) {
-      throw new BadRequestException('Failed to send email');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('send email', 'email service failed'));
     }
 
     return {
@@ -1123,7 +1089,7 @@ ${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` 
         return;
       }
 
-      console.log(`[Mentions] Processing mentions for opportunity ${opportunityId}:`, {
+      this.logger.log(`[Mentions] Processing mentions for opportunity ${opportunityId}:`, {
         identifiers,
         textPreview: text.substring(0, 100),
       });
@@ -1131,13 +1097,13 @@ ${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` 
       // Find users by mentions
       const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
       
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      this.logger.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
       
       // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
       const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
       
       if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        this.logger.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
         return;
       }
 
@@ -1163,10 +1129,10 @@ ${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` 
         opportunityId,
       );
 
-      console.log(`[Mentions] Created ${notifications.length} notifications for opportunity ${opportunityId}`);
+      this.logger.log(`[Mentions] Created ${notifications.length} notifications for opportunity ${opportunityId}`);
     } catch (error) {
       // Log error but don't fail the opportunity creation/update
-      console.error(`[Mentions] Error processing mentions for opportunity ${opportunityId}:`, error);
+      this.logger.error(`[Mentions] Error processing mentions for opportunity ${opportunityId}:`, error);
     }
   }
 }

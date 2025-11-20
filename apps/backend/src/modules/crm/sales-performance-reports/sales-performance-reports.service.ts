@@ -7,6 +7,9 @@ import {
 } from '@nestjs/common';
 import { UserRole, Prisma, TemplateType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateSalesPerformanceReportDto } from './dto/create-sales-performance-report.dto';
 import { UpdateSalesPerformanceReportDto } from './dto/update-sales-performance-report.dto';
 import { FilterSalesPerformanceReportsDto } from './dto/filter-sales-performance-reports.dto';
@@ -17,13 +20,15 @@ import { PreviewSalesPerformanceReportDto } from './dto/preview-sales-performanc
 import { SendSalesPerformanceReportDto } from './dto/send-sales-performance-report.dto';
 
 @Injectable()
-export class SalesPerformanceReportsService {
+export class SalesPerformanceReportsService extends BaseService {
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private pdfService: PdfService,
     private templatesService: TemplatesService,
     private emailService: EmailService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly reportInclude = {
     salesperson: {
@@ -47,7 +52,7 @@ export class SalesPerformanceReportsService {
     });
 
     if (!salesperson) {
-      throw new NotFoundException(`Salesperson with ID ${salespersonId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Salesperson', salespersonId));
     }
 
     if (salesperson.role !== UserRole.SALESPERSON && salesperson.role !== UserRole.ADMIN) {
@@ -130,49 +135,53 @@ export class SalesPerformanceReportsService {
     userId: string,
     userRole: UserRole,
   ) {
-    const where: Prisma.SalesPerformanceReportWhereInput = {};
+    // Build base where clause using QueryBuilder
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.SalesPerformanceReportWhereInput>(
+      filters,
+      {
+        dateFields: ['weekEnding'],
+        fieldMappings: {
+          weekEndingFrom: 'weekEnding',
+          weekEndingTo: 'weekEnding',
+        },
+      },
+    );
 
     // If user is a salesperson, only show their own reports
     if (userRole === UserRole.SALESPERSON) {
-      where.salespersonId = userId;
+      baseWhere.salespersonId = userId;
     } else if (filters.salespersonId) {
-      where.salespersonId = filters.salespersonId;
+      baseWhere.salespersonId = filters.salespersonId;
     }
 
+    // Handle date range filtering
     if (filters.weekEndingFrom || filters.weekEndingTo) {
-      where.weekEnding = {};
+      const weekEndingFilter: Prisma.DateTimeFilter = {};
       if (filters.weekEndingFrom) {
-        where.weekEnding.gte = new Date(filters.weekEndingFrom);
+        weekEndingFilter.gte = new Date(filters.weekEndingFrom);
       }
       if (filters.weekEndingTo) {
-        where.weekEnding.lte = new Date(filters.weekEndingTo);
+        weekEndingFilter.lte = new Date(filters.weekEndingTo);
       }
+      baseWhere.weekEnding = weekEndingFilter;
     }
 
+    const where = baseWhere;
     const page = filters.page || 1;
     const pageSize = filters.pageSize || 10;
-    const skip = (page - 1) * pageSize;
 
-    const [data, total] = await Promise.all([
-      this.prisma.salesPerformanceReport.findMany({
-        where,
-        include: this.reportInclude,
-        orderBy: { weekEnding: 'desc' },
-        skip,
-        take: pageSize,
-      }),
-      this.prisma.salesPerformanceReport.count({ where }),
-    ]);
-
-    return {
-      data,
-      meta: {
+    const result = await this.paginate(
+      this.prisma.salesPerformanceReport,
+      where,
+      {
         page,
         pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
+        include: this.reportInclude,
+        orderBy: { weekEnding: 'desc' },
       },
-    };
+    );
+
+    return result;
   }
 
   /**
@@ -185,7 +194,7 @@ export class SalesPerformanceReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Sales performance report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Sales performance report', id));
     }
 
     // If user is a salesperson, only allow access to their own reports
@@ -210,7 +219,7 @@ export class SalesPerformanceReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Sales performance report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Sales performance report', id));
     }
 
     // If user is a salesperson, only allow updates to their own reports
@@ -312,7 +321,7 @@ export class SalesPerformanceReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Sales performance report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Sales performance report', id));
     }
 
     // Only admins can delete reports
@@ -560,7 +569,7 @@ export class SalesPerformanceReportsService {
         });
 
         if (!template) {
-          throw new NotFoundException(`Template with ID ${previewDto.templateId} not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Template', previewDto.templateId));
         }
 
         usedTemplateId = template.id;
@@ -610,7 +619,7 @@ export class SalesPerformanceReportsService {
     const report = await this.findOne(id, userId, userRole);
 
     if (!sendDto.to || sendDto.to.length === 0) {
-      throw new BadRequestException('At least one recipient email address is required');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('recipient email addresses'));
     }
 
     // Generate PDF

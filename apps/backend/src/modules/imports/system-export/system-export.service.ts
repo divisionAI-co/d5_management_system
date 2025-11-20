@@ -1,5 +1,7 @@
 import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { Prisma } from '@prisma/client';
 
 interface SystemExportData {
@@ -15,8 +17,7 @@ interface SystemExportData {
 }
 
 @Injectable()
-export class SystemExportService {
-  private readonly logger = new Logger(SystemExportService.name);
+export class SystemExportService extends BaseService {
 
   // Define export order to maintain referential integrity
   // Models without foreign keys first, then models that depend on them
@@ -94,7 +95,9 @@ export class SystemExportService {
     'dataImport',
   ];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   /**
    * Export all system data to JSON format
@@ -137,7 +140,7 @@ export class SystemExportService {
       return exportData;
     } catch (error) {
       this.logger.error('Failed to export system data:', error);
-      throw new InternalServerErrorException('Failed to export system data');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('system data'));
     }
   }
 
@@ -270,7 +273,7 @@ export class SystemExportService {
 
       // Validate export data structure
       if (!exportData.version || !exportData.data) {
-        throw new BadRequestException('Invalid export data format');
+        throw new BadRequestException(ErrorMessages.INVALID_INPUT('export data format'));
       }
 
       // If clearExisting is true, delete all data first in a separate transaction
@@ -311,7 +314,7 @@ export class SystemExportService {
       };
     } catch (error: any) {
       this.logger.error('Failed to import system data:', error);
-      throw new InternalServerErrorException(`Failed to import system data: ${error.message}`);
+      throw new InternalServerErrorException(ErrorMessages.CREATE_FAILED('system data') + `: ${error.message}`);
     }
   }
 

@@ -1,16 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { Prisma } from '@prisma/client';
 import { PdfService } from '../../../common/pdf/pdf.service';
 import { CreatePerformanceReviewDto } from './dto/create-performance-review.dto';
 import { UpdatePerformanceReviewDto } from './dto/update-performance-review.dto';
 
 @Injectable()
-export class PerformanceReviewsService {
+export class PerformanceReviewsService extends BaseService {
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private pdfService: PdfService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async create(createReviewDto: CreatePerformanceReviewDto) {
     // Verify employee exists
@@ -22,7 +27,7 @@ export class PerformanceReviewsService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${createReviewDto.employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', createReviewDto.employeeId));
     }
 
     return this.prisma.performanceReview.create({
@@ -57,11 +62,9 @@ export class PerformanceReviewsService {
   }
 
   async findAll(filters?: { employeeId?: string }) {
-    const where: any = {};
-
-    if (filters?.employeeId) {
-      where.employeeId = filters.employeeId;
-    }
+    const where = QueryBuilder.buildWhereClause<Prisma.PerformanceReviewWhereInput>(
+      filters || {},
+    );
 
     return this.prisma.performanceReview.findMany({
       where,
@@ -105,7 +108,7 @@ export class PerformanceReviewsService {
     });
 
     if (!review) {
-      throw new NotFoundException(`Performance review with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Performance review', id));
     }
 
     return review;

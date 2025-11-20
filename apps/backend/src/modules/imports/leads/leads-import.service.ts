@@ -9,6 +9,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
@@ -150,7 +152,7 @@ const LEAD_FIELD_DEFINITIONS: LeadImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class LeadsImportService {
+export class LeadsImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -159,7 +161,9 @@ export class LeadsImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -286,7 +290,7 @@ export class LeadsImportService {
       where: { id },
     });
     if (!importRecord || importRecord.type !== 'leads') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -351,7 +355,7 @@ export class LeadsImportService {
     });
 
     if (!importRecord || importRecord.type !== 'leads') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -586,7 +590,7 @@ export class LeadsImportService {
     });
 
     if (!importRecord || importRecord.type !== 'leads') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

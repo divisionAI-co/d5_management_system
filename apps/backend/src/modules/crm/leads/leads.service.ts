@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CustomerSentiment, CustomerStatus, CustomerType, LeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { FilterLeadsDto } from './dto/filter-leads.dto';
@@ -9,8 +12,10 @@ import { ConvertLeadDto } from './dto/convert-lead.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 @Injectable()
-export class LeadsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class LeadsService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private formatLead(lead: any) {
     if (!lead) return lead;
@@ -63,7 +68,9 @@ export class LeadsService {
       if (contacts.length !== createDto.contactIds.length) {
         const foundIds = new Set(contacts.map(c => c.id));
         const missingIds = createDto.contactIds.filter(id => !foundIds.has(id));
-        throw new NotFoundException(`Contacts not found: ${missingIds.join(', ')}`);
+        throw new NotFoundException(
+          ErrorMessages.NOT_FOUND_BY_FIELD('Contacts', 'id', missingIds.join(', '))
+        );
       }
       return contacts.map(c => c.id);
     }
@@ -72,7 +79,7 @@ export class LeadsService {
     if (createDto.contactId) {
       const existing = await this.prisma.contact.findUnique({ where: { id: createDto.contactId } });
       if (!existing) {
-        throw new NotFoundException(`Contact ${createDto.contactId} not found`);
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Contact', createDto.contactId));
       }
       return [existing.id];
     }
@@ -146,12 +153,13 @@ export class LeadsService {
   }
 
   async create(createLeadDto: CreateLeadDto) {
-    const contactIds = await this.resolveContacts(createLeadDto);
+    return this.handlePrismaError(async () => {
+      const contactIds = await this.resolveContacts(createLeadDto);
 
-    // Create lead with first contactId for backward compatibility (legacy field)
-    const firstContactId = contactIds[0];
+      // Create lead with first contactId for backward compatibility (legacy field)
+      const firstContactId = contactIds[0];
 
-    const lead = await this.prisma.lead.create({
+      const lead = await this.prisma.lead.create({
       data: {
         contactId: firstContactId, // Legacy field for backward compatibility
         title: createLeadDto.title,
@@ -180,12 +188,12 @@ export class LeadsService {
       },
     });
 
-    return this.findOne(lead.id);
+      return this.findOne(lead.id);
+    }, ErrorMessages.CREATE_FAILED('Lead'));
   }
 
   async findAll(filters: FilterLeadsDto) {
     const { page = 1, pageSize = 25 } = filters;
-    const skip = (page - 1) * pageSize;
 
     const where = this.buildWhereClause(filters);
 
@@ -193,13 +201,13 @@ export class LeadsService {
       [filters.sortBy ?? 'createdAt']: filters.sortOrder ?? 'desc',
     };
 
-    const [total, leads] = await this.prisma.$transaction([
-      this.prisma.lead.count({ where }),
-      this.prisma.lead.findMany({
-        where,
+    const result = await this.paginate(
+      this.prisma.lead,
+      where,
+      {
+        page,
+        pageSize,
         orderBy,
-        skip,
-        take: pageSize,
         include: {
           // New many-to-many relationship
           contacts: {
@@ -233,17 +241,12 @@ export class LeadsService {
             },
           },
         },
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: leads.map((lead) => this.formatLead(lead)),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+      ...result,
+      data: result.data.map((lead) => this.formatLead(lead)),
     };
   }
 
@@ -320,7 +323,7 @@ export class LeadsService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Lead with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', id));
     }
 
     // Handle contact updates
@@ -335,7 +338,9 @@ export class LeadsService {
       if (contacts.length !== updateDto.contactIds.length) {
         const foundIds = new Set(contacts.map(c => c.id));
         const missingIds = updateDto.contactIds.filter(id => !foundIds.has(id));
-        throw new NotFoundException(`Contacts not found: ${missingIds.join(', ')}`);
+        throw new NotFoundException(
+          ErrorMessages.NOT_FOUND_BY_FIELD('Contacts', 'id', missingIds.join(', '))
+        );
       }
       contactIds = contacts.map(c => c.id);
       firstContactId = contactIds[0];
@@ -344,7 +349,7 @@ export class LeadsService {
     else if (updateDto.contactId) {
       const newContact = await this.prisma.contact.findUnique({ where: { id: updateDto.contactId } });
       if (!newContact) {
-        throw new NotFoundException(`Contact ${updateDto.contactId} not found`);
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Contact', updateDto.contactId));
       }
       firstContactId = newContact.id;
       contactIds = [newContact.id];
@@ -418,11 +423,13 @@ export class LeadsService {
     });
 
     if (!lead) {
-      throw new NotFoundException(`Lead with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', id));
     }
 
     if (lead.convertedCustomerId) {
-      throw new BadRequestException('Lead is already converted to a customer');
+      throw new BadRequestException(
+        ErrorMessages.OPERATION_NOT_ALLOWED('convert', 'Lead is already converted to a customer')
+      );
     }
 
     // Get the first contact for customer link (or use contactId if contacts array is empty)
@@ -442,7 +449,7 @@ export class LeadsService {
       if (customerId) {
         const existingCustomer = await tx.customer.findUnique({ where: { id: customerId } });
         if (!existingCustomer) {
-          throw new NotFoundException(`Customer ${customerId} not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', customerId));
         }
       } else {
         const customer = await tx.customer.create({

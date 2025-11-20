@@ -2,10 +2,14 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, CompanySettings, NotificationType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { CreateRemoteWorkLogDto } from './dto/create-remote-work-log.dto';
 import {
@@ -28,11 +32,13 @@ type ExtendedCompanySettings = CompanySettings & {
 };
 
 @Injectable()
-export class RemoteWorkService {
+export class RemoteWorkService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly MAX_REMOTE_DAYS_PER_WINDOW = 3;
   private readonly defaultWindowState = {
@@ -89,7 +95,7 @@ export class RemoteWorkService {
     const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
     const match = dateOnly.match(dateRegex);
     if (!match) {
-      throw new BadRequestException(`Invalid date format: ${dateString}. Expected YYYY-MM-DD or ISO date string.`);
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('date format', 'expected YYYY-MM-DD or ISO date string'));
     }
 
     const year = parseInt(match[1], 10);
@@ -144,7 +150,7 @@ export class RemoteWorkService {
       !resolvedSettings.remoteWorkWindowStart ||
       !resolvedSettings.remoteWorkWindowEnd
     ) {
-      throw new BadRequestException('Remote work submissions are currently closed.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('submit remote work', 'submissions are currently closed'));
     }
 
     const start = this.normalizeDate(resolvedSettings.remoteWorkWindowStart);
@@ -156,7 +162,7 @@ export class RemoteWorkService {
       const normalized = this.normalizeDate(checkDate);
       if (normalized < start || normalized > end) {
         throw new BadRequestException(
-          'Selected date is outside the active remote work window.',
+          ErrorMessages.INVALID_INPUT('date', 'selected date is outside the active remote work window'),
         );
       }
     }
@@ -195,7 +201,7 @@ export class RemoteWorkService {
 
     if (logsCount >= limit) {
       throw new BadRequestException(
-        `Remote work limit of ${limit} day(s) reached for the current ${resolvedSettings.remoteWorkFrequency.toLowerCase()} period`,
+        ErrorMessages.OPERATION_NOT_ALLOWED('submit remote work', `remote work limit of ${limit} day(s) reached for the current ${resolvedSettings.remoteWorkFrequency.toLowerCase()} period`),
       );
     }
   }
@@ -214,7 +220,7 @@ export class RemoteWorkService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', employeeId));
     }
 
     if (employee.userId !== userId) {
@@ -267,7 +273,7 @@ export class RemoteWorkService {
         error.code === 'P2002'
       ) {
         throw new BadRequestException(
-          'A remote work log already exists for this date',
+          ErrorMessages.ALREADY_EXISTS('Remote work log', 'date'),
         );
       }
       throw error;
@@ -280,22 +286,30 @@ export class RemoteWorkService {
     startDate?: string;
     endDate?: string;
   }) {
-    const where: Prisma.RemoteWorkLogWhereInput = {};
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.RemoteWorkLogWhereInput>(
+      filters || {},
+      {
+        dateFields: ['date'],
+        fieldMappings: {
+          startDate: 'date',
+          endDate: 'date',
+        },
+      },
+    );
 
-    if (filters?.employeeId) {
-      where.employeeId = filters.employeeId;
-    }
-
-    if (filters?.userId) {
-      where.userId = filters.userId;
-    }
-
+    // Handle date range filtering
     if (filters?.startDate || filters?.endDate) {
-      where.date = {
-        gte: filters.startDate ? this.parseDateString(filters.startDate) : undefined,
-        lte: filters.endDate ? this.parseDateString(filters.endDate) : undefined,
-      };
+      const dateFilter: Prisma.DateTimeFilter = {};
+      if (filters.startDate) {
+        dateFilter.gte = this.parseDateString(filters.startDate);
+      }
+      if (filters.endDate) {
+        dateFilter.lte = this.parseDateString(filters.endDate);
+      }
+      baseWhere.date = dateFilter;
     }
+
+    const where = baseWhere;
 
     return this.prisma.remoteWorkLog.findMany({
       where,
@@ -394,7 +408,7 @@ export class RemoteWorkService {
     if (openDto.endDate) {
       end = this.parseDateString(openDto.endDate);
       if (Number.isNaN(end.getTime())) {
-        throw new BadRequestException('Invalid end date provided.');
+        throw new BadRequestException(ErrorMessages.INVALID_INPUT('end date', 'invalid date format'));
       }
       // Set end date to end of day (23:59:59.999) to include the full last day
       end.setUTCHours(23, 59, 59, 999);
@@ -406,7 +420,7 @@ export class RemoteWorkService {
     }
 
     if (end < start) {
-      throw new BadRequestException('Window end date must be on or after the start date.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('date range', 'window end date must be on or after the start date'));
     }
 
     const spanDays = Math.floor((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
@@ -429,7 +443,7 @@ export class RemoteWorkService {
 
     // Notify all users that remote work window is open
     this.notifyAllUsersRemoteWindowOpen(start, end).catch((error) => {
-      console.error('[RemoteWork] Failed to send notifications:', error);
+      this.logger.error('[RemoteWork] Failed to send notifications:', error);
     });
 
     return {
@@ -513,7 +527,7 @@ export class RemoteWorkService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', employeeId));
     }
 
     if (employee.userId !== userId) {

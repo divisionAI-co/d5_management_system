@@ -7,6 +7,8 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 
 interface CollectionFieldSelector<T> {
   key: string;
@@ -239,8 +241,10 @@ type SalesPerformanceReportPayload = Prisma.SalesPerformanceReportGetPayload<{
 }>;
 
 @Injectable()
-export class CollectionFieldResolver {
-  constructor(private readonly prisma: PrismaService) {}
+export class CollectionFieldResolver extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private formatEodTasks(tasks: Prisma.JsonValue | null | undefined): string | null {
     if (!tasks) {
@@ -2172,7 +2176,7 @@ export class CollectionFieldResolver {
   ensureCollectionSupported(entityType: AiEntityType, collectionKey: AiCollectionKey) {
     const definition = this.getCollectionDefinition(entityType, collectionKey);
     if (!definition) {
-      throw new BadRequestException(`Collection ${collectionKey} is not supported for ${entityType}`);
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('collection', `${collectionKey} is not supported for ${entityType}`));
     }
   }
 
@@ -2183,14 +2187,14 @@ export class CollectionFieldResolver {
   ) {
     const definition = this.getCollectionDefinition(entityType, collectionKey);
     if (!definition) {
-      throw new BadRequestException(`Collection ${collectionKey} is not supported for ${entityType}`);
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('collection', `${collectionKey} is not supported for ${entityType}`));
     }
 
     const supportedKeys = new Set(definition.fields.map((field) => field.key));
     const unsupported = fieldKeys.filter((key) => !supportedKeys.has(key));
     if (unsupported.length > 0) {
       throw new BadRequestException(
-        `Unsupported fields for ${collectionKey}: ${unsupported.join(', ')}`,
+        ErrorMessages.INVALID_INPUT('field selection', `Unsupported fields for ${collectionKey}: ${unsupported.join(', ')}`),
       );
     }
   }

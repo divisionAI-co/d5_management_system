@@ -8,6 +8,8 @@ import { google } from 'googleapis';
 import type { calendar_v3 } from 'googleapis';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { GoogleOAuthService, type GoogleOAuthConfig } from '../google-oauth.service';
 import { CreateGoogleCalendarEventDto } from './dto/create-google-calendar-event.dto';
 
@@ -34,12 +36,14 @@ interface ListEventsOptions {
 }
 
 @Injectable()
-export class GoogleCalendarService {
+export class GoogleCalendarService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly googleOAuth: GoogleOAuthService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async getConnectionStatus(userId: string) {
     return this.googleOAuth.getConnectionStatus(userId, INTEGRATION_NAME);
@@ -78,7 +82,7 @@ export class GoogleCalendarService {
       });
       response = data;
     } catch (error) {
-      throw new InternalServerErrorException('Failed to fetch Google Calendar events.');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('Google Calendar events'));
     }
 
     await this.prisma.userCalendarIntegration.update({
@@ -129,11 +133,11 @@ export class GoogleCalendarService {
 
       createdEvent = data;
     } catch (error) {
-      throw new InternalServerErrorException('Failed to create Google Calendar event.');
+      throw new InternalServerErrorException(ErrorMessages.CREATE_FAILED('Google Calendar event'));
     }
 
     if (!createdEvent) {
-      throw new InternalServerErrorException('Google Calendar did not return a created event.');
+      throw new InternalServerErrorException(ErrorMessages.CREATE_FAILED('Google Calendar event'));
     }
 
     await this.prisma.userCalendarIntegration.update({
@@ -152,7 +156,7 @@ export class GoogleCalendarService {
     const mappedEvent = this.mapGoogleEvent(createdEvent);
 
     if (!mappedEvent) {
-      throw new InternalServerErrorException('Failed to map Google Calendar event response.');
+      throw new InternalServerErrorException(ErrorMessages.FETCH_FAILED('Google Calendar event data'));
     }
 
     return mappedEvent;
@@ -169,7 +173,7 @@ export class GoogleCalendarService {
     });
 
     if (!integration || !integration.isActive) {
-      throw new BadRequestException('Google Calendar integration is disabled.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('access Google Calendar', 'integration is disabled'));
     }
 
     return integration;

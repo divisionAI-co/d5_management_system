@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { Prisma, EmploymentStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 
@@ -13,8 +16,10 @@ interface EmployeeFilters {
 }
 
 @Injectable()
-export class EmployeesService {
-  constructor(private prisma: PrismaService) {}
+export class EmployeesService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   async create(createEmployeeDto: CreateEmployeeDto) {
     // Check if user exists
@@ -23,7 +28,7 @@ export class EmployeesService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${createEmployeeDto.userId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', createEmployeeDto.userId));
     }
 
     // Check if employee already exists for this user
@@ -32,7 +37,7 @@ export class EmployeesService {
     });
 
     if (existingEmployee) {
-      throw new ConflictException(`Employee already exists for user ID ${createEmployeeDto.userId}`);
+      throw new ConflictException(ErrorMessages.ALREADY_EXISTS('Employee', 'user'));
     }
 
     return this.prisma.employee.create({
@@ -61,19 +66,23 @@ export class EmployeesService {
     const rawPageSize = filters.pageSize ?? 10;
     const pageSize = Math.min(Math.max(rawPageSize, 1), 100);
 
-    const where: Prisma.EmployeeWhereInput = {};
+    // Build base where clause using QueryBuilder
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.EmployeeWhereInput>(
+      { ...filters, search },
+      {
+        searchFields: ['employeeNumber', 'jobTitle'],
+      },
+    );
 
+    // Handle status filter (validate enum)
     if (status && Object.values(EmploymentStatus).includes(status as EmploymentStatus)) {
-      where.status = status as EmploymentStatus;
+      baseWhere.status = status as EmploymentStatus;
     }
 
-    if (department) {
-      where.department = department;
-    }
-
+    // Handle search with nested user fields
     if (search && search.trim().length > 0) {
       const term = search.trim();
-      where.OR = [
+      baseWhere.OR = [
         { employeeNumber: { contains: term, mode: Prisma.QueryMode.insensitive } },
         { jobTitle: { contains: term, mode: Prisma.QueryMode.insensitive } },
         {
@@ -88,46 +97,38 @@ export class EmployeesService {
       ];
     }
 
-    const total = await this.prisma.employee.count({ where });
-    const pageCount = pageSize > 0 ? Math.ceil(total / pageSize) : 0;
-    const currentPage = pageCount > 0 ? Math.min(page, pageCount) : 1;
-    const skip = pageCount > 0 ? (currentPage - 1) * pageSize : 0;
+    const where = baseWhere;
 
-    const items = await this.prisma.employee.findMany({
+    const result = await this.paginate(
+      this.prisma.employee,
       where,
-      skip,
-      take: pageSize,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
-        _count: {
-          select: {
-            leaveRequests: true,
-            performanceReviews: true,
-          },
-        },
-      },
-      orderBy: {
-        hireDate: 'desc',
-      },
-    });
-
-    return {
-      data: items,
-      meta: {
-        page: currentPage,
+      {
+        page,
         pageSize,
-        total,
-        pageCount,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+          _count: {
+            select: {
+              leaveRequests: true,
+              performanceReviews: true,
+            },
+          },
+        },
+        orderBy: {
+          hireDate: 'desc',
+        },
       },
-    };
+    );
+
+    return result;
   }
 
   async findOne(id: string) {
@@ -159,7 +160,7 @@ export class EmployeesService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', id));
     }
 
     const recentEodReports = await this.prisma.eodReport.findMany({
@@ -191,7 +192,7 @@ export class EmployeesService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee for user ID ${userId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('Employee', 'userId', userId));
     }
 
     return employee;

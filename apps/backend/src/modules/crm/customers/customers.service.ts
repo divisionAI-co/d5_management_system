@@ -10,6 +10,9 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { FilterCustomersDto } from './dto/filter-customers.dto';
@@ -17,22 +20,14 @@ import { UpdateCustomerStatusDto } from './dto/update-customer-status.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 import { EncryptionService } from '../../../common/encryption/encryption.service';
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
-
 @Injectable()
-export class CustomersService {
+export class CustomersService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private formatCustomer(customer: any) {
     const formatted = {
@@ -92,90 +87,80 @@ export class CustomersService {
   }
 
   async create(createCustomerDto: CreateCustomerDto) {
-    const data: Prisma.CustomerCreateInput = {
-      name: createCustomerDto.name,
-      email: createCustomerDto.email.toLowerCase(),
-      phone: createCustomerDto.phone,
-      website: createCustomerDto.website,
-      industry: createCustomerDto.industry,
-      type: createCustomerDto.type,
-      status: createCustomerDto.status ?? CustomerStatus.ONBOARDING,
-      sentiment: createCustomerDto.sentiment ?? CustomerSentiment.NEUTRAL,
-      address: createCustomerDto.address,
-      city: createCustomerDto.city,
-      country: createCustomerDto.country,
-      postalCode: createCustomerDto.postalCode,
-      taxId: this.encryptionService.encrypt(createCustomerDto.taxId),
-      registrationId: this.encryptionService.encrypt(createCustomerDto.registrationId),
-      currency: createCustomerDto.currency ?? 'USD',
-      notes: createCustomerDto.notes,
-      tags: createCustomerDto.tags ?? [],
-      odooId: createCustomerDto.odooId,
-    };
+    return this.handlePrismaError(async () => {
+      const data: Prisma.CustomerCreateInput = {
+        name: createCustomerDto.name,
+        email: createCustomerDto.email.toLowerCase(),
+        phone: createCustomerDto.phone,
+        website: createCustomerDto.website,
+        industry: createCustomerDto.industry,
+        type: createCustomerDto.type,
+        status: createCustomerDto.status ?? CustomerStatus.ONBOARDING,
+        sentiment: createCustomerDto.sentiment ?? CustomerSentiment.NEUTRAL,
+        address: createCustomerDto.address,
+        city: createCustomerDto.city,
+        country: createCustomerDto.country,
+        postalCode: createCustomerDto.postalCode,
+        taxId: this.encryptionService.encrypt(createCustomerDto.taxId),
+        registrationId: this.encryptionService.encrypt(createCustomerDto.registrationId),
+        currency: createCustomerDto.currency ?? 'USD',
+        notes: createCustomerDto.notes,
+        tags: createCustomerDto.tags ?? [],
+        odooId: createCustomerDto.odooId,
+      };
 
-    if (createCustomerDto.monthlyValue !== undefined) {
-      data.monthlyValue = new Prisma.Decimal(createCustomerDto.monthlyValue);
-    }
+      if (createCustomerDto.monthlyValue !== undefined) {
+        data.monthlyValue = new Prisma.Decimal(createCustomerDto.monthlyValue);
+      }
 
-    const customer = await this.prisma.customer.create({ data });
-    return this.findOne(customer.id);
+      const customer = await this.prisma.customer.create({ data });
+      return this.findOne(customer.id);
+    }, ErrorMessages.CREATE_FAILED('Customer'));
   }
 
   private buildWhereClause(filters: FilterCustomersDto): Prisma.CustomerWhereInput {
-    const where: Prisma.CustomerWhereInput = {};
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.CustomerWhereInput>(
+      filters,
+      {
+        searchFields: ['name', 'email', 'industry', 'website'],
+      },
+    );
 
-    if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-        { email: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-        { industry: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-        { website: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-      ];
-    }
-
-    if (filters.type) {
-      where.type = filters.type as CustomerType;
-    }
-
-    if (filters.status) {
-      where.status = filters.status as CustomerStatus;
-    }
-
-    if (filters.sentiment) {
-      where.sentiment = filters.sentiment as CustomerSentiment;
-    }
-
+    // Handle special filters
     if (filters.country) {
-      where.country = {
+      baseWhere.country = {
         equals: filters.country,
         mode: Prisma.QueryMode.insensitive,
       };
     }
 
     if (filters.tags && filters.tags.length > 0) {
-      where.tags = { hasEvery: filters.tags };
+      baseWhere.tags = { hasEvery: filters.tags };
     }
 
-    return where;
+    return baseWhere;
   }
 
-  async findAll(filters: FilterCustomersDto): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterCustomersDto) {
     const { page = 1, pageSize = 25 } = filters;
-    const skip = (page - 1) * pageSize;
 
     const sortBy = (filters.sortBy ?? 'createdAt') as keyof Prisma.CustomerOrderByWithRelationInput;
     const sortOrder = filters.sortOrder ?? 'desc';
 
-    if (!['name', 'createdAt', 'updatedAt', 'monthlyValue'].includes(sortBy)) {
-      throw new BadRequestException(`Unsupported sort field: ${sortBy}`);
+    try {
+      QueryBuilder.validateSortField(sortBy, ['name', 'createdAt', 'updatedAt', 'monthlyValue']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
     }
 
     const where = this.buildWhereClause(filters);
 
-    const [total, items] = await this.prisma.$transaction([
-      this.prisma.customer.count({ where }),
-      this.prisma.customer.findMany({
-        where,
+    const result = await this.paginate(
+      this.prisma.customer,
+      where,
+      {
+        page,
+        pageSize,
         orderBy: {
           [sortBy]: sortOrder,
         },
@@ -187,19 +172,12 @@ export class CustomersService {
             },
           },
         },
-        skip,
-        take: pageSize,
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: items.map((item) => this.formatCustomer(item)),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+      ...result,
+      data: result.data.map((item) => this.formatCustomer(item)),
     };
   }
 
@@ -244,7 +222,7 @@ export class CustomersService {
     });
 
     if (!customer) {
-      throw new NotFoundException(`Customer with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', id));
     }
 
     const contacts = await this.prisma.contact.findMany({
@@ -271,10 +249,11 @@ export class CustomersService {
   }
 
   async update(id: string, updateCustomerDto: UpdateCustomerDto) {
-    const existing = await this.prisma.customer.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException(`Customer with ID ${id} not found`);
-    }
+    return this.handlePrismaError(async () => {
+      const existing = await this.prisma.customer.findUnique({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', id));
+      }
 
     const data: Prisma.CustomerUpdateInput = {
       name: updateCustomerDto.name,
@@ -307,12 +286,13 @@ export class CustomersService {
       data.monthlyValue = new Prisma.Decimal(updateCustomerDto.monthlyValue);
     }
 
-    await this.prisma.customer.update({
-      where: { id },
-      data,
-    });
+      await this.prisma.customer.update({
+        where: { id },
+        data,
+      });
 
-    return this.findOne(id);
+      return this.findOne(id);
+    }, ErrorMessages.UPDATE_FAILED('Customer'));
   }
 
   async updateStatus(id: string, updateStatusDto: UpdateCustomerStatusDto) {
@@ -338,19 +318,21 @@ export class CustomersService {
   }
 
   async remove(id: string) {
-    const existing = await this.prisma.customer.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundException(`Customer with ID ${id} not found`);
-    }
+    return this.handlePrismaError(async () => {
+      const existing = await this.prisma.customer.findUnique({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', id));
+      }
 
-    await this.prisma.customer.delete({ where: { id } });
-    return { deleted: true };
+      await this.prisma.customer.delete({ where: { id } });
+      return { deleted: true };
+    }, ErrorMessages.DELETE_FAILED('Customer'));
   }
 
   async getCustomerActivities(id: string, take = 20) {
     const customer = await this.prisma.customer.findUnique({ where: { id } });
     if (!customer) {
-      throw new NotFoundException(`Customer with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', id));
     }
 
     const activities = await this.prisma.activity.findMany({
@@ -366,7 +348,7 @@ export class CustomersService {
   async getCustomerOpportunities(id: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id } });
     if (!customer) {
-      throw new NotFoundException(`Customer with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', id));
     }
 
     const opportunities = await this.prisma.opportunity.findMany({

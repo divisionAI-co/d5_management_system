@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, Res, HttpStatus, BadRequestException, Logger } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import * as https from 'https';
@@ -7,6 +7,7 @@ import { Public } from '../../common/decorators/public.decorator';
 @ApiTags('Templates')
 @Controller({ path: 'templates/proxy', version: '1' })
 export class GoogleDriveProxyController {
+  private readonly logger = new Logger(GoogleDriveProxyController.name);
   @Public()
   @Get('google-drive-image')
   @ApiOperation({ summary: 'Proxy Google Drive images to bypass CORS restrictions (public endpoint). Returns full resolution image.' })
@@ -36,7 +37,7 @@ export class GoogleDriveProxyController {
       https.get(url, (proxyRes) => {
         // Handle redirects (301, 302, 303, 307, 308)
         if (proxyRes.statusCode && proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
-          console.log(`Following redirect to: ${proxyRes.headers.location}`);
+          this.logger.log(`Following redirect to: ${proxyRes.headers.location}`);
           fetchImage(proxyRes.headers.location, redirectCount + 1);
           return;
         }
@@ -57,7 +58,7 @@ export class GoogleDriveProxyController {
         // Pipe the image data to the response
         proxyRes.pipe(res);
       }).on('error', (error) => {
-        console.error('Error proxying Google Drive image:', error);
+        this.logger.error('Error proxying Google Drive image:', error);
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Failed to fetch image');
       });
     };
@@ -65,7 +66,7 @@ export class GoogleDriveProxyController {
     try {
       fetchImage(googleDriveUrl);
     } catch (error) {
-      console.error('Error in Google Drive proxy:', error);
+      this.logger.error('Error in Google Drive proxy:', error);
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Failed to fetch image');
     }
   }

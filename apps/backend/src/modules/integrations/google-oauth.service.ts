@@ -9,6 +9,8 @@ import { google } from 'googleapis';
 import type { Credentials } from 'google-auth-library';
 import type { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { EncryptionService } from '../../common/encryption/encryption.service';
 
 export interface GoogleOAuthConfig {
@@ -31,14 +33,14 @@ export interface ConnectionStatus {
 }
 
 @Injectable()
-export class GoogleOAuthService {
-  private readonly logger = new Logger(GoogleOAuthService.name);
-
+export class GoogleOAuthService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   /**
    * Get connection status for a user
@@ -108,7 +110,7 @@ export class GoogleOAuthService {
       oauthClient.setCredentials(tokens);
     } catch (error) {
       throw new BadRequestException(
-        `Failed to exchange authorization code with Google for ${config.errorPrefix}.`,
+        ErrorMessages.OPERATION_NOT_ALLOWED(`exchange authorization code with Google for ${config.errorPrefix}`),
       );
     }
 
@@ -125,7 +127,7 @@ export class GoogleOAuthService {
       userInfoId = data.id ?? undefined;
     } catch (error) {
       throw new InternalServerErrorException(
-        `Connected to Google but failed to fetch account details for ${config.errorPrefix}.`,
+        ErrorMessages.FETCH_FAILED(`account details for ${config.errorPrefix}`),
       );
     }
 
@@ -195,7 +197,7 @@ export class GoogleOAuthService {
 
     if (!connection || !connection.refreshToken) {
       throw new InternalServerErrorException(
-        `${config.errorPrefix} is not connected for this user.`,
+        ErrorMessages.OPERATION_NOT_ALLOWED(`access ${config.errorPrefix}`, 'integration is not connected for this user'),
       );
     }
 
@@ -237,12 +239,12 @@ export class GoogleOAuthService {
         // If it's an invalid_grant error, the refresh token is invalid/revoked
         if (error?.response?.data?.error === 'invalid_grant') {
           throw new BadRequestException(
-            `Your ${config.errorPrefix} connection has expired. Please reconnect your account.`,
+            ErrorMessages.OPERATION_NOT_ALLOWED(`use ${config.errorPrefix}`, 'connection has expired. Please reconnect your account'),
           );
         }
         
         throw new BadRequestException(
-          `Failed to refresh ${config.errorPrefix} access token. Please try reconnecting your account.`,
+          ErrorMessages.OPERATION_NOT_ALLOWED(`refresh ${config.errorPrefix} access token`, 'Please try reconnecting your account'),
         );
       }
     }
@@ -264,7 +266,7 @@ export class GoogleOAuthService {
 
     if (!clientId || !clientSecret) {
       throw new InternalServerErrorException(
-        `${config.errorPrefix} OAuth credentials are not configured. Please set ${config.clientIdEnvKey} and ${config.clientSecretEnvKey}.`,
+        ErrorMessages.MISSING_REQUIRED_FIELD(`${config.errorPrefix} OAuth credentials`) + `. Please set ${config.clientIdEnvKey} and ${config.clientSecretEnvKey}.`,
       );
     }
 

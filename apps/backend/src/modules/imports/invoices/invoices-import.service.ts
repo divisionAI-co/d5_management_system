@@ -9,6 +9,8 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { parseSpreadsheet } from '../../../common/utils/spreadsheet-parser';
 import { validateFileUpload } from '../../../common/config/multer.config';
 import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
@@ -205,7 +207,7 @@ const INVOICE_FIELD_DEFINITIONS: InvoiceImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class InvoicesImportService {
+export class InvoicesImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -214,7 +216,9 @@ export class InvoicesImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -340,7 +344,7 @@ export class InvoicesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'invoices') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -388,19 +392,19 @@ export class InvoicesImportService {
     });
 
     if (!fieldMapping[InvoiceImportField.INVOICE_NUMBER]) {
-      throw new BadRequestException('Invoice number must be mapped.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('invoice number mapping'));
     }
 
     if (!fieldMapping[InvoiceImportField.ISSUE_DATE]) {
-      throw new BadRequestException('Issue date must be mapped.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('issue date mapping'));
     }
 
     if (!fieldMapping[InvoiceImportField.DUE_DATE]) {
-      throw new BadRequestException('Due date must be mapped.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('due date mapping'));
     }
 
     if (!fieldMapping[InvoiceImportField.TOTAL]) {
-      throw new BadRequestException('Total amount must be mapped.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('total amount mapping'));
     }
 
     return fieldMapping;
@@ -412,7 +416,7 @@ export class InvoicesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'invoices') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -1050,7 +1054,7 @@ export class InvoicesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'invoices') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

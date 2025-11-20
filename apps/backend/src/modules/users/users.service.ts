@@ -1,10 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { addHours } from 'date-fns';
 import { randomBytes } from 'crypto';
 import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { QueryBuilder } from '../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FilterUsersDto } from './dto/filter-users.dto';
@@ -53,12 +56,14 @@ const USER_PROFILE_SELECT = Prisma.validator<Prisma.UserSelect>()({
 });
 
 @Injectable()
-export class UsersService {
+export class UsersService extends BaseService {
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private emailService: EmailService,
     private configService: ConfigService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async create(createUserDto: CreateUserDto) {
     const { sendInvite = false, password, ...rest } = createUserDto;
@@ -67,7 +72,7 @@ export class UsersService {
     const sanitizedPhone = rest.phone?.trim() || undefined;
 
     if (!sendInvite && (!password || password.length < 8)) {
-      throw new BadRequestException('Password must be provided and at least 8 characters long.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('password', 'must be at least 8 characters long'));
     }
 
     const passwordToHash = sendInvite ? this.generateRandomPassword() : password!;
@@ -184,15 +189,15 @@ export class UsersService {
     });
 
     if (!record) {
-      throw new BadRequestException('Reset link is invalid or has already been used.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('reset link', 'invalid or has already been used'));
     }
 
     if (record.usedAt) {
-      throw new BadRequestException('Reset link has already been used.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('reset link', 'has already been used'));
     }
 
     if (record.expiresAt < new Date()) {
-      throw new BadRequestException('Reset link has expired.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('reset link', 'has expired'));
     }
 
     return record;
@@ -229,43 +234,51 @@ export class UsersService {
       sortOrder = 'desc',
     } = filters;
 
-    const where: Prisma.UserWhereInput = {};
+    // Build base where clause using QueryBuilder
+    const { search: searchFilter, role: roleFilter, isActive: isActiveFilter, ...baseFilters } = filters;
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.UserWhereInput>(
+      baseFilters,
+      {
+        searchFields: ['firstName', 'lastName', 'email'],
+      },
+    );
 
+    // Handle search manually (QueryBuilder already handles it, but we want to ensure it's trimmed)
     if (search) {
       const trimmed = search.trim();
       if (trimmed) {
-        where.OR = [
-          { firstName: { contains: trimmed, mode: 'insensitive' } },
-          { lastName: { contains: trimmed, mode: 'insensitive' } },
-          { email: { contains: trimmed, mode: 'insensitive' } },
+        baseWhere.OR = [
+          { firstName: { contains: trimmed, mode: Prisma.QueryMode.insensitive } },
+          { lastName: { contains: trimmed, mode: Prisma.QueryMode.insensitive } },
+          { email: { contains: trimmed, mode: Prisma.QueryMode.insensitive } },
         ];
       }
     }
 
+    // Handle excludeRoles (takes precedence over role filter)
     if (excludeRoles && excludeRoles.length > 0) {
-      // If excludeRoles is provided, use it (this takes precedence over role filter)
-      where.role = {
+      baseWhere.role = {
         notIn: excludeRoles,
       };
-      console.log('[UsersService] Excluding roles:', excludeRoles);
-    } else if (role) {
+      this.logger.log('[UsersService] Excluding roles:', excludeRoles);
+    } else if (roleFilter) {
       // Only use role filter if excludeRoles is not provided
-      where.role = role;
+      baseWhere.role = roleFilter;
     }
 
-    if (typeof isActive === 'boolean') {
-      where.isActive = isActive;
+    // Handle isActive filter
+    if (typeof isActiveFilter === 'boolean') {
+      baseWhere.isActive = isActiveFilter;
     }
 
     const orderBy: Prisma.UserOrderByWithRelationInput = {
       [sortBy]: sortOrder,
     };
 
-    console.log('[UsersService] Query where clause:', JSON.stringify(where, null, 2));
-    
+    // Use manual pagination since we need to use 'select' instead of 'include'
     const [items, total] = await this.prisma.$transaction([
       this.prisma.user.findMany({
-        where,
+        where: baseWhere,
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy,
@@ -298,14 +311,8 @@ export class UsersService {
           },
         },
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: baseWhere }),
     ]);
-
-    console.log('[UsersService] Found', items.length, 'users. Roles:', items.map(u => u.role));
-    const employeeCount = items.filter(u => u.role === 'EMPLOYEE').length;
-    if (employeeCount > 0) {
-      console.error('[UsersService] ERROR: Found', employeeCount, 'EMPLOYEE users when they should be excluded!');
-    }
 
     return {
       data: items,
@@ -313,7 +320,7 @@ export class UsersService {
         total,
         page,
         pageSize,
-        totalPages: Math.ceil(total / pageSize),
+        pageCount: Math.ceil(total / pageSize),
       },
     };
   }
@@ -325,7 +332,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', id));
     }
 
     return user;
@@ -415,7 +422,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', id));
     }
 
     return user;
@@ -454,7 +461,7 @@ export class UsersService {
     });
 
     if (!existingUser) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
     }
 
     const data: Prisma.UserUpdateInput = {};
@@ -463,7 +470,7 @@ export class UsersService {
       const trimmedFirstName = dto.firstName.trim();
 
       if (!trimmedFirstName) {
-        throw new BadRequestException('First name cannot be empty');
+        throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('firstName'));
       }
 
       data.firstName = trimmedFirstName;
@@ -473,7 +480,7 @@ export class UsersService {
       const trimmedLastName = dto.lastName.trim();
 
       if (!trimmedLastName) {
-        throw new BadRequestException('Last name cannot be empty');
+        throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('lastName'));
       }
 
       data.lastName = trimmedLastName;
@@ -502,7 +509,7 @@ export class UsersService {
         });
 
         if (emailInUse && emailInUse.id !== userId) {
-          throw new BadRequestException('Email address is already in use');
+          throw new BadRequestException(ErrorMessages.ALREADY_EXISTS('User', 'email'));
         }
 
         data.email = normalizedEmail;
@@ -511,7 +518,7 @@ export class UsersService {
 
     if (dto.newPassword) {
       if (!dto.currentPassword) {
-        throw new BadRequestException('Current password is required to set a new password');
+        throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('current password'));
       }
 
       const isCurrentPasswordValid = await bcrypt.compare(
@@ -520,12 +527,12 @@ export class UsersService {
       );
 
       if (!isCurrentPasswordValid) {
-        throw new BadRequestException('Current password is incorrect');
+        throw new BadRequestException(ErrorMessages.INVALID_INPUT('current password', 'incorrect'));
       }
 
       data.password = await bcrypt.hash(dto.newPassword, 10);
     } else if (dto.currentPassword) {
-      throw new BadRequestException('New password is required when providing the current password');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('new password'));
     }
 
     if (Object.keys(data).length > 0) {
@@ -626,11 +633,11 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', id));
     }
 
     if (!user.isActive) {
-      throw new BadRequestException('Cannot send reset link for an inactive user.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('send reset link', 'user is inactive'));
     }
 
     const { token } = await this.generatePasswordResetToken(

@@ -19,6 +19,8 @@ import { sanitizeFilename } from '../../../common/utils/file-sanitizer';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { ExecuteEmployeeImportDto } from './dto/execute-employee-import.dto';
 import {
   EmployeeFieldMappingEntry,
@@ -181,7 +183,7 @@ const EMPLOYEE_FIELD_DEFINITIONS: EmployeeImportFieldMetadata[] = [
 ];
 
 @Injectable()
-export class EmployeesImportService {
+export class EmployeesImportService extends BaseService {
   private readonly uploadDir = path.join(
     process.cwd(),
     'apps',
@@ -190,7 +192,9 @@ export class EmployeesImportService {
     'imports',
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureUploadDir() {
     await fs.mkdir(this.uploadDir, { recursive: true });
@@ -316,7 +320,7 @@ export class EmployeesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'employees') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     return {
@@ -364,7 +368,7 @@ export class EmployeesImportService {
     });
 
     if (!fieldMapping[EmployeeImportField.EMAIL]) {
-      throw new BadRequestException('Email must be mapped for employee import.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('email mapping'));
     }
 
     if (!fieldMapping[EmployeeImportField.EMPLOYEE_NUMBER]) {
@@ -394,7 +398,7 @@ export class EmployeesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'employees') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const buffer = await this.readImportFile(importRecord);
@@ -586,7 +590,7 @@ export class EmployeesImportService {
   ) {
     const email = this.extractValue(row, mapping, EmployeeImportField.EMAIL);
     if (!email) {
-      throw new BadRequestException('Email is required for each employee row.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('email'));
     }
 
     let firstName =
@@ -638,7 +642,7 @@ export class EmployeesImportService {
     );
     const hireDate = this.parseDate(hireDateValue);
     if (!hireDate) {
-      throw new BadRequestException('Hire date is required for each employee.');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('hire date'));
     }
 
     const terminationDate = this.parseDate(
@@ -736,7 +740,7 @@ export class EmployeesImportService {
     });
 
     if (!importRecord || importRecord.type !== 'employees') {
-      throw new NotFoundException('Import not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Import', id));
     }
 
     const mappingPayload = importRecord.fieldMapping as

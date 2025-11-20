@@ -6,6 +6,9 @@ import {
 import { QuoteStatus, Prisma, TemplateType } from '@prisma/client';
 import { format } from 'date-fns';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { PdfService } from '../../../common/pdf/pdf.service';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
@@ -15,13 +18,15 @@ import { FilterQuotesDto } from './dto/filter-quotes.dto';
 import { SendQuoteDto } from './dto/send-quote.dto';
 
 @Injectable()
-export class QuotesService {
+export class QuotesService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly pdfService: PdfService,
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly quoteInclude = {
     lead: {
@@ -135,7 +140,7 @@ export class QuotesService {
     });
 
     if (!lead) {
-      throw new NotFoundException(`Lead with ID ${createQuoteDto.leadId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', createQuoteDto.leadId));
     }
 
     // Verify opportunity exists if provided
@@ -145,7 +150,7 @@ export class QuotesService {
       });
 
       if (!opportunity) {
-        throw new NotFoundException(`Opportunity with ID ${createQuoteDto.opportunityId} not found`);
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', createQuoteDto.opportunityId));
       }
     }
 
@@ -158,7 +163,7 @@ export class QuotesService {
     });
 
     if (existing) {
-      throw new BadRequestException(`Quote number ${quoteNumber} already exists`);
+      throw new BadRequestException(ErrorMessages.ALREADY_EXISTS('Quote', 'quote number'));
     }
 
     const quote = await this.prisma.quote.create({
@@ -190,8 +195,8 @@ export class QuotesService {
   }
 
   async findAll(filters: FilterQuotesDto) {
-    const { page = 1, pageSize = 25 } = filters;
-    const skip = (page - 1) * pageSize;
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 25;
 
     const where = this.buildWhereClause(filters);
 
@@ -199,25 +204,20 @@ export class QuotesService {
       [filters.sortBy ?? 'createdAt']: filters.sortOrder ?? 'desc',
     };
 
-    const [total, quotes] = await this.prisma.$transaction([
-      this.prisma.quote.count({ where }),
-      this.prisma.quote.findMany({
-        where,
-        orderBy,
-        skip,
-        take: pageSize,
-        include: this.quoteInclude,
-      }),
-    ]);
-
-    return {
-      data: quotes.map((quote: any) => this.formatQuote(quote)),
-      meta: {
+    const result = await this.paginate(
+      this.prisma.quote,
+      where,
+      {
         page,
         pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+        orderBy,
+        include: this.quoteInclude,
+      }
+    );
+
+    return {
+      ...result,
+      data: result.data.map((quote: any) => this.formatQuote(quote)),
     };
   }
 
@@ -228,7 +228,7 @@ export class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundException(`Quote with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Quote', id));
     }
 
     return this.formatQuote(quote);
@@ -240,7 +240,7 @@ export class QuotesService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Quote with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Quote', id));
     }
 
     // Check if quote number is being updated and if it already exists
@@ -250,7 +250,7 @@ export class QuotesService {
       });
 
       if (existingWithNumber) {
-        throw new BadRequestException(`Quote number ${updateDto.quoteNumber} already exists`);
+        throw new BadRequestException(ErrorMessages.ALREADY_EXISTS('Quote', 'quote number'));
       }
     }
 
@@ -261,7 +261,7 @@ export class QuotesService {
       });
 
       if (!lead) {
-        throw new NotFoundException(`Lead with ID ${updateDto.leadId} not found`);
+        throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', updateDto.leadId));
       }
     }
 
@@ -273,7 +273,7 @@ export class QuotesService {
         });
 
         if (!opportunity) {
-          throw new NotFoundException(`Opportunity with ID ${updateDto.opportunityId} not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', updateDto.opportunityId));
         }
       }
     }
@@ -313,7 +313,7 @@ export class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundException(`Quote with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Quote', id));
     }
 
     await this.prisma.quote.delete({
@@ -520,7 +520,7 @@ export class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundException(`Quote with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Quote', id));
     }
 
     const activities = await this.prisma.activity.findMany({
@@ -607,30 +607,13 @@ export class QuotesService {
     }));
   }
 
-  private buildWhereClause(filters: FilterQuotesDto): any {
-    const where: any = {};
-
-    if (filters.search) {
-      where.OR = [
-        { title: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-        { quoteNumber: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-        { description: { contains: filters.search, mode: Prisma.QueryMode.insensitive } },
-      ];
-    }
-
-    if (filters.leadId) {
-      where.leadId = filters.leadId;
-    }
-
-    if (filters.opportunityId) {
-      where.opportunityId = filters.opportunityId;
-    }
-
-    if (filters.status) {
-      where.status = filters.status;
-    }
-
-    return where;
+  private buildWhereClause(filters: FilterQuotesDto): Prisma.QuoteWhereInput {
+    return QueryBuilder.buildWhereClause<Prisma.QuoteWhereInput>(
+      filters,
+      {
+        searchFields: ['title', 'quoteNumber', 'description'],
+      },
+    );
   }
 
   private formatQuote(quote: any) {

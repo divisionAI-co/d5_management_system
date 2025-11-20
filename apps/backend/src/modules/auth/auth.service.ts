@@ -7,6 +7,8 @@ import * as QRCode from 'qrcode';
 import * as crypto from 'crypto';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -14,33 +16,35 @@ import { EmailService } from '../../common/email/email.service';
 import { EncryptionService } from '../../common/encryption/encryption.service';
 
 @Injectable()
-export class AuthService {
+export class AuthService extends BaseService {
   private static readonly DEFAULT_REFRESH_EXPIRY = '30d';
 
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private usersService: UsersService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
     private encryptionService: EncryptionService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findByEmail(email);
     
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('access this account'));
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Account is inactive');
+      throw new UnauthorizedException(ErrorMessages.OPERATION_NOT_ALLOWED('login', 'Account is inactive'));
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('access this account'));
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -68,7 +72,7 @@ export class AuthService {
 
       const isValid = await this.verifyTwoFactorCode(user.id, loginDto.twoFactorCode);
       if (!isValid) {
-        throw new UnauthorizedException('Invalid 2FA code');
+        throw new UnauthorizedException(ErrorMessages.INVALID_INPUT('2FA code'));
       }
     }
 
@@ -92,7 +96,7 @@ export class AuthService {
     const existingUser = await this.usersService.findByEmail(registerDto.email);
     
     if (existingUser) {
-      throw new BadRequestException('Email already exists');
+      throw new BadRequestException(ErrorMessages.ALREADY_EXISTS('User', 'email'));
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -187,7 +191,7 @@ export class AuthService {
       });
 
       if (!payload?.sid) {
-        throw new UnauthorizedException('Invalid refresh token');
+        throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('refresh token'));
       }
 
       const session = await this.prisma.userSession.findUnique({
@@ -195,11 +199,11 @@ export class AuthService {
       });
 
       if (!session) {
-        throw new UnauthorizedException('Invalid refresh token');
+        throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('refresh token'));
       }
 
       if (session.revokedAt || session.expiresAt < new Date()) {
-        throw new UnauthorizedException('Invalid refresh token');
+        throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('refresh token'));
       }
 
       const presentedHash = this.hashToken(refreshToken);
@@ -213,13 +217,13 @@ export class AuthService {
           },
         });
 
-        throw new UnauthorizedException('Invalid refresh token');
+        throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('refresh token'));
       }
 
       const user = await this.usersService.findById(payload.sub);
       
       if (!user || !user.isActive) {
-        throw new UnauthorizedException('Invalid token');
+        throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('use this token'));
       }
 
       await this.prisma.userSession.update({
@@ -346,13 +350,13 @@ export class AuthService {
     const user = await this.usersService.findByIdWithSecret(userId);
 
     if (!user.twoFactorSecret) {
-      throw new BadRequestException('2FA secret not generated');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('2FA secret'));
     }
 
     // Decrypt the secret before verification
     const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
     if (!decryptedSecret) {
-      throw new BadRequestException('2FA secret is invalid');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('2FA secret'));
     }
 
     const isValid = speakeasy.totp.verify({
@@ -363,7 +367,7 @@ export class AuthService {
     });
 
     if (!isValid) {
-      throw new BadRequestException('Invalid 2FA code');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('2FA code'));
     }
 
     await this.prisma.user.update({

@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, NotFoundException, Logger } from '@nes
 import { ActivityVisibility, AiEntityType, AiCollectionKey, AiCollectionFormat, AiActionExecutionStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { ActivitiesService } from '../activities/activities.service';
 import { CreateActivityDto } from '../activities/dto/create-activity.dto';
 import { GeminiService } from './gemini.service';
@@ -30,17 +32,18 @@ interface ExecuteAdhocOptions {
 }
 
 @Injectable()
-export class AiActionExecutor {
-  private readonly logger = new Logger(AiActionExecutor.name);
+export class AiActionExecutor extends BaseService {
   private activityTypeId?: string;
 
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly activitiesService: ActivitiesService,
     private readonly geminiService: GeminiService,
     private readonly entityFieldResolver: EntityFieldResolver,
     private readonly collectionResolver: CollectionFieldResolver,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async executeSavedAction(options: ExecuteSavedActionOptions) {
     const prisma = this.prisma as any;
@@ -55,10 +58,10 @@ export class AiActionExecutor {
     });
 
     if (!action) {
-      throw new NotFoundException('Gemini action not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Gemini action', options.actionId));
     }
     if (!action.isActive) {
-      throw new BadRequestException('Gemini action is inactive');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('execute action', 'action is inactive'));
     }
 
     const fieldKeys =
@@ -620,7 +623,7 @@ export class AiActionExecutor {
         // Reports don't have specific activity targets, return undefined
         return undefined;
       default:
-        throw new BadRequestException(`Unsupported entity type ${entityType} for activity creation`);
+        throw new BadRequestException(ErrorMessages.INVALID_INPUT('entity type', `${entityType} is not supported for activity creation`));
     }
   }
 
@@ -873,19 +876,19 @@ export class AiActionExecutor {
     });
 
     if (!execution) {
-      throw new NotFoundException('Execution not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Execution', executionId));
     }
 
     if (execution.status !== 'SUCCESS') {
-      throw new BadRequestException('Execution must be successful before applying changes');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('apply changes', 'execution must be successful'));
     }
 
     if (execution.appliedAt) {
-      throw new BadRequestException('Changes have already been applied');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('apply changes', 'changes have already been applied'));
     }
 
     if (!execution.proposedChanges) {
-      throw new BadRequestException('No proposed changes to apply');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('proposed changes'));
     }
 
     const changes = execution.proposedChanges as {
@@ -897,7 +900,7 @@ export class AiActionExecutor {
 
     if (changes.operation === 'UPDATE') {
       if (!changes.entityId) {
-        throw new BadRequestException('Entity ID is required for UPDATE operations');
+        throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('entity ID for UPDATE operations'));
       }
 
       // Get current entity values (reload to ensure we have latest, but use oldValue from proposedChanges for display)
@@ -1001,7 +1004,7 @@ export class AiActionExecutor {
 
       return updated;
     } else {
-      throw new BadRequestException(`Unsupported operation type: ${changes.operation}`);
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('operation type', `${changes.operation} is not supported`));
     }
   }
 
