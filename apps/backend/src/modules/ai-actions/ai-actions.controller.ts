@@ -118,7 +118,10 @@ export class AiActionsController {
   }
 
   @Post(':id/execute')
-  @ApiOperation({ summary: 'Execute a saved Gemini action for an entity' })
+  @ApiOperation({
+    summary: 'Execute a saved Gemini action for an entity',
+    description: 'Execute a saved action. Omit entityId in the body to run on all records of the entity type.',
+  })
   executeSaved(
     @Param('id') actionId: string,
     @Body() dto: ExecuteAiActionDto,
@@ -135,7 +138,10 @@ export class AiActionsController {
   }
 
   @Post('execute')
-  @ApiOperation({ summary: 'Execute an ad-hoc Gemini prompt for an entity' })
+  @ApiOperation({
+    summary: 'Execute an ad-hoc Gemini prompt for an entity',
+    description: 'Execute an ad-hoc prompt. Omit entityId in the body to run on all records of the entity type.',
+  })
   executeAdhoc(@Body() dto: ExecuteAdhocAiActionDto, @CurrentUser('id') userId: string) {
     return this.aiActionExecutor.executeAdhoc({
       entityType: dto.entityType,

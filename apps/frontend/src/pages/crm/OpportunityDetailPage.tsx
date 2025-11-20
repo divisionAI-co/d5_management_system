@@ -222,7 +222,7 @@ export default function OpportunityDetailPage() {
 
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => navigate(`/crm/quotes?opportunityId=${opportunity.id}`)}
+            onClick={() => navigate(`/crm/quotes?opportunityId=${opportunity.id}&leadId=${opportunity.lead.id}`)}
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <FileText className="h-4 w-4" /> View Quotes

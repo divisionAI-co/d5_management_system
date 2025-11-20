@@ -76,6 +76,13 @@ export class QuotesService {
         email: true,
       },
     },
+    template: {
+      select: {
+        id: true,
+        name: true,
+        type: true,
+      },
+    },
     activities: {
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -174,6 +181,7 @@ export class QuotesService {
             : undefined,
         currency: createQuoteDto.currency || 'USD',
         status: createQuoteDto.status || QuoteStatus.DRAFT,
+        templateId: createQuoteDto.templateId,
       },
       include: this.quoteInclude,
     });
@@ -291,6 +299,7 @@ export class QuotesService {
             : undefined,
         currency: updateDto.currency,
         status: updateDto.status,
+        templateId: updateDto.templateId !== undefined ? updateDto.templateId : undefined,
       },
       include: this.quoteInclude,
     });
@@ -323,8 +332,14 @@ export class QuotesService {
     // Use templatesService to render the template with proper helpers
     let renderedHtml: string;
     try {
-      const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
-      renderedHtml = rendered.html;
+      // Use selected template if available, otherwise use default
+      if (quote.templateId) {
+        const rendered = await this.templatesService.render(quote.templateId, data);
+        renderedHtml = rendered.html;
+      } else {
+        const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
+        renderedHtml = rendered.html;
+      }
     } catch (error) {
       // Fallback to default template if no template found or rendering fails
       const templateHtml = this.getDefaultTemplate();
@@ -369,8 +384,14 @@ export class QuotesService {
 
     // Use templatesService to render the template with proper helpers
     try {
-      const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
-      return { html: rendered.html };
+      // Use selected template if available, otherwise use default
+      if (quote.templateId) {
+        const rendered = await this.templatesService.render(quote.templateId, data);
+        return { html: rendered.html };
+      } else {
+        const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
+        return { html: rendered.html };
+      }
     } catch (error) {
       // Fallback to default template if no template found or rendering fails
       const templateHtml = this.getDefaultTemplate();

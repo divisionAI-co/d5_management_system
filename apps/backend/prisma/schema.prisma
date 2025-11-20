@@ -349,6 +349,10 @@ model Quote {
   // PDF
   pdfUrl String?
 
+  // Template
+  templateId String?
+  template   Template? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -359,6 +363,7 @@ model Quote {
   @@index([opportunityId])
   @@index([status])
   @@index([sentBy])
+  @@index([templateId])
   @@map("quotes")
 }
 
@@ -1260,6 +1265,7 @@ enum AiCollectionKey {
   TASKS
   ACTIVITIES
   FEEDBACK_REPORTS
+  CHECK_IN_OUTS
 }
 
 enum AiCollectionFormat {
@@ -1535,6 +1541,9 @@ model Template {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  quotes Quote[]
 
   @@map("templates")
 }

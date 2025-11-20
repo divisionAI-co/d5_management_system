@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { checkInOutsApi } from '@/lib/api/hr';
+import { checkInOutsApi, employeesApi } from '@/lib/api/hr';
 import type { CheckInOut } from '@/types/hr/check-in-out';
 import { CheckInOutStatus } from '@/types/hr/check-in-out';
 import { format } from 'date-fns';
@@ -33,11 +33,31 @@ export function CheckInOutsList({
   );
   const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [statusFilter, setStatusFilter] = useState<CheckInOutStatus | ''>('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(employeeId || '');
   const [page, setPage] = useState(1);
   const pageSize = 25;
 
+  // Fetch employees for the filter dropdown (only for admin/HR)
+  const { data: employeesResponse } = useQuery({
+    queryKey: ['employees', 'for-filter'],
+    queryFn: () => employeesApi.getAll({ page: 1, pageSize: 100 }),
+    enabled: isPrivileged,
+  });
+
+  const employees = employeesResponse?.data ?? [];
+
+  // Sync selectedEmployeeId with employeeId prop when it changes (from navigation)
+  useEffect(() => {
+    if (employeeId) {
+      setSelectedEmployeeId(employeeId);
+    }
+  }, [employeeId]);
+
+  // Use employeeId prop if provided (from navigation), otherwise use the selectedEmployeeId filter
+  const effectiveEmployeeId = employeeId || selectedEmployeeId || undefined;
+
   const { data: response, isLoading } = useQuery({
-    queryKey: ['check-in-outs', employeeId, startDate, endDate, statusFilter, page, pageSize, isPrivileged],
+    queryKey: ['check-in-outs', effectiveEmployeeId, startDate, endDate, statusFilter, page, pageSize, isPrivileged],
     queryFn: async () => {
       const filters = {
         page,
@@ -45,7 +65,7 @@ export function CheckInOutsList({
         startDate,
         endDate,
         status: statusFilter || undefined,
-        employeeId: employeeId || undefined,
+        employeeId: effectiveEmployeeId,
       };
 
       return isPrivileged
@@ -73,7 +93,30 @@ export function CheckInOutsList({
     <div className="space-y-4">
       {/* Filters */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${isPrivileged ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+          {isPrivileged && (
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
+                Employee
+              </label>
+              <select
+                value={selectedEmployeeId}
+                onChange={(e) => {
+                  setSelectedEmployeeId(e.target.value);
+                  setPage(1); // Reset to first page when filter changes
+                }}
+                disabled={!!employeeId} // Disable if employeeId is provided via prop
+                className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-muted/70 disabled:cursor-not-allowed"
+              >
+                <option value="">All Employees</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.user ? `${emp.user.firstName} ${emp.user.lastName}` : emp.employeeNumber}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-1">
               Start Date
@@ -81,7 +124,10 @@ export function CheckInOutsList({
             <input
               type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setPage(1); // Reset to first page when filter changes
+              }}
               className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -92,7 +138,10 @@ export function CheckInOutsList({
             <input
               type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1); // Reset to first page when filter changes
+              }}
               className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -102,7 +151,10 @@ export function CheckInOutsList({
             </label>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as CheckInOutStatus | '')}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as CheckInOutStatus | '');
+                setPage(1); // Reset to first page when filter changes
+              }}
               className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All</option>

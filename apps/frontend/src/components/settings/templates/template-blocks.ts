@@ -357,10 +357,10 @@ const renderNormalImageOutside = (block: TemplateImageBlock, stackedBlocks: Temp
       bottom: 'align-items:flex-end;',
     }[block.overlayPosition ?? 'center'];
     
-    // For center alignment, use margin:0 auto; for left/right, rely on text-align
+    // For center alignment, use margin:0 auto; for left/right, use display:block
     const containerStyle = block.align === 'center' 
       ? `position:relative; display:block; max-width:100%; width:${block.width}px; margin:0 auto;`
-      : `position:relative; display:inline-block; max-width:100%; width:${block.width}px;`;
+      : `position:relative; display:block; max-width:100%; width:${block.width}px;`;
     
     return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%; background-color:#f8fafc;">
@@ -391,7 +391,7 @@ const renderNormalImageOutside = (block: TemplateImageBlock, stackedBlocks: Temp
   }
   
   // Regular image without overlay
-  // For center alignment, use margin:0 auto; for left/right, rely on text-align
+  // For center alignment, use margin:0 auto; for left/right, use display:block
   const imageDisplayStyle = block.align === 'center' 
     ? `max-width:100%; border-radius:8px; display:block; margin:0 auto;`
     : `max-width:100%; border-radius:8px; display:block;`;
@@ -401,7 +401,7 @@ const renderNormalImageOutside = (block: TemplateImageBlock, stackedBlocks: Temp
       <tbody>
         <tr>
           <td align="${block.align}" style="padding:20px 12px; text-align:${block.align};">
-            <div style="position:relative; display:${block.align === 'center' ? 'block' : 'inline-block'};">
+            <div style="position:relative; display:block;">
               <img
                 src="${imageUrl}"
                 alt="${escapeHtml(block.altText)}"
@@ -444,10 +444,10 @@ const renderImage = (block: TemplateImageBlock, stackedBlocks: TemplateBlock[] =
       bottom: 'align-items:flex-end;',
     }[block.overlayPosition ?? 'center'];
     
-    // For center alignment, use margin:0 auto; for left/right, rely on text-align
+    // For center alignment, use margin:0 auto; for left/right, use display:block
     const containerStyle = block.align === 'center' 
       ? `position:relative; display:block; max-width:100%; width:${block.width}px; margin:0 auto;`
-      : `position:relative; display:inline-block; max-width:100%; width:${block.width}px;`;
+      : `position:relative; display:block; max-width:100%; width:${block.width}px;`;
     
     return `
   <tr>
@@ -474,7 +474,7 @@ const renderImage = (block: TemplateImageBlock, stackedBlocks: TemplateBlock[] =
   }
   
   // Regular image without overlay
-  // For center alignment, use margin:0 auto; for left/right, rely on text-align
+  // For center alignment, use margin:0 auto; for left/right, use display:block
   const imageDisplayStyle = block.align === 'center' 
     ? `max-width:100%; border-radius:8px; display:block; margin:0 auto;`
     : `max-width:100%; border-radius:8px; display:block;`;
@@ -482,7 +482,7 @@ const renderImage = (block: TemplateImageBlock, stackedBlocks: TemplateBlock[] =
   return `
   <tr>
     <td align="${block.align}" style="padding:20px 24px; text-align:${block.align};">
-      <div style="position:relative; display:${block.align === 'center' ? 'block' : 'inline-block'};">
+      <div style="position:relative; display:block;">
         <img
           src="${imageUrl}"
           alt="${escapeHtml(block.altText)}"

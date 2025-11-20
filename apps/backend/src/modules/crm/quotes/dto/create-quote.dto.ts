@@ -75,5 +75,10 @@ export class CreateQuoteDto {
   @IsOptional()
   @IsEnum(QuoteStatus)
   status?: QuoteStatus;
+
+  @ApiPropertyOptional({ description: 'Template ID to use for PDF/preview generation' })
+  @IsOptional()
+  @IsUUID()
+  templateId?: string;
 }
 

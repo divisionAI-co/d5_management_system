@@ -10,7 +10,7 @@ import { CollectionFieldResolver } from './collection-field-resolver.service';
 
 interface ExecuteSavedActionOptions {
   actionId: string;
-  entityId: string;
+  entityId?: string; // Optional: if omitted, runs on all records
   fieldKeysOverride?: string[];
   promptOverride?: string;
   extraInstructions?: string;
@@ -19,7 +19,7 @@ interface ExecuteSavedActionOptions {
 
 interface ExecuteAdhocOptions {
   entityType: AiEntityType;
-  entityId: string;
+  entityId?: string; // Optional: if omitted, runs on all records
   fieldKeys: string[];
   prompt: string;
   extraInstructions?: string;
@@ -64,11 +64,14 @@ export class AiActionExecutor {
 
     this.entityFieldResolver.ensureFieldKeysSupported(action.entityType, fieldKeys);
 
-    const fieldValues = await this.entityFieldResolver.resolveFields(
-      action.entityType,
-      options.entityId,
-      fieldKeys,
-    );
+    // For bulk operations (no entityId), skip field resolution or use aggregate data
+    const fieldValues = options.entityId
+      ? await this.entityFieldResolver.resolveFields(
+          action.entityType,
+          options.entityId,
+          fieldKeys,
+        )
+      : {}; // Empty field values for bulk operations
 
     const collectionsData = await this.buildCollectionContext({
       actionEntityType: action.entityType,
@@ -95,20 +98,22 @@ export class AiActionExecutor {
       }
     }
 
-    const attachment = await prisma.aiActionAttachment.findFirst({
-      where: {
-        actionId: action.id,
-        entityType: action.entityType,
-        entityId: options.entityId,
-      },
-      select: { id: true },
-    });
+    const attachment = options.entityId
+      ? await prisma.aiActionAttachment.findFirst({
+          where: {
+            actionId: action.id,
+            entityType: action.entityType,
+            entityId: options.entityId,
+          },
+          select: { id: true },
+        })
+      : undefined;
 
     return this.executeWithGemini({
       actionId: action.id,
       attachmentId: attachment?.id,
       entityType: action.entityType,
-      entityId: options.entityId,
+      entityId: options.entityId ?? 'ALL', // Use 'ALL' as a placeholder for bulk operations
       model: action.model ?? undefined,
       fieldValues: promptContext,
       collectionContext: collectionsData.debugContext,
@@ -120,17 +125,20 @@ export class AiActionExecutor {
 
   async executeAdhoc(options: ExecuteAdhocOptions) {
     this.entityFieldResolver.ensureFieldKeysSupported(options.entityType, options.fieldKeys);
-    const fieldValues = await this.entityFieldResolver.resolveFields(
-      options.entityType,
-      options.entityId,
-      options.fieldKeys,
-    );
+    // For bulk operations (no entityId), skip field resolution
+    const fieldValues = options.entityId
+      ? await this.entityFieldResolver.resolveFields(
+          options.entityType,
+          options.entityId,
+          options.fieldKeys,
+        )
+      : {}; // Empty field values for bulk operations
 
     const prompt = this.interpolatePrompt(options.prompt, fieldValues, options.extraInstructions);
 
     return this.executeWithGemini({
       entityType: options.entityType,
-      entityId: options.entityId,
+      entityId: options.entityId ?? 'ALL', // Use 'ALL' as a placeholder for bulk operations
       model: options.model,
       fieldValues,
       prompt,
@@ -179,16 +187,20 @@ export class AiActionExecutor {
         model: params.model,
       });
 
-      const activity = await this.createActivityForExecution({
-        executionId: execution.id,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        triggeredById: params.triggeredById,
-        actionName: params.actionName,
-        outputText: result.text,
-        fieldValues: params.fieldValues,
-        collections: params.collectionContext,
-      });
+      // For bulk operations (entityId === 'ALL'), skip activity creation
+      // as activities require at least one target entity
+      const activity = params.entityId !== 'ALL'
+        ? await this.createActivityForExecution({
+            executionId: execution.id,
+            entityType: params.entityType,
+            entityId: params.entityId,
+            triggeredById: params.triggeredById,
+            actionName: params.actionName,
+            outputText: result.text,
+            fieldValues: params.fieldValues,
+            collections: params.collectionContext,
+          })
+        : null;
 
       const updated = await prisma.aiActionExecution.update({
         where: { id: execution.id },
@@ -197,11 +209,11 @@ export class AiActionExecutor {
           output: { text: result.text } as Prisma.InputJsonValue,
           rawOutput: this.safeStringify(result.rawResponse),
           completedAt: new Date(),
-          activityId: activity.id,
+          activityId: activity?.id ?? null,
         },
         include: {
           action: true,
-          activity: true,
+          activity: activity ? true : false,
         },
       });
 
@@ -277,9 +289,18 @@ export class AiActionExecutor {
     fieldValues: Record<string, unknown>;
     collections?: Record<string, { rows: Array<Record<string, unknown>>; formatted: string }>;
   }) {
+    // For bulk operations (entityId === 'ALL'), skip activity creation
+    // as activities require at least one target entity
+    if (params.entityId === 'ALL') {
+      return null;
+    }
+
     const activityTypeId = await this.getActivityTypeId();
 
     const targets = this.buildActivityTargets(params.entityType, params.entityId);
+    if (!targets) {
+      return null; // Should not happen for non-bulk operations, but handle gracefully
+    }
 
     const metadata = {
       aiActionExecutionId: params.executionId,
@@ -312,7 +333,7 @@ export class AiActionExecutor {
 
   private async buildCollectionContext(params: {
     actionEntityType: AiEntityType;
-    entityId: string;
+    entityId?: string; // Optional: if omitted, runs on all records
     collections: Array<{
       collectionKey: AiCollectionKey;
       format: AiCollectionFormat;
@@ -356,7 +377,7 @@ export class AiActionExecutor {
 
       const rows = await this.collectionResolver.resolveCollection({
         entityType: params.actionEntityType,
-        entityId: params.entityId,
+        entityId: params.entityId, // Can be undefined for bulk operations
         collectionKey: collection.collectionKey,
         limit: collection.limit ?? definition.defaultLimit,
         fieldKeys,
@@ -497,7 +518,12 @@ export class AiActionExecutor {
     return created.id;
   }
 
-  private buildActivityTargets(entityType: AiEntityType, entityId: string): CreateActivityDto['targets'] {
+  private buildActivityTargets(entityType: AiEntityType, entityId: string): CreateActivityDto['targets'] | undefined {
+    // For bulk operations, entityId will be 'ALL', so we don't set specific targets
+    if (entityId === 'ALL') {
+      return undefined; // No specific entity target for bulk operations
+    }
+
     switch (entityType) {
       case 'CANDIDATE':
         return { candidateId: entityId };

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   ChevronUp,
   Loader2,
   Pencil,
+  Play,
   Plus,
   RefreshCw,
   Sparkles,
@@ -17,6 +19,7 @@ import {
 import { aiActionsApi } from '@/lib/api/ai-actions';
 import type {
   AiActionCollectionSummary,
+  AiActionExecution,
   AiActionPayload,
   AiActionSummary,
   AiActionUpdatePayload,
@@ -30,6 +33,8 @@ import type {
 } from '@/types/ai-actions';
 import { cn } from '@/lib/utils';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { useToast } from '@/components/ui/use-toast';
+import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
 type FormMode = 'create' | 'edit';
 
@@ -87,6 +92,10 @@ export function AiActionsManager() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [collectionModal, setCollectionModal] = useState<CollectionModalState | null>(null);
+  const [showRunModal, setShowRunModal] = useState(false);
+  const [selectedActionForRun, setSelectedActionForRun] = useState<AiActionSummary | null>(null);
+  const [executionResult, setExecutionResult] = useState<AiActionExecution | null>(null);
+  const { toast } = useToast();
 
   const actionsQuery = useQuery({
     queryKey: ['ai-actions', 'admin'],
@@ -140,6 +149,29 @@ export function AiActionsManager() {
     },
     onError: () => {
       setError('Unable to delete Gemini action.');
+    },
+  });
+
+  const executeMutation = useMutation({
+    mutationFn: ({ actionId }: { actionId: string }) =>
+      aiActionsApi.executeSaved(actionId, {}),
+    onSuccess: (execution) => {
+      setExecutionResult(execution);
+      setShowRunModal(false);
+      toast({
+        title: 'Gemini request started',
+        description: 'The response will appear shortly.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions'] });
+    },
+    onError: (err: any) => {
+      const message = err?.response?.data?.message ?? 'Gemini request failed.';
+      setError(message);
+      toast({
+        title: 'Could not run action',
+        description: message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -513,10 +545,24 @@ export function AiActionsManager() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      {action.isActive && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedActionForRun(action);
+                            setShowRunModal(true);
+                          }}
+                          className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-blue-600"
+                          title="Run action"
+                        >
+                          <Play className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => openEditForm(action)}
                         className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                        title="Edit action"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -524,6 +570,7 @@ export function AiActionsManager() {
                         type="button"
                         onClick={() => handleDelete(action)}
                         className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-red-500"
+                        title="Delete action"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -535,6 +582,147 @@ export function AiActionsManager() {
           </tbody>
         </table>
       </div>
+
+      {showRunModal && selectedActionForRun && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card-elevated shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-blue-500" />
+                <h3 className="text-lg font-semibold text-foreground">Run Action</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRunModal(false);
+                  setSelectedActionForRun(null);
+                }}
+                className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{selectedActionForRun.name}</p>
+                {selectedActionForRun.description && (
+                  <p className="mt-1 text-xs text-muted-foreground">{selectedActionForRun.description}</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    defaultChecked
+                    className="mt-1"
+                    id="runOnAllCheckbox"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">Run on all records</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Execute this action across all {selectedActionForRun.entityType.toLowerCase()} records
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-border px-5 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRunModal(false);
+                  setSelectedActionForRun(null);
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  executeMutation.mutate({
+                    actionId: selectedActionForRun.id,
+                  });
+                }}
+                disabled={executeMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {executeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Run Action
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {executionResult && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card-elevated shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-blue-500" />
+                <h3 className="text-lg font-semibold text-foreground">Gemini Output</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExecutionResult(null)}
+                className="rounded-full p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5 text-sm text-foreground">
+              {executionResult.status === 'FAILED' ? (
+                <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">Gemini request failed</p>
+                    <p className="mt-1">{executionResult.errorMessage ?? 'Unknown error occurred.'}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="font-semibold text-muted-foreground">
+                    Generated {new Date(executionResult.createdAt).toLocaleString()}
+                  </p>
+                  <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-muted/40 px-4 py-3">
+                    <MarkdownRenderer
+                      content={
+                        typeof executionResult.output?.text === 'string'
+                          ? executionResult.output.text
+                          : executionResult.rawOutput ?? JSON.stringify(executionResult.output ?? {}, null, 2)
+                      }
+                      className="text-sm text-foreground"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const outputText =
+                    typeof executionResult.output?.text === 'string'
+                      ? executionResult.output.text
+                      : executionResult.rawOutput ?? JSON.stringify(executionResult.output ?? {}, null, 2);
+                  navigator.clipboard.writeText(outputText ?? '');
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={() => setExecutionResult(null)}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">

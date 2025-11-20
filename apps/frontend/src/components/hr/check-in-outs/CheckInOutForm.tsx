@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { checkInOutsApi, employeesApi } from '@/lib/api/hr';
@@ -25,6 +26,7 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm<CreateCheckInOutDto | UpdateCheckInOutDto>({
     defaultValues: record ? {
@@ -36,6 +38,23 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
       status: CheckInOutStatus.IN,
     },
   });
+
+  // Fix race condition: reset form values once employees are loaded and when record changes
+  useEffect(() => {
+    if (record) {
+      // When editing, wait for employees to load before setting the value
+      if (employees.length > 0) {
+        const employeeExists = employees.some(emp => emp.id === record.employeeId);
+        if (employeeExists) {
+          reset({
+            employeeId: record.employeeId,
+            dateTime: new Date(record.dateTime).toISOString().slice(0, 16),
+            status: record.status,
+          });
+        }
+      }
+    }
+  }, [record, employees, reset]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCheckInOutDto) => checkInOutsApi.create(data),

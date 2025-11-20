@@ -33,6 +33,7 @@ export interface CollectionDefinition<T> {
   fields: CollectionFieldSelector<T>[];
   filters?: CollectionFilterDefinition[];
   resolve: (params: { entityId: string; limit: number; filters?: Record<string, unknown> | undefined }) => Promise<T[]>;
+  resolveBulk?: (params: { limit: number; filters?: Record<string, unknown> | undefined }) => Promise<T[]>;
   format?: AiCollectionFormat[];
 }
 
@@ -166,6 +167,33 @@ type FeedbackReportPayload = Prisma.FeedbackReportGetPayload<{
     amUpdatedBy: true;
   };
 }>;
+
+type CheckInOutPayload = Prisma.CheckInOutGetPayload<{
+  select: {
+    id: true;
+    dateTime: true;
+    status: true;
+    createdAt: true;
+  };
+}>;
+
+type EodReportWithEmployeePayload = EodReportPayload & {
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+};
+
+type CheckInOutWithEmployeePayload = CheckInOutPayload & {
+  employee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+};
 
 @Injectable()
 export class CollectionFieldResolver {
@@ -327,6 +355,15 @@ export class CollectionFieldResolver {
           },
         ],
         fields: [
+          {
+            key: 'employeeName',
+            label: 'Employee',
+            description: 'Employee name',
+            select: (report: EodReportPayload | EodReportWithEmployeePayload) =>
+              (report as EodReportWithEmployeePayload).employee
+                ? `${(report as EodReportWithEmployeePayload).employee!.firstName} ${(report as EodReportWithEmployeePayload).employee!.lastName}`
+                : null,
+          },
           { key: 'date', label: 'Date', description: 'Report date', select: (report: EodReportPayload) => report.date },
           {
             key: 'summary',
@@ -402,6 +439,76 @@ export class CollectionFieldResolver {
               tasksWorkedOn: true,
             },
           });
+        },
+        resolveBulk: async ({ limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const lateOnly = this.parseBoolean(filters?.lateOnly);
+
+          const where: Prisma.EodReportWhereInput = {};
+
+          if (startDate || endDate) {
+            where.date = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          if (lateOnly === true) {
+            where.isLate = true;
+          }
+
+          const reports = await this.prisma.eodReport.findMany({
+            where,
+            orderBy: { date: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              date: true,
+              summary: true,
+              hoursWorked: true,
+              isLate: true,
+              submittedAt: true,
+              tasksWorkedOn: true,
+              userId: true,
+            },
+          });
+
+          // Fetch employee information for each report
+          const userIds = [...new Set(reports.map((r) => r.userId).filter(Boolean))];
+          const employees = await this.prisma.employee.findMany({
+            where: { userId: { in: userIds } },
+            select: {
+              id: true,
+              userId: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+
+          const employeeMap = new Map(
+            employees.map((e) => [
+              e.userId,
+              e.user
+                ? {
+                    id: e.id,
+                    firstName: e.user.firstName,
+                    lastName: e.user.lastName,
+                    email: e.user.email,
+                  }
+                : null,
+            ]),
+          );
+
+          return reports.map((report) => ({
+            ...report,
+            employee: report.userId ? employeeMap.get(report.userId) ?? null : null,
+          })) as EodReportWithEmployeePayload[];
         },
       },
       [AiCollectionKey.TASKS]: {
@@ -717,6 +824,159 @@ export class CollectionFieldResolver {
               amUpdatedBy: true,
             },
           });
+        },
+      },
+      [AiCollectionKey.CHECK_IN_OUTS]: {
+        key: AiCollectionKey.CHECK_IN_OUTS,
+        label: 'Check-In/Check-Out Records',
+        description: 'Recent check-in and check-out records for this employee.',
+        defaultLimit: 10,
+        defaultFormat: AiCollectionFormat.TABLE,
+        filters: [
+          {
+            key: 'startDate',
+            label: 'Start date',
+            type: 'date',
+            description: 'Include records on or after this date',
+          },
+          {
+            key: 'endDate',
+            label: 'End date',
+            type: 'date',
+            description: 'Include records on or before this date',
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'IN', label: 'Check-In' },
+              { value: 'OUT', label: 'Check-Out' },
+            ],
+            description: 'Filter by check-in or check-out status',
+          },
+        ],
+        fields: [
+          {
+            key: 'employeeName',
+            label: 'Employee',
+            description: 'Employee name',
+            select: (record: CheckInOutPayload | CheckInOutWithEmployeePayload) =>
+              (record as CheckInOutWithEmployeePayload).employee
+                ? `${(record as CheckInOutWithEmployeePayload).employee!.firstName} ${(record as CheckInOutWithEmployeePayload).employee!.lastName}`
+                : null,
+          },
+          {
+            key: 'dateTime',
+            label: 'Date & Time',
+            description: 'Check-in or check-out timestamp',
+            select: (record: CheckInOutPayload) => record.dateTime.toISOString(),
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            description: 'Check-in or check-out status',
+            select: (record: CheckInOutPayload) => record.status,
+          },
+          {
+            key: 'createdAt',
+            label: 'Created',
+            description: 'When the record was created',
+            select: (record: CheckInOutPayload) => record.createdAt.toISOString(),
+          },
+        ],
+        resolve: async ({ entityId, limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const status = typeof filters?.status === 'string' ? filters.status : undefined;
+
+          const where: Prisma.CheckInOutWhereInput = {
+            employeeId: entityId,
+            ...(status ? { status: status as any } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.dateTime = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          return this.prisma.checkInOut.findMany({
+            where,
+            orderBy: { dateTime: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              dateTime: true,
+              status: true,
+              createdAt: true,
+            },
+          });
+        },
+        resolveBulk: async ({ limit, filters }) => {
+          const startDate = this.parseDate(filters?.startDate);
+          const endDate = this.parseDate(filters?.endDate);
+          const status = typeof filters?.status === 'string' ? filters.status : undefined;
+
+          const where: Prisma.CheckInOutWhereInput = {
+            ...(status ? { status: status as any } : {}),
+          };
+
+          if (startDate || endDate) {
+            where.dateTime = {
+              ...(startDate ? { gte: startDate } : {}),
+              ...(endDate ? { lte: endDate } : {}),
+            };
+          }
+
+          const records = await this.prisma.checkInOut.findMany({
+            where,
+            orderBy: { dateTime: 'desc' },
+            take: limit,
+            select: {
+              id: true,
+              dateTime: true,
+              status: true,
+              createdAt: true,
+              employeeId: true,
+            },
+          });
+
+          // Fetch employee information for each record
+          const employeeIds = [...new Set(records.map((r) => r.employeeId).filter(Boolean))];
+          const employees = await this.prisma.employee.findMany({
+            where: { id: { in: employeeIds } },
+            select: {
+              id: true,
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
+          });
+
+          const employeeMap = new Map(
+            employees.map((e) => [
+              e.id,
+              e.user
+                ? {
+                    id: e.id,
+                    firstName: e.user.firstName,
+                    lastName: e.user.lastName,
+                    email: e.user.email,
+                  }
+                : null,
+            ]),
+          );
+
+          return records.map((record) => ({
+            ...record,
+            employee: record.employeeId ? employeeMap.get(record.employeeId) ?? null : null,
+          })) as CheckInOutWithEmployeePayload[];
         },
       },
     },
@@ -1624,7 +1884,7 @@ export class CollectionFieldResolver {
 
   async resolveCollection(params: {
     entityType: AiEntityType;
-    entityId: string;
+    entityId?: string; // Optional: if omitted, runs on all records
     collectionKey: AiCollectionKey;
     limit?: number;
     fieldKeys: string[];
@@ -1635,11 +1895,25 @@ export class CollectionFieldResolver {
       return [];
     }
 
-    const rows = await definition.resolve({
-      entityId: params.entityId,
-      limit: params.limit ?? definition.defaultLimit,
-      filters: params.filters,
-    });
+    // For bulk operations (no entityId), check if the definition supports bulk resolution
+    if (!params.entityId && !definition.resolveBulk) {
+      // Fall back to regular resolution if bulk is not supported
+      // This will likely return empty results, but won't break
+      return [];
+    }
+
+    const rows = params.entityId
+      ? await definition.resolve({
+          entityId: params.entityId,
+          limit: params.limit ?? definition.defaultLimit,
+          filters: params.filters,
+        })
+      : definition.resolveBulk
+        ? await definition.resolveBulk({
+            limit: params.limit ?? definition.defaultLimit,
+            filters: params.filters,
+          })
+        : [];
 
     const fieldSelectors = definition.fields.filter((field) => params.fieldKeys.includes(field.key));
 

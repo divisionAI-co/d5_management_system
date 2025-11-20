@@ -502,6 +502,12 @@ export interface Quote {
   sentTo?: string | null;
   sentBy?: string | null;
   pdfUrl?: string | null;
+  templateId?: string | null;
+  template?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   lead: QuoteLead;
@@ -564,6 +570,7 @@ export interface CreateQuotePayload {
   totalValue?: number;
   currency?: string;
   status?: QuoteStatus;
+  templateId?: string;
 }
 
 export interface UpdateQuotePayload extends Partial<CreateQuotePayload> {}
