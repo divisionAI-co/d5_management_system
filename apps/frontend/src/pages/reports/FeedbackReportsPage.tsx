@@ -414,10 +414,18 @@ export default function FeedbackReportsPage() {
       {/* Preview Modal */}
       {showPreviewModal && selectedReport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="border-b border-border p-6 flex justify-between items-center">
+          <div
+            className="flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+            style={{
+              width: '850px', // A4 width (794px) + padding
+              height: '1200px', // A4 height (1123px) + header + padding
+              maxWidth: '95vw',
+              maxHeight: '95vh',
+            }}
+          >
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-card px-6 py-4">
               <div>
-                <h2 className="text-xl font-semibold">Report Preview</h2>
+                <h2 className="text-xl font-semibold text-foreground">Report Preview</h2>
                 <p className="text-sm text-muted-foreground mt-1">
                   {selectedReport.employee?.user?.firstName} {selectedReport.employee?.user?.lastName} - {formatReportPeriod(selectedReport.month, selectedReport.year)}
                 </p>
@@ -432,10 +440,20 @@ export default function FeedbackReportsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div
-              className="p-6"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-            />
+            <div className="flex-1 min-h-0 overflow-auto bg-gray-100 flex items-center justify-center p-4">
+              <iframe
+                title="Feedback report preview"
+                className="border-0 bg-white shadow-lg"
+                style={{
+                  width: '794px',
+                  height: '1123px',
+                  maxWidth: '100%',
+                }}
+                srcDoc={previewHtml}
+                sandbox="allow-same-origin allow-scripts"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
         </div>
       )}

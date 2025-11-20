@@ -8,6 +8,7 @@ import { InvoicesImportModule } from './invoices/invoices-import.module';
 import { CandidatesImportModule } from './candidates/candidates-import.module';
 import { OpportunitiesImportModule } from './opportunities/opportunities-import.module';
 import { SystemExportModule } from './system-export/system-export.module';
+import { CheckInsImportModule } from './check-ins/check-ins-import.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { SystemExportModule } from './system-export/system-export.module';
     CandidatesImportModule,
     OpportunitiesImportModule,
     SystemExportModule,
+    CheckInsImportModule,
   ],
 })
 export class ImportsModule {}

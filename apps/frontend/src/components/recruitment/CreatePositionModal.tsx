@@ -12,6 +12,7 @@ import type {
   OpenPosition,
   UpdatePositionDto,
 } from '@/types/recruitment';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 
 interface CreatePositionModalProps {
   onClose: () => void;
@@ -65,6 +66,9 @@ export function CreatePositionModal({
       recruitmentStatus: position?.recruitmentStatus ?? null,
     },
   });
+
+  const descriptionValue = watch('description') || '';
+  const requirementsValue = watch('requirements') || '';
 
   const selectedOpportunityId = watch('opportunityId');
 
@@ -159,6 +163,7 @@ export function CreatePositionModal({
     if (isEditMode && position) {
       const payload: UpdatePositionDto = {
         title: values.title.trim(),
+        // For HTML content, only set if not empty (after trimming whitespace)
         description: values.description?.trim() || undefined,
         requirements: values.requirements?.trim() || undefined,
         status: values.status,
@@ -173,6 +178,7 @@ export function CreatePositionModal({
 
     const payload: CreatePositionDto = {
       title: values.title.trim(),
+      // For HTML content, only set if not empty (after trimming whitespace)
       description: values.description?.trim() || undefined,
       requirements: values.requirements?.trim() || undefined,
       status: values.status,
@@ -258,22 +264,22 @@ export function CreatePositionModal({
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Description
               </label>
-              <textarea
-                rows={4}
-                {...register('description')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              <RichTextEditor
+                value={descriptionValue}
+                onChange={(html) => setValue('description', html)}
                 placeholder="Overview of responsibilities and context."
+                minHeight="150px"
               />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
                 Requirements
               </label>
-              <textarea
-                rows={4}
-                {...register('requirements')}
-                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              <RichTextEditor
+                value={requirementsValue}
+                onChange={(html) => setValue('requirements', html)}
                 placeholder="Key skills, location/timezone expectations, availability, etc."
+                minHeight="150px"
               />
             </div>
             </div>

@@ -180,8 +180,8 @@ function ActivityItem({
                   />
                 ) : (
                   <pre className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {highlightMentions(activity.body)}
-                  </pre>
+                {highlightMentions(activity.body)}
+              </pre>
                 )}
               </div>
             )}

@@ -857,9 +857,11 @@ export class InvoicesService {
 
     let renderedHtml: string;
     let usedTemplateId: string | null = null;
+    let cssContent: string | null = null;
 
     if (template) {
       usedTemplateId = template.id;
+      cssContent = template.cssContent;
       const htmlTemplate = this.mergeTemplateHtmlAndCss(
         template.htmlContent,
         template.cssContent,
@@ -872,12 +874,77 @@ export class InvoicesService {
       renderedHtml = this.buildInvoiceHtml(invoice);
     }
 
+    // Wrap in A4 document structure to match PDF dimensions
+    const wrappedHtml = this.wrapInDocumentForPreview(renderedHtml, cssContent);
+
     return {
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       templateId: usedTemplateId,
-      renderedHtml,
+      renderedHtml: wrappedHtml,
     };
+  }
+
+  /**
+   * Wraps HTML content in a complete document structure for preview
+   * This uses the same logic as templatesService.wrapInDocument to ensure identical rendering
+   */
+  private wrapInDocumentForPreview(html: string, cssContent?: string | null): string {
+    // Check if HTML already has a complete document structure
+    const hasHtmlTag = /<html[^>]*>/i.test(html);
+    const hasHeadTag = /<head[^>]*>/i.test(html);
+    const hasBodyTag = /<body[^>]*>/i.test(html);
+    
+    if (hasHtmlTag && hasHeadTag && hasBodyTag) {
+      // Already a complete document, just ensure CSS is injected if not already present
+      if (cssContent && cssContent.trim() && !html.includes('<style>')) {
+        // Inject CSS into existing head
+        if (html.includes('</head>')) {
+          return html.replace('</head>', `<style>\n${cssContent.trim()}\n</style>\n</head>`);
+        }
+      }
+      return html;
+    }
+    
+    // Extract body content and any prepended CSS
+    let bodyContent = html;
+    let extractedCss = '';
+    
+    // Check if CSS was prepended
+    const styleTagMatch = html.match(/<style>([\s\S]*?)<\/style>/i);
+    if (styleTagMatch) {
+      extractedCss = styleTagMatch[1];
+      // Remove the style tag from body content
+      bodyContent = html.replace(/<style>[\s\S]*?<\/style>/i, '').trim();
+    }
+    
+    if (hasBodyTag) {
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      if (bodyMatch) {
+        bodyContent = bodyMatch[1];
+      }
+    }
+    
+    // Use extracted CSS or provided CSS content
+    const cssStyle = (extractedCss || (cssContent && cssContent.trim()))
+      ? `<style>\n${extractedCss || (cssContent?.trim() ?? '')}\n</style>`
+      : '';
+    
+    // Wrap in complete HTML document structure matching Puppeteer's rendering
+    // A4 dimensions: 210mm x 297mm = 794px x 1123px at 96 DPI
+    // With 20px margins: content area is 754px x 1083px
+    // Set viewport to match A4 page dimensions for accurate preview
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=794, initial-scale=1.0">
+  ${cssStyle}
+</head>
+<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; width: 754px; min-height: 1083px;">
+${bodyContent}
+</body>
+</html>`;
   }
 
   async generateInvoicePdf(

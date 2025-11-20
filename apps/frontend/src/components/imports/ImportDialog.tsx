@@ -13,6 +13,7 @@ import { usersApi } from '@/lib/api/users';
 import { customersApi } from '@/lib/api/crm/customers';
 import { positionsApi } from '@/lib/api/recruitment/positions';
 import { activitiesApi } from '@/lib/api/activities';
+import { employeesApi } from '@/lib/api/hr';
 
 type ImportStep = 'upload' | 'map' | 'match' | 'execute' | 'result';
 
@@ -480,8 +481,9 @@ export function ImportDialog<
   const hasUnmatchedValues = Object.keys(unmatchedValues).length > 0;
   
   const needsUsers = categories.some((cat) => 
-    ['unmatchedRecruiters', 'unmatchedOwners', 'unmatchedEmployees'].includes(cat)
+    ['unmatchedRecruiters', 'unmatchedOwners'].includes(cat)
   );
+  const needsEmployees = categories.includes('unmatchedEmployees');
   const needsCustomers = categories.includes('unmatchedCustomers');
   const needsPositions = categories.includes('unmatchedPositions');
   const needsActivityTypes = categories.includes('unmatchedActivityTypes');
@@ -490,6 +492,12 @@ export function ImportDialog<
     queryKey: ['users', 'for-matching'],
     queryFn: () => usersApi.list({ pageSize: 100 }),
     enabled: hasUnmatchedValues && needsUsers,
+  });
+
+  const { data: employeesData, isLoading: isLoadingEmployees } = useQuery({
+    queryKey: ['employees', 'for-matching'],
+    queryFn: () => employeesApi.getAll({ pageSize: 1000 }),
+    enabled: hasUnmatchedValues && needsEmployees,
   });
 
   const { data: customersData, isLoading: isLoadingCustomers } = useQuery({
@@ -515,7 +523,6 @@ export function ImportDialog<
       switch (category) {
         case 'unmatchedRecruiters':
         case 'unmatchedOwners':
-        case 'unmatchedEmployees':
           if (!usersData?.data) {
             if (import.meta.env.DEV) {
               console.log('No users data available', { usersData, category });
@@ -525,6 +532,18 @@ export function ImportDialog<
           return usersData.data.map((user) => ({
             id: user.id,
             label: `${user.firstName} ${user.lastName} (${user.email})`,
+          }));
+        case 'unmatchedEmployees':
+          // For check-ins, we need to match to employees, not users
+          if (!employeesData?.data) {
+            if (import.meta.env.DEV) {
+              console.log('No employees data available', { employeesData, category });
+            }
+            return [];
+          }
+          return employeesData.data.map((employee) => ({
+            id: employee.id,
+            label: `${employee.user.firstName} ${employee.user.lastName} (${employee.user.email})${employee.cardNumber ? ` - Card: ${employee.cardNumber}` : ''}`,
           }));
         case 'unmatchedCustomers':
           if (!customersData?.data) {
@@ -625,7 +644,8 @@ export function ImportDialog<
                     {values.map((value) => {
                       const options = getOptionsForCategory(category);
                       const isLoading = 
-                        (category === 'unmatchedRecruiters' || category === 'unmatchedOwners' || category === 'unmatchedEmployees') && isLoadingUsers ||
+                        (category === 'unmatchedRecruiters' || category === 'unmatchedOwners') && isLoadingUsers ||
+                        category === 'unmatchedEmployees' && isLoadingEmployees ||
                         category === 'unmatchedCustomers' && isLoadingCustomers ||
                         category === 'unmatchedPositions' && isLoadingPositions ||
                         category === 'unmatchedActivityTypes' && isLoadingActivityTypes;

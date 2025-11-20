@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Calendar, ChevronDown, ClipboardList, Clock, Edit2, PenSquare, Trash2, User, Play, Square } from 'lucide-react';
+import { Calendar, ChevronDown, ClipboardList, Clock, Edit2, PenSquare, Trash2, User, Play, Square, GitBranch, Link2, AlertCircle, Plus } from 'lucide-react';
 import type { Task, TaskPriority, TaskStatus } from '@/types/tasks';
 
 const PRIORITY_STYLES: Record<
@@ -34,6 +34,7 @@ interface TaskCardProps {
   onStartTimer?: (task: Task) => void;
   onStopTimer?: (taskId: string) => void;
   currentUserId?: string;
+  onCreateChild?: (parentTask: Task) => void;
 }
 
 export function TaskCard({
@@ -50,6 +51,7 @@ export function TaskCard({
   onStartTimer,
   onStopTimer,
   currentUserId,
+  onCreateChild,
 }: TaskCardProps) {
   const priorityVariant = PRIORITY_STYLES[task.priority];
 
@@ -194,6 +196,19 @@ export function TaskCard({
               title="View activities"
             >
               <PenSquare className="h-4 w-4" />
+            </button>
+          )}
+          {onCreateChild && (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onCreateChild(task);
+              }}
+              className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground/70 hover:text-green-600"
+              aria-label="Create child task"
+              title="Create child task"
+            >
+              <Plus className="h-4 w-4" />
             </button>
           )}
           {onDelete && (
@@ -348,6 +363,107 @@ export function TaskCard({
                   #{tag}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Task Relationships */}
+          {(task.parent || (task.children && task.children.length > 0) || 
+            (task.blocks && task.blocks.length > 0) || 
+            (task.blockedBy && task.blockedBy.length > 0) || 
+            (task.related && task.related.length > 0)) && (
+            <div className="space-y-3 border-t border-border pt-3">
+              <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+                Relationships
+              </h4>
+              
+              {task.parent && (
+                <div className="flex items-start gap-2">
+                  <GitBranch className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">Parent Task</p>
+                    <p className="text-sm text-foreground">{task.parent.title}</p>
+                    <p className="text-xs text-muted-foreground">{task.parent.status}</p>
+                  </div>
+                </div>
+              )}
+
+              {task.children && task.children.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <GitBranch className="h-4 w-4 mt-0.5 text-green-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Child Tasks ({task.children.length})
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {task.children.map((child) => (
+                        <div key={child.id} className="text-sm text-foreground">
+                          {child.title} <span className="text-xs text-muted-foreground">({child.status})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {task.blockedBy && task.blockedBy.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5 text-orange-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Blocked By ({task.blockedBy.length})
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {task.blockedBy.map((blocker) => (
+                        <div key={blocker.id} className="text-sm text-foreground">
+                          {blocker.title} <span className="text-xs text-muted-foreground">({blocker.status})</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This task cannot start until the blocking tasks are completed.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {task.blocks && task.blocks.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5 text-red-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Blocks ({task.blocks.length})
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {task.blocks.map((blocked) => (
+                        <div key={blocked.id} className="text-sm text-foreground">
+                          {blocked.title} <span className="text-xs text-muted-foreground">({blocked.status})</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      These tasks cannot start until this task is completed.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {task.related && task.related.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <Link2 className="h-4 w-4 mt-0.5 text-blue-600" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Related Tasks ({task.related.length})
+                    </p>
+                    <div className="mt-1 space-y-1">
+                      {task.related.map((related) => (
+                        <div key={related.id} className="text-sm text-foreground">
+                          {related.title} <span className="text-xs text-muted-foreground">({related.status})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

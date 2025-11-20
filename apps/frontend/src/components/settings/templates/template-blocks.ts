@@ -2,6 +2,7 @@ import type {
   TemplateBlock,
   TemplateBlockType,
   TemplateButtonBlock,
+  TemplateDivBlock,
   TemplateDividerBlock,
   TemplateHeadingBlock,
   TemplateImageBlock,
@@ -87,6 +88,15 @@ export const createBlock = (type: TemplateBlockType): TemplateBlock => {
         rightWidth: 50,
         gap: 24,
       } satisfies TemplateRowBlock;
+    case 'div':
+      return {
+        id: createBlockId(),
+        type: 'div',
+        blocks: [],
+        padding: 0,
+        backgroundColor: undefined,
+        borderRadius: 0,
+      } satisfies TemplateDivBlock;
     case 'raw_html':
     default:
       return {
@@ -153,11 +163,22 @@ const renderHeading = (block: TemplateHeadingBlock) => {
   const fontFamily = block.fontFamily || 'Arial';
   const baseStyle = `margin:0; font-size:${fontSize}px; font-weight:600; color:#0f172a; line-height:1.3; text-align:${block.align}; font-family:${fontFamily}, sans-serif;`;
   const customStyle = block.customStyle ? ` ${block.customStyle}` : '';
+  
+  // Check if text contains HTML tags or Handlebars triple braces
+  // Triple braces {{{ }}} will be rendered as HTML by Handlebars, so don't escape
+  const containsHtml = /<[^>]+>/.test(block.text);
+  const containsTripleBraces = /\{\{\{.*?\}\}\}/.test(block.text);
+  
+  // If it contains HTML or triple braces, render it directly
+  // Triple braces will be processed by Handlebars to output HTML
+  // Otherwise, escape and normalize the text
+  const content = (containsHtml || containsTripleBraces) ? block.text : normaliseText(block.text);
+  
   return `
     <tr>
       <td style="padding:24px 24px 12px; text-align:${block.align};">
       <${block.level} style="${baseStyle}${customStyle}">
-          ${normaliseText(block.text)}
+          ${content}
         </${block.level}>
       </td>
     </tr>
@@ -168,12 +189,26 @@ const renderText = (block: TemplateTextBlock) => {
   const fontFamily = block.fontFamily || 'Arial';
   const baseStyle = `margin:0; font-size:15px; color:#1f2937; line-height:1.7; text-align:${block.align}; font-family:${fontFamily}, sans-serif;`;
   const customStyle = block.customStyle ? ` ${block.customStyle}` : '';
+  
+  // Check if text contains HTML tags or Handlebars triple braces
+  // Triple braces {{{ }}} will be rendered as HTML by Handlebars, so don't escape
+  const containsHtml = /<[^>]+>/.test(block.text);
+  const containsTripleBraces = /\{\{\{.*?\}\}\}/.test(block.text);
+  
+  // If it contains HTML or triple braces, render it directly
+  // Triple braces will be processed by Handlebars to output HTML
+  // Use a div wrapper instead of p for HTML content to allow block-level elements
+  // Otherwise, escape and normalize the text and use p tag
+  const hasHtmlContent = containsHtml || containsTripleBraces;
+  const content = hasHtmlContent ? block.text : normaliseText(block.text);
+  const wrapperTag = hasHtmlContent ? 'div' : 'p';
+  
   return `
   <tr>
     <td style="padding:12px 24px; text-align:${block.align};">
-      <p style="${baseStyle}${customStyle}">
-        ${normaliseText(block.text)}
-      </p>
+      <${wrapperTag} style="${baseStyle}${customStyle}">
+        ${content}
+      </${wrapperTag}>
     </td>
   </tr>
 `;
@@ -513,6 +548,28 @@ const renderRaw = (block: TemplateRawHtmlBlock) => `
   </tr>
 `;
 
+const renderDiv = (block: TemplateDivBlock, allBlocks: TemplateBlock[] = []): string => {
+  const padding = block.padding ?? 0;
+  const backgroundColor = block.backgroundColor || 'transparent';
+  const borderRadius = block.borderRadius ?? 0;
+  const customStyle = block.customStyle ? ` ${block.customStyle}` : '';
+  
+  // Render nested blocks
+  const nestedContent = renderBlocksToHtmlInner(block.blocks, allBlocks);
+  
+  const divStyle = `padding:${padding}px; background-color:${backgroundColor}; border-radius:${borderRadius}px;${customStyle}`;
+  
+  return `
+  <tr>
+    <td style="padding:0;">
+      <div style="${divStyle}">
+        ${nestedContent}
+      </div>
+    </td>
+  </tr>
+`;
+};
+
 const renderRow = (block: TemplateRowBlock): string => {
   const leftWidth = block.leftWidth ?? 50;
   const rightWidth = block.rightWidth ?? 50;
@@ -571,7 +628,7 @@ const renderStackedBlocks = (stackedBlocks: TemplateBlock[], baseZIndex: number 
         </div>
       `;
       } else {
-        const stackedHtml = renderSingleBlock(stackedBlock);
+        const stackedHtml = renderSingleBlock(stackedBlock, [], allBlocks);
         // Extract content and wrap for absolute positioning
         // For text blocks, ensure they're visible with proper styling
         let stackedHtmlContent = extractTableContent(stackedHtml);
@@ -598,7 +655,7 @@ const renderStackedBlocks = (stackedBlocks: TemplateBlock[], baseZIndex: number 
 };
 
 // Helper function to render a single block (returns the HTML for the block)
-const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] = []): string => {
+const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] = [], allBlocks: TemplateBlock[] = []): string => {
   switch (block.type) {
     case 'heading':
       return renderHeading(block);
@@ -616,6 +673,8 @@ const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] 
       return renderRaw(block);
     case 'row':
       return renderRow(block);
+    case 'div':
+      return renderDiv(block, allBlocks);
     default:
       return '';
   }
@@ -628,7 +687,7 @@ const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[
     const baseBlock = allBlocks.find(b => b.id === block.stackOnBlockId);
     if (!baseBlock) {
       // Base block not found, render normally
-      return renderSingleBlock(block);
+      return renderSingleBlock(block, [], allBlocks);
     }
     
     // Special handling for images - they already handle stacking internally
@@ -650,7 +709,7 @@ const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[
     const allStackedBlocks = allBlocks.filter(b => b.stackOnBlockId === baseBlock.id);
     
     // For non-image blocks, render with absolute positioning
-    const baseHtml = renderSingleBlock(baseBlock);
+    const baseHtml = renderSingleBlock(baseBlock, [], allBlocks);
     
     // Render all stacked blocks with proper layering
     const stackedContent = renderStackedBlocks(allStackedBlocks, 2);
@@ -677,11 +736,11 @@ const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[
   if (stackedOnThis.length > 0 && block.type !== 'image') {
     // This block has other blocks stacked on it, but they will handle the container
     // Just render this block normally (the stacked blocks will handle the container)
-    return renderSingleBlock(block);
+    return renderSingleBlock(block, [], allBlocks);
   }
   
   // Normal rendering
-  return renderSingleBlock(block);
+  return renderSingleBlock(block, [], allBlocks);
 };
 
 // Helper function to render blocks without the outer table structure (for nested blocks in rows)
@@ -1273,8 +1332,25 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           continue;
         }
         
-        // Check for overlay (nested div with absolute positioning)
-        const overlayDiv = table.querySelector('div[style*="position:absolute"]');
+        // Check for overlay (nested div with absolute positioning that contains text)
+        // Overlay divs have z-index:1 and contain text, stacked blocks have z-index:2+
+        const allAbsoluteDivs = table.querySelectorAll('div[style*="position:absolute"]');
+        let overlayDiv: Element | null = null;
+        const stackedDivs: Element[] = [];
+        
+        for (const div of Array.from(allAbsoluteDivs)) {
+          const divStyle = div.getAttribute('style') || '';
+          const zIndexMatch = divStyle.match(/z-index:\s*(\d+)/);
+          const zIndex = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 0;
+          
+          // Overlay typically has z-index:1, stacked blocks have z-index:2+
+          if (zIndex === 1 && div.querySelector('div[style*="background-color"]')) {
+            overlayDiv = div;
+          } else if (zIndex >= 2) {
+            stackedDivs.push(div);
+          }
+        }
+        
         const overlayText = overlayDiv?.textContent?.trim();
         
         // Check overlay styles
@@ -1311,8 +1387,8 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           }
         }
         
-        // Add full-width image at the beginning (they come first in HTML)
-        blocks.push({
+        // Create base image block
+        const baseImageBlock: TemplateImageBlock = {
           id: createBlockId(),
           type: 'image',
           url,
@@ -1326,7 +1402,35 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           overlayTextColor,
           overlayBackgroundColor,
           overlayBackgroundOpacity,
-        } satisfies TemplateImageBlock);
+        };
+        
+        blocks.push(baseImageBlock);
+        
+        // Process stacked blocks
+        for (const stackedDiv of stackedDivs) {
+          // Extract content from stacked div - it might contain img, p, h1-h3, etc.
+          // Stacked blocks can be directly in the div or nested in another div
+          let content: Element | null = stackedDiv.querySelector('img, p, h1, h2, h3, a, hr, div[style*="height"]');
+          
+          // If no direct content found, check if there's a nested div with width:100%
+          if (!content) {
+            const innerDiv = stackedDiv.querySelector('div[style*="width:100%"]');
+            if (innerDiv) {
+              content = innerDiv.querySelector('img, p, h1, h2, h3, a, hr, div[style*="height"]') || innerDiv;
+            }
+          }
+          
+          // If still no content, use the stackedDiv itself
+          if (!content) {
+            content = stackedDiv;
+          }
+          
+          const stackedBlock = processElement(content, 'center');
+          if (stackedBlock) {
+            stackedBlock.stackOnBlockId = baseImageBlock.id;
+            blocks.push(stackedBlock);
+          }
+        }
       }
     }
 
@@ -1459,9 +1563,28 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           processedImageUrls.add(url);
         }
         
-        // Check for overlay (look in parent elements)
+        // Check for overlay and stacked blocks (look in parent elements)
         const parent = element.parentElement;
-        const overlayDiv = parent?.querySelector('div[style*="position:absolute"]');
+        const relativeContainer = parent?.closest('div[style*="position:relative"]');
+        
+        // Check for overlay (div with z-index:1 that contains text)
+        const allAbsoluteDivs = relativeContainer?.querySelectorAll('div[style*="position:absolute"]') || [];
+        let overlayDiv: Element | null = null;
+        const stackedDivs: Element[] = [];
+        
+        for (const div of Array.from(allAbsoluteDivs)) {
+          const divStyle = div.getAttribute('style') || '';
+          const zIndexMatch = divStyle.match(/z-index:\s*(\d+)/);
+          const zIndex = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 0;
+          
+          // Overlay typically has z-index:1, stacked blocks have z-index:2+
+          if (zIndex === 1 && div.querySelector('div[style*="background-color"]')) {
+            overlayDiv = div;
+          } else if (zIndex >= 2) {
+            stackedDivs.push(div);
+          }
+        }
+        
         const overlayText = overlayDiv?.textContent?.trim();
         
         // Determine align from float or text-align in style
@@ -1474,7 +1597,7 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
         // Only remove nothing - all styles should be preserved as they might contain custom values
         const customStyle = extractCustomStyle(style, []);
         
-        return {
+        const imageBlock: TemplateImageBlock = {
           id: createBlockId(),
           type: 'image',
           url,
@@ -1485,7 +1608,11 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
           position: isFullWidth ? 'inline' : undefined, // Default to inline for full-width images when parsing
           overlayText: overlayText || undefined,
           customStyle,
-        } satisfies TemplateImageBlock;
+        };
+        
+        // Note: Stacked blocks will be processed separately by processStackedContainer
+        // We return the base image block here, and stacked blocks will be added with stackOnBlockId
+        return imageBlock;
       }
 
       // Check for divider (hr)
@@ -1571,6 +1698,148 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
       return null;
     };
 
+    // Helper function to detect and process stacked blocks
+    const processStackedContainer = (container: Element, parentAlign: 'left' | 'center' | 'right' = 'left'): { baseBlock: TemplateBlock | null; stackedBlocks: TemplateBlock[] } => {
+      const containerStyle = container.getAttribute('style') || '';
+      const isRelativeContainer = containerStyle.includes('position:relative');
+      
+      if (!isRelativeContainer) {
+        // Not a stacking container, process normally
+        const block = processElement(container, parentAlign);
+        return { baseBlock: block, stackedBlocks: [] };
+      }
+      
+      // Find all absolutely positioned children (stacked blocks have z-index >= 2)
+      const allAbsoluteDivs = Array.from(container.querySelectorAll('div[style*="position:absolute"]'));
+      const stackedDivs = allAbsoluteDivs.filter(div => {
+        const divStyle = div.getAttribute('style') || '';
+        const zIndexMatch = divStyle.match(/z-index:\s*(\d+)/);
+        const zIndex = zIndexMatch ? parseInt(zIndexMatch[1], 10) : 0;
+        // Stacked blocks have z-index >= 2 (overlay has z-index:1)
+        return zIndex >= 2;
+      });
+      
+      // Find base element - it's the one that's NOT absolutely positioned
+      // Look for img, p, h1-h3, a, hr, or div with content that's not absolutely positioned
+      let baseElement: Element | null = null;
+      
+      // First, check direct children
+      for (const child of Array.from(container.children)) {
+        const childStyle = child.getAttribute('style') || '';
+        if (childStyle.includes('position:absolute')) continue;
+        
+        const tagName = child.tagName.toLowerCase();
+        if (['img', 'p', 'h1', 'h2', 'h3', 'a', 'hr'].includes(tagName)) {
+          baseElement = child;
+          break;
+        }
+      }
+      
+      // If no direct child found, look for nested content (but not in absolutely positioned divs)
+      if (!baseElement) {
+        const allElements = container.querySelectorAll('img, p, h1, h2, h3, a, hr');
+        for (const elem of Array.from(allElements)) {
+          // Check if this element is inside an absolutely positioned div
+          const isInAbsoluteDiv = elem.closest('div[style*="position:absolute"]');
+          if (!isInAbsoluteDiv) {
+            baseElement = elem;
+            break;
+          }
+        }
+      }
+      
+      // Process base element
+      let baseBlock: TemplateBlock | null = null;
+      if (baseElement) {
+        baseBlock = processElement(baseElement, parentAlign);
+      }
+      
+      // If still no base block, the container itself might be the base (for text blocks)
+      // Check if container has text content directly
+      if (!baseBlock && container.textContent && container.textContent.trim()) {
+        // Try to find any block-like content
+        const firstChild = container.firstElementChild;
+        if (firstChild && !firstChild.getAttribute('style')?.includes('position:absolute')) {
+          baseBlock = processElement(firstChild, parentAlign);
+        }
+      }
+      
+      // Process stacked elements
+      const stackedBlocks: TemplateBlock[] = [];
+      if (baseBlock) {
+        // Sort stacked elements by z-index to maintain order
+        const sortedStacked = stackedDivs.sort((a, b) => {
+          const aStyle = a.getAttribute('style') || '';
+          const bStyle = b.getAttribute('style') || '';
+          const aZMatch = aStyle.match(/z-index:\s*(\d+)/);
+          const bZMatch = bStyle.match(/z-index:\s*(\d+)/);
+          const aZ = aZMatch ? parseInt(aZMatch[1], 10) : 0;
+          const bZ = bZMatch ? parseInt(bZMatch[1], 10) : 0;
+          return aZ - bZ;
+        });
+        
+        for (const stackedDiv of sortedStacked) {
+          // Extract the actual content from the absolutely positioned div
+          // It might contain an img, p, h1-h3, etc. inside a nested div
+          const innerDiv = stackedDiv.querySelector('div[style*="width:100%"]');
+          const content = innerDiv 
+            ? (innerDiv.querySelector('img, p, h1, h2, h3, a, hr, div[style*="height"]') || innerDiv)
+            : (stackedDiv.querySelector('img, p, h1, h2, h3, a, hr, div[style*="height"]') || stackedDiv);
+          
+          const stackedBlock = processElement(content, parentAlign);
+          if (stackedBlock) {
+            stackedBlock.stackOnBlockId = baseBlock.id;
+            stackedBlocks.push(stackedBlock);
+          }
+        }
+      }
+      
+      return { baseBlock, stackedBlocks };
+    };
+
+    // Helper function to process an element and its children recursively
+    const processElementRecursive = (element: Element, parentAlign: 'left' | 'center' | 'right' = 'left'): void => {
+      const tagName = element.tagName.toLowerCase();
+      const elementStyle = element.getAttribute('style') || '';
+      
+      // Check if this is a stacking container
+      if (elementStyle.includes('position:relative')) {
+        const { baseBlock, stackedBlocks } = processStackedContainer(element, parentAlign);
+        if (baseBlock) {
+          blocks.push(baseBlock);
+          blocks.push(...stackedBlocks);
+        }
+        return;
+      }
+      
+      // Try to process as a block
+      const block = processElement(element, parentAlign);
+      if (block) {
+        blocks.push(block);
+        return;
+      }
+      
+      // If not a recognized block, check if it has children that should be processed
+      // This handles cases like divs that contain block elements
+      const children = Array.from(element.children);
+      if (children.length > 0) {
+        // Determine alignment from element or parent
+        const align = (element.getAttribute('align') || 
+                      elementStyle.match(/text-align:\s*([^;]+)/)?.[1]?.trim() || 
+                      parentAlign) as 'left' | 'center' | 'right';
+        
+        for (const child of children) {
+          processElementRecursive(child, align);
+        }
+      } else {
+        // No children, create raw HTML block if it has content
+        const html = element.outerHTML || element.innerHTML || '';
+        if (html.trim() && !html.match(/^\s*$/)) {
+          blocks.push(createRawHtmlBlock(html.trim()));
+        }
+      }
+    };
+
     // Process all direct children of tbody in order
     // Handle both standard structure (<tr><td>) and malformed HTML (direct children)
     if (!tbody) return [];
@@ -1585,39 +1854,31 @@ export const parseHtmlToBlocks = (html: string): TemplateBlock[] | null => {
                             td.style.textAlign || 
                             'left') as 'left' | 'center' | 'right';
           
-          // Process each direct child of td
+          // Process all children of td recursively
           const tdChildren = Array.from(td.children);
-          for (const tdChild of tdChildren) {
-            const block = processElement(tdChild, textAlign);
-            if (block) {
-              blocks.push(block);
-            } else {
-              // If element doesn't match a pattern, create a raw HTML block
-              const html = tdChild.outerHTML || tdChild.innerHTML || '';
-              if (html.trim()) {
-                blocks.push(createRawHtmlBlock(html.trim()));
-              }
+          if (tdChildren.length > 0) {
+            for (const tdChild of tdChildren) {
+              processElementRecursive(tdChild, textAlign);
             }
-          }
-          
-          // If td has content but no child elements, process it as raw HTML
-          if (tdChildren.length === 0 && td.innerHTML.trim()) {
-            blocks.push(createRawHtmlBlock(td.innerHTML.trim()));
+          } else if (td.innerHTML.trim()) {
+            // If td has content but no child elements, try to parse it
+            // This handles cases where content is directly in td as text or HTML
+            const tempDiv = doc.createElement('div');
+            tempDiv.innerHTML = td.innerHTML;
+            const tempChildren = Array.from(tempDiv.children);
+            if (tempChildren.length > 0) {
+              for (const tempChild of tempChildren) {
+                processElementRecursive(tempChild, textAlign);
+              }
+            } else {
+              blocks.push(createRawHtmlBlock(td.innerHTML.trim()));
+            }
           }
         }
       } else {
         // Process direct child of tbody (not in <tr>)
-        const block = processElement(child, 'left');
-        if (block) {
-          blocks.push(block);
-        } else {
-          // If it doesn't match a block pattern, create a raw HTML block
-          // Use outerHTML for self-closing tags (like <img>) and innerHTML for others
-          const html = child.outerHTML || child.innerHTML || '';
-          if (html.trim()) {
-            blocks.push(createRawHtmlBlock(html.trim()));
-          }
-        }
+        // This handles malformed HTML where elements are directly in tbody
+        processElementRecursive(child, 'left');
       }
     }
 

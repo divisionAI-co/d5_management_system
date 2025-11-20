@@ -39,6 +39,76 @@ export function sanitizeText(input: string | null | undefined): string {
     .trim();
 }
 
+// Allowed CSS properties for style attribute (whitelist approach)
+const allowedStyleProperties = [
+  'font-family',
+  'font-size',
+  'font-weight',
+  'font-style',
+  'color',
+  'background-color',
+  'text-align',
+  'text-decoration',
+  'text-decoration-line',
+  'text-decoration-style',
+  'text-decoration-color',
+];
+
+/**
+ * Sanitizes a style attribute value to only allow safe CSS properties
+ */
+function sanitizeStyleAttribute(styleValue: string): string {
+  if (!styleValue) return '';
+
+  // Parse CSS declarations
+  const declarations: string[] = [];
+  const parts = styleValue.split(';').map((s) => s.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    const colonIndex = part.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const property = part.substring(0, colonIndex).trim().toLowerCase();
+    const value = part.substring(colonIndex + 1).trim();
+
+    // Only allow whitelisted CSS properties
+    if (allowedStyleProperties.includes(property)) {
+      // Additional validation for specific properties
+      if (property === 'color' || property === 'background-color') {
+        // Allow hex colors, rgb/rgba, and named colors
+        if (
+          /^#[0-9a-f]{3,8}$/i.test(value) ||
+          /^rgb\(/i.test(value) ||
+          /^rgba\(/i.test(value) ||
+          /^[a-z]+$/i.test(value) // Named colors
+        ) {
+          declarations.push(`${property}: ${value}`);
+        }
+      } else if (property === 'font-size') {
+        // Allow px, em, rem, %, pt units
+        if (/^\d+(\.\d+)?(px|em|rem|%|pt)$/i.test(value)) {
+          declarations.push(`${property}: ${value}`);
+        }
+      } else if (property === 'text-align') {
+        // Allow only safe text-align values
+        if (['left', 'right', 'center', 'justify'].includes(value.toLowerCase())) {
+          declarations.push(`${property}: ${value}`);
+        }
+      } else if (property === 'font-family') {
+        // Allow font-family values (sanitize quotes)
+        const sanitized = value.replace(/[<>]/g, '');
+        declarations.push(`${property}: ${sanitized}`);
+      } else {
+        // For other allowed properties, do basic sanitization
+        const sanitized = value.replace(/[<>]/g, '');
+        declarations.push(`${property}: ${sanitized}`);
+      }
+    }
+  }
+
+  return declarations.join('; ');
+}
+
 /**
  * Sanitizes HTML content by allowing only safe tags and attributes
  * This is a basic implementation - for production, consider using DOMPurify
@@ -50,7 +120,7 @@ export function sanitizeHtml(html: string | null | undefined): string {
   const allowedTags = [
     'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead',
-    'tbody', 'tr', 'td', 'th', 'div', 'span', 'hr',
+    'tbody', 'tr', 'td', 'th', 'div', 'span', 'hr', 'mark', // mark is used by TipTap for highlighting
   ];
 
   // List of allowed attributes
@@ -60,6 +130,8 @@ export function sanitizeHtml(html: string | null | undefined): string {
     table: ['border', 'cellpadding', 'cellspacing'],
     td: ['colspan', 'rowspan'],
     th: ['colspan', 'rowspan'],
+    // Allow style attribute on all elements for rich text formatting
+    '*': ['style'],
   };
 
   // Create a temporary DOM element to parse HTML
@@ -83,10 +155,22 @@ export function sanitizeHtml(html: string | null | undefined): string {
     }
 
     // Remove disallowed attributes
-    const allowedAttrs = allowedAttributes[tagName] || [];
+    const allowedAttrs = [
+      ...(allowedAttributes[tagName] || []),
+      ...(allowedAttributes['*'] || []), // Global attributes
+    ];
     Array.from(element.attributes).forEach((attr) => {
-      if (!allowedAttrs.includes(attr.name.toLowerCase())) {
+      const attrName = attr.name.toLowerCase();
+      if (!allowedAttrs.includes(attrName)) {
         element.removeAttribute(attr.name);
+      } else if (attrName === 'style') {
+        // Sanitize style attribute to only allow safe CSS properties
+        const sanitizedStyle = sanitizeStyleAttribute(attr.value);
+        if (sanitizedStyle) {
+          element.setAttribute('style', sanitizedStyle);
+        } else {
+          element.removeAttribute('style');
+        }
       }
     });
 

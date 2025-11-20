@@ -19,6 +19,11 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
+  cardNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
   department?: string;
 
   @ApiProperty()

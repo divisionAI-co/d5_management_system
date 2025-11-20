@@ -32,6 +32,11 @@ export enum LeaveRequestStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum CheckInStatus {
+  IN = 'IN',
+  OUT = 'OUT',
+}
+
 export type User = UserSummary;
 
 export interface EodReportTask {
@@ -64,6 +69,7 @@ export interface Employee {
   userId: string;
   candidateId?: string | null;
   employeeNumber: string;
+  cardNumber?: string | null;
   department?: string | null;
   jobTitle: string;
   status: EmploymentStatus;
@@ -112,6 +118,7 @@ export interface CreateEmployeeDto {
   userId: string;
   candidateId?: string;
   employeeNumber: string;
+  cardNumber?: string;
   department?: string;
   jobTitle: string;
   status?: EmploymentStatus;
@@ -279,4 +286,52 @@ export interface CreateHolidayDto {
 }
 
 export interface UpdateHolidayDto extends Partial<CreateHolidayDto> {}
+
+// Employee Check-in
+export interface EmployeeCheckIn {
+  id: string;
+  date: string;
+  time: string;
+  firstName: string;
+  lastName: string;
+  employeeCardNumber: string;
+  status: CheckInStatus;
+  employeeId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  employee?: Employee & { user: User };
+}
+
+export interface CreateCheckInDto {
+  date: string;
+  time: string;
+  firstName: string;
+  lastName: string;
+  employeeCardNumber: string;
+  status: CheckInStatus;
+  employeeId: string;
+}
+
+export interface UpdateCheckInDto extends Partial<CreateCheckInDto> {}
+
+export interface CheckInFilters {
+  employeeId?: string;
+  employeeCardNumber?: string;
+  status?: CheckInStatus;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CheckInsListResponse {
+  data: EmployeeCheckIn[];
+  pagination: {
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  };
+}
 

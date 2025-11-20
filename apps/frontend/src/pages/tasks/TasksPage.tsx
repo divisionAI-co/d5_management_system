@@ -85,6 +85,9 @@ export default function TasksPage() {
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus | undefined>(
     undefined,
   );
+  const [defaultParentId, setDefaultParentId] = useState<string | undefined>(
+    undefined,
+  );
   const [feedback, setFeedback] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [isLoadingTaskDetail, setIsLoadingTaskDetail] = useState(false);
@@ -187,10 +190,15 @@ export default function TasksPage() {
     },
   });
 
-  const handleOpenCreate = (status?: TaskStatus) => {
+  const handleOpenCreate = (status?: TaskStatus, parentId?: string) => {
     setEditingTask(null);
     setDefaultStatus(status);
+    setDefaultParentId(parentId);
     setShowForm(true);
+  };
+
+  const handleCreateChild = (parentTask: Task) => {
+    handleOpenCreate(undefined, parentTask.id);
   };
 
   const handleOpenActivities = (task: Task) => {
@@ -681,6 +689,7 @@ export default function TasksPage() {
             onStartTimer={handleStartTimer}
             onStopTimer={handleStopTimer}
             currentUserId={user?.id}
+            onCreateChild={handleCreateChild}
           />
         ) : (
           <TaskTable
@@ -728,17 +737,20 @@ export default function TasksPage() {
             setShowForm(false);
             setEditingTask(null);
             setDefaultStatus(undefined);
+            setDefaultParentId(undefined);
           }}
           onSuccess={(savedTask) => {
             setShowForm(false);
             setEditingTask(null);
             setDefaultStatus(undefined);
+            setDefaultParentId(undefined);
             setFeedback(
               `Task "${savedTask.title}" ${
                 editingTask ? 'updated' : 'created'
               } successfully.`,
             );
           }}
+          defaultParentId={defaultParentId}
         />
       )}
 

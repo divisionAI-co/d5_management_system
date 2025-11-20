@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { UserRound, Users, ExternalLink } from 'lucide-react';
 import type { OpenPositionSummary, PositionStatus } from '@/types/recruitment';
+import { SafeText } from '@/components/ui/SafeHtml';
 
 const STATUS_COLORS: Record<PositionStatus, string> = {
   Open: 'bg-emerald-100 text-emerald-700',
@@ -104,7 +105,11 @@ export function OpenPositionsTable({
                         {position.title}
                       </p>
                       <p className="text-xs text-muted-foreground line-clamp-2">
-                        {position.description ?? 'No description provided'}
+                        {position.description ? (
+                          <SafeText text={position.description} tag="span" />
+                        ) : (
+                          'No description provided'
+                        )}
                       </p>
                     </div>
                   </td>

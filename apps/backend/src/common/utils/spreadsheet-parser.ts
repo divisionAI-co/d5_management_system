@@ -10,37 +10,10 @@ export interface ParsedSheet {
  * Safely parses spreadsheet files (CSV or Excel) using ExcelJS
  * Replaces vulnerable xlsx library
  */
-export async function parseSpreadsheet(
-  buffer: Buffer,
-): Promise<ParsedSheet> {
-  try {
-    const workbook = new ExcelJS.Workbook();
-    
-    // Try to parse as Excel first
-    // ExcelJS accepts Buffer, but TypeScript needs explicit type assertion
-    try {
-      await workbook.xlsx.load(buffer as any);
-    } catch {
-      // If Excel parsing fails, try CSV
-      const { Readable } = await import('stream');
-      const stream = Readable.from(buffer);
-      await workbook.csv.read(stream);
-    }
-    
-    if (workbook.worksheets.length === 0) {
-      throw new BadRequestException(
-        'Uploaded file does not contain any worksheets.',
-      );
-    }
-
-    const worksheet = workbook.worksheets[0];
-    
-    if (!worksheet) {
-      throw new BadRequestException(
-        'Uploaded file does not contain any data.',
-      );
-    }
-
+/**
+ * Helper function to extract data from a worksheet
+ */
+function extractWorksheetData(worksheet: ExcelJS.Worksheet): ParsedSheet {
     // Extract headers from first row
     const headerRow = worksheet.getRow(1);
     const headers: string[] = [];
@@ -92,28 +65,177 @@ export async function parseSpreadsheet(
     });
 
     return { headers: headers.filter(Boolean), rows };
-  } catch (error) {
-    if (error instanceof BadRequestException) {
-      throw error;
+}
+
+/**
+ * Detects if buffer is likely an Excel file based on magic bytes
+ */
+function isExcelFile(buffer: Buffer): boolean {
+  // Excel files start with specific magic bytes
+  // .xlsx files: PK (ZIP signature, since .xlsx is a ZIP archive)
+  // .xls files: D0 CF 11 E0 A1 B1 1A E1 (OLE2 signature)
+  if (buffer.length < 8) return false;
+  
+  // Check for .xlsx (ZIP signature)
+  if (buffer[0] === 0x50 && buffer[1] === 0x4B) {
+    return true;
+  }
+  
+  // Check for .xls (OLE2 signature)
+  if (buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0) {
+    return true;
+  }
+  
+  return false;
+}
+
+export async function parseSpreadsheet(
+  buffer: Buffer,
+): Promise<ParsedSheet> {
+  // Detect file type and parse accordingly
+  const isExcel = isExcelFile(buffer);
+  
+  if (isExcel) {
+    // Try to parse as Excel first
+    try {
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as any);
+      
+      if (workbook.worksheets.length === 0) {
+        // Excel file has no worksheets, try CSV as fallback
+        throw new Error('No worksheets found, trying CSV fallback');
+      }
+
+      const worksheet = workbook.worksheets[0];
+      
+      if (!worksheet) {
+        throw new Error('Worksheet is null, trying CSV fallback');
+      }
+
+      return extractWorksheetData(worksheet);
+    } catch (excelError) {
+      // If Excel parsing fails, always try CSV as fallback
+      // (file might be misidentified, corrupted, or in an unsupported format)
+      // Only throw immediately if it's a header row error (which means Excel parsed but has issues)
+      if (excelError instanceof BadRequestException && 
+          excelError.message.includes('header row')) {
+        throw excelError;
     }
     
-    // Try parsing as CSV if Excel parsing fails
+      // For all other Excel errors, fall through to CSV parsing
+      // This handles cases where:
+      // - File is detected as Excel but can't be parsed (corrupted, old format, etc.)
+      // - File is actually CSV but has Excel magic bytes
+      // - Excel file has no worksheets
+    }
+  }
+  
+  // CSV parsing (for non-Excel files, or as fallback for failed Excel parsing)
+  try {
+    // Try CSV parsing with ExcelJS first
+    const csvWorkbook = new ExcelJS.Workbook();
+    const { Readable } = await import('stream');
+    
+    // Remove BOM and ensure proper encoding
+    const cleanBuffer = removeBOM(buffer);
+    const stream = Readable.from(cleanBuffer);
+    
+    await csvWorkbook.csv.read(stream);
+    
+    if (csvWorkbook.worksheets.length === 0) {
+      throw new BadRequestException(
+        'Uploaded file does not contain any data.',
+      );
+    }
+    
+    const worksheet = csvWorkbook.worksheets[0];
+    
+    if (!worksheet) {
+      throw new BadRequestException(
+        'Uploaded file does not contain any data.',
+      );
+    }
+    
+    return extractWorksheetData(worksheet);
+  } catch (csvError) {
+    // If ExcelJS CSV parsing fails, try manual CSV parsing
+    if (csvError instanceof BadRequestException) {
+      // If it's already a BadRequestException, try manual parsing before throwing
+      try {
+        return parseCSV(buffer);
+      } catch {
+        throw csvError;
+      }
+    }
+    
+    // For other errors, try manual CSV parsing
     try {
       return parseCSV(buffer);
-    } catch (csvError) {
+    } catch (finalError) {
+      if (finalError instanceof BadRequestException) {
+        throw finalError;
+      }
       throw new BadRequestException(
-        `Failed to parse file. Please ensure it is a valid CSV or Excel file. ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to parse file. Please ensure it is a valid CSV or Excel file. ${finalError instanceof Error ? finalError.message : 'Unknown error'}`,
       );
     }
   }
 }
 
 /**
- * Parses CSV file manually
+ * Detects and removes BOM (Byte Order Mark) from buffer
+ */
+function removeBOM(buffer: Buffer): Buffer {
+  // Check for UTF-8 BOM (EF BB BF)
+  if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+    return buffer.slice(3);
+  }
+  // Check for UTF-16 LE BOM (FF FE)
+  if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE) {
+    // Convert UTF-16 LE to UTF-8
+    return Buffer.from(buffer.slice(2).toString('utf16le'), 'utf-8');
+  }
+  // Check for UTF-16 BE BOM (FE FF)
+  if (buffer.length >= 2 && buffer[0] === 0xFE && buffer[1] === 0xFF) {
+    // Convert UTF-16 BE to UTF-8 (need to swap bytes)
+    const utf16Buffer = buffer.slice(2);
+    const swapped = Buffer.alloc(utf16Buffer.length);
+    for (let i = 0; i < utf16Buffer.length; i += 2) {
+      if (i + 1 < utf16Buffer.length) {
+        swapped[i] = utf16Buffer[i + 1];
+        swapped[i + 1] = utf16Buffer[i];
+      } else {
+        swapped[i] = utf16Buffer[i];
+      }
+    }
+    return Buffer.from(swapped.toString('utf16le'), 'utf-8');
+  }
+  return buffer;
+}
+
+/**
+ * Parses CSV file manually with proper encoding handling
  */
 async function parseCSV(buffer: Buffer): Promise<ParsedSheet> {
-  const content = buffer.toString('utf-8');
-  const lines = content.split('\n').map((line) => line.trim());
+  // Remove BOM and ensure UTF-8 encoding
+  const cleanBuffer = removeBOM(buffer);
+  let content: string;
+  
+  try {
+    // Try UTF-8 first
+    content = cleanBuffer.toString('utf-8');
+  } catch {
+    try {
+      // Fallback to latin1 if UTF-8 fails
+      content = buffer.toString('latin1');
+    } catch {
+      throw new BadRequestException('Unable to decode file. Please ensure it is a valid UTF-8 or ASCII CSV file.');
+    }
+  }
+  
+  // Normalize line endings (handle \r\n, \n, \r)
+  content = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = content.split('\n').filter(line => line.trim().length > 0);
   
   if (lines.length === 0) {
     throw new BadRequestException('File is empty.');

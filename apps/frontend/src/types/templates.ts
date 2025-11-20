@@ -69,7 +69,8 @@ export type TemplateBlockType =
   | 'divider'
   | 'spacer'
   | 'raw_html'
-  | 'row';
+  | 'row'
+  | 'div';
 
 interface TemplateBlockBase {
   id: string;
@@ -142,6 +143,14 @@ export interface TemplateRowBlock extends TemplateBlockBase {
   gap?: number; // Gap between columns in pixels, defaults to 24
 }
 
+export interface TemplateDivBlock extends TemplateBlockBase {
+  type: 'div';
+  blocks: TemplateBlock[]; // Blocks contained within this div
+  padding?: number; // Padding in pixels, defaults to 0
+  backgroundColor?: string; // Background color, defaults to transparent
+  borderRadius?: number; // Border radius in pixels, defaults to 0
+}
+
 export type TemplateBlock =
   | TemplateHeadingBlock
   | TemplateTextBlock
@@ -150,7 +159,8 @@ export type TemplateBlock =
   | TemplateDividerBlock
   | TemplateSpacerBlock
   | TemplateRawHtmlBlock
-  | TemplateRowBlock;
+  | TemplateRowBlock
+  | TemplateDivBlock;
 
 
 

@@ -23,6 +23,12 @@ export interface TaskAssignee {
   assignedAt: string;
 }
 
+export interface TaskRef {
+  id: string;
+  title: string;
+  status: TaskStatus;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -41,6 +47,13 @@ export interface Task {
   tags: string[];
   estimatedHours?: number | null;
   actualHours?: number | null;
+  // Task Relationships
+  parentId?: string | null;
+  parent?: TaskRef | null;
+  children?: TaskRef[];
+  blocks?: TaskRef[]; // Tasks that this task blocks
+  blockedBy?: TaskRef[]; // Tasks that block this task
+  related?: TaskRef[]; // Tasks related to this task
   createdAt: string;
   updatedAt: string;
 }
@@ -82,6 +95,10 @@ export interface CreateTaskPayload {
   tags?: string[];
   estimatedHours?: number;
   actualHours?: number;
+  // Task Relationships
+  parentId?: string;
+  blockedByTaskIds?: string[]; // Tasks that block this task
+  relatedTaskIds?: string[]; // Tasks related to this task
 }
 
 export interface UpdateTaskPayload extends Partial<CreateTaskPayload> {}

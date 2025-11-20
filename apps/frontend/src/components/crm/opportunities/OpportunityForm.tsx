@@ -14,6 +14,7 @@ import type {
 } from '@/types/crm';
 import { Loader2, X, ChevronDown, Search } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 
 interface OpportunityFormProps {
   opportunityId?: string;
@@ -288,6 +289,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
 
   const descriptionValue = watch('description') || '';
   const positionDescriptionValue = watch('positionDescription') || '';
+  const positionRequirementsValue = watch('positionRequirements') || '';
 
   const selectedType = watch('type');
   const selectedLeadId = watch('leadId');
@@ -375,8 +377,9 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
 
     if (requiresPositionDetails) {
       payload.positionTitle = values.positionTitle || undefined;
-      payload.positionDescription = values.positionDescription || undefined;
-      payload.positionRequirements = values.positionRequirements || undefined;
+      // For HTML content, only set if not empty (after trimming whitespace)
+      payload.positionDescription = values.positionDescription?.trim() || undefined;
+      payload.positionRequirements = values.positionRequirements?.trim() || undefined;
     }
 
     if (isEdit) {
@@ -650,24 +653,22 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
                     className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-blue-900">Requirements</label>
-                  <input
-                    type="text"
-                    {...register('positionRequirements')}
-                    placeholder="Key skills or requirements"
-                    className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-blue-900">Position Description</label>
+                  <RichTextEditor
+                    value={positionDescriptionValue}
+                    onChange={(html) => setValue('positionDescription', html)}
+                    placeholder="Share detailed context for recruiters."
+                    minHeight="150px"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-blue-900">Position Description</label>
-                  <MentionInput
-                    value={positionDescriptionValue}
-                    onChange={(value) => setValue('positionDescription', value)}
-                    rows={3}
-                    placeholder="Share detailed context for recruiters. Type @ to mention someone"
-                    multiline={true}
-                    className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  <label className="mb-1 block text-sm font-medium text-blue-900">Requirements</label>
+                  <RichTextEditor
+                    value={positionRequirementsValue}
+                    onChange={(html) => setValue('positionRequirements', html)}
+                    placeholder="Key skills, location/timezone expectations, availability, etc."
+                    minHeight="150px"
                   />
                 </div>
               </div>

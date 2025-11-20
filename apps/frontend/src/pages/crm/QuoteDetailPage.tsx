@@ -363,8 +363,9 @@ export default function QuoteDetailPage() {
         </div>
       </div>
 
-      {showEditForm && (
+      {showEditForm && quote && (
         <QuoteForm
+          key={quote.id}
           quote={quote}
           onClose={() => setShowEditForm(false)}
           onSuccess={() => {
@@ -387,8 +388,16 @@ export default function QuoteDetailPage() {
 
       {showPreview && previewHtml && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-            <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card px-6 py-4">
+          <div
+            className="flex flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg"
+            style={{
+              width: '850px', // A4 width (794px) + padding
+              height: '1200px', // A4 height (1123px) + header + padding
+              maxWidth: '95vw',
+              maxHeight: '95vh',
+            }}
+          >
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-card px-6 py-4">
               <h2 className="text-xl font-semibold text-foreground">Quote Preview</h2>
               <button
                 onClick={() => {
@@ -400,8 +409,19 @@ export default function QuoteDetailPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6">
-              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div className="flex-1 min-h-0 overflow-auto bg-gray-100 flex items-center justify-center p-4">
+              <iframe
+                title="Quote preview"
+                className="border-0 bg-white shadow-lg"
+                style={{
+                  width: '794px',
+                  height: '1123px',
+                  maxWidth: '100%',
+                }}
+                srcDoc={previewHtml}
+                sandbox="allow-same-origin allow-scripts"
+                referrerPolicy="no-referrer"
+              />
             </div>
           </div>
         </div>

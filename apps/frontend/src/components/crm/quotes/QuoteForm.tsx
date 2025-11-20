@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { quotesApi, leadsApi, opportunitiesApi } from '@/lib/api/crm';
+import { templatesApi } from '@/lib/api/templates';
 import type { CreateQuotePayload, Quote, QuoteStatus } from '@/types/crm';
 import { X } from 'lucide-react';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
@@ -29,6 +30,7 @@ type FormValues = {
   currency?: string;
   status: QuoteStatus;
   milestones?: string;
+  templateId?: string;
 };
 
 const QUOTE_STATUSES: QuoteStatus[] = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'];
@@ -43,6 +45,12 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
     queryFn: () => leadsApi.list({ page: 1, pageSize: 100 }),
   });
 
+  // Fetch QUOTE templates for selection
+  const templatesQuery = useQuery({
+    queryKey: ['templates', 'QUOTE'],
+    queryFn: () => templatesApi.list({ type: 'QUOTE', onlyActive: true }),
+  });
+
   const defaultValues = useMemo<FormValues>(() => {
     if (!quote) {
       const urlLeadId = searchParams.get('leadId');
@@ -54,11 +62,12 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
         status: 'DRAFT',
         currency: 'USD',
         milestones: '',
+        templateId: '',
       } as FormValues;
     }
 
     return {
-      leadId: quote.leadId,
+      leadId: quote.leadId || '',
       opportunityId: quote.opportunityId ?? '',
       quoteNumber: quote.quoteNumber,
       title: quote.title,
@@ -73,8 +82,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
       currency: quote.currency || 'USD',
       status: quote.status,
       milestones: quote.milestones ?? '',
+      templateId: quote.templateId ?? '',
     } as FormValues;
-  }, [quote]);
+  }, [quote, searchParams]);
 
   const {
     register,
@@ -82,9 +92,37 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
     formState: { errors, isSubmitting },
     watch,
     setValue,
+    reset,
   } = useForm<FormValues>({
     defaultValues,
   });
+
+  // Reset form when quote changes (for edit mode)
+  // Wait for leads to be loaded before resetting to ensure leadId can be properly set
+  useEffect(() => {
+    if (quote && isEdit && !leadsQuery.isLoading && leadsQuery.data) {
+      const formValues: FormValues = {
+        leadId: quote.leadId || '',
+        opportunityId: quote.opportunityId ?? '',
+        quoteNumber: quote.quoteNumber,
+        title: quote.title,
+        description: quote.description ?? '',
+        overview: quote.overview ?? '',
+        functionalProposal: quote.functionalProposal ?? '',
+        technicalProposal: quote.technicalProposal ?? '',
+        teamComposition: quote.teamComposition ?? '',
+        paymentTerms: quote.paymentTerms ?? '',
+        warrantyPeriod: quote.warrantyPeriod ?? '',
+        totalValue: quote.totalValue ?? undefined,
+        currency: quote.currency || 'USD',
+        status: quote.status,
+        milestones: quote.milestones ?? '',
+        templateId: quote.templateId ?? '',
+      };
+      // Use reset with keepDefaultValues: false to ensure all fields are updated
+      reset(formValues, { keepDefaultValues: false });
+    }
+  }, [quote?.id, isEdit, reset, quote, leadsQuery.isLoading, leadsQuery.data]); // Wait for leads to load
 
   const selectedLeadId = watch('leadId');
   const opportunitiesQuery = useQuery({
@@ -99,6 +137,10 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       onSuccess();
     },
+    onError: (error: any) => {
+      console.error('Failed to create quote:', error);
+      alert(error?.response?.data?.message || 'Failed to create quote. Please try again.');
+    },
   });
 
   const updateMutation = useMutation({
@@ -108,31 +150,66 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
       queryClient.invalidateQueries({ queryKey: ['quotes', quote!.id] });
       onSuccess();
     },
+    onError: (error: any) => {
+      console.error('Failed to update quote:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update quote. Please try again.';
+      alert(errorMessage);
+    },
   });
 
-  const onSubmit = async (data: FormValues) => {
-    const payload: CreateQuotePayload = {
-      leadId: data.leadId,
-      opportunityId: data.opportunityId || undefined,
-      quoteNumber: data.quoteNumber,
-      title: data.title,
-      description: data.description || undefined,
-      overview: data.overview || undefined,
-      functionalProposal: data.functionalProposal || undefined,
-      technicalProposal: data.technicalProposal || undefined,
-      teamComposition: data.teamComposition || undefined,
-      milestones: data.milestones || undefined,
-      paymentTerms: data.paymentTerms || undefined,
-      warrantyPeriod: data.warrantyPeriod || undefined,
-      totalValue: data.totalValue || undefined,
-      currency: data.currency || 'USD',
-      status: data.status,
+  const onSubmit = (data: FormValues) => {
+    console.log('onSubmit called with data:', data);
+    
+    if (isSubmitting || createMutation.isPending || updateMutation.isPending) {
+      console.warn('Form submission already in progress');
+      return; // Prevent double submission
+    }
+
+    // Helper to convert empty strings to undefined
+    const toUndefined = (value: string | undefined | null) => {
+      return value && value.trim() ? value : undefined;
     };
 
-    if (isEdit) {
-      updateMutation.mutate(payload);
-    } else {
-      createMutation.mutate(payload);
+      const payload: CreateQuotePayload = {
+        leadId: data.leadId,
+      opportunityId: toUndefined(data.opportunityId),
+      quoteNumber: toUndefined(data.quoteNumber),
+        title: data.title,
+      description: toUndefined(data.description),
+      overview: toUndefined(data.overview),
+      functionalProposal: toUndefined(data.functionalProposal),
+      technicalProposal: toUndefined(data.technicalProposal),
+      teamComposition: toUndefined(data.teamComposition),
+      milestones: toUndefined(data.milestones),
+      paymentTerms: toUndefined(data.paymentTerms),
+      warrantyPeriod: toUndefined(data.warrantyPeriod),
+        totalValue: data.totalValue || undefined,
+        currency: data.currency || 'USD',
+        status: data.status,
+        templateId: toUndefined(data.templateId),
+      };
+
+    console.log('Submitting quote:', { isEdit, quoteId: quote?.id, payload: { ...payload, description: payload.description?.substring(0, 50) + '...' } });
+
+      if (isEdit) {
+      if (!quote?.id) {
+        console.error('Cannot update: quote ID is missing');
+        alert('Error: Quote ID is missing. Please refresh and try again.');
+        return;
+      }
+      console.log('Calling updateMutation.mutate');
+      updateMutation.mutate(payload, {
+        onSettled: (data, error) => {
+          console.log('Update mutation settled:', { data, error });
+        },
+      });
+      } else {
+      console.log('Calling createMutation.mutate');
+      createMutation.mutate(payload, {
+        onSettled: (data, error) => {
+          console.log('Create mutation settled:', { data, error });
+        },
+      });
     }
   };
 
@@ -153,7 +230,25 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 p-6">
+        <form 
+          onSubmit={handleSubmit(
+            (data) => {
+              console.log('Form validation passed, calling onSubmit');
+              onSubmit(data);
+            },
+            (errors) => {
+              console.error('Form validation failed:', errors);
+              // Show first error to user
+              const firstError = Object.values(errors)[0];
+              if (firstError && 'message' in firstError) {
+                alert(`Validation error: ${firstError.message}`);
+              } else {
+                alert('Please fix the form errors before submitting.');
+              }
+            }
+          )} 
+          className="space-y-6 p-6"
+        >
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">
@@ -210,6 +305,26 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                Template (Language)
+              </label>
+              <select
+                {...register('templateId')}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Default Template</option>
+                {templatesQuery.data?.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} {template.isDefault ? '(Default)' : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Select a template for language-specific formatting (e.g., Italian, English)
+              </p>
+            </div>
           </div>
 
           <div>
@@ -229,8 +344,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Description</label>
             <RichTextEditor
+              key={`description-${quote?.id || 'new'}`}
               value={watch('description') || ''}
-              onChange={(html) => setValue('description', html)}
+              onChange={(html) => setValue('description', html, { shouldDirty: true })}
               placeholder="Enter quote description..."
               minHeight="150px"
             />
@@ -239,8 +355,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Overview</label>
             <RichTextEditor
+              key={`overview-${quote?.id || 'new'}`}
               value={watch('overview') || ''}
-              onChange={(html) => setValue('overview', html)}
+              onChange={(html) => setValue('overview', html, { shouldDirty: true })}
               placeholder="Provide a high-level overview of the proposal..."
               minHeight="200px"
             />
@@ -249,8 +366,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Functional Proposal</label>
             <RichTextEditor
+              key={`functionalProposal-${quote?.id || 'new'}`}
               value={watch('functionalProposal') || ''}
-              onChange={(html) => setValue('functionalProposal', html)}
+              onChange={(html) => setValue('functionalProposal', html, { shouldDirty: true })}
               placeholder="Describe the functional aspects of your proposal..."
               minHeight="250px"
             />
@@ -259,8 +377,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Technical Proposal</label>
             <RichTextEditor
+              key={`technicalProposal-${quote?.id || 'new'}`}
               value={watch('technicalProposal') || ''}
-              onChange={(html) => setValue('technicalProposal', html)}
+              onChange={(html) => setValue('technicalProposal', html, { shouldDirty: true })}
               placeholder="Describe the technical aspects of your proposal..."
               minHeight="250px"
             />
@@ -269,8 +388,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Team Composition</label>
             <RichTextEditor
+              key={`teamComposition-${quote?.id || 'new'}`}
               value={watch('teamComposition') || ''}
-              onChange={(html) => setValue('teamComposition', html)}
+              onChange={(html) => setValue('teamComposition', html, { shouldDirty: true })}
               placeholder="Describe the team that will work on this project..."
               minHeight="200px"
             />
@@ -279,8 +399,9 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Milestones</label>
             <RichTextEditor
+              key={`milestones-${quote?.id || 'new'}`}
               value={watch('milestones') || ''}
-              onChange={(html) => setValue('milestones', html)}
+              onChange={(html) => setValue('milestones', html, { shouldDirty: true })}
               placeholder="Describe project milestones, deliverables, and timeline..."
               minHeight="250px"
             />
@@ -288,11 +409,12 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Payment Terms</label>
-            <textarea
-              {...register('paymentTerms')}
-              rows={4}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            <RichTextEditor
+              key={`paymentTerms-${quote?.id || 'new'}`}
+              value={watch('paymentTerms') || ''}
+              onChange={(html) => setValue('paymentTerms', html, { shouldDirty: true })}
               placeholder="Describe payment terms and schedule..."
+              minHeight="200px"
             />
           </div>
 
@@ -356,6 +478,15 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
             <button
               type="submit"
               disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}
+              onClick={(e) => {
+                console.log('Submit button clicked', {
+                  isSubmitting,
+                  createPending: createMutation.isPending,
+                  updatePending: updateMutation.isPending,
+                  isEdit,
+                  quoteId: quote?.id,
+                });
+              }}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting || createMutation.isPending || updateMutation.isPending

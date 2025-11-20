@@ -29,6 +29,7 @@ import { OpportunityCloseDialog } from '@/components/crm/opportunities/Opportuni
 import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { SafeHtml } from '@/components/ui/SafeHtml';
 
 const VALUE_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -438,13 +439,13 @@ export default function OpportunityDetailPage() {
                 {opportunity.openPosition.description ? (
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
-                    <p>{opportunity.openPosition.description}</p>
+                    <SafeHtml html={opportunity.openPosition.description} className="prose prose-sm max-w-none text-foreground" />
                   </div>
                 ) : null}
                 {opportunity.openPosition.requirements ? (
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Requirements</p>
-                    <p>{opportunity.openPosition.requirements}</p>
+                    <SafeHtml html={opportunity.openPosition.requirements} className="prose prose-sm max-w-none text-foreground" />
                   </div>
                 ) : null}
               </div>

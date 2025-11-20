@@ -28,6 +28,7 @@ interface TaskBoardProps {
   onStartTimer?: (task: Task) => void;
   onStopTimer?: (taskId: string) => void;
   currentUserId?: string;
+  onCreateChild?: (parentTask: Task) => void;
 }
 
 const STATUS_TITLES: Record<TaskStatus, string> = {
@@ -62,6 +63,7 @@ export function TaskBoard({
   onStartTimer,
   onStopTimer,
   currentUserId,
+  onCreateChild,
 }: TaskBoardProps) {
   const tasksMap = new Map<string, Task>();
   columns.forEach((column) => {
@@ -182,6 +184,7 @@ export function TaskBoard({
                             onStartTimer={onStartTimer}
                             onStopTimer={onStopTimer}
                             currentUserId={currentUserId}
+                            onCreateChild={onCreateChild}
                           />
                         </div>
                       )}

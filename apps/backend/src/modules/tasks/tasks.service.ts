@@ -60,12 +60,79 @@ export class TasksService {
         role: true,
       },
     },
+    parent: {
+      select: {
+        id: true,
+        title: true,
+        status: true,
+      },
+    },
+    children: {
+      select: {
+        id: true,
+        title: true,
+        status: true,
+      },
+    },
+    blocksTasks: {
+      include: {
+        blockedTask: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+    },
+    blockedByTasks: {
+      include: {
+        blockingTask: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+    },
+    relatedTasks: {
+      include: {
+        relatedTask: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+    },
+    relatedToTasks: {
+      include: {
+        task: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+          },
+        },
+      },
+    },
   } as const;
 
   private static formatTask(task: any) {
     if (!task) {
       return task;
     }
+
+    // Format blocking relationships
+    const blocks = task.blocksTasks?.map((tb: any) => tb.blockedTask) || [];
+    const blockedBy = task.blockedByTasks?.map((tb: any) => tb.blockingTask) || [];
+    
+    // Format related relationships (combine both directions)
+    const relatedFrom = task.relatedTasks?.map((tr: any) => tr.relatedTask) || [];
+    const relatedTo = task.relatedToTasks?.map((tr: any) => tr.task) || [];
+    const related = [...relatedFrom, ...relatedTo];
 
     return {
       ...task,
@@ -77,7 +144,224 @@ export class TasksService {
         task.actualHours !== undefined && task.actualHours !== null
           ? Number(task.actualHours)
           : null,
+      blocks,
+      blockedBy,
+      related,
     };
+  }
+
+  /**
+   * Automatically relate sibling tasks (tasks with the same parent)
+   */
+  private async relateSiblings(taskId: string, parentId: string | null) {
+    if (!parentId) return;
+
+    // Find all siblings (other children of the same parent)
+    const siblings = await this.prisma.task.findMany({
+      where: {
+        parentId,
+        id: { not: taskId }, // Exclude the current task
+      },
+      select: { id: true },
+    });
+
+    // Create bidirectional relationships between the new task and all siblings
+    for (const sibling of siblings) {
+      // Check if relationship already exists
+      const existing = await this.prisma.taskRelation.findFirst({
+        where: {
+          OR: [
+            { taskId, relatedTaskId: sibling.id },
+            { taskId: sibling.id, relatedTaskId: taskId },
+          ],
+        },
+      });
+
+      if (!existing) {
+        await this.prisma.taskRelation.create({
+          data: {
+            taskId,
+            relatedTaskId: sibling.id,
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Automatically block parent task by all its children
+   */
+  private async blockParentByChildren(parentId: string) {
+    const children = await this.prisma.task.findMany({
+      where: { parentId },
+      select: { id: true },
+    });
+
+    // Create blocking relationships: each child blocks the parent
+    for (const child of children) {
+      // Check if blocking relationship already exists
+      const existing = await this.prisma.taskBlock.findUnique({
+        where: {
+          blockingTaskId_blockedTaskId: {
+            blockingTaskId: child.id,
+            blockedTaskId: parentId,
+          },
+        },
+      });
+
+      if (!existing) {
+        await this.prisma.taskBlock.create({
+          data: {
+            blockingTaskId: child.id,
+            blockedTaskId: parentId,
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle task relationships after create/update
+   */
+  private async handleTaskRelationships(
+    taskId: string,
+    parentId: string | null | undefined,
+    blockedByTaskIds: string[] | undefined,
+    relatedTaskIds: string[] | undefined,
+  ) {
+    // Prevent circular dependencies: task cannot be its own parent
+    if (parentId === taskId) {
+      throw new BadRequestException('A task cannot be its own parent');
+    }
+
+    // Prevent circular dependencies: check if parent is a descendant
+    if (parentId) {
+      const parent = await this.prisma.task.findUnique({
+        where: { id: parentId },
+        select: { id: true, parentId: true },
+      });
+      if (!parent) {
+        throw new NotFoundException(`Parent task with ID ${parentId} not found`);
+      }
+
+      // Check if parent is a descendant of this task (would create a cycle)
+      let currentParentId = parent.parentId;
+      while (currentParentId) {
+        if (currentParentId === taskId) {
+          throw new BadRequestException('Cannot set parent: would create a circular dependency');
+        }
+        const currentParent = await this.prisma.task.findUnique({
+          where: { id: currentParentId },
+          select: { parentId: true },
+        });
+        currentParentId = currentParent?.parentId || null;
+      }
+    }
+
+    // Validate blocked-by tasks exist and prevent self-blocking
+    if (blockedByTaskIds && blockedByTaskIds.length > 0) {
+      // Prevent self-blocking
+      if (blockedByTaskIds.includes(taskId)) {
+        throw new BadRequestException('A task cannot block itself');
+      }
+
+      const blockingTasks = await this.prisma.task.findMany({
+        where: { id: { in: blockedByTaskIds } },
+        select: { id: true },
+      });
+      if (blockingTasks.length !== blockedByTaskIds.length) {
+        const foundIds = new Set(blockingTasks.map((t) => t.id));
+        const missingIds = blockedByTaskIds.filter((id) => !foundIds.has(id));
+        throw new NotFoundException(
+          `Blocking tasks with IDs ${missingIds.join(', ')} not found`,
+        );
+      }
+    }
+
+    // Validate related tasks exist and prevent self-relation
+    if (relatedTaskIds && relatedTaskIds.length > 0) {
+      // Remove self from related tasks if present
+      const filteredRelatedTaskIds = relatedTaskIds.filter((id) => id !== taskId);
+      
+      if (filteredRelatedTaskIds.length > 0) {
+        const relatedTasks = await this.prisma.task.findMany({
+          where: { id: { in: filteredRelatedTaskIds } },
+          select: { id: true },
+        });
+        if (relatedTasks.length !== filteredRelatedTaskIds.length) {
+          const foundIds = new Set(relatedTasks.map((t) => t.id));
+          const missingIds = filteredRelatedTaskIds.filter((id) => !foundIds.has(id));
+          throw new NotFoundException(
+            `Related tasks with IDs ${missingIds.join(', ')} not found`,
+          );
+        }
+      }
+    }
+
+    // Handle parent-child relationship
+    if (parentId !== undefined) {
+      const finalParentId = parentId || null;
+      
+      // Relate to siblings (automatic) - only if parent exists
+      if (finalParentId) {
+        await this.relateSiblings(taskId, finalParentId);
+        // Block parent by all children (automatic)
+        await this.blockParentByChildren(finalParentId);
+      }
+    }
+
+    // Handle explicit blocking relationships
+    // blockedByTaskIds = tasks that block this task
+    // So we create TaskBlock records where blockingTaskId = selected task, blockedTaskId = this task
+    if (blockedByTaskIds !== undefined) {
+      // Remove existing blocking relationships where this task is blocked
+      await this.prisma.taskBlock.deleteMany({
+        where: { blockedTaskId: taskId },
+      });
+
+      // Create new blocking relationships
+      if (blockedByTaskIds.length > 0) {
+        await this.prisma.taskBlock.createMany({
+          data: blockedByTaskIds.map((blockingTaskId) => ({
+            blockingTaskId, // The task that blocks
+            blockedTaskId: taskId, // This task is blocked
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    // Handle explicit related relationships
+    if (relatedTaskIds !== undefined) {
+      // Remove existing related relationships (both directions)
+      await this.prisma.taskRelation.deleteMany({
+        where: {
+          OR: [
+            { taskId },
+            { relatedTaskId: taskId },
+          ],
+        },
+      });
+
+      // Create new related relationships (bidirectional)
+      // Filter out self and use filtered list
+      const filteredRelatedTaskIds = relatedTaskIds.filter((id) => id !== taskId);
+      if (filteredRelatedTaskIds.length > 0) {
+        const relations = [];
+        for (const relatedTaskId of filteredRelatedTaskIds) {
+          // Create bidirectional relationship (avoid duplicates by using consistent ordering)
+          if (taskId < relatedTaskId) {
+            relations.push({ taskId, relatedTaskId });
+          } else {
+            relations.push({ taskId: relatedTaskId, relatedTaskId: taskId });
+          }
+        }
+        await this.prisma.taskRelation.createMany({
+          data: relations,
+          skipDuplicates: true,
+        });
+      }
+    }
   }
 
   private buildWhereClause(filters: FilterTasksDto): Prisma.TaskWhereInput {
@@ -215,6 +499,7 @@ export class TasksService {
       createdById: createTaskDto.createdById,
       customerId: createTaskDto.customerId ?? null,
       tags: createTaskDto.tags ?? [],
+      parentId: createTaskDto.parentId ?? null,
       assignees: assigneeIds.length > 0
         ? {
             create: assigneeIds.map((userId) => ({ userId })),
@@ -243,13 +528,27 @@ export class TasksService {
       include: this.taskInclude,
     });
 
+    // Handle relationships (after task is created)
+    await this.handleTaskRelationships(
+      task.id,
+      createTaskDto.parentId,
+      createTaskDto.blockedByTaskIds,
+      createTaskDto.relatedTaskIds,
+    );
+
+    // Reload task with relationships
+    const taskWithRelations = await this.prisma.task.findUnique({
+      where: { id: task.id },
+      include: this.taskInclude,
+    });
+
     // Process @mentions in title and description and create notifications
     // Don't await - let it run in background to not slow down task creation
     this.processMentions(task.id, createTaskDto.title, createTaskDto.description, createTaskDto.createdById).catch((error) => {
       console.error(`[Mentions] Failed to process mentions for task ${task.id}:`, error);
     });
 
-    return TasksService.formatTask(task);
+    return TasksService.formatTask(taskWithRelations);
   }
 
   async findAll(filters: FilterTasksDto) {
@@ -413,9 +712,46 @@ export class TasksService {
       data.actualHours = new Prisma.Decimal(updateTaskDto.actualHours);
     }
 
+    // Handle parent relationship update
+    if (updateTaskDto.parentId !== undefined) {
+      data.parentId = updateTaskDto.parentId ?? null;
+    }
+
     const task = await this.prisma.task.update({
       where: { id },
       data,
+      include: this.taskInclude,
+    });
+
+    // Handle relationships (after task is updated)
+    const newParentId = updateTaskDto.parentId !== undefined 
+      ? (updateTaskDto.parentId ?? null)
+      : existing.parentId;
+    
+    await this.handleTaskRelationships(
+      id,
+      updateTaskDto.parentId !== undefined ? newParentId : undefined,
+      updateTaskDto.blockedByTaskIds,
+      updateTaskDto.relatedTaskIds,
+    );
+
+    // If parent changed, update relationships for old and new parent
+    if (updateTaskDto.parentId !== undefined && existing.parentId !== newParentId) {
+      // Relate to new siblings
+      if (newParentId) {
+        await this.relateSiblings(id, newParentId);
+        await this.blockParentByChildren(newParentId);
+      }
+      
+      // Update old parent's blocking relationships if it still has children
+      if (existing.parentId) {
+        await this.blockParentByChildren(existing.parentId);
+      }
+    }
+
+    // Reload task with relationships
+    const taskWithRelations = await this.prisma.task.findUnique({
+      where: { id },
       include: this.taskInclude,
     });
 
@@ -430,7 +766,7 @@ export class TasksService {
       });
     }
 
-    return TasksService.formatTask(task);
+    return TasksService.formatTask(taskWithRelations);
   }
 
   async logTime(id: string, logTimeDto: LogTimeDto, userId: string) {

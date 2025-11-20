@@ -76,6 +76,13 @@ export class QuotesService {
         email: true,
       },
     },
+    template: {
+      select: {
+        id: true,
+        name: true,
+        type: true,
+      },
+    },
     activities: {
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -154,6 +161,21 @@ export class QuotesService {
       throw new BadRequestException(`Quote number ${quoteNumber} already exists`);
     }
 
+    // Verify template exists if provided
+    if (createQuoteDto.templateId) {
+      const template = await this.prisma.template.findUnique({
+        where: { id: createQuoteDto.templateId },
+      });
+
+      if (!template) {
+        throw new NotFoundException(`Template with ID ${createQuoteDto.templateId} not found`);
+      }
+
+      if (template.type !== TemplateType.QUOTE) {
+        throw new BadRequestException(`Template must be of type QUOTE`);
+      }
+    }
+
     const quote = await this.prisma.quote.create({
       data: {
         leadId: createQuoteDto.leadId,
@@ -168,6 +190,7 @@ export class QuotesService {
         milestones: createQuoteDto.milestones,
         paymentTerms: createQuoteDto.paymentTerms,
         warrantyPeriod: createQuoteDto.warrantyPeriod,
+        templateId: createQuoteDto.templateId,
         totalValue:
           createQuoteDto.totalValue !== undefined && createQuoteDto.totalValue !== null
             ? new Prisma.Decimal(createQuoteDto.totalValue)
@@ -270,6 +293,23 @@ export class QuotesService {
       }
     }
 
+    // Verify template exists if being updated
+    if (updateDto.templateId !== undefined) {
+      if (updateDto.templateId) {
+        const template = await this.prisma.template.findUnique({
+          where: { id: updateDto.templateId },
+        });
+
+        if (!template) {
+          throw new NotFoundException(`Template with ID ${updateDto.templateId} not found`);
+        }
+
+        if (template.type !== TemplateType.QUOTE) {
+          throw new BadRequestException(`Template must be of type QUOTE`);
+        }
+      }
+    }
+
     const quote = await this.prisma.quote.update({
       where: { id },
       data: {
@@ -285,6 +325,7 @@ export class QuotesService {
         milestones: updateDto.milestones,
         paymentTerms: updateDto.paymentTerms,
         warrantyPeriod: updateDto.warrantyPeriod,
+        templateId: updateDto.templateId !== undefined ? updateDto.templateId : undefined,
         totalValue:
           updateDto.totalValue !== undefined && updateDto.totalValue !== null
             ? new Prisma.Decimal(updateDto.totalValue)
@@ -314,31 +355,71 @@ export class QuotesService {
     return { deleted: true };
   }
 
-  async generatePdf(id: string): Promise<Buffer> {
-    const quote = await this.findOne(id);
-
+  /**
+   * Renders quote HTML using the same logic as template preview
+   * This ensures preview, template preview, and PDF are identical
+   */
+  private async renderQuoteHtml(quote: any): Promise<string> {
     // Prepare data for template
     const data = this.prepareTemplateData(quote);
 
-    // Use templatesService to render the template with proper helpers
-    let renderedHtml: string;
+    // Use the quote's selected template if available, otherwise use default
     try {
+      if (quote.templateId) {
+        // Use the specific template selected for this quote
+        const template = await this.prisma.template.findUnique({
+          where: { id: quote.templateId },
+        });
+
+        if (template && template.type === TemplateType.QUOTE && template.isActive) {
+          const rendered = await this.templatesService.renderTemplateById(template.id, data);
+          return rendered.html;
+        }
+      }
+
+      // Fallback to default template
       const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
-      renderedHtml = rendered.html;
+      return rendered.html;
     } catch (error) {
-      // Fallback to default template if no template found or rendering fails
+      // Fallback: create a temporary template and use templatesService.renderTemplateById
+      // to ensure we go through the same rendering pipeline (CSS injection, etc.)
       const templateHtml = this.getDefaultTemplate();
+      
+      // Create a temporary template in memory structure
+      const tempTemplate = {
+        id: 'temp-quote-template',
+        htmlContent: templateHtml,
+        cssContent: null,
+        type: TemplateType.QUOTE,
+        name: 'Default Quote Template',
+        isDefault: false,
+        isActive: true,
+        variables: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Use templatesService's renderTemplate method directly to ensure same processing
+      // This ensures CSS injection, Google Drive URL conversion, etc.
       const Handlebars = require('handlebars');
       const handlebars = Handlebars.create();
       
-      // Register helpers for fallback template
-      handlebars.registerHelper('formatDate', (value: unknown, dateFormat = 'PPP') => {
+      // Register helpers (templatesService already has these, but we need them for fallback)
+      handlebars.registerHelper('formatDate', (value: unknown, ...args: unknown[]) => {
         if (!value) {
           return '';
         }
+        let dateFormat = 'PPP';
+        if (args.length > 0 && typeof args[0] === 'string') {
+          dateFormat = args[0];
+        }
+        
         const date = value instanceof Date ? value : new Date(String(value));
         if (Number.isNaN(date.getTime())) {
           return '';
+        }
+        if (typeof dateFormat !== 'string') {
+          dateFormat = 'PPP';
         }
         return format(date, dateFormat);
       });
@@ -354,56 +435,137 @@ export class QuotesService {
         }).format(amount);
       });
 
-      const template = handlebars.compile(templateHtml);
-      renderedHtml = template(data);
+      // Use the same rendering pipeline as templatesService.renderTemplate
+      const compiled = handlebars.compile(templateHtml);
+      const sanitizedData = JSON.parse(JSON.stringify(data ?? {}));
+      const html = compiled(sanitizedData);
+      // Note: CSS injection and Google Drive URL conversion would happen here
+      // but since we don't have CSS content and this is a fallback, we skip those
+      return html;
     }
+  }
 
+  async generatePdf(id: string): Promise<Buffer> {
+    const quote = await this.findOne(id);
+    const renderedHtml = await this.renderQuoteHtml(quote);
     return this.pdfService.generatePdfFromHtml(renderedHtml);
   }
 
   async preview(id: string): Promise<{ html: string }> {
     const quote = await this.findOne(id);
-
-    // Prepare data for template
+    // Prepare data for template - same structure as PDF generation
     const data = this.prepareTemplateData(quote);
 
-    // Use templatesService to render the template with proper helpers
+    // Use templatesService preview method directly to ensure identical rendering
+    // This uses the EXACT same renderTemplate and wrapInDocument methods as template preview
     try {
-      const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
-      return { html: rendered.html };
-    } catch (error) {
-      // Fallback to default template if no template found or rendering fails
-      const templateHtml = this.getDefaultTemplate();
-      const Handlebars = require('handlebars');
-      const handlebars = Handlebars.create();
+      // Use the quote's selected template if available, otherwise use default
+      let template = null;
       
-      // Register helpers for fallback template
-      handlebars.registerHelper('formatDate', (value: unknown, dateFormat = 'PPP') => {
-        if (!value) {
-          return '';
-        }
-        const date = value instanceof Date ? value : new Date(String(value));
-        if (Number.isNaN(date.getTime())) {
-          return '';
-        }
-        return format(date, dateFormat);
-      });
+      if (quote.templateId) {
+        template = await this.prisma.template.findUnique({
+          where: { id: quote.templateId },
+        });
+      }
 
-      handlebars.registerHelper('formatCurrency', (value: unknown, currency = 'USD') => {
-        const amount = typeof value === 'number' ? value : Number(value);
-        if (Number.isNaN(amount)) {
-          return '';
-        }
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency,
-        }).format(amount);
-      });
+      // If no template selected or template not found, use default
+      if (!template || template.type !== TemplateType.QUOTE || !template.isActive) {
+        template = await this.prisma.template.findFirst({
+          where: {
+            type: TemplateType.QUOTE,
+            isDefault: true,
+            isActive: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+        });
+      }
 
-      const template = handlebars.compile(templateHtml);
-      const html = template(data);
-      return { html };
+      if (template) {
+        // Use templatesService.preview with the template ID and quote data
+        // This ensures:
+        // 1. Same renderTemplate method (CSS injection, Google Drive URL conversion)
+        // 2. Same wrapInDocument method (document structure, spacing, layout)
+        // 3. Identical output to template preview and PDF
+        const previewResult = await this.templatesService.preview(template.id, { data });
+        return { html: previewResult.renderedHtml };
+      } else {
+        // No template found - use renderDefault (same as PDF) and wrap for preview
+        // This ensures consistency even when no template exists
+        const rendered = await this.templatesService.renderDefault(TemplateType.QUOTE, data);
+        // Wrap in document structure using the same method as templatesService.wrapInDocument
+        const wrappedHtml = this.wrapInDocumentForPreview(rendered.html, null);
+        return { html: wrappedHtml };
+      }
+    } catch (error) {
+      // Final fallback: use the same method as PDF generation and wrap for preview
+      const renderedHtml = await this.renderQuoteHtml(quote);
+      const wrappedHtml = this.wrapInDocumentForPreview(renderedHtml, null);
+      return { html: wrappedHtml };
     }
+  }
+
+  /**
+   * Wraps HTML content in a complete document structure for preview
+   * This uses the same logic as templatesService.wrapInDocument to ensure identical rendering
+   */
+  private wrapInDocumentForPreview(html: string, cssContent?: string | null): string {
+    // Check if HTML already has a complete document structure
+    const hasHtmlTag = /<html[^>]*>/i.test(html);
+    const hasHeadTag = /<head[^>]*>/i.test(html);
+    const hasBodyTag = /<body[^>]*>/i.test(html);
+    
+    if (hasHtmlTag && hasHeadTag && hasBodyTag) {
+      // Already a complete document, just ensure CSS is injected if not already present
+      if (cssContent && cssContent.trim() && !html.includes('<style>')) {
+        // Inject CSS into existing head
+        if (html.includes('</head>')) {
+          return html.replace('</head>', `<style>\n${cssContent.trim()}\n</style>\n</head>`);
+        }
+      }
+      return html;
+    }
+    
+    // Extract body content and any prepended CSS (same logic as templatesService.wrapInDocument)
+    let bodyContent = html;
+    let extractedCss = '';
+    
+    // Check if CSS was prepended (from injectCss when no head tag exists)
+    const styleTagMatch = html.match(/<style>([\s\S]*?)<\/style>/i);
+    if (styleTagMatch) {
+      extractedCss = styleTagMatch[1];
+      // Remove the style tag from body content
+      bodyContent = html.replace(/<style>[\s\S]*?<\/style>/i, '').trim();
+    }
+    
+    if (hasBodyTag) {
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      if (bodyMatch) {
+        bodyContent = bodyMatch[1];
+      }
+    }
+    
+    // Use extracted CSS or provided CSS content
+    const cssStyle = (extractedCss || (cssContent && cssContent.trim()))
+      ? `<style>\n${extractedCss || (cssContent?.trim() ?? '')}\n</style>`
+      : '';
+    
+    // Wrap in complete HTML document structure matching Puppeteer's rendering
+    // A4 dimensions: 210mm x 297mm = 794px x 1123px at 96 DPI
+    // With 20px margins: content area is 754px x 1083px
+    // Set viewport to match A4 page dimensions for accurate preview
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=794, initial-scale=1.0">
+  ${cssStyle}
+</head>
+<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; width: 754px; min-height: 1083px;">
+${bodyContent}
+</body>
+</html>`;
   }
 
   async send(id: string, sendDto: SendQuoteDto, userId: string) {
@@ -629,6 +791,10 @@ export class QuotesService {
     return formatted;
   }
 
+  /**
+   * Prepares template data from a quote object
+   * This is used by both PDF generation and preview to ensure consistency
+   */
   private prepareTemplateData(quote: any) {
     const lead = quote.lead || {};
     const contacts = lead.contacts || [];
@@ -667,6 +833,47 @@ export class QuotesService {
               companyName: primaryContact.companyName || '',
             }
           : null,
+      },
+    };
+  }
+
+  /**
+   * Gets sample quote data for template preview
+   * This ensures template preview uses the same data structure as actual quotes
+   */
+  getSampleQuoteData() {
+    const now = new Date();
+    return {
+      quote: {
+        quoteNumber: 'QT-2025-0001',
+        title: 'Sample Quote Title',
+        description: '<p>This is a sample quote description with <strong>formatted</strong> text.</p>',
+        overview: '<p>This is a sample overview section with <em>rich text</em> formatting.</p>',
+        functionalProposal: '<p>Sample functional proposal content with <u>underlined</u> text.</p>',
+        technicalProposal: '<p>Sample technical proposal with <span style="color: #0066cc;">colored</span> text.</p>',
+        teamComposition: '<p>Sample team composition details.</p>',
+        milestones: '<p>Sample milestones and deliverables.</p>',
+        paymentTerms: '<p>Sample payment terms and schedule.</p>',
+        warrantyPeriod: '12 months',
+        totalValue: 50000,
+        currency: 'USD',
+        status: 'DRAFT',
+        createdAt: now,
+        updatedAt: now,
+        lead: {
+          title: 'Sample Lead',
+          description: 'Sample lead description',
+          prospectCompanyName: 'Sample Company Inc.',
+          prospectWebsite: 'https://example.com',
+          prospectIndustry: 'Technology',
+        },
+        contact: {
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'john.doe@example.com',
+          phone: '+1-555-0123',
+          companyName: 'Sample Company Inc.',
+        },
       },
     };
   }

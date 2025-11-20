@@ -148,12 +148,24 @@ export class TemplatesService {
 
   async preview(id: string, dto: PreviewTemplateDto) {
     const template = await this.findOne(id);
-    const renderedHtml = this.renderTemplate(template, dto.data ?? {});
+    
+    // For QUOTE templates, use the same data structure as actual quotes
+    // This ensures template preview matches quote preview and PDF
+    let previewData = dto.data ?? {};
+    if (template.type === TemplateType.QUOTE && (!dto.data || Object.keys(dto.data).length === 0)) {
+      previewData = this.getSampleQuoteData();
+    }
+    
+    const renderedHtml = this.renderTemplate(template, previewData);
+    
+    // Wrap in complete HTML document structure to match PDF rendering
+    // This ensures spacing, CSS, and layout are identical to PDF
+    const wrappedHtml = this.wrapInDocument(renderedHtml, template.cssContent);
 
     return {
       templateId: template.id,
       type: template.type,
-      renderedHtml,
+      renderedHtml: wrappedHtml,
       variables: template.variables,
     };
   }
@@ -325,6 +337,65 @@ export class TemplatesService {
     return `${styleTag}\n${html}`;
   }
 
+  /**
+   * Wraps HTML content in a complete document structure to match PDF rendering
+   * This ensures spacing, CSS, and layout are identical between preview and PDF
+   */
+  private wrapInDocument(html: string, cssContent?: string | null): string {
+    // Check if HTML already has a complete document structure
+    const hasHtmlTag = /<html[^>]*>/i.test(html);
+    const hasHeadTag = /<head[^>]*>/i.test(html);
+    const hasBodyTag = /<body[^>]*>/i.test(html);
+    
+    if (hasHtmlTag && hasHeadTag && hasBodyTag) {
+      // Already a complete document, just ensure CSS is injected if not already present
+      if (cssContent && cssContent.trim() && !html.includes('<style>')) {
+        return this.injectCss(html, cssContent);
+      }
+      return html;
+    }
+    
+    // Extract body content and any prepended CSS
+    let bodyContent = html;
+    let extractedCss = '';
+    
+    // Check if CSS was prepended (from injectCss when no head tag exists)
+    const styleTagMatch = html.match(/<style>([\s\S]*?)<\/style>/i);
+    if (styleTagMatch) {
+      extractedCss = styleTagMatch[1];
+      // Remove the style tag from body content
+      bodyContent = html.replace(/<style>[\s\S]*?<\/style>/i, '').trim();
+    }
+    
+    if (hasBodyTag) {
+      const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+      if (bodyMatch) {
+        bodyContent = bodyMatch[1];
+      }
+    }
+    
+    // Use extracted CSS or provided CSS content
+    const cssStyle = (extractedCss || (cssContent && cssContent.trim()))
+      ? `<style>\n${extractedCss || (cssContent?.trim() ?? '')}\n</style>`
+      : '';
+    
+    // Wrap in complete HTML document structure matching Puppeteer's rendering
+    // A4 dimensions: 210mm x 297mm = 794px x 1123px at 96 DPI
+    // With 20px margins: content area is 754px x 1083px
+    // Set viewport to match A4 page dimensions for accurate preview
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=794, initial-scale=1.0">
+  ${cssStyle}
+</head>
+<body style="margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; width: 754px; min-height: 1083px;">
+${bodyContent}
+</body>
+</html>`;
+  }
+
   private registerDefaultHelpers() {
     this.handlebars.registerHelper('uppercase', (value: unknown) => {
       if (value === null || value === undefined) {
@@ -384,6 +455,48 @@ export class TemplatesService {
       description: variable.description ?? null,
       sampleValue: variable.sampleValue ?? null,
     })) as Prisma.InputJsonValue;
+  }
+
+  /**
+   * Gets sample quote data for template preview
+   * This ensures template preview uses the same data structure as actual quotes
+   * Must match the structure returned by QuotesService.prepareTemplateData()
+   */
+  private getSampleQuoteData() {
+    const now = new Date();
+    return {
+      quote: {
+        quoteNumber: 'QT-2025-0001',
+        title: 'Sample Quote Title',
+        description: '<p>This is a sample quote description with <strong>formatted</strong> text.</p>',
+        overview: '<p>This is a sample overview section with <em>rich text</em> formatting.</p>',
+        functionalProposal: '<p>Sample functional proposal content with <u>underlined</u> text.</p>',
+        technicalProposal: '<p>Sample technical proposal with <span style="color: #0066cc;">colored</span> text.</p>',
+        teamComposition: '<p>Sample team composition details.</p>',
+        milestones: '<p>Sample milestones and deliverables.</p>',
+        paymentTerms: '<p>Sample payment terms and schedule.</p>',
+        warrantyPeriod: '12 months',
+        totalValue: 50000,
+        currency: 'USD',
+        status: 'DRAFT',
+        createdAt: now,
+        updatedAt: now,
+        lead: {
+          title: 'Sample Lead',
+          description: 'Sample lead description',
+          prospectCompanyName: 'Sample Company Inc.',
+          prospectWebsite: 'https://example.com',
+          prospectIndustry: 'Technology',
+        },
+        contact: {
+          firstName: 'John',
+          lastName: 'Doe',
+          email: 'john.doe@example.com',
+          phone: '+1-555-0123',
+          companyName: 'Sample Company Inc.',
+        },
+      },
+    };
   }
 }
 

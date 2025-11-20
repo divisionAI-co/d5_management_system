@@ -38,7 +38,15 @@ export function InvoicePreviewDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative flex h-full max-h-[90vh] w-full max-w-5xl flex-col rounded-lg bg-card shadow-lg">
+      <div
+        className="relative flex flex-col overflow-hidden rounded-lg bg-card shadow-lg"
+        style={{
+          width: '850px', // A4 width (794px) + padding
+          height: '1200px', // A4 height (1123px) + header + padding
+          maxWidth: '95vw',
+          maxHeight: '95vh',
+        }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
@@ -83,10 +91,18 @@ export function InvoicePreviewDialog({
           )}
 
           {!isLoading && !error && preview && (
-            <div className="mx-auto max-w-4xl">
-              <div
-                className="rounded-lg border border-border bg-white p-8 shadow-sm"
-                dangerouslySetInnerHTML={{ __html: preview.renderedHtml }}
+            <div className="flex-1 min-h-0 overflow-auto bg-gray-100 flex items-center justify-center p-4">
+              <iframe
+                title="Invoice preview"
+                className="border-0 bg-white shadow-lg"
+                style={{
+                  width: '794px',
+                  height: '1123px',
+                  maxWidth: '100%',
+                }}
+                srcDoc={preview.renderedHtml}
+                sandbox="allow-same-origin allow-scripts"
+                referrerPolicy="no-referrer"
               />
             </div>
           )}

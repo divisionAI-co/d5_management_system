@@ -122,6 +122,31 @@ export class CreateTaskDto {
     return [];
   })
   tags?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Parent task ID (for hierarchical task structure)',
+  })
+  @IsUUID()
+  @IsOptional()
+  parentId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Task IDs that block this task (those tasks must be done before this task can start)',
+    type: [String],
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  blockedByTaskIds?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Task IDs that are related to this task (for reference, not dependency)',
+    type: [String],
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  relatedTaskIds?: string[];
 }
 
 

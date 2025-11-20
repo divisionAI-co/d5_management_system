@@ -7,6 +7,7 @@ import type {
   EodImportSummary,
   InvoicesImportSummary,
   CandidatesImportSummary,
+  CheckInsImportSummary,
   ContactMapPayload,
   LeadMapPayload,
   OpportunityMapPayload,
@@ -14,6 +15,7 @@ import type {
   EodMapPayload,
   InvoiceMapPayload,
   CandidateMapPayload,
+  CheckInsMapPayload,
   ExecuteContactImportPayload,
   ExecuteLeadImportPayload,
   ExecuteOpportunityImportPayload,
@@ -21,6 +23,7 @@ import type {
   ExecuteEodImportPayload,
   ExecuteInvoiceImportPayload,
   ExecuteCandidateImportPayload,
+  ExecuteCheckInsImportPayload,
   UploadContactsResult,
   UploadLeadsResult,
   UploadOpportunitiesResult,
@@ -28,6 +31,7 @@ import type {
   UploadEodResult,
   UploadInvoicesResult,
   UploadCandidatesResult,
+  UploadCheckInsResult,
 } from '@/types/imports';
 
 const multipartHeaders = { 'Content-Type': 'multipart/form-data' };
@@ -215,6 +219,37 @@ export const candidatesImportsApi = {
   ) => {
     const { data } = await apiClient.post<CandidatesImportSummary>(
       `/imports/candidates/${importId}/execute`,
+      payload,
+    );
+    return data;
+  },
+};
+
+export const checkInsImportsApi = {
+  upload: async (file: File) =>
+    uploadCsv<UploadCheckInsResult>('/imports/check-ins/upload', file),
+
+  saveMapping: async (importId: string, payload: CheckInsMapPayload) => {
+    const { data } = await apiClient.post(
+      `/imports/check-ins/${importId}/map`,
+      payload,
+    );
+    return data;
+  },
+
+  validate: async (importId: string) => {
+    const { data } = await apiClient.get<{
+      unmatchedEmployees: string[];
+    }>(`/imports/check-ins/${importId}/validate`);
+    return data;
+  },
+
+  execute: async (
+    importId: string,
+    payload: ExecuteCheckInsImportPayload,
+  ) => {
+    const { data } = await apiClient.post<CheckInsImportSummary>(
+      `/imports/check-ins/${importId}/execute`,
       payload,
     );
     return data;

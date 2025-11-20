@@ -498,6 +498,7 @@ export interface Quote {
   totalValue?: number | null;
   currency?: string | null;
   status: QuoteStatus;
+  templateId?: string | null;
   sentAt?: string | null;
   sentTo?: string | null;
   sentBy?: string | null;
@@ -505,6 +506,11 @@ export interface Quote {
   createdAt: string;
   updatedAt: string;
   lead: QuoteLead;
+  template?: {
+    id: string;
+    name: string;
+    type: string;
+  } | null;
   opportunity?: {
     id: string;
     title: string;
@@ -549,6 +555,7 @@ export interface QuoteFilters {
 }
 
 export interface CreateQuotePayload {
+  templateId?: string;
   leadId: string;
   opportunityId?: string;
   quoteNumber?: string;

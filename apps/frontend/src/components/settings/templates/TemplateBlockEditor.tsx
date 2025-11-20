@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, ArrowDown, ArrowUp, ChevronDown, ChevronUp, Trash2, GripVertical } from 'lucide-react';
-import type { TemplateBlock, TemplateBlockType, TemplateRowBlock } from '@/types/templates';
+import type { TemplateBlock, TemplateBlockType, TemplateDivBlock, TemplateRowBlock } from '@/types/templates';
 import { createBlock, convertGoogleDriveUrl } from './template-blocks';
 import {
   DndContext,
@@ -40,6 +40,7 @@ const BLOCK_OPTIONS: Array<{ type: TemplateBlockType; label: string; description
   { type: 'button', label: 'Button', description: 'Call-to-action button' },
   { type: 'image', label: 'Image', description: 'Banner or product image' },
   { type: 'row', label: 'Two Columns', description: 'Side-by-side layout' },
+  { type: 'div', label: 'Container', description: 'Styled container for grouping blocks' },
   { type: 'divider', label: 'Divider', description: 'Horizontal separator' },
   { type: 'spacer', label: 'Spacer', description: 'Adjust vertical spacing' },
   { type: 'raw_html', label: 'Raw HTML', description: 'Custom HTML block' },
@@ -359,6 +360,12 @@ function BlockItem({
                 return (
                   <div className="text-xs text-muted-foreground">
                     Row: {block.leftBlocks.length} left block(s), {block.rightBlocks.length} right block(s)
+                  </div>
+                );
+              case 'div':
+                return (
+                  <div className="text-xs text-muted-foreground">
+                    Container: {block.blocks.length} block(s)
                   </div>
                 );
               case 'raw_html':
@@ -1129,6 +1136,98 @@ function BlockItem({
                         />
                       )}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {block.type === 'div' && (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Padding (px)</label>
+                    <input
+                      type="number"
+                      value={block.padding ?? 0}
+                      min={0}
+                      max={100}
+                      onChange={(event) =>
+                        onUpdate(block.id, { padding: Number(event.target.value) || 0 })
+                      }
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Border Radius (px)</label>
+                    <input
+                      type="number"
+                      value={block.borderRadius ?? 0}
+                      min={0}
+                      max={50}
+                      onChange={(event) =>
+                        onUpdate(block.id, { borderRadius: Number(event.target.value) || 0 })
+                      }
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Background Color</label>
+                    <input
+                      type="color"
+                      value={block.backgroundColor || '#ffffff'}
+                      onChange={(event) =>
+                        onUpdate(block.id, { backgroundColor: event.target.value || undefined })
+                      }
+                      className="mt-2 h-10 w-full rounded-lg border border-border bg-card"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-3">
+                  <label className="text-xs font-semibold uppercase text-muted-foreground">Custom Style (optional)</label>
+                  <input
+                    type="text"
+                    value={block.customStyle || ''}
+                    onChange={(event) =>
+                      onUpdate(block.id, { customStyle: event.target.value || undefined })
+                    }
+                    placeholder="e.g., border:1px solid #ccc; box-shadow:0 2px 4px rgba(0,0,0,0.1);"
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm font-mono focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Add inline CSS styles for the container
+                  </p>
+                </div>
+
+                <div className="border-t border-border pt-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase text-muted-foreground">Container Blocks</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const divBlock = block as TemplateDivBlock;
+                        onUpdate(block.id, {
+                          blocks: [...divBlock.blocks, createBlock('text')],
+                        });
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 transition hover:bg-blue-100"
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add Block
+                    </button>
+                  </div>
+                  <div className="min-h-[100px] rounded-lg border border-dashed border-border bg-muted/30 p-3">
+                    {(block as TemplateDivBlock).blocks.length === 0 ? (
+                      <p className="text-center text-xs text-muted-foreground">No blocks yet. Add blocks to group them in this container.</p>
+                    ) : (
+                      <TemplateBlockEditor
+                        blocks={(block as TemplateDivBlock).blocks}
+                        onChange={(newBlocks) => {
+                          onUpdate(block.id, { blocks: newBlocks });
+                        }}
+                        availableVariables={availableVariables}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

@@ -42,6 +42,10 @@ type FormValues = {
   tags?: string;
   estimatedHours?: string;
   actualHours?: string;
+  // Task Relationships
+  parentId?: string;
+  blockedByTaskIds?: string[];
+  relatedTaskIds?: string[];
 };
 
 interface TaskFormProps {
@@ -49,6 +53,7 @@ interface TaskFormProps {
   currentUserId: string;
   currentUserRole?: string;
   defaultStatus?: TaskStatus;
+  defaultParentId?: string;
   onClose: () => void;
   onSuccess: (task: Task) => void;
 }
@@ -58,6 +63,7 @@ export function TaskForm({
   currentUserId,
   currentUserRole,
   defaultStatus,
+  defaultParentId,
   onClose,
   onSuccess,
 }: TaskFormProps) {
@@ -78,6 +84,10 @@ export function TaskForm({
         tags: '',
         estimatedHours: '',
         actualHours: '',
+        // Task Relationships
+        parentId: defaultParentId || undefined,
+        blockedByTaskIds: [],
+        relatedTaskIds: [],
       };
     }
 
@@ -108,8 +118,12 @@ export function TaskForm({
         task.actualHours !== undefined && task.actualHours !== null
           ? String(task.actualHours)
           : '',
+      // Task Relationships
+      parentId: task.parentId ?? undefined,
+      blockedByTaskIds: task.blockedBy?.map((t) => t.id) ?? [],
+      relatedTaskIds: task.related?.map((t) => t.id) ?? [],
     };
-  }, [task, defaultStatus, currentUserId]);
+  }, [task, defaultStatus, defaultParentId, currentUserId]);
 
   const {
     register,
@@ -127,6 +141,13 @@ export function TaskForm({
   useEffect(() => {
     reset(defaultValues);
   }, [defaultValues, reset]);
+
+  // Set parentId when defaultParentId is provided (for creating child tasks)
+  useEffect(() => {
+    if (!task && defaultParentId) {
+      setValue('parentId', defaultParentId);
+    }
+  }, [task, defaultParentId, setValue]);
 
   const usersQuery = useQuery<UsersListResponse>({
     queryKey: ['users', 'options', 'task-assignment'],
@@ -155,6 +176,41 @@ export function TaskForm({
       return customersApi.list(filters);
     },
   });
+
+  // Fetch all tasks for relationship selectors
+  const allTasksQuery = useQuery<TasksKanbanResponse>({
+    queryKey: ['tasks', 'all', 'for-relationships'],
+    queryFn: async () => {
+      try {
+        const result = await tasksApi.list({ limit: 200 }); // Get up to 200 tasks for selectors (backend max)
+        console.log('[TaskForm] Tasks loaded for relationships:', result);
+        return result;
+      } catch (error) {
+        console.error('[TaskForm] Error loading tasks for relationships:', error);
+        throw error;
+      }
+    },
+    enabled: true,
+    retry: 2,
+  });
+
+  // Flatten tasks from kanban columns
+  const allTasks = useMemo(() => {
+    if (!allTasksQuery.data) {
+      console.log('[TaskForm] No tasks data available');
+      return [];
+    }
+    const tasks = allTasksQuery.data.columns.flatMap((col) => col.tasks);
+    console.log('[TaskForm] Flattened tasks:', tasks.length);
+    return tasks;
+  }, [allTasksQuery.data]);
+
+  // Filter out current task from relationship options
+  const availableTasksForRelations = useMemo(() => {
+    const filtered = allTasks.filter((t) => t.id !== task?.id);
+    console.log('[TaskForm] Available tasks for relationships:', filtered.length, 'out of', allTasks.length);
+    return filtered;
+  }, [allTasks, task?.id]);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateTaskPayload) => tasksApi.create(payload),
@@ -188,6 +244,10 @@ export function TaskForm({
         values.actualHours && values.actualHours !== ''
           ? Number(values.actualHours)
           : undefined,
+      // Task Relationships
+      parentId: values.parentId || undefined,
+      blockedByTaskIds: values.blockedByTaskIds && values.blockedByTaskIds.length > 0 ? values.blockedByTaskIds : undefined,
+      relatedTaskIds: values.relatedTaskIds && values.relatedTaskIds.length > 0 ? values.relatedTaskIds : undefined,
     };
 
     if (isEdit) {
@@ -457,6 +517,168 @@ export function TaskForm({
               multiline={true}
               className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          {/* Task Relationships Section */}
+          <div className="space-y-4 border-t border-border pt-6">
+            <div>
+              <h3 className="mb-4 text-sm font-semibold uppercase text-muted-foreground">
+                Task Relationships
+              </h3>
+              <p className="mb-4 text-xs text-muted-foreground">
+                Define how this task relates to other tasks. Children tasks are automatically related to each other, and parent tasks are automatically blocked by their children.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                Parent Task
+              </label>
+              {allTasksQuery.isLoading ? (
+                <div className="w-full rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground">
+                  Loading tasks...
+                </div>
+              ) : allTasksQuery.isError ? (
+                <div className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  Error loading tasks. Please try again.
+                </div>
+              ) : (
+                <select
+                  {...register('parentId')}
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">None (top-level task)</option>
+                  {availableTasksForRelations.length === 0 ? (
+                    <option value="" disabled>
+                      No other tasks available
+                    </option>
+                  ) : (
+                    availableTasksForRelations.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title} ({t.status})
+                      </option>
+                    ))
+                  )}
+                </select>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Select a parent task to create a hierarchical structure. This task will be a child of the selected parent.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-muted-foreground">
+                Blocked By These Tasks
+              </label>
+              <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
+                {availableTasksForRelations.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No other tasks available</p>
+                ) : (
+                  availableTasksForRelations.map((t) => {
+                    const fieldName = 'blockedByTaskIds' as const;
+                    const currentValues = watch(fieldName) || [];
+                    const isChecked = Array.isArray(currentValues) && currentValues.includes(t.id);
+                    
+                    return (
+                      <label
+                        key={t.id}
+                        className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition ${
+                          isChecked
+                            ? 'border-orange-500 bg-orange-50 text-orange-700'
+                            : 'border-border bg-card hover:bg-muted'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const currentArray = watch(fieldName) || [];
+                            let newArray: string[];
+                            if (e.target.checked) {
+                              newArray = Array.isArray(currentArray) 
+                                ? [...currentArray, t.id]
+                                : [t.id];
+                            } else {
+                              newArray = Array.isArray(currentArray)
+                                ? currentArray.filter((id: string) => id !== t.id)
+                                : [];
+                            }
+                            setValue(fieldName, newArray, { shouldValidate: true });
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-2 focus:ring-orange-500"
+                        />
+                        <span className="text-sm font-medium">
+                          {t.title}
+                        </span>
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {t.status}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Select tasks that must be completed before this task can start. This task is blocked by the selected tasks.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-muted-foreground">
+                Related Tasks
+              </label>
+              <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-border p-3">
+                {availableTasksForRelations.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No other tasks available</p>
+                ) : (
+                  availableTasksForRelations.map((t) => {
+                    const fieldName = 'relatedTaskIds' as const;
+                    const currentValues = watch(fieldName) || [];
+                    const isChecked = Array.isArray(currentValues) && currentValues.includes(t.id);
+                    
+                    return (
+                      <label
+                        key={t.id}
+                        className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition ${
+                          isChecked
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-border bg-card hover:bg-muted'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const currentArray = watch(fieldName) || [];
+                            let newArray: string[];
+                            if (e.target.checked) {
+                              newArray = Array.isArray(currentArray) 
+                                ? [...currentArray, t.id]
+                                : [t.id];
+                            } else {
+                              newArray = Array.isArray(currentArray)
+                                ? currentArray.filter((id: string) => id !== t.id)
+                                : [];
+                            }
+                            setValue(fieldName, newArray, { shouldValidate: true });
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium">
+                          {t.title}
+                        </span>
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {t.status}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Select tasks that are related to this task (for reference, not dependency). Sibling tasks (tasks with the same parent) are automatically related.
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 border-t border-border pt-6">

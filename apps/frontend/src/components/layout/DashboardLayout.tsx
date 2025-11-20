@@ -52,6 +52,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { name: 'Leave Requests', href: '/employees/leave-requests', roles: ROLE_PERMISSIONS.LEAVE_REQUESTS },
       { name: 'Performance Reviews', href: '/employees/performance-reviews', roles: ROLE_PERMISSIONS.PERFORMANCE_REVIEWS },
       { name: 'Remote Work', href: '/employees/remote-work', roles: ROLE_PERMISSIONS.REMOTE_WORK },
+      { name: 'Check-ins', href: '/employees/check-ins', roles: ROLE_PERMISSIONS.CHECK_INS },
     ],
   },
   {

@@ -98,6 +98,15 @@ export interface ExecuteInvoiceImportPayload extends ExecutePayloadBase {
 
 export type UploadCandidatesResult = UploadBaseResult;
 export type CandidatesImportSummary = ImportSummaryBase;
+
+export type UploadCheckInsResult = UploadBaseResult;
+export type CheckInsImportSummary = ImportSummaryBase;
+export interface CheckInsMapPayload extends MapPayloadBase {}
+export interface ExecuteCheckInsImportPayload extends ExecutePayloadBase {
+  manualMatches?: {
+    employees?: Record<string, string>;
+  };
+}
 export interface CandidateMapPayload extends MapPayloadBase {}
 export interface ExecuteCandidateImportPayload extends ExecutePayloadBase {
   defaultStage?: string;
