@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AiCollectionFormat, AiCollectionKey, AiEntityType, Prisma } from '@prisma/client';
+import { AiActionOperationType, AiCollectionFormat, AiCollectionKey, AiEntityType, Prisma } from '@prisma/client';
 import { validate as uuidValidate } from 'uuid';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -52,6 +52,9 @@ export class AiActionsService {
             fields: { orderBy: { order: 'asc' } },
           },
         },
+        fieldMappings: {
+          orderBy: { order: 'asc' },
+        },
         _count: {
           select: { attachments: true, executions: true },
         },
@@ -69,6 +72,9 @@ export class AiActionsService {
         collections: {
           orderBy: { order: 'asc' },
           include: { fields: { orderBy: { order: 'asc' } } },
+        },
+        fieldMappings: {
+          orderBy: { order: 'asc' },
         },
         attachments: {
           orderBy: { createdAt: 'desc' },
@@ -106,6 +112,7 @@ export class AiActionsService {
         model: dto.model,
         isActive: dto.isActive ?? true,
         isSystem: false,
+        operationType: dto.operationType ?? AiActionOperationType.READ_ONLY,
         createdBy: { connect: { id: createdById } },
         fields: {
           create: dto.fields.map((field, index) => ({
@@ -134,10 +141,21 @@ export class AiActionsService {
               })),
             }
           : undefined,
+        fieldMappings: dto.fieldMappings && dto.fieldMappings.length > 0
+          ? {
+              create: dto.fieldMappings.map((mapping, index) => ({
+                sourceKey: mapping.sourceKey,
+                targetField: mapping.targetField,
+                transformRule: mapping.transformRule ?? null,
+                order: mapping.order ?? index,
+              })),
+            }
+          : undefined,
       },
       include: {
         fields: { orderBy: { order: 'asc' } },
         collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+        fieldMappings: { orderBy: { order: 'asc' } },
       },
     });
 
@@ -224,6 +242,23 @@ export class AiActionsService {
         }
       }
 
+      if (dto.fieldMappings !== undefined) {
+        await tx.aiActionFieldMapping.deleteMany({ where: { actionId: id } });
+        if (dto.fieldMappings.length > 0) {
+          for (const [index, mapping] of dto.fieldMappings.entries()) {
+            await tx.aiActionFieldMapping.create({
+              data: {
+                actionId: id,
+                sourceKey: mapping.sourceKey,
+                targetField: mapping.targetField,
+                transformRule: mapping.transformRule ?? null,
+                order: mapping.order ?? index,
+              },
+            });
+          }
+        }
+      }
+
       const data: Prisma.AiActionUpdateInput = {
         ...(dto.name !== undefined && { name: dto.name.trim() }),
         ...(dto.description !== undefined && { description: dto.description.trim() }),
@@ -231,6 +266,7 @@ export class AiActionsService {
         ...(dto.entityType !== undefined && { entityType: dto.entityType }),
         ...(dto.model !== undefined && { model: dto.model }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(dto.operationType !== undefined && { operationType: dto.operationType }),
       };
 
       const updated = await tx.aiAction.update({
@@ -239,6 +275,7 @@ export class AiActionsService {
         include: {
           fields: { orderBy: { order: 'asc' } },
           collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+          fieldMappings: { orderBy: { order: 'asc' } },
         },
       });
 
@@ -359,6 +396,7 @@ export class AiActionsService {
           include: {
             fields: { orderBy: { order: 'asc' } },
             collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+            fieldMappings: { orderBy: { order: 'asc' } },
           },
         },
       },
@@ -479,6 +517,22 @@ export class AiActionsService {
               ) ?? [],
           };
         }) ?? [],
+      fieldMappings:
+        action.fieldMappings?.map(
+          (mapping: {
+            id: string;
+            sourceKey: string;
+            targetField: string;
+            transformRule?: string | null;
+            order: number;
+          }) => ({
+            id: mapping.id,
+            sourceKey: mapping.sourceKey,
+            targetField: mapping.targetField,
+            transformRule: mapping.transformRule ?? undefined,
+            order: mapping.order,
+          }),
+        ) ?? [],
     };
   }
 }

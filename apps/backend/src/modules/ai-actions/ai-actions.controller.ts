@@ -151,6 +151,8 @@ export class AiActionsController {
       model: dto.model,
       triggeredById: userId,
       extraInstructions: dto.extraInstructions,
+      operationType: dto.operationType,
+      fieldMappings: dto.fieldMappings,
     });
   }
 

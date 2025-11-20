@@ -233,6 +233,7 @@ export function AiActionsManager() {
       promptTemplate: action.promptTemplate,
       model: action.model ?? '',
       isActive: action.isActive,
+      operationType: action.operationType ?? 'READ_ONLY',
       selectedFields: action.fields.map((field) => ({
         key: field.fieldKey,
         label: field.fieldLabel,
@@ -259,6 +260,13 @@ export function AiActionsManager() {
               order: field.order ?? 0,
               metadata: field.metadata ?? undefined,
             })) ?? [],
+        })) ?? [],
+      fieldMappings:
+        action.fieldMappings?.map((mapping) => ({
+          sourceKey: mapping.sourceKey,
+          targetField: mapping.targetField,
+          transformRule: mapping.transformRule ?? undefined,
+          order: mapping.order,
         })) ?? [],
     });
     setShowForm(true);
@@ -421,7 +429,7 @@ export function AiActionsManager() {
       promptTemplate: formState.promptTemplate,
       model: formState.model.trim() || undefined,
       isActive: formState.isActive,
-      operationType: formState.operationType !== 'READ_ONLY' ? formState.operationType : undefined,
+      operationType: formState.operationType,
       fields: formState.selectedFields.map((field, index) => ({
         fieldKey: field.key,
         fieldLabel: field.label,
@@ -429,8 +437,8 @@ export function AiActionsManager() {
         order: index,
       })),
       fieldMappings:
-        formState.operationType !== 'READ_ONLY' && formState.fieldMappings.length > 0
-          ? formState.fieldMappings.map((mapping) => ({
+        formState.operationType !== 'READ_ONLY' && (formState.fieldMappings?.length ?? 0) > 0
+          ? (formState.fieldMappings ?? []).map((mapping) => ({
               sourceKey: mapping.sourceKey,
               targetField: mapping.targetField,
               transformRule: mapping.transformRule || undefined,
@@ -749,8 +757,8 @@ export function AiActionsManager() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-4xl rounded-xl border border-border bg-card-elevated shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card-elevated shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-blue-500" />
                 <h3 className="text-lg font-semibold text-foreground">
@@ -766,7 +774,7 @@ export function AiActionsManager() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-6 px-6 py-6 md:grid-cols-[1.5fr_1fr]">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto grid gap-6 px-6 py-6 md:grid-cols-[1.5fr_1fr]">
               <div className="space-y-4">
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
@@ -845,7 +853,7 @@ export function AiActionsManager() {
                       setFormState((prev) => ({
                         ...prev,
                         operationType: event.target.value as 'READ_ONLY' | 'UPDATE' | 'CREATE',
-                        fieldMappings: event.target.value === 'READ_ONLY' ? [] : prev.fieldMappings,
+                        fieldMappings: event.target.value === 'READ_ONLY' ? [] : (prev.fieldMappings ?? []),
                       }))
                     }
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
@@ -1107,12 +1115,12 @@ export function AiActionsManager() {
                           setFormState((prev) => ({
                             ...prev,
                             fieldMappings: [
-                              ...prev.fieldMappings,
+                              ...(prev.fieldMappings ?? []),
                               {
                                 sourceKey: '',
                                 targetField: '',
                                 transformRule: '',
-                                order: prev.fieldMappings.length,
+                                order: prev.fieldMappings?.length ?? 0,
                               },
                             ],
                           }));
@@ -1124,13 +1132,13 @@ export function AiActionsManager() {
                       </button>
                     </div>
 
-                    {formState.fieldMappings.length === 0 ? (
+                    {(formState.fieldMappings?.length ?? 0) === 0 ? (
                       <p className="text-xs text-muted-foreground">
                         No field mappings configured. Add mappings to enable automatic field updates.
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {formState.fieldMappings.map((mapping, index) => (
+                        {(formState.fieldMappings ?? []).map((mapping, index) => (
                           <div
                             key={index}
                             className="grid grid-cols-[1fr_1fr_auto] gap-2 rounded-lg border border-border bg-white p-2 dark:bg-card"
@@ -1143,7 +1151,7 @@ export function AiActionsManager() {
                                 type="text"
                                 value={mapping.sourceKey}
                                 onChange={(event) => {
-                                  const updated = [...formState.fieldMappings];
+                                  const updated = [...(formState.fieldMappings ?? [])];
                                   updated[index].sourceKey = event.target.value;
                                   setFormState((prev) => ({ ...prev, fieldMappings: updated }));
                                 }}
@@ -1159,7 +1167,7 @@ export function AiActionsManager() {
                                 type="text"
                                 value={mapping.targetField}
                                 onChange={(event) => {
-                                  const updated = [...formState.fieldMappings];
+                                  const updated = [...(formState.fieldMappings ?? [])];
                                   updated[index].targetField = event.target.value;
                                   setFormState((prev) => ({ ...prev, fieldMappings: updated }));
                                 }}
@@ -1172,7 +1180,7 @@ export function AiActionsManager() {
                               onClick={() => {
                                 setFormState((prev) => ({
                                   ...prev,
-                                  fieldMappings: prev.fieldMappings.filter((_, i) => i !== index),
+                                  fieldMappings: (prev.fieldMappings ?? []).filter((_, i) => i !== index),
                                 }));
                               }}
                               className="mt-5 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-red-500"
@@ -1214,7 +1222,7 @@ export function AiActionsManager() {
                 </div>
               </div>
 
-              <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-border pt-4">
+              <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-border pt-4 flex-shrink-0">
                 <button
                   type="button"
                   onClick={closeForm}
@@ -1238,7 +1246,7 @@ export function AiActionsManager() {
             </form>
 
             {availableFieldsQuery.isError && (
-              <div className="border-t border-border bg-red-50 px-6 py-3 text-xs text-red-600">
+              <div className="border-t border-border bg-red-50 px-6 py-3 text-xs text-red-600 flex-shrink-0">
                 Could not load entity fields. Ensure the selected entity has field mappings configured.
               </div>
             )}

@@ -189,8 +189,8 @@ export function CreatePositionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      <div className="flex h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4 flex-shrink-0">
           <div>
             <h2 className="text-2xl font-semibold text-foreground">
               {isEditMode ? 'Edit Job Position' : 'Create Job Position'}
@@ -198,7 +198,7 @@ export function CreatePositionModal({
             <p className="text-sm text-muted-foreground">
               {isEditMode
                 ? 'Update position details to keep recruiting and delivery aligned.'
-                : 'Job positions can exist independently or be linked to an opportunity. Link it when you’re ready to source candidates.'}
+                : "Job positions can exist independently or be linked to an opportunity. Link it when you're ready to source candidates."}
             </p>
           </div>
           <button
@@ -209,7 +209,7 @@ export function CreatePositionModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto space-y-6 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">
@@ -406,7 +406,7 @@ export function CreatePositionModal({
             )}
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-border pt-4 md:flex-row md:justify-end">
+          <div className="flex flex-col gap-3 border-t border-border pt-4 md:flex-row md:justify-end flex-shrink-0">
             <button
               type="button"
               onClick={onClose}

@@ -115,6 +115,8 @@ export interface AiActionAttachment {
     fields: AiActionField[];
     collections: AiActionCollectionSummary[];
     isActive: boolean;
+    operationType?: AiActionOperationType;
+    fieldMappings?: AiActionFieldMapping[];
   };
 }
 
@@ -161,6 +163,7 @@ export interface AiActionExecution {
     name: string;
     entityType: AiEntityType;
     operationType?: AiActionOperationType;
+    fieldMappings?: AiActionFieldMapping[];
   } | null;
   attachment?: {
     id: string;

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { ActivityVisibility, AiEntityType, AiCollectionKey, AiCollectionFormat, AiActionExecutionStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -25,10 +25,13 @@ interface ExecuteAdhocOptions {
   extraInstructions?: string;
   triggeredById: string;
   model?: string;
+  operationType?: 'UPDATE' | 'CREATE' | 'READ_ONLY';
+  fieldMappings?: Array<{ sourceKey: string; targetField: string; transformRule?: string | null }>;
 }
 
 @Injectable()
 export class AiActionExecutor {
+  private readonly logger = new Logger(AiActionExecutor.name);
   private activityTypeId?: string;
 
   constructor(
@@ -110,6 +113,14 @@ export class AiActionExecutor {
         })
       : undefined;
 
+    // If action has field mappings and is UPDATE or CREATE, append JSON instruction
+    let finalPrompt = prompt;
+    if (action.operationType !== 'READ_ONLY' && action.fieldMappings && action.fieldMappings.length > 0) {
+      const expectedKeys = action.fieldMappings.map((m: { sourceKey: string; targetField: string; transformRule?: string | null }) => m.sourceKey).join(', ');
+      finalPrompt = `${prompt}\n\nIMPORTANT: Return your response as a valid JSON object with the following keys: ${expectedKeys}. Do not include any additional text or explanation, only the JSON object.`;
+      this.logger.log(`Appended JSON instruction to prompt for UPDATE/CREATE action with field mappings`);
+    }
+
     return this.executeWithGemini({
       actionId: action.id,
       attachmentId: attachment?.id,
@@ -118,7 +129,7 @@ export class AiActionExecutor {
       model: action.model ?? undefined,
       fieldValues: promptContext,
       collectionContext: collectionsData.debugContext,
-      prompt,
+      prompt: finalPrompt,
       actionName: action.name,
       triggeredById: options.triggeredById,
     });
@@ -135,7 +146,15 @@ export class AiActionExecutor {
         )
       : {}; // Empty field values for bulk operations
 
-    const prompt = this.interpolatePrompt(options.prompt, fieldValues, options.extraInstructions);
+    let prompt = this.interpolatePrompt(options.prompt, fieldValues, options.extraInstructions);
+
+    // If operation type is UPDATE or CREATE and field mappings are provided, append JSON instruction
+    const operationType = options.operationType ?? 'READ_ONLY';
+    if (operationType !== 'READ_ONLY' && options.fieldMappings && options.fieldMappings.length > 0) {
+      const expectedKeys = options.fieldMappings.map((m) => m.sourceKey).join(', ');
+      prompt = `${prompt}\n\nIMPORTANT: Return your response as a valid JSON object with the following keys: ${expectedKeys}. Do not include any additional text or explanation, only the JSON object.`;
+      this.logger.log(`Appended JSON instruction to ad-hoc prompt for ${operationType} operation with field mappings`);
+    }
 
     return this.executeWithGemini({
       entityType: options.entityType,
@@ -145,6 +164,8 @@ export class AiActionExecutor {
       prompt,
       actionName: 'Ad-hoc Gemini prompt',
       triggeredById: options.triggeredById,
+      adhocOperationType: operationType,
+      adhocFieldMappings: options.fieldMappings,
     });
   }
 
@@ -159,6 +180,8 @@ export class AiActionExecutor {
     actionName: string;
     triggeredById: string;
     collectionContext?: Record<string, { rows: Array<Record<string, unknown>>; formatted: string }>;
+    adhocOperationType?: 'UPDATE' | 'CREATE' | 'READ_ONLY';
+    adhocFieldMappings?: Array<{ sourceKey: string; targetField: string; transformRule?: string | null }>;
   }) {
     const prisma = this.prisma as any;
 
@@ -208,6 +231,16 @@ export class AiActionExecutor {
             operationType: action.operationType,
           });
         }
+      } else if (params.adhocOperationType && params.adhocOperationType !== 'READ_ONLY' && params.adhocFieldMappings && params.adhocFieldMappings.length > 0) {
+        // Handle ad-hoc actions with field mappings
+        proposedChanges = await this.parseAndMapResponse({
+          response: result.text,
+          rawResponse: result.rawResponse,
+          fieldMappings: params.adhocFieldMappings,
+          entityType: params.entityType,
+          entityId: params.entityId,
+          operationType: params.adhocOperationType,
+        });
       }
 
       // For bulk operations (entityId === 'ALL'), skip activity creation
@@ -249,7 +282,11 @@ export class AiActionExecutor {
         where: { id: execution.id },
         data: updateData,
         include: {
-          action: true,
+          action: {
+            include: {
+              fieldMappings: true,
+            },
+          },
           activity: activity ? true : false,
         },
       });
@@ -600,35 +637,157 @@ export class AiActionExecutor {
   }): Promise<Record<string, unknown> | null> {
     try {
       // Try to parse response as JSON first
-      let parsedResponse: Record<string, unknown>;
-      try {
-        parsedResponse = JSON.parse(params.response);
-      } catch {
-        // If not JSON, try to extract JSON from the response
-        const jsonMatch = params.response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsedResponse = JSON.parse(jsonMatch[0]);
-        } else {
-          // If no JSON found, return null (no structured data to map)
+      let parsedResponse: Record<string, unknown> | null = null;
+      let parseError: string | null = null;
+      
+      /**
+       * Extracts a clean JSON string from a raw API response that may include markdown.
+       * Finds the content between the first { and the last }
+       */
+      const extractJsonFromString = (rawText: string): string | null => {
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (match) {
+          return match[0];
+        }
+        return null;
+      };
+      
+      // Helper function to safely parse JSON, handling double-stringified cases
+      const parseJsonSafely = (text: string): Record<string, unknown> | null => {
+        try {
+          const parsed = JSON.parse(text);
+          // If the parsed result is a string, it might be double-stringified JSON
+          if (typeof parsed === 'string') {
+            try {
+              const doubleParsed = JSON.parse(parsed);
+              if (typeof doubleParsed === 'object' && doubleParsed !== null && !Array.isArray(doubleParsed)) {
+                this.logger.log(`Detected double-stringified JSON, parsed successfully`);
+                return doubleParsed as Record<string, unknown>;
+              }
+            } catch {
+              // If second parse fails, return null (not valid JSON)
+            }
+          }
+          // If it's already an object, return it
+          if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+            return parsed as Record<string, unknown>;
+          }
           return null;
+        } catch {
+          return null;
+        }
+      };
+      
+      parsedResponse = parseJsonSafely(params.response);
+      if (parsedResponse) {
+        this.logger.log(`Successfully parsed Gemini response as JSON with keys: ${Object.keys(parsedResponse).join(', ')}`);
+      } else {
+        // If not JSON, try to extract JSON from the response
+        this.logger.warn(`Initial JSON parse failed, attempting to extract JSON from response`);
+        
+        // Try to extract JSON from markdown code fences first (```json ... ```)
+        const markdownJsonMatch = params.response.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+        if (markdownJsonMatch) {
+          parsedResponse = parseJsonSafely(markdownJsonMatch[1]);
+          if (parsedResponse) {
+            this.logger.log(`Successfully extracted and parsed JSON from markdown code fence with keys: ${Object.keys(parsedResponse).join(', ')}`);
+          } else {
+            this.logger.warn(`Failed to parse JSON from markdown fence, trying generic extraction`);
+          }
+        }
+        
+        // If markdown extraction failed, try generic JSON extraction using extractJsonFromString
+        if (!parsedResponse) {
+          const extractedJson = extractJsonFromString(params.response);
+          if (extractedJson) {
+            try {
+              parsedResponse = parseJsonSafely(extractedJson);
+              if (parsedResponse) {
+                this.logger.log(`Successfully extracted and parsed JSON from response with keys: ${Object.keys(parsedResponse).join(', ')}`);
+              } else {
+                parseError = 'Could not parse extracted JSON';
+                this.logger.error(`Failed to parse extracted JSON: ${parseError}`);
+                return null;
+              }
+            } catch (extractError) {
+              parseError = 'Could not parse extracted JSON';
+              this.logger.error(`Failed to parse extracted JSON: ${extractError}`);
+              return null;
+            }
+          } else {
+            // If no JSON found, return null (no structured data to map)
+            parseError = 'No JSON structure found in response';
+            this.logger.error(`No JSON structure found in Gemini response for field mapping. Response preview: ${params.response.substring(0, 200)}`);
+            return null;
+          }
+        }
+      }
+
+      // Ensure parsedResponse is defined and is an object before proceeding
+      if (!parsedResponse || typeof parsedResponse !== 'object' || Array.isArray(parsedResponse)) {
+        this.logger.error(`Failed to parse Gemini response for field mapping. Parsed result is not an object. Type: ${typeof parsedResponse}, IsArray: ${Array.isArray(parsedResponse)}`);
+        return null;
+      }
+
+      // For UPDATE operations, load current entity values to compare
+      let currentEntityValues: Record<string, unknown> = {};
+      if (params.operationType === 'UPDATE' && params.entityId && params.entityId !== 'ALL') {
+        try {
+          const targetFields = params.fieldMappings.map((m) => m.targetField);
+          currentEntityValues = await this.entityFieldResolver.resolveFields(
+            params.entityType,
+            params.entityId,
+            targetFields,
+          );
+          this.logger.log(`Loaded current entity values for comparison: ${Object.keys(currentEntityValues).join(', ')}`);
+        } catch (error) {
+          this.logger.warn(`Failed to load current entity values for comparison: ${(error as Error).message}`);
+          // Continue without comparison - will still create proposed changes
         }
       }
 
       const fields: Record<string, { oldValue: unknown; newValue: unknown; sourceKey: string }> = {};
+      const mappingResults: string[] = [];
 
       // Map each field according to mappings
       for (const mapping of params.fieldMappings) {
+        // Trim targetField to handle any trailing/leading whitespace issues
+        const trimmedTargetField = mapping.targetField.trim();
         const sourceValue = this.extractValue(parsedResponse, mapping.sourceKey, mapping.transformRule);
         if (sourceValue !== undefined && sourceValue !== null) {
-          fields[mapping.targetField] = {
-            oldValue: null, // Will be populated when applying
-            newValue: sourceValue,
+          const oldValue = currentEntityValues[trimmedTargetField] ?? null;
+          const newValue = sourceValue;
+          
+          // For UPDATE operations, only include fields that actually changed
+          if (params.operationType === 'UPDATE') {
+            // Normalize values for comparison (handle string trimming, null vs empty string, etc.)
+            const normalizedOld = this.normalizeValueForComparison(oldValue);
+            const normalizedNew = this.normalizeValueForComparison(newValue);
+            
+            if (normalizedOld === normalizedNew) {
+              mappingResults.push(`⊘ ${mapping.sourceKey} -> ${trimmedTargetField} (unchanged)`);
+              this.logger.log(`Skipped unchanged field: ${mapping.sourceKey} -> ${trimmedTargetField}`);
+              continue; // Skip unchanged fields
+            }
+          }
+          
+          fields[trimmedTargetField] = {
+            oldValue,
+            newValue,
             sourceKey: mapping.sourceKey,
           };
+          mappingResults.push(`✓ ${mapping.sourceKey} -> ${trimmedTargetField}`);
+          this.logger.log(`Mapped field: ${mapping.sourceKey} -> ${trimmedTargetField}`);
+        } else {
+          mappingResults.push(`✗ ${mapping.sourceKey} (not found in response)`);
+          this.logger.warn(`Field mapping failed: ${mapping.sourceKey} not found in Gemini response`);
         }
       }
 
+      this.logger.log(`Field mapping summary: ${mappingResults.join(', ')}`);
+
       if (Object.keys(fields).length === 0) {
+        this.logger.warn(`No fields were successfully mapped from Gemini response. Available keys: ${Object.keys(parsedResponse).join(', ')}`);
         return null;
       }
 
@@ -639,9 +798,11 @@ export class AiActionExecutor {
         fields,
       };
 
+      this.logger.log(`Created proposed changes with ${Object.keys(fields).length} field(s)`);
       return changes;
     } catch (error) {
       // If parsing fails, return null (no structured changes)
+      this.logger.error(`Error in parseAndMapResponse: ${(error as Error).message}`, (error as Error).stack);
       return null;
     }
   }
@@ -654,8 +815,10 @@ export class AiActionExecutor {
     key: string,
     transformRule?: string | null,
   ): unknown {
+    // Trim the key to handle trailing/leading whitespace issues
+    const trimmedKey = key.trim();
     // Support dot notation (e.g., "person.name")
-    const keys = key.split('.');
+    const keys = trimmedKey.split('.').map(k => k.trim());
     let value: unknown = data;
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {
@@ -685,9 +848,23 @@ export class AiActionExecutor {
   }
 
   /**
+   * Normalize values for comparison (handles string trimming, null vs empty string, etc.)
+   */
+  private normalizeValueForComparison(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value.trim();
+    }
+    // For other types, convert to string for comparison
+    return String(value).trim();
+  }
+
+  /**
    * Apply proposed changes to the database
    */
-  async applyChanges(executionId: string, triggeredById: string): Promise<Record<string, unknown>> {
+  async applyChanges(executionId: string, triggeredById: string) {
     const prisma = this.prisma as any;
 
     const execution = await prisma.aiActionExecution.findUnique({
@@ -723,7 +900,7 @@ export class AiActionExecutor {
         throw new BadRequestException('Entity ID is required for UPDATE operations');
       }
 
-      // Get current entity values
+      // Get current entity values (reload to ensure we have latest, but use oldValue from proposedChanges for display)
       const currentEntity = await this.entityFieldResolver.resolveFields(
         changes.entityType,
         changes.entityId,
@@ -735,16 +912,32 @@ export class AiActionExecutor {
       const appliedFields: Record<string, { oldValue: unknown; newValue: unknown }> = {};
 
       for (const [fieldKey, change] of Object.entries(changes.fields)) {
-        const oldValue = currentEntity[fieldKey] ?? null;
-        updateData[fieldKey] = change.newValue;
-        appliedFields[fieldKey] = {
+        // Trim field keys to handle any trailing/leading whitespace issues
+        const trimmedKey = fieldKey.trim();
+        
+        // Use oldValue from proposedChanges if available (what user saw), otherwise use current value
+        const oldValue = change.oldValue !== null && change.oldValue !== undefined 
+          ? change.oldValue 
+          : (currentEntity[trimmedKey] ?? null);
+        updateData[trimmedKey] = change.newValue;
+        appliedFields[trimmedKey] = {
           oldValue,
           newValue: change.newValue,
         };
+        this.logger.log(`Field ${trimmedKey}: oldValue=${JSON.stringify(oldValue)}, newValue=${JSON.stringify(change.newValue)}`);
       }
 
+      this.logger.log(`Applying changes to ${changes.entityType} ${changes.entityId} with ${Object.keys(updateData).length} field(s): ${Object.keys(updateData).join(', ')}`);
+      this.logger.log(`Update data: ${JSON.stringify(updateData, null, 2)}`);
+
       // Update the entity based on type
-      await this.updateEntity(changes.entityType, changes.entityId, updateData);
+      try {
+        await this.updateEntity(changes.entityType, changes.entityId, updateData);
+        this.logger.log(`Successfully applied changes to ${changes.entityType} ${changes.entityId}`);
+      } catch (error) {
+        this.logger.error(`Failed to apply changes to ${changes.entityType} ${changes.entityId}: ${(error as Error).message}`, (error as Error).stack);
+        throw error;
+      }
 
       // Update execution with applied changes
       const appliedChanges = {
@@ -753,15 +946,22 @@ export class AiActionExecutor {
         appliedAt: new Date().toISOString(),
       };
 
-      await prisma.aiActionExecution.update({
+      const updated = await prisma.aiActionExecution.update({
         where: { id: executionId },
         data: {
           appliedChanges: appliedChanges as Prisma.InputJsonValue,
           appliedAt: new Date(),
         },
+        include: {
+          action: {
+            include: {
+              fieldMappings: true,
+            },
+          },
+        },
       });
 
-      return appliedChanges;
+      return updated;
     } else if (changes.operation === 'CREATE') {
       // Create new entity
       const createData: Record<string, unknown> = {};
@@ -783,16 +983,23 @@ export class AiActionExecutor {
         appliedAt: new Date().toISOString(),
       };
 
-      await prisma.aiActionExecution.update({
+      const updated = await prisma.aiActionExecution.update({
         where: { id: executionId },
         data: {
           appliedChanges: appliedChanges as Prisma.InputJsonValue,
           appliedAt: new Date(),
           entityId: newEntity.id, // Update execution with created entity ID
         },
+        include: {
+          action: {
+            include: {
+              fieldMappings: true,
+            },
+          },
+        },
       });
 
-      return appliedChanges;
+      return updated;
     } else {
       throw new BadRequestException(`Unsupported operation type: ${changes.operation}`);
     }
@@ -824,10 +1031,39 @@ export class AiActionExecutor {
         break;
       }
       case 'QUOTE': {
-        await prisma.quote.update({
+        const sanitizedData = this.sanitizeQuoteData(data);
+        this.logger.log(`Updating quote ${entityId} with sanitized data keys: ${Object.keys(sanitizedData).join(', ')}`);
+        this.logger.log(`Sanitized data values: ${JSON.stringify(sanitizedData, null, 2)}`);
+        
+        if (Object.keys(sanitizedData).length === 0) {
+          this.logger.warn(`No valid fields to update for quote ${entityId}. Original data had keys: ${Object.keys(data).join(', ')}`);
+          throw new BadRequestException('No valid fields to update. Check that field mappings match allowed quote fields.');
+        }
+        
+        // Verify quote exists before updating
+        const existingQuote = await prisma.quote.findUnique({
           where: { id: entityId },
-          data: this.sanitizeQuoteData(data),
+          select: { id: true, title: true },
         });
+        
+        if (!existingQuote) {
+          this.logger.error(`Quote ${entityId} not found`);
+          throw new NotFoundException(`Quote with ID ${entityId} not found`);
+        }
+        
+        this.logger.log(`Quote ${entityId} exists. Current title: ${existingQuote.title}`);
+        
+        try {
+          const updated = await prisma.quote.update({
+            where: { id: entityId },
+            data: sanitizedData,
+          });
+          this.logger.log(`Successfully updated quote ${entityId}. Updated title: ${updated.title}`);
+          this.logger.log(`Updated fields: ${Object.keys(sanitizedData).join(', ')}`);
+        } catch (updateError) {
+          this.logger.error(`Prisma update failed for quote ${entityId}: ${(updateError as Error).message}`, (updateError as Error).stack);
+          throw updateError;
+        }
         break;
       }
       // Add more entity types as needed
@@ -909,17 +1145,54 @@ export class AiActionExecutor {
       'functionalProposal',
       'technicalProposal',
       'teamComposition',
+      'milestones',
       'paymentTerms',
       'warrantyPeriod',
       'totalValue',
       'currency',
       'status',
     ];
+    
+    this.logger.log(`Sanitizing quote data. Input keys: ${Object.keys(data).join(', ')}`);
+    this.logger.log(`Input data: ${JSON.stringify(data, null, 2)}`);
+    
+    // Normalize input data by trimming keys to handle trailing/leading whitespace
+    const normalizedData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      const trimmedKey = key.trim();
+      // If there are duplicate keys after trimming, keep the last one
+      normalizedData[trimmedKey] = value;
+    }
+    
     for (const key of allowedFields) {
-      if (key in data) {
-        sanitized[key] = data[key];
+      if (key in normalizedData) {
+        const value = normalizedData[key];
+        
+        // Skip undefined values (Prisma will ignore them anyway, but we want to be explicit)
+        if (value === undefined) {
+          this.logger.log(`Skipping ${key} because it's undefined`);
+          continue;
+        }
+        
+        // Convert totalValue to Prisma.Decimal if it's a number or string
+        if (key === 'totalValue' && value !== null && value !== undefined) {
+          try {
+            sanitized[key] = new Prisma.Decimal(value as string | number);
+            this.logger.log(`Converted totalValue to Decimal: ${sanitized[key]}`);
+          } catch (error) {
+            this.logger.error(`Failed to convert totalValue to Decimal: ${(error as Error).message}`);
+            // Skip invalid totalValue rather than failing the entire update
+            continue;
+          }
+        } else {
+          // For other fields, include null values (they're valid for nullable fields)
+          sanitized[key] = value;
+          this.logger.log(`Including field ${key} with value: ${typeof value === 'string' ? value.substring(0, 50) : value}`);
+        }
       }
     }
+    
+    this.logger.log(`Sanitized quote data with ${Object.keys(sanitized).length} field(s): ${Object.keys(sanitized).join(', ')}`);
     return sanitized;
   }
 }

@@ -16,6 +16,7 @@ import {
   PlusCircle,
   Repeat,
   Sparkles,
+  Trash2,
   XCircle,
 } from 'lucide-react';
 
@@ -63,6 +64,7 @@ interface ActivityItemProps {
     unknown
   >;
   pinMutation: UseMutationResult<unknown, unknown, { id: string; isPinned: boolean }, unknown>;
+  deleteMutation: UseMutationResult<unknown, unknown, string, unknown>;
 }
 
 function ActivityItem({
@@ -70,6 +72,7 @@ function ActivityItem({
   getTypeStyles,
   completionMutation,
   pinMutation,
+  deleteMutation,
 }: ActivityItemProps) {
   const isAiActivity = useMemo(() => {
     const typeKey = activity.activityType?.key?.toUpperCase();
@@ -201,7 +204,7 @@ function ActivityItem({
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
               : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
           )}
-          disabled={completionMutation.isPending}
+          disabled={completionMutation?.isPending ?? false}
         >
           {activity.isCompleted ? (
             <>
@@ -219,7 +222,7 @@ function ActivityItem({
           type="button"
           onClick={() => pinMutation.mutate({ id: activity.id, isPinned: !activity.isPinned })}
           className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          disabled={pinMutation.isPending}
+          disabled={pinMutation?.isPending ?? false}
         >
           {activity.isPinned ? (
             <>
@@ -233,6 +236,21 @@ function ActivityItem({
             </>
           )}
         </button>
+        {isAiActivity && (
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Are you sure you want to delete this Gemini action result?')) {
+                deleteMutation.mutate(activity.id);
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+            disabled={deleteMutation?.isPending ?? false}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        )}
       </div>
     </div>
   );
@@ -338,6 +356,19 @@ export function ActivityPanel({
     onError: (error: any) => {
       const message =
         error?.response?.data?.message ?? 'Unable to update activity status. Please try again.';
+      setActivityError(Array.isArray(message) ? message.join(' ') : String(message));
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => activitiesApi.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activities', entityType, entityId] });
+      setActivityError(null);
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.message ?? 'Unable to delete activity. Please try again.';
       setActivityError(Array.isArray(message) ? message.join(' ') : String(message));
     },
   });
@@ -641,6 +672,7 @@ export function ActivityPanel({
               getTypeStyles={getTypeStyles}
               completionMutation={completionMutation}
               pinMutation={pinMutation}
+              deleteMutation={deleteMutation}
             />
           ))
         )}
