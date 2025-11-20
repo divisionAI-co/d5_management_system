@@ -50,7 +50,7 @@ export function sanitizeHtml(html: string | null | undefined): string {
   const allowedTags = [
     'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead',
-    'tbody', 'tr', 'td', 'th', 'div', 'span', 'hr',
+    'tbody', 'tr', 'td', 'th', 'div', 'span', 'hr', 'mark',
   ];
 
   // List of allowed attributes
@@ -60,6 +60,16 @@ export function sanitizeHtml(html: string | null | undefined): string {
     table: ['border', 'cellpadding', 'cellspacing'],
     td: ['colspan', 'rowspan'],
     th: ['colspan', 'rowspan'],
+    mark: ['data-color', 'style'],
+    span: ['style'],
+    p: ['style'],
+    div: ['style'],
+    h1: ['style'],
+    h2: ['style'],
+    h3: ['style'],
+    h4: ['style'],
+    h5: ['style'],
+    h6: ['style'],
   };
 
   // Create a temporary DOM element to parse HTML
@@ -85,8 +95,17 @@ export function sanitizeHtml(html: string | null | undefined): string {
     // Remove disallowed attributes
     const allowedAttrs = allowedAttributes[tagName] || [];
     Array.from(element.attributes).forEach((attr) => {
-      if (!allowedAttrs.includes(attr.name.toLowerCase())) {
+      const attrName = attr.name.toLowerCase();
+      if (!allowedAttrs.includes(attrName)) {
         element.removeAttribute(attr.name);
+      } else if (attrName === 'style') {
+        // Sanitize style attribute to only allow safe CSS properties
+        const sanitizedStyle = sanitizeStyleAttribute(attr.value);
+        if (sanitizedStyle) {
+          element.setAttribute('style', sanitizedStyle);
+        } else {
+          element.removeAttribute('style');
+        }
       }
     });
 
@@ -162,6 +181,55 @@ export function sanitizeAttribute(value: string | null | undefined): string {
   return escapeHtml(value)
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Sanitizes style attribute to only allow safe CSS properties
+ * Supports TipTap formatting like color, background-color, text-align
+ */
+function sanitizeStyleAttribute(styleValue: string): string | null {
+  if (!styleValue) return null;
+
+  // Allowed CSS properties for rich text formatting
+  const allowedProperties = [
+    'color',
+    'background-color',
+    'background',
+    'text-align',
+    'text-decoration',
+    'font-weight',
+    'font-style',
+    'font-size',
+  ];
+
+  const styles: string[] = [];
+  const declarations = styleValue.split(';');
+
+  for (const declaration of declarations) {
+    const trimmed = declaration.trim();
+    if (!trimmed) continue;
+
+    const colonIndex = trimmed.indexOf(':');
+    if (colonIndex === -1) continue;
+
+    const property = trimmed.substring(0, colonIndex).trim().toLowerCase();
+    const value = trimmed.substring(colonIndex + 1).trim();
+
+    // Only allow whitelisted properties
+    if (allowedProperties.includes(property)) {
+      // Basic validation for values (prevent javascript: and other dangerous patterns)
+      if (
+        value &&
+        !value.toLowerCase().includes('javascript:') &&
+        !value.toLowerCase().includes('expression(') &&
+        !value.toLowerCase().includes('url(javascript:')
+      ) {
+        styles.push(`${property}: ${value}`);
+      }
+    }
+  }
+
+  return styles.length > 0 ? styles.join('; ') : null;
 }
 
 /**

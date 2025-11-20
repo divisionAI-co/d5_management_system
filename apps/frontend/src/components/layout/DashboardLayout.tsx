@@ -49,6 +49,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     items: [
       { name: 'Employees', href: '/employees', roles: ROLE_PERMISSIONS.EMPLOYEE_DIRECTORY },
       { name: 'EOD Reports', href: '/employees/eod-reports', roles: ROLE_PERMISSIONS.EOD_REPORTS },
+      { name: 'Check-In/Check-Out', href: '/employees/check-in-outs' },
       { name: 'Leave Requests', href: '/employees/leave-requests', roles: ROLE_PERMISSIONS.LEAVE_REQUESTS },
       { name: 'Performance Reviews', href: '/employees/performance-reviews', roles: ROLE_PERMISSIONS.PERFORMANCE_REVIEWS },
       { name: 'Remote Work', href: '/employees/remote-work', roles: ROLE_PERMISSIONS.REMOTE_WORK },

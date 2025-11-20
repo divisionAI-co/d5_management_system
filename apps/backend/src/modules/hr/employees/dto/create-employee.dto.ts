@@ -71,5 +71,10 @@ export class CreateEmployeeDto {
   @IsString()
   @IsOptional()
   emergencyContactRelation?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  cardNumber?: string;
 }
 

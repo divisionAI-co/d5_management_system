@@ -2,6 +2,7 @@ import type {
   TemplateBlock,
   TemplateBlockType,
   TemplateButtonBlock,
+  TemplateDivBlock,
   TemplateDividerBlock,
   TemplateHeadingBlock,
   TemplateImageBlock,
@@ -87,6 +88,18 @@ export const createBlock = (type: TemplateBlockType): TemplateBlock => {
         rightWidth: 50,
         gap: 24,
       } satisfies TemplateRowBlock;
+    case 'div':
+      return {
+        id: createBlockId(),
+        type: 'div',
+        blocks: [],
+        backgroundColor: undefined,
+        padding: 24,
+        align: 'left',
+        borderRadius: 0,
+        borderColor: undefined,
+        borderWidth: 0,
+      } satisfies TemplateDivBlock;
     case 'raw_html':
     default:
       return {
@@ -539,6 +552,45 @@ const renderRow = (block: TemplateRowBlock): string => {
 `;
 };
 
+const renderDiv = (block: TemplateDivBlock, allBlocks: TemplateBlock[] = []): string => {
+  const padding = block.padding ?? 24;
+  const borderRadius = block.borderRadius ?? 0;
+  const borderWidth = block.borderWidth ?? 0;
+  const align = block.align ?? 'left';
+  
+  // Build style string
+  let style = `padding:${padding}px;`;
+  
+  if (block.backgroundColor) {
+    style += ` background-color:${block.backgroundColor};`;
+  }
+  
+  if (borderRadius > 0) {
+    style += ` border-radius:${borderRadius}px;`;
+  }
+  
+  if (borderWidth > 0 && block.borderColor) {
+    style += ` border:${borderWidth}px solid ${block.borderColor};`;
+  }
+  
+  if (block.customStyle) {
+    style += ` ${block.customStyle}`;
+  }
+  
+  // Render nested blocks
+  const nestedContent = renderBlocksToHtmlInner(block.blocks, allBlocks);
+  
+  return `
+  <tr>
+    <td style="padding:0 24px;" align="${align}">
+      <div style="${style}">
+        ${nestedContent}
+      </div>
+    </td>
+  </tr>
+`;
+};
+
 // Helper function to extract content from table row (for nested blocks in rows)
 const extractTableContent = (html: string): string => {
   // Extract the content between <td> tags, removing the outer <tr><td> wrapper
@@ -571,7 +623,7 @@ const renderStackedBlocks = (stackedBlocks: TemplateBlock[], baseZIndex: number 
         </div>
       `;
       } else {
-        const stackedHtml = renderSingleBlock(stackedBlock);
+        const stackedHtml = renderSingleBlock(stackedBlock, [], []);
         // Extract content and wrap for absolute positioning
         // For text blocks, ensure they're visible with proper styling
         let stackedHtmlContent = extractTableContent(stackedHtml);
@@ -598,7 +650,7 @@ const renderStackedBlocks = (stackedBlocks: TemplateBlock[], baseZIndex: number 
 };
 
 // Helper function to render a single block (returns the HTML for the block)
-const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] = []): string => {
+const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] = [], allBlocks: TemplateBlock[] = []): string => {
   switch (block.type) {
     case 'heading':
       return renderHeading(block);
@@ -616,6 +668,8 @@ const renderSingleBlock = (block: TemplateBlock, stackedBlocks: TemplateBlock[] 
       return renderRaw(block);
     case 'row':
       return renderRow(block);
+    case 'div':
+      return renderDiv(block as TemplateDivBlock, allBlocks);
     default:
       return '';
   }
@@ -628,7 +682,7 @@ const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[
     const baseBlock = allBlocks.find(b => b.id === block.stackOnBlockId);
     if (!baseBlock) {
       // Base block not found, render normally
-      return renderSingleBlock(block);
+      return renderSingleBlock(block, [], allBlocks);
     }
     
     // Special handling for images - they already handle stacking internally
@@ -650,7 +704,7 @@ const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[
     const allStackedBlocks = allBlocks.filter(b => b.stackOnBlockId === baseBlock.id);
     
     // For non-image blocks, render with absolute positioning
-    const baseHtml = renderSingleBlock(baseBlock);
+    const baseHtml = renderSingleBlock(baseBlock, [], allBlocks);
     
     // Render all stacked blocks with proper layering
     const stackedContent = renderStackedBlocks(allStackedBlocks, 2);
@@ -677,11 +731,11 @@ const renderBlockWithStacking = (block: TemplateBlock, allBlocks: TemplateBlock[
   if (stackedOnThis.length > 0 && block.type !== 'image') {
     // This block has other blocks stacked on it, but they will handle the container
     // Just render this block normally (the stacked blocks will handle the container)
-    return renderSingleBlock(block);
+    return renderSingleBlock(block, [], allBlocks);
   }
   
   // Normal rendering
-  return renderSingleBlock(block);
+  return renderSingleBlock(block, [], allBlocks);
 };
 
 // Helper function to render blocks without the outer table structure (for nested blocks in rows)

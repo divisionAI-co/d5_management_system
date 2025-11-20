@@ -76,6 +76,7 @@ model User {
   failedLoginAttempts   FailedLoginAttempt[]
   accountLockout        AccountLockout?
   sentQuotes            Quote[]
+  importedCheckInOuts   CheckInOut[]              @relation("CheckInOutImportedBy")
 
   @@map("users")
 }
@@ -709,6 +710,9 @@ model Employee {
   emergencyContactPhone    String?
   emergencyContactRelation String?
 
+  // Card Number for check-in/check-out
+  cardNumber String?
+
   // Documents
   documents Json? // Array of document objects with name, url, type
 
@@ -721,6 +725,7 @@ model Employee {
   remoteWorkLogs     RemoteWorkLog[]
   activities         Activity[]
   feedbackReports    FeedbackReport[]
+  checkInOuts        CheckInOut[]
 
   @@map("employees")
 }
@@ -957,6 +962,36 @@ model EodReport {
   @@index([userId])
   @@index([date])
   @@map("eod_reports")
+}
+
+enum CheckInOutStatus {
+  IN
+  OUT
+}
+
+model CheckInOut {
+  id         String           @id @default(uuid())
+  employeeId String
+  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // Date and time combined
+  dateTime DateTime
+
+  // Status (IN or OUT)
+  status CheckInOutStatus
+
+  // Import metadata
+  importedAt DateTime?
+  importedBy String?
+  importedByUser User? @relation("CheckInOutImportedBy", fields: [importedBy], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([employeeId])
+  @@index([dateTime])
+  @@index([status])
+  @@map("check_in_outs")
 }
 
 // ============================================

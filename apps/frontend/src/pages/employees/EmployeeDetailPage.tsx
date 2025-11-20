@@ -338,6 +338,17 @@ export default function EmployeeDetailPage() {
               View EOD Reports
               <ArrowLeft className="h-4 w-4 rotate-180" />
             </Link>
+            <Link
+              to="/employees/check-in-outs"
+              state={{
+                employeeId: displayEmployee.id,
+                employeeName: employeeDisplayName,
+              }}
+              className="flex items-center justify-between rounded-lg border border-purple-100 bg-purple-50 px-4 py-3 text-sm font-medium text-purple-700 transition hover:bg-purple-100"
+            >
+              View Check-In/Check-Out Records
+              <ArrowLeft className="h-4 w-4 rotate-180" />
+            </Link>
           </div>
         </section>
       </div>

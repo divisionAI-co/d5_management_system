@@ -37,6 +37,7 @@ import PositionDetailPage from '@/pages/recruitment/PositionDetailPage';
 import EmployeesPage from '@/pages/employees/EmployeesPage';
 import EmployeeDetailPage from '@/pages/employees/EmployeeDetailPage';
 import EodReportsPage from '@/pages/employees/EodReportsPage';
+import CheckInOutsPage from '@/pages/employees/CheckInOutsPage';
 import LeaveRequestsPage from '@/pages/employees/LeaveRequestsPage';
 import PerformanceReviewsPage from '@/pages/employees/PerformanceReviewsPage';
 import RemoteWorkPage from '@/pages/employees/RemoteWorkPage';
@@ -131,6 +132,7 @@ function App() {
             <Route index element={<EmployeesPage />} />
             <Route path=":id" element={<EmployeeDetailPage />} />
             <Route path="eod-reports" element={<EodReportsPage />} />
+            <Route path="check-in-outs" element={<CheckInOutsPage />} />
             <Route path="leave-requests" element={<LeaveRequestsPage />} />
             <Route path="performance-reviews" element={<PerformanceReviewsPage />} />
             <Route path="remote-work" element={<RemoteWorkPage />} />

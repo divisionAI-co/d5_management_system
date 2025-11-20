@@ -28,6 +28,7 @@ import { OpportunityForm } from '@/components/crm/opportunities/OpportunityForm'
 import { OpportunityCloseDialog } from '@/components/crm/opportunities/OpportunityCloseDialog';
 import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
+import { SafeHtml } from '@/components/ui/SafeHtml';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const VALUE_FORMATTER = new Intl.NumberFormat('en-US', {
@@ -438,13 +439,17 @@ export default function OpportunityDetailPage() {
                 {opportunity.openPosition.description ? (
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
-                    <p>{opportunity.openPosition.description}</p>
+                    <div className="prose prose-sm max-w-none">
+                      <SafeHtml html={opportunity.openPosition.description} />
+                    </div>
                   </div>
                 ) : null}
                 {opportunity.openPosition.requirements ? (
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">Requirements</p>
-                    <p>{opportunity.openPosition.requirements}</p>
+                    <div className="prose prose-sm max-w-none">
+                      <SafeHtml html={opportunity.openPosition.requirements} />
+                    </div>
                   </div>
                 ) : null}
               </div>

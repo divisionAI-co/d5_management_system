@@ -105,4 +105,13 @@ export interface ExecuteCandidateImportPayload extends ExecutePayloadBase {
   isOdooImport?: boolean;
 }
 
+export type UploadCheckInOutResult = UploadBaseResult;
+export type CheckInOutImportSummary = ImportSummaryBase;
+export interface CheckInOutMapPayload extends MapPayloadBase {}
+export interface ExecuteCheckInOutImportPayload extends ExecutePayloadBase {
+  manualMatches?: {
+    employees?: Record<string, string>;
+  };
+}
+
 

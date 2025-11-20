@@ -47,6 +47,14 @@ export default defineConfig({
   },
   optimizeDeps: {
     exclude: ['@prisma/client', '.prisma/client'],
+    include: [
+      '@tiptap/extension-text-style',
+      '@tiptap/extension-color',
+      '@tiptap/extension-highlight',
+      '@tiptap/extension-link',
+      '@tiptap/extension-text-align',
+      '@tiptap/extension-underline',
+    ],
   },
   server: {
     port: 5173,

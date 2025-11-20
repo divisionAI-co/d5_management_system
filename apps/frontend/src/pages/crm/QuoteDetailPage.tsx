@@ -72,7 +72,14 @@ export default function QuoteDetailPage() {
     setShowPreview(true);
     try {
       const preview = await quotesApi.preview(id);
-      setPreviewHtml(preview.html);
+      // Convert relative API URLs to absolute URLs for iframe compatibility
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      // API_URL already includes /api/v1, so remove it from the path
+      const processedHtml = preview.html.replace(
+        /src=["'](\/api\/v1\/[^"']+)["']/gi,
+        (_match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+      );
+      setPreviewHtml(processedHtml);
     } catch (error) {
       console.error('Failed to load preview:', error);
       alert('Failed to load preview. Please try again.');
@@ -387,9 +394,9 @@ export default function QuoteDetailPage() {
 
       {showPreview && previewHtml && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-            <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card px-6 py-4">
-              <h2 className="text-xl font-semibold text-foreground">Quote Preview</h2>
+          <div className="flex w-full max-w-5xl max-h-[95vh] flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border bg-card px-6 py-4">
+              <h2 className="text-xl font-semibold text-foreground">Quote Preview (A4 Format)</h2>
               <button
                 onClick={() => {
                   setShowPreview(false);
@@ -400,8 +407,29 @@ export default function QuoteDetailPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-6">
-              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div className="flex-1 min-h-0 overflow-auto rounded-b-lg border-t border-border bg-gray-100 p-4 md:p-6">
+              {/* A4 Container - 210mm × 297mm (794px × 1123px at 96 DPI) matching Puppeteer PDF output */}
+              <div 
+                className="mx-auto bg-white shadow-lg"
+                style={{ 
+                  width: '794px', 
+                  minHeight: '1123px',
+                  maxWidth: 'calc(100% - 32px)'
+                }}
+              >
+                <iframe
+                  title="Quote preview"
+                  className="border-0 bg-white"
+                  style={{ 
+                    width: '794px', 
+                    minHeight: '1123px',
+                    display: 'block'
+                  }}
+                  srcDoc={`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=794"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"><style>html, body { margin: 0; padding: 0; width: 794px; box-sizing: border-box; font-family: Arial, sans-serif; } body { padding: 20px; width: 794px; min-height: calc(1123px - 40px); } * { box-sizing: border-box; }</style></head><body>${previewHtml}</body></html>`}
+                  sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -134,7 +134,14 @@ export default function FeedbackReportsPage() {
   const handlePreview = async (report: FeedbackReport) => {
     try {
       const { html } = await feedbackReportsApi.preview(report.id);
-      setPreviewHtml(html);
+      // Convert relative API URLs to absolute URLs for iframe compatibility
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      // API_URL already includes /api/v1, so remove it from the path
+      const processedHtml = html.replace(
+        /src=["'](\/api\/v1\/[^"']+)["']/gi,
+        (_match, path) => `src="${apiUrl}${path.replace(/^\/api\/v1/, '')}"`
+      );
+      setPreviewHtml(processedHtml);
       setSelectedReport(report);
       setShowPreviewModal(true);
     } catch (error) {
@@ -414,8 +421,8 @@ export default function FeedbackReportsPage() {
       {/* Preview Modal */}
       {showPreviewModal && selectedReport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
-            <div className="border-b border-border p-6 flex justify-between items-center">
+          <div className="flex flex-col bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="border-b border-border p-6 flex justify-between items-center flex-shrink-0">
               <div>
                 <h2 className="text-xl font-semibold">Report Preview</h2>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -432,10 +439,15 @@ export default function FeedbackReportsPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div
-              className="p-6"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <iframe
+                title="Report preview"
+                className="h-full w-full border-0 bg-white"
+                srcDoc={`<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https: http://localhost:* drive.google.com; connect-src 'self' http://localhost:* https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';"></head><body>${previewHtml}</body></html>`}
+                sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+                referrerPolicy="no-referrer"
+              />
+            </div>
           </div>
         </div>
       )}

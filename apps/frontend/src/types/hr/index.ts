@@ -76,6 +76,7 @@ export interface Employee {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   emergencyContactRelation?: string | null;
+  cardNumber?: string | null;
   documents?: any;
   createdAt: string;
   updatedAt: string;

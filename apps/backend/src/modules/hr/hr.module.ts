@@ -6,6 +6,7 @@ import { HolidaysModule } from './holidays/holidays.module';
 import { EodReportsModule } from './eod-reports/eod-reports.module';
 import { RemoteWorkModule } from './remote-work/remote-work.module';
 import { FeedbackReportsModule } from './feedback-reports/feedback-reports.module';
+import { CheckInOutsModule } from './check-in-outs/check-in-outs.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { FeedbackReportsModule } from './feedback-reports/feedback-reports.modul
     EodReportsModule,
     RemoteWorkModule,
     FeedbackReportsModule,
+    CheckInOutsModule,
   ],
   exports: [
     EmployeesModule,
@@ -25,6 +27,7 @@ import { FeedbackReportsModule } from './feedback-reports/feedback-reports.modul
     EodReportsModule,
     RemoteWorkModule,
     FeedbackReportsModule,
+    CheckInOutsModule,
   ],
 })
 export class HrModule {}
