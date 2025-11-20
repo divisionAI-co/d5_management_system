@@ -1,4 +1,4 @@
-import { User } from '../auth';
+import type { UserSummary } from '../users';
 
 export enum CheckInOutStatus {
   IN = 'IN',
@@ -18,9 +18,9 @@ export interface CheckInOut {
     id: string;
     userId: string;
     employeeNumber: string;
-    user?: User;
+    user?: UserSummary;
   };
-  importedByUser?: User;
+  importedByUser?: UserSummary;
 }
 
 export interface CreateCheckInOutDto {

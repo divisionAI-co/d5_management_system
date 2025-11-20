@@ -4,7 +4,6 @@ import { checkInOutsApi, employeesApi } from '@/lib/api/hr';
 import type { CreateCheckInOutDto, UpdateCheckInOutDto, CheckInOut } from '@/types/hr/check-in-out';
 import { CheckInOutStatus } from '@/types/hr/check-in-out';
 import { X } from 'lucide-react';
-import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface CheckInOutFormProps {
   record?: CheckInOut;
@@ -44,10 +43,6 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
       queryClient.invalidateQueries({ queryKey: ['check-in-outs'] });
       onSuccess();
       onClose();
-      FeedbackToast.success('Check-in/out record created successfully');
-    },
-    onError: (error: any) => {
-      FeedbackToast.error(error?.response?.data?.message || 'Failed to create check-in/out record');
     },
   });
 
@@ -57,10 +52,6 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
       queryClient.invalidateQueries({ queryKey: ['check-in-outs'] });
       onSuccess();
       onClose();
-      FeedbackToast.success('Check-in/out record updated successfully');
-    },
-    onError: (error: any) => {
-      FeedbackToast.error(error?.response?.data?.message || 'Failed to update check-in/out record');
     },
   });
 

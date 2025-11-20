@@ -8,7 +8,6 @@ import { checkInOutsApi } from '@/lib/api/hr';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
 import type { CheckInOut } from '@/types/hr/check-in-out';
-import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function CheckInOutsPage() {
   const location = useLocation();
@@ -38,10 +37,6 @@ export default function CheckInOutsPage() {
     mutationFn: (id: string) => checkInOutsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['check-in-outs'] });
-      FeedbackToast.success('Check-in/out record deleted successfully');
-    },
-    onError: (error: any) => {
-      FeedbackToast.error(error?.response?.data?.message || 'Failed to delete check-in/out record');
     },
   });
 

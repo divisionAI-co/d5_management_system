@@ -285,7 +285,7 @@ function BlockItem({
   block,
   index,
   isExpanded,
-  expandedBlocks,
+  expandedBlocks: _expandedBlocks,
   availableVariables,
   blocks,
   onToggle,
@@ -848,7 +848,7 @@ function BlockItem({
                   <select
                     value={block.align}
                     onChange={(event) =>
-                      handleUpdateBlock(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
+                      onUpdate(block.id, { align: event.target.value as 'left' | 'center' | 'right' })
                     }
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >

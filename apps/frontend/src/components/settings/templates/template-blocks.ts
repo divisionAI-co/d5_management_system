@@ -631,10 +631,10 @@ const renderStackedBlocks = (stackedBlocks: TemplateBlock[], baseZIndex: number 
           // Ensure text is visible with proper contrast - add text shadow and white color
           stackedHtmlContent = stackedHtmlContent.replace(
             /<p style="([^"]*)"/g,
-            (match, style) => `<p style="${style} color:#ffffff; text-shadow:1px 1px 2px rgba(0,0,0,0.8);"`
+            (_match, style) => `<p style="${style} color:#ffffff; text-shadow:1px 1px 2px rgba(0,0,0,0.8);"`
           ).replace(
             /<(h[1-3]) style="([^"]*)"/g,
-            (match, tag, style) => `<${tag} style="${style} color:#ffffff; text-shadow:1px 1px 2px rgba(0,0,0,0.8);"`
+            (_match, tag, style) => `<${tag} style="${style} color:#ffffff; text-shadow:1px 1px 2px rgba(0,0,0,0.8);"`
           );
         }
         return `
@@ -779,9 +779,8 @@ export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 
   // Track which blocks are stacked on images (to skip them in regular rendering)
   const blocksStackedOnImages = new Set<string>();
   
-  // Find the first and last regular block indices to determine inline positioning
+  // Find the first regular block index to determine inline positioning
   let firstRegularBlockIndex = -1;
-  let lastRegularBlockIndex = -1;
   
   blocks.forEach((block, index) => {
     if (block.type === 'image') {
@@ -822,7 +821,6 @@ export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 
           if (firstRegularBlockIndex === -1) {
             firstRegularBlockIndex = index;
           }
-          lastRegularBlockIndex = index;
         }
       }
     } else {
@@ -832,7 +830,6 @@ export const renderBlocksToHtml = (blocks: TemplateBlock[], pageWidth: number = 
         if (firstRegularBlockIndex === -1) {
           firstRegularBlockIndex = index;
         }
-        lastRegularBlockIndex = index;
       }
     }
   });
