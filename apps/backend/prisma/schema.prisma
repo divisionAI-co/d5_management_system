@@ -1504,6 +1504,9 @@ model AiActionExecution {
   triggeredBy   User?                   @relation("AiActionExecutionsTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
   activityId    String?
   activity      Activity?               @relation("ActivityExecutions", fields: [activityId], references: [id], onDelete: SetNull)
+  proposedChanges Json?                 // Preview of changes to be applied (for UPDATE/CREATE operations)
+  appliedChanges Json?                  // Actual changes that were applied
+  appliedAt     DateTime?               // When changes were applied (for UPDATE/CREATE operations)
   createdAt     DateTime                @default(now())
   completedAt   DateTime?
 

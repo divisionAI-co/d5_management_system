@@ -225,16 +225,29 @@ export class AiActionExecutor {
           })
         : null;
 
+      const updateData: {
+        status: AiActionExecutionStatus;
+        output: Prisma.InputJsonValue;
+        rawOutput: string | null;
+        proposedChanges?: Prisma.InputJsonValue;
+        completedAt: Date;
+        activityId: string | null;
+      } = {
+        status: 'SUCCESS' as AiActionExecutionStatus,
+        output: { text: result.text } as Prisma.InputJsonValue,
+        rawOutput: this.safeStringify(result.rawResponse),
+        completedAt: new Date(),
+        activityId: activity?.id ?? null,
+      };
+
+      // Only add proposedChanges if it exists (and if the field exists in the schema)
+      if (proposedChanges !== null && proposedChanges !== undefined) {
+        updateData.proposedChanges = proposedChanges as Prisma.InputJsonValue;
+      }
+
       const updated = await prisma.aiActionExecution.update({
         where: { id: execution.id },
-        data: {
-          status: 'SUCCESS' as AiActionExecutionStatus,
-          output: { text: result.text } as Prisma.InputJsonValue,
-          rawOutput: this.safeStringify(result.rawResponse),
-          proposedChanges: proposedChanges as Prisma.InputJsonValue | undefined,
-          completedAt: new Date(),
-          activityId: activity?.id ?? null,
-        },
+        data: updateData,
         include: {
           action: true,
           activity: activity ? true : false,
