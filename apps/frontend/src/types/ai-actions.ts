@@ -70,6 +70,14 @@ export interface AiActionCollectionSummary {
   }>;
 }
 
+export interface AiActionFieldMapping {
+  id: string;
+  sourceKey: string;
+  targetField: string;
+  transformRule?: string | null;
+  order: number;
+}
+
 export interface AiActionSummary {
   id: string;
   name: string;
@@ -79,8 +87,10 @@ export interface AiActionSummary {
   model?: string | null;
   isActive: boolean;
   isSystem: boolean;
+  operationType?: AiActionOperationType;
   fields: AiActionField[];
   collections: AiActionCollectionSummary[];
+  fieldMappings?: AiActionFieldMapping[];
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -109,6 +119,23 @@ export interface AiActionAttachment {
 }
 
 export type AiActionExecutionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+export type AiActionOperationType = 'READ_ONLY' | 'UPDATE' | 'CREATE';
+
+export interface ProposedChanges {
+  operation: 'UPDATE' | 'CREATE';
+  entityType: AiEntityType;
+  entityId: string | null;
+  fields: Record<string, {
+    oldValue: unknown;
+    newValue: unknown;
+    sourceKey: string;
+  }>;
+}
+
+export interface AppliedChanges extends ProposedChanges {
+  appliedAt: string;
+  createdEntityId?: string;
+}
 
 export interface AiActionExecution {
   id: string;
@@ -124,12 +151,16 @@ export interface AiActionExecution {
   errorMessage?: string | null;
   triggeredById?: string | null;
   activityId?: string | null;
+  proposedChanges?: ProposedChanges | null;
+  appliedChanges?: AppliedChanges | null;
+  appliedAt?: string | null;
   createdAt: string;
   completedAt?: string | null;
   action?: {
     id: string;
     name: string;
     entityType: AiEntityType;
+    operationType?: AiActionOperationType;
   } | null;
   attachment?: {
     id: string;
@@ -151,6 +182,13 @@ export interface AiCollectionPayload {
   }>;
 }
 
+export interface AiActionFieldMappingPayload {
+  sourceKey: string;
+  targetField: string;
+  transformRule?: string;
+  order?: number;
+}
+
 export interface AiActionPayload {
   name: string;
   description?: string;
@@ -158,6 +196,7 @@ export interface AiActionPayload {
   entityType: AiEntityType;
   model?: string;
   isActive?: boolean;
+  operationType?: AiActionOperationType;
   fields: Array<{
     fieldKey: string;
     fieldLabel: string;
@@ -165,6 +204,7 @@ export interface AiActionPayload {
     order?: number;
   }>;
   collections?: AiCollectionPayload[];
+  fieldMappings?: AiActionFieldMappingPayload[];
 }
 
 export interface ListAiActionsParams {

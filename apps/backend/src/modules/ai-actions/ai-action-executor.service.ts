@@ -47,6 +47,7 @@ export class AiActionExecutor {
       include: {
         fields: { orderBy: { order: 'asc' } },
         collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+        fieldMappings: { orderBy: { order: 'asc' } },
       },
     });
 
@@ -187,6 +188,28 @@ export class AiActionExecutor {
         model: params.model,
       });
 
+      // Load action with field mappings if this is a saved action
+      let action = null;
+      let proposedChanges = null;
+      if (params.actionId) {
+        action = await prisma.aiAction.findUnique({
+          where: { id: params.actionId },
+          include: { fieldMappings: { orderBy: { order: 'asc' } } },
+        });
+
+        // If action has field mappings and is UPDATE or CREATE, parse response and create preview
+        if (action && action.operationType !== 'READ_ONLY' && action.fieldMappings && action.fieldMappings.length > 0) {
+          proposedChanges = await this.parseAndMapResponse({
+            response: result.text,
+            rawResponse: result.rawResponse,
+            fieldMappings: action.fieldMappings,
+            entityType: params.entityType,
+            entityId: params.entityId,
+            operationType: action.operationType,
+          });
+        }
+      }
+
       // For bulk operations (entityId === 'ALL'), skip activity creation
       // as activities require at least one target entity
       const activity = params.entityId !== 'ALL'
@@ -208,6 +231,7 @@ export class AiActionExecutor {
           status: 'SUCCESS' as AiActionExecutionStatus,
           output: { text: result.text } as Prisma.InputJsonValue,
           rawOutput: this.safeStringify(result.rawResponse),
+          proposedChanges: proposedChanges as Prisma.InputJsonValue | undefined,
           completedAt: new Date(),
           activityId: activity?.id ?? null,
         },
@@ -548,6 +572,342 @@ export class AiActionExecutor {
       default:
         throw new BadRequestException(`Unsupported entity type ${entityType} for activity creation`);
     }
+  }
+
+  /**
+   * Parse Gemini response and map to database fields based on field mappings
+   */
+  private async parseAndMapResponse(params: {
+    response: string;
+    rawResponse: unknown;
+    fieldMappings: Array<{ sourceKey: string; targetField: string; transformRule?: string | null }>;
+    entityType: AiEntityType;
+    entityId: string;
+    operationType: string;
+  }): Promise<Record<string, unknown> | null> {
+    try {
+      // Try to parse response as JSON first
+      let parsedResponse: Record<string, unknown>;
+      try {
+        parsedResponse = JSON.parse(params.response);
+      } catch {
+        // If not JSON, try to extract JSON from the response
+        const jsonMatch = params.response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsedResponse = JSON.parse(jsonMatch[0]);
+        } else {
+          // If no JSON found, return null (no structured data to map)
+          return null;
+        }
+      }
+
+      const fields: Record<string, { oldValue: unknown; newValue: unknown; sourceKey: string }> = {};
+
+      // Map each field according to mappings
+      for (const mapping of params.fieldMappings) {
+        const sourceValue = this.extractValue(parsedResponse, mapping.sourceKey, mapping.transformRule);
+        if (sourceValue !== undefined && sourceValue !== null) {
+          fields[mapping.targetField] = {
+            oldValue: null, // Will be populated when applying
+            newValue: sourceValue,
+            sourceKey: mapping.sourceKey,
+          };
+        }
+      }
+
+      if (Object.keys(fields).length === 0) {
+        return null;
+      }
+
+      const changes: Record<string, unknown> = {
+        operation: params.operationType,
+        entityType: params.entityType,
+        entityId: params.entityId === 'ALL' ? null : params.entityId,
+        fields,
+      };
+
+      return changes;
+    } catch (error) {
+      // If parsing fails, return null (no structured changes)
+      return null;
+    }
+  }
+
+  /**
+   * Extract value from parsed response, optionally applying transformation
+   */
+  private extractValue(
+    data: Record<string, unknown>,
+    key: string,
+    transformRule?: string | null,
+  ): unknown {
+    // Support dot notation (e.g., "person.name")
+    const keys = key.split('.');
+    let value: unknown = data;
+    for (const k of keys) {
+      if (value && typeof value === 'object' && k in value) {
+        value = (value as Record<string, unknown>)[k];
+      } else {
+        return undefined;
+      }
+    }
+
+    // Apply transformation if provided
+    if (transformRule && value !== undefined) {
+      try {
+        // Simple transformation rules (can be extended)
+        // For now, support JSON path expressions
+        if (transformRule.startsWith('json:')) {
+          const jsonPath = transformRule.substring(5).trim();
+          const jsonValue = JSON.parse(jsonPath);
+          return jsonValue;
+        }
+        // Add more transformation rules as needed
+      } catch {
+        // If transformation fails, return original value
+      }
+    }
+
+    return value;
+  }
+
+  /**
+   * Apply proposed changes to the database
+   */
+  async applyChanges(executionId: string, triggeredById: string): Promise<Record<string, unknown>> {
+    const prisma = this.prisma as any;
+
+    const execution = await prisma.aiActionExecution.findUnique({
+      where: { id: executionId },
+      include: { action: true },
+    });
+
+    if (!execution) {
+      throw new NotFoundException('Execution not found');
+    }
+
+    if (execution.status !== 'SUCCESS') {
+      throw new BadRequestException('Execution must be successful before applying changes');
+    }
+
+    if (execution.appliedAt) {
+      throw new BadRequestException('Changes have already been applied');
+    }
+
+    if (!execution.proposedChanges) {
+      throw new BadRequestException('No proposed changes to apply');
+    }
+
+    const changes = execution.proposedChanges as {
+      operation: string;
+      entityType: AiEntityType;
+      entityId: string | null;
+      fields: Record<string, { oldValue: unknown; newValue: unknown; sourceKey: string }>;
+    };
+
+    if (changes.operation === 'UPDATE') {
+      if (!changes.entityId) {
+        throw new BadRequestException('Entity ID is required for UPDATE operations');
+      }
+
+      // Get current entity values
+      const currentEntity = await this.entityFieldResolver.resolveFields(
+        changes.entityType,
+        changes.entityId,
+        Object.keys(changes.fields),
+      );
+
+      // Build update data
+      const updateData: Record<string, unknown> = {};
+      const appliedFields: Record<string, { oldValue: unknown; newValue: unknown }> = {};
+
+      for (const [fieldKey, change] of Object.entries(changes.fields)) {
+        const oldValue = currentEntity[fieldKey] ?? null;
+        updateData[fieldKey] = change.newValue;
+        appliedFields[fieldKey] = {
+          oldValue,
+          newValue: change.newValue,
+        };
+      }
+
+      // Update the entity based on type
+      await this.updateEntity(changes.entityType, changes.entityId, updateData);
+
+      // Update execution with applied changes
+      const appliedChanges = {
+        ...changes,
+        fields: appliedFields,
+        appliedAt: new Date().toISOString(),
+      };
+
+      await prisma.aiActionExecution.update({
+        where: { id: executionId },
+        data: {
+          appliedChanges: appliedChanges as Prisma.InputJsonValue,
+          appliedAt: new Date(),
+        },
+      });
+
+      return appliedChanges;
+    } else if (changes.operation === 'CREATE') {
+      // Create new entity
+      const createData: Record<string, unknown> = {};
+      for (const [fieldKey, change] of Object.entries(changes.fields)) {
+        createData[fieldKey] = change.newValue;
+      }
+
+      const newEntity = await this.createEntity(changes.entityType, createData);
+
+      const appliedChanges = {
+        ...changes,
+        createdEntityId: newEntity.id,
+        fields: Object.fromEntries(
+          Object.entries(changes.fields).map(([key, change]) => [
+            key,
+            { oldValue: null, newValue: change.newValue },
+          ]),
+        ),
+        appliedAt: new Date().toISOString(),
+      };
+
+      await prisma.aiActionExecution.update({
+        where: { id: executionId },
+        data: {
+          appliedChanges: appliedChanges as Prisma.InputJsonValue,
+          appliedAt: new Date(),
+          entityId: newEntity.id, // Update execution with created entity ID
+        },
+      });
+
+      return appliedChanges;
+    } else {
+      throw new BadRequestException(`Unsupported operation type: ${changes.operation}`);
+    }
+  }
+
+  /**
+   * Update an existing entity
+   */
+  private async updateEntity(
+    entityType: AiEntityType,
+    entityId: string,
+    data: Record<string, unknown>,
+  ): Promise<void> {
+    const prisma = this.prisma as any;
+
+    switch (entityType) {
+      case 'CANDIDATE': {
+        await prisma.candidate.update({
+          where: { id: entityId },
+          data: this.sanitizeCandidateData(data),
+        });
+        break;
+      }
+      case 'EMPLOYEE': {
+        await prisma.employee.update({
+          where: { id: entityId },
+          data: this.sanitizeEmployeeData(data),
+        });
+        break;
+      }
+      case 'QUOTE': {
+        await prisma.quote.update({
+          where: { id: entityId },
+          data: this.sanitizeQuoteData(data),
+        });
+        break;
+      }
+      // Add more entity types as needed
+      default:
+        throw new BadRequestException(`Update not supported for entity type: ${entityType}`);
+    }
+  }
+
+  /**
+   * Create a new entity
+   */
+  private async createEntity(
+    entityType: AiEntityType,
+    data: Record<string, unknown>,
+  ): Promise<{ id: string }> {
+    const prisma = this.prisma as any;
+
+    switch (entityType) {
+      case 'QUOTE': {
+        const quote = await prisma.quote.create({
+          data: this.sanitizeQuoteData(data),
+        });
+        return { id: quote.id };
+      }
+      // Add more entity types as needed
+      default:
+        throw new BadRequestException(`Create not supported for entity type: ${entityType}`);
+    }
+  }
+
+  /**
+   * Sanitize and validate data for Candidate updates
+   */
+  private sanitizeCandidateData(data: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    const allowedFields = [
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'skills',
+      'experience',
+      'education',
+      'notes',
+      'status',
+      'source',
+    ];
+    for (const key of allowedFields) {
+      if (key in data) {
+        sanitized[key] = data[key];
+      }
+    }
+    return sanitized;
+  }
+
+  /**
+   * Sanitize and validate data for Employee updates
+   */
+  private sanitizeEmployeeData(data: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    const allowedFields = ['department', 'jobTitle', 'status', 'contractType'];
+    for (const key of allowedFields) {
+      if (key in data) {
+        sanitized[key] = data[key];
+      }
+    }
+    return sanitized;
+  }
+
+  /**
+   * Sanitize and validate data for Quote updates/creates
+   */
+  private sanitizeQuoteData(data: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    const allowedFields = [
+      'title',
+      'description',
+      'overview',
+      'functionalProposal',
+      'technicalProposal',
+      'teamComposition',
+      'paymentTerms',
+      'warrantyPeriod',
+      'totalValue',
+      'currency',
+      'status',
+    ];
+    for (const key of allowedFields) {
+      if (key in data) {
+        sanitized[key] = data[key];
+      }
+    }
+    return sanitized;
   }
 }
 

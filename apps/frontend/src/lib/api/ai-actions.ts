@@ -116,6 +116,11 @@ export const aiActionsApi = {
     });
     return data;
   },
+
+  async applyChanges(executionId: string) {
+    const { data } = await apiClient.post<AiActionExecution>(`/ai/actions/executions/${executionId}/apply`);
+    return data;
+  },
 };
 
 

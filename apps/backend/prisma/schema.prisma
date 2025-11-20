@@ -1382,6 +1382,12 @@ enum AiCollectionFormat {
   PLAIN_TEXT
 }
 
+enum AiActionOperationType {
+  READ_ONLY
+  UPDATE
+  CREATE
+}
+
 model AiAction {
   id             String               @id @default(uuid())
   name           String
@@ -1391,12 +1397,14 @@ model AiAction {
   model          String? // Optional override, defaults in service
   isSystem       Boolean              @default(false)
   isActive       Boolean              @default(true)
+  operationType  AiActionOperationType @default(READ_ONLY) // READ_ONLY, UPDATE, or CREATE
   createdById    String?
   createdBy      User?                @relation("AiActionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   fields         AiActionField[]
   collections    AiActionCollection[]
   attachments    AiActionAttachment[]
   executions     AiActionExecution[]
+  fieldMappings  AiActionFieldMapping[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
 
@@ -1462,6 +1470,20 @@ model AiActionAttachment {
   @@unique([actionId, entityType, entityId])
   @@index([entityType, entityId])
   @@map("ai_action_attachments")
+}
+
+model AiActionFieldMapping {
+  id            String   @id @default(uuid())
+  actionId      String
+  action        AiAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  sourceKey     String   // Key from Gemini response (e.g., "extractedSkills")
+  targetField   String   // Database field to update (e.g., "skills")
+  transformRule String?  @db.Text // Optional transformation (e.g., JSON path, format conversion)
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@unique([actionId, sourceKey, targetField])
+  @@map("ai_action_field_mappings")
 }
 
 model AiActionExecution {

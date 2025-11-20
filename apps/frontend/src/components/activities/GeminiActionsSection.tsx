@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  CheckCircle2,
   Loader2,
   MessageCircle,
   PenSquare,
@@ -71,6 +72,7 @@ interface AdhocModalProps {
 interface ExecutionResultModalProps {
   execution: AiActionExecution | null;
   onClose: () => void;
+  onApply?: () => void;
 }
 
 interface ExecuteActionModalProps {
@@ -418,7 +420,7 @@ function ExecuteActionModal({ actionName, entityType, onClose, onExecute, isExec
   );
 }
 
-function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps) {
+function ExecutionResultModal({ execution, onClose, onApply }: ExecutionResultModalProps) {
   if (!execution) return null;
 
   const outputText =
@@ -426,13 +428,19 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
       ? execution.output.text
       : execution.rawOutput ?? JSON.stringify(execution.output ?? {}, null, 2);
 
+  const hasProposedChanges = execution.proposedChanges && Object.keys(execution.proposedChanges.fields || {}).length > 0;
+  const isApplied = !!execution.appliedAt;
+  const proposedChanges = execution.proposedChanges;
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6">
       <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card-elevated shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-500" />
-            <h3 className="text-lg font-semibold text-foreground">Gemini Output</h3>
+            <h3 className="text-lg font-semibold text-foreground">
+              {hasProposedChanges ? 'Review Changes' : 'Gemini Output'}
+            </h3>
           </div>
           <button
             type="button"
@@ -455,12 +463,116 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
             <>
               <p className="font-semibold text-muted-foreground">
                 Generated {new Date(execution.createdAt).toLocaleString()}
+                {isApplied && execution.appliedAt && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-500/20 dark:text-green-200">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Applied {new Date(execution.appliedAt).toLocaleString()}
+                  </span>
+                )}
               </p>
-              <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border bg-muted/40 px-4 py-3">
-                <MarkdownRenderer
-                  content={outputText || 'Gemini returned an empty response.'}
-                  className="text-sm text-foreground"
-                />
+
+              {hasProposedChanges && !isApplied && (
+                <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                      Proposed {proposedChanges?.operation === 'CREATE' ? 'New Record' : 'Changes'}
+                    </h4>
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    Review the changes below before applying them to the database.
+                  </p>
+                  <div className="space-y-2 rounded-lg border border-blue-200 bg-white p-3 dark:border-blue-800 dark:bg-card">
+                    {proposedChanges &&
+                      Object.entries(proposedChanges.fields).map(([fieldKey, change]) => (
+                        <div key={fieldKey} className="flex items-start justify-between gap-4 border-b border-border pb-2 last:border-0 last:pb-0">
+                          <div className="flex-1">
+                            <p className="font-semibold text-foreground">{fieldKey}</p>
+                            {proposedChanges.operation === 'UPDATE' && (
+                              <div className="mt-1 space-y-1">
+                                <div className="text-xs">
+                                  <span className="text-muted-foreground">Current: </span>
+                                  <span className="font-mono text-red-600 dark:text-red-400">
+                                    {change.oldValue === null || change.oldValue === undefined
+                                      ? '(empty)'
+                                      : String(change.oldValue)}
+                                  </span>
+                                </div>
+                                <div className="text-xs">
+                                  <span className="text-muted-foreground">New: </span>
+                                  <span className="font-mono text-green-600 dark:text-green-400">
+                                    {String(change.newValue)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            {proposedChanges.operation === 'CREATE' && (
+                              <div className="mt-1 text-xs">
+                                <span className="text-muted-foreground">Value: </span>
+                                <span className="font-mono text-green-600 dark:text-green-400">
+                                  {String(change.newValue)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {isApplied && execution.appliedChanges && (
+                <div className="space-y-3 rounded-lg border border-green-200 bg-green-50/50 p-4 dark:border-green-800 dark:bg-green-950/20">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <h4 className="font-semibold text-green-900 dark:text-green-100">Applied Changes</h4>
+                  </div>
+                  <div className="space-y-2 rounded-lg border border-green-200 bg-white p-3 dark:border-green-800 dark:bg-card">
+                    {Object.entries(execution.appliedChanges.fields).map(([fieldKey, change]) => (
+                      <div key={fieldKey} className="flex items-start justify-between gap-4 border-b border-border pb-2 last:border-0 last:pb-0">
+                        <div className="flex-1">
+                          <p className="font-semibold text-foreground">{fieldKey}</p>
+                          {execution.appliedChanges.operation === 'UPDATE' && (
+                            <div className="mt-1 space-y-1 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Was: </span>
+                                <span className="font-mono text-red-600 dark:text-red-400">
+                                  {change.oldValue === null || change.oldValue === undefined
+                                    ? '(empty)'
+                                    : String(change.oldValue)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Now: </span>
+                                <span className="font-mono text-green-600 dark:text-green-400">
+                                  {String(change.newValue)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          {execution.appliedChanges.operation === 'CREATE' && (
+                            <div className="mt-1 text-xs">
+                              <span className="text-muted-foreground">Created with: </span>
+                              <span className="font-mono text-green-600 dark:text-green-400">
+                                {String(change.newValue)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="mb-2 font-semibold text-muted-foreground">Gemini Response</p>
+                <div className="max-h-[40vh] overflow-y-auto rounded-lg border border-border bg-muted/40 px-4 py-3">
+                  <MarkdownRenderer
+                    content={outputText || 'Gemini returned an empty response.'}
+                    className="text-sm text-foreground"
+                  />
+                </div>
               </div>
             </>
           )}
@@ -475,6 +587,16 @@ function ExecutionResultModal({ execution, onClose }: ExecutionResultModalProps)
           >
             Copy
           </button>
+          {hasProposedChanges && !isApplied && onApply && (
+            <button
+              type="button"
+              onClick={onApply}
+              className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Apply Changes
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -651,6 +773,31 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
       setError(message);
       toast({
         title: 'Could not run prompt',
+        description: message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: (executionId: string) => aiActionsApi.applyChanges(executionId),
+    onSuccess: (updatedExecution) => {
+      setError(null);
+      toast({
+        title: 'Changes applied',
+        description: 'The proposed changes have been successfully applied to the database.',
+      });
+      setSelectedExecution(updatedExecution);
+      queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType, entityId] });
+      queryClient.invalidateQueries({ queryKey: ['ai-actions', 'executions', aiEntityType] });
+      // Invalidate entity queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: [entityType, entityId] });
+    },
+    onError: (err: any) => {
+      const message = err?.response?.data?.message ?? 'Could not apply changes.';
+      setError(message);
+      toast({
+        title: 'Could not apply changes',
         description: message,
         variant: 'destructive',
       });
@@ -836,7 +983,19 @@ export function GeminiActionsSection({ entityId, entityType }: GeminiActionsSect
         />
       )}
 
-      <ExecutionResultModal execution={selectedExecution} onClose={() => setSelectedExecution(null)} />
+      <ExecutionResultModal
+        execution={selectedExecution}
+        onClose={() => {
+          setSelectedExecution(null);
+        }}
+        onApply={
+          selectedExecution && !selectedExecution.appliedAt
+            ? () => {
+                applyMutation.mutate(selectedExecution.id);
+              }
+            : undefined
+        }
+      />
       </div>
     </>
   );
