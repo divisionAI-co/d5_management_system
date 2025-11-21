@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -31,22 +31,30 @@ export class AuthService extends BaseService {
   }
 
   async validateUser(email: string, password: string): Promise<any> {
+    this.logger.log(`[ValidateUser] Attempting to validate user: ${email}`);
     const user = await this.usersService.findByEmail(email);
     
     if (!user) {
+      this.logger.warn(`[ValidateUser] User not found: ${email}`);
       throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('access this account'));
     }
 
+    this.logger.log(`[ValidateUser] User found: ${user.id}, isActive: ${user.isActive}, twoFactorEnabled: ${user.twoFactorEnabled}`);
+
     if (!user.isActive) {
+      this.logger.warn(`[ValidateUser] User is inactive: ${user.id}`);
       throw new UnauthorizedException(ErrorMessages.OPERATION_NOT_ALLOWED('login', 'Account is inactive'));
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    this.logger.log(`[ValidateUser] Password validation result: ${isPasswordValid}`);
     
     if (!isPasswordValid) {
+      this.logger.warn(`[ValidateUser] Invalid password for user: ${email}`);
       throw new UnauthorizedException(ErrorMessages.UNAUTHORIZED('access this account'));
     }
 
+    this.logger.log(`[ValidateUser] User validated successfully: ${user.email} (${user.id})`);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...result } = user;
     return result;
@@ -59,11 +67,16 @@ export class AuthService extends BaseService {
       ipAddress?: string;
     },
   ) {
+    this.logger.log(`[Login] Login attempt for: ${loginDto.email}, IP: ${sessionMetadata?.ipAddress || 'unknown'}`);
+    
     const user = await this.validateUser(loginDto.email, loginDto.password);
+    this.logger.log(`[Login] User validated, proceeding with login for: ${user.email} (${user.id})`);
 
     // Check if 2FA is enabled
     if (user.twoFactorEnabled) {
+      this.logger.log(`[Login] 2FA enabled for user: ${user.id}`);
       if (!loginDto.twoFactorCode) {
+        this.logger.log(`[Login] 2FA code required for user: ${user.id}`);
         return {
           requiresTwoFactor: true,
           message: '2FA code required',
@@ -71,21 +84,26 @@ export class AuthService extends BaseService {
       }
 
       const isValid = await this.verifyTwoFactorCode(user.id, loginDto.twoFactorCode);
+      this.logger.log(`[Login] 2FA code validation result: ${isValid}`);
       if (!isValid) {
+        this.logger.warn(`[Login] Invalid 2FA code for user: ${user.id}`);
         throw new UnauthorizedException(ErrorMessages.INVALID_INPUT('2FA code'));
       }
     }
 
     // Update last login
+    this.logger.log(`[Login] Updating last login for user: ${user.id}`);
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
 
+    this.logger.log(`[Login] Generating tokens for user: ${user.id}`);
     const tokens = await this.generateTokens(user, {
       sessionMetadata,
     });
     
+    this.logger.log(`[Login] Login successful for user: ${user.email} (${user.id})`);
     return {
       user,
       ...tokens,

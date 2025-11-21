@@ -172,6 +172,9 @@ model Customer {
   notes String?
   tags  String[]
 
+  // Google Drive Integration
+  driveFolderId String? // Google Drive folder containing contracts and documents
+
   // Odoo Migration
   odooId String? @unique
 

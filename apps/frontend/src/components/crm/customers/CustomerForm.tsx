@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/crm';
@@ -12,6 +12,8 @@ import type {
 } from '@/types/crm';
 import { X } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { DrivePicker } from '@/components/shared/DrivePicker';
+import type { DriveFile } from '@/types/integrations';
 
 const CUSTOMER_TYPES: { label: string; value: CustomerType }[] = [
   { label: 'Staff Augmentation', value: 'STAFF_AUGMENTATION' },
@@ -52,6 +54,8 @@ type FormValues = {
   currency?: string;
   notes?: string;
   tags?: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
   odooId?: string;
 };
 
@@ -64,6 +68,7 @@ interface CustomerFormProps {
 export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(customer);
+  const [drivePickerOpen, setDrivePickerOpen] = useState(false);
 
   const defaultValues = useMemo<FormValues>(() => {
     if (!customer) {
@@ -77,6 +82,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         tags: '',
         taxId: '',
         registrationId: '',
+        driveFolderId: '',
+        driveFolderUrl: '',
       };
     }
 
@@ -102,6 +109,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
       currency: customer.currency ?? 'USD',
       notes: customer.notes ?? '',
       tags: customer.tags?.join(', ') ?? '',
+      driveFolderId: customer.driveFolderId ?? '',
+      driveFolderUrl: customer.driveFolderUrl ?? '',
       odooId: customer.odooId ?? '',
     };
   }, [customer]);
@@ -118,10 +127,23 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
   });
 
   const notesValue = watch('notes') || '';
+  const driveFolderIdValue = watch('driveFolderId');
 
   useEffect(() => {
     reset(defaultValues);
   }, [defaultValues, reset]);
+
+  const handleSelectDriveFolder = (folder: DriveFile) => {
+    const folderLink = folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`;
+    setValue('driveFolderUrl', folderLink, { shouldDirty: true, shouldTouch: true });
+    setValue('driveFolderId', folder.id, { shouldDirty: true, shouldTouch: true });
+  };
+
+  const handleUseCurrentFolder = (folderId: string) => {
+    const link = `https://drive.google.com/drive/folders/${folderId}`;
+    setValue('driveFolderUrl', link, { shouldDirty: true, shouldTouch: true });
+    setValue('driveFolderId', folderId, { shouldDirty: true, shouldTouch: true });
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateCustomerPayload) => customersApi.create(payload),
@@ -163,6 +185,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
       currency: values.currency || undefined,
       notes: values.notes || undefined,
       tags,
+      driveFolderId: values.driveFolderId || undefined,
+      driveFolderUrl: values.driveFolderUrl || undefined,
       odooId: values.odooId || undefined,
     };
 
@@ -399,6 +423,43 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
             </div>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <label className="block text-sm font-medium text-muted-foreground">
+                  Google Drive Folder ID
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setDrivePickerOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                >
+                  Choose from Drive
+                </button>
+              </div>
+              <input
+                type="text"
+                {...register('driveFolderId')}
+                placeholder="1A2b3C4D5E6F7G8H"
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enter the folder ID or URL containing contracts and documents
+              </p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                Google Drive Folder URL (alternative)
+              </label>
+              <input
+                type="text"
+                {...register('driveFolderUrl')}
+                placeholder="https://drive.google.com/drive/folders/..."
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
             <MentionInput
@@ -429,6 +490,17 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
           </div>
         </form>
       </div>
+
+      <DrivePicker
+        open={drivePickerOpen}
+        mode="folder"
+        initialFolderId={driveFolderIdValue || undefined}
+        title="Choose Google Drive Folder"
+        description="Navigate your Google Drive and pick the folder that stores customer contracts and documents."
+        onClose={() => setDrivePickerOpen(false)}
+        onSelectFolder={handleSelectDriveFolder}
+        onUseCurrentFolder={handleUseCurrentFolder}
+      />
     </div>
   );
 }

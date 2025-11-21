@@ -19,6 +19,7 @@ import { FilterCustomersDto } from './dto/filter-customers.dto';
 import { UpdateCustomerStatusDto } from './dto/update-customer-status.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 import { EncryptionService } from '../../../common/encryption/encryption.service';
+import { extractDriveFolderId, generateDriveFolderUrl } from '../../../common/utils/drive-folder.util';
 
 @Injectable()
 export class CustomersService extends BaseService {
@@ -39,6 +40,11 @@ export class CustomersService extends BaseService {
       taxId: customer?.taxId ? this.encryptionService.decrypt(customer.taxId) : null,
       registrationId: customer?.registrationId
         ? this.encryptionService.decrypt(customer.registrationId)
+        : null,
+      // Google Drive folder
+      driveFolderId: customer?.driveFolderId ?? null,
+      driveFolderUrl: customer?.driveFolderId
+        ? generateDriveFolderUrl(customer.driveFolderId)
         : null,
     };
 
@@ -111,6 +117,18 @@ export class CustomersService extends BaseService {
 
       if (createCustomerDto.monthlyValue !== undefined) {
         data.monthlyValue = new Prisma.Decimal(createCustomerDto.monthlyValue);
+      }
+
+      // Handle Google Drive folder ID
+      const inputValue = createCustomerDto.driveFolderId ?? createCustomerDto.driveFolderUrl;
+      const driveFolderId = extractDriveFolderId(inputValue);
+      if (inputValue && !driveFolderId) {
+        throw new BadRequestException(
+          'Unable to extract Google Drive folder ID from the provided value. Please provide a valid folder URL or ID, not a file URL.',
+        );
+      }
+      if (driveFolderId) {
+        data.driveFolderId = driveFolderId;
       }
 
       const customer = await this.prisma.customer.create({ data });
@@ -284,6 +302,35 @@ export class CustomersService extends BaseService {
 
     if (updateCustomerDto.monthlyValue !== undefined) {
       data.monthlyValue = new Prisma.Decimal(updateCustomerDto.monthlyValue);
+    }
+
+    // Handle Google Drive folder ID
+    let driveFolderIdUpdate: string | null | undefined = undefined;
+    if (
+      updateCustomerDto.driveFolderId !== undefined ||
+      updateCustomerDto.driveFolderUrl !== undefined
+    ) {
+      const inputValue = updateCustomerDto.driveFolderId ?? updateCustomerDto.driveFolderUrl;
+      
+      // If the input is an empty string or null, explicitly clear the field
+      if (!inputValue || (typeof inputValue === 'string' && inputValue.trim().length === 0)) {
+        driveFolderIdUpdate = null;
+      } else {
+        const resolved = extractDriveFolderId(inputValue);
+
+        // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
+        // silently ignore it rather than throwing an error - this allows users to clear invalid values
+        if (!resolved) {
+          // Invalid value provided (e.g., file URL instead of folder URL) - set to null to clear it
+          driveFolderIdUpdate = null;
+        } else {
+          // Valid folder ID extracted
+          driveFolderIdUpdate = resolved;
+        }
+      }
+    }
+    if (driveFolderIdUpdate !== undefined) {
+      data.driveFolderId = driveFolderIdUpdate;
     }
 
       await this.prisma.customer.update({

@@ -5,10 +5,13 @@ import { ExternalLink, FileText, FolderOpen, Loader2, Link as LinkIcon, Check } 
 import { googleDriveApi } from '@/lib/api/google-drive';
 import type { DriveFile } from '@/types/integrations';
 
-interface CandidateDrivePreviewProps {
+interface DrivePreviewProps {
   folderId?: string | null;
   folderUrl?: string | null;
-  candidateName: string;
+  entityName: string;
+  title?: string;
+  description?: string;
+  emptyStateMessage?: string;
 }
 
 function getFileThumbnail(file: DriveFile) {
@@ -30,16 +33,19 @@ function getFileThumbnail(file: DriveFile) {
   );
 }
 
-export function CandidateDrivePreview({
+export function DrivePreview({
   folderId,
   folderUrl,
-  candidateName,
-}: CandidateDrivePreviewProps) {
+  entityName,
+  title = 'Documents',
+  description,
+  emptyStateMessage,
+}: DrivePreviewProps) {
   const [copiedFileId, setCopiedFileId] = useState<string | null>(null);
   const resetTimerRef = useRef<number | undefined>(undefined);
 
   const driveQuery = useQuery({
-    queryKey: ['candidate-drive-preview', folderId],
+    queryKey: ['drive-preview', folderId],
     enabled: Boolean(folderId),
     queryFn: () =>
       googleDriveApi.listFiles({
@@ -78,10 +84,10 @@ export function CandidateDrivePreview({
         <div className="flex items-start gap-3 text-sm text-muted-foreground">
           <FolderOpen className="h-5 w-5 text-muted-foreground" />
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Candidate Documents</h3>
+            <h3 className="text-sm font-semibold text-foreground">{title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Link the candidate&apos;s Google Drive folder in the profile to surface interview
-              recordings, CVs, and other documents directly in this workspace.
+              {description ||
+                `Link the ${entityName}'s Google Drive folder in the profile to surface documents directly in this workspace.`}
             </p>
           </div>
         </div>
@@ -93,9 +99,9 @@ export function CandidateDrivePreview({
     <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Candidate Documents</h2>
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <p className="text-sm text-muted-foreground">
-            Files stored for {candidateName}. Click to open in Google Drive.
+            {description || `Files stored for ${entityName}. Click to open in Google Drive.`}
           </p>
         </div>
         {folderUrl && (
@@ -122,7 +128,7 @@ export function CandidateDrivePreview({
         </p>
       ) : files.length === 0 ? (
         <p className="mt-6 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-6 text-center text-sm text-muted-foreground">
-          The Google Drive folder is connected but currently empty.
+          {emptyStateMessage || 'The Google Drive folder is connected but currently empty.'}
         </p>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -192,5 +198,4 @@ export function CandidateDrivePreview({
     </div>
   );
 }
-
 

@@ -13,7 +13,7 @@ import { CandidateForm } from '@/components/recruitment/CandidateForm';
 import { LinkCandidatePositionModal } from '@/components/recruitment/LinkCandidatePositionModal';
 import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
-import { CandidateDrivePreview } from '@/components/recruitment/CandidateDrivePreview';
+import { DrivePreview } from '@/components/shared/DrivePreview';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function CandidateDetailPage() {
@@ -424,10 +424,13 @@ export default function CandidateDetailPage() {
         </section>
 
         <aside className="space-y-6">
-          <CandidateDrivePreview
+          <DrivePreview
             folderId={candidate.driveFolderId ?? undefined}
             folderUrl={candidate.driveFolderUrl ?? undefined}
-            candidateName={`${candidate.firstName} ${candidate.lastName}`}
+            entityName={`${candidate.firstName} ${candidate.lastName}`}
+            title="Candidate Documents"
+            description="Files stored for this candidate. Click to open in Google Drive."
+            emptyStateMessage="The Google Drive folder is connected but currently empty."
           />
           <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-foreground">Linked Positions</h2>

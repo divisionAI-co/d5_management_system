@@ -17,6 +17,7 @@ import { TemplatesService } from '../../templates/templates.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { UsersService } from '../../users/users.service';
 import { extractMentionIdentifiers } from '../../../common/utils/mention-parser';
+import { extractDriveFolderId, generateDriveFolderUrl } from '../../../common/utils/drive-folder.util';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { FilterCandidatesDto } from './dto/filter-candidates.dto';
@@ -120,7 +121,7 @@ export class CandidatesService extends BaseService {
 
     formatted.driveFolderId = candidate.driveFolderId ?? null;
     formatted.driveFolderUrl = candidate.driveFolderId
-      ? `https://drive.google.com/drive/folders/${candidate.driveFolderId}`
+      ? generateDriveFolderUrl(candidate.driveFolderId)
       : null;
 
     formatted.recruiter = candidate.recruiter
@@ -142,54 +143,6 @@ export class CandidatesService extends BaseService {
     return formatted;
   }
 
-  private extractDriveFolderId(input?: string | null): string | undefined {
-    if (!input) {
-      return undefined;
-    }
-
-    const trimmed = input.trim();
-
-    if (!trimmed) {
-      return undefined;
-    }
-
-    const idPattern = /[-\w]{10,}/;
-
-    // If it does not look like a URL, assume it's already an ID.
-    if (!trimmed.includes('/')) {
-      const maybeId = trimmed.match(idPattern)?.[0];
-      return maybeId ?? undefined;
-    }
-
-    try {
-      const url = new URL(trimmed);
-
-      // Only extract folder IDs, not file IDs
-      // Check for folder pattern first: /drive/folders/ID or /folders/ID
-      const folderMatch = url.pathname.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/) || 
-                         url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-      if (folderMatch?.[1]) {
-        return folderMatch[1];
-      }
-
-      // If it's a file URL (/file/d/ID), reject it - this is not a folder
-      const fileMatch = url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileMatch?.[1]) {
-        // This is a file, not a folder - return undefined
-        return undefined;
-      }
-
-      const idFromQuery = url.searchParams.get('id');
-      if (idFromQuery) {
-        return idFromQuery;
-      }
-    } catch {
-      // Not a valid URL; fall back to regex below.
-    }
-
-    const fallbackMatch = trimmed.match(idPattern);
-    return fallbackMatch?.[0];
-  }
 
   private validateSortField(sortBy?: string) {
     try {
@@ -322,7 +275,7 @@ export class CandidatesService extends BaseService {
     }
 
     const inputValue = createDto.driveFolderId ?? createDto.driveFolderUrl;
-    const driveFolderId = this.extractDriveFolderId(inputValue);
+    const driveFolderId = extractDriveFolderId(inputValue);
 
     // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
     // throw an error for create (since we need valid data), but allow null for updates
@@ -452,7 +405,7 @@ export class CandidatesService extends BaseService {
       if (!inputValue || (typeof inputValue === 'string' && inputValue.trim().length === 0)) {
         driveFolderIdUpdate = null;
       } else {
-        const resolved = this.extractDriveFolderId(inputValue);
+        const resolved = extractDriveFolderId(inputValue);
 
         // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
         // silently ignore it rather than throwing an error - this allows users to clear invalid values
