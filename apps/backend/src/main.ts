@@ -173,37 +173,79 @@ async function bootstrap() {
   );
 
   // Swagger API Documentation
-  const config = new DocumentBuilder()
-    .setTitle('division5 API')
-    .setDescription('Integrated Business Management Platform - REST API Documentation')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('Authentication', 'User authentication and authorization')
-    .addTag('Users', 'User management')
-    .addTag('CRM', 'Customer Relationship Management')
-    .addTag('Leads', 'Lead management')
-    .addTag('Opportunities', 'Opportunity management')
-    .addTag('Campaigns', 'Email campaigns and sequences')
-    .addTag('Invoices', 'Billing and invoicing')
-    .addTag('Recruitment', 'Candidate and recruitment management')
-    .addTag('Employees', 'Employee and HR management')
-    .addTag('EOD Reports', 'End-of-Day reporting')
-    .addTag('Tasks', 'Task management')
-    .addTag('Activities', 'Universal activity tracking')
-    .addTag('Notifications', 'Notification system')
-    .addTag('Meetings', 'Meeting scheduling')
-    .addTag('Reports', 'Customer reports')
-    .addTag('Templates', 'Template management')
-    .addTag('Imports', 'Data import from Odoo')
-    .addTag('Integrations', 'External integrations (Google Drive, Calendar)')
-    .build();
+  const swaggerEnabled = configService.get<string>('SWAGGER_ENABLED', 'true') !== 'false';
+  const swaggerUsername = configService.get<string>('SWAGGER_USERNAME', 'admin');
+  const swaggerPassword = configService.get<string>('SWAGGER_PASSWORD', '');
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup(`${apiPrefix}/docs`, app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+  // Protect Swagger with basic auth in production
+  if (isProduction && swaggerEnabled) {
+    if (!swaggerPassword) {
+      console.warn('⚠️  WARNING: SWAGGER_PASSWORD is not set in production. Swagger will be disabled for security.');
+    } else {
+      // Basic authentication middleware for Swagger (protects both UI and JSON endpoints)
+      const swaggerBasicAuth = (req: Request, res: Response, next: NextFunction) => {
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Basic ')) {
+          res.setHeader('WWW-Authenticate', 'Basic realm="Swagger API Documentation"');
+          return res.status(401).send('Authentication required');
+        }
+
+        // Decode basic auth credentials
+        const base64Credentials = authHeader.split(' ')[1];
+        const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+        const [username, password] = credentials.split(':');
+
+        if (username === swaggerUsername && password === swaggerPassword) {
+          return next();
+        }
+
+        res.setHeader('WWW-Authenticate', 'Basic realm="Swagger API Documentation"');
+        return res.status(401).send('Invalid credentials');
+      };
+
+      // Protect all Swagger endpoints
+      app.use(`${apiPrefix}/docs`, swaggerBasicAuth);
+      app.use(`${apiPrefix}/docs-json`, swaggerBasicAuth);
+      app.use(`${apiPrefix}/docs-yaml`, swaggerBasicAuth);
+    }
+  }
+
+  if (swaggerEnabled && (!isProduction || swaggerPassword)) {
+    const config = new DocumentBuilder()
+      .setTitle('division5 API')
+      .setDescription('Integrated Business Management Platform - REST API Documentation')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('Authentication', 'User authentication and authorization')
+      .addTag('Users', 'User management')
+      .addTag('CRM', 'Customer Relationship Management')
+      .addTag('Leads', 'Lead management')
+      .addTag('Opportunities', 'Opportunity management')
+      .addTag('Campaigns', 'Email campaigns and sequences')
+      .addTag('Invoices', 'Billing and invoicing')
+      .addTag('Recruitment', 'Candidate and recruitment management')
+      .addTag('Employees', 'Employee and HR management')
+      .addTag('EOD Reports', 'End-of-Day reporting')
+      .addTag('Tasks', 'Task management')
+      .addTag('Activities', 'Universal activity tracking')
+      .addTag('Notifications', 'Notification system')
+      .addTag('Meetings', 'Meeting scheduling')
+      .addTag('Reports', 'Customer reports')
+      .addTag('Templates', 'Template management')
+      .addTag('Imports', 'Data import from Odoo')
+      .addTag('Integrations', 'External integrations (Google Drive, Calendar)')
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup(`${apiPrefix}/docs`, app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+  } else if (!swaggerEnabled) {
+    console.log('📚 Swagger documentation is disabled (SWAGGER_ENABLED=false)');
+  }
 
   // Start server
   const port = configService.get<number>('PORT', 3000);
@@ -211,10 +253,14 @@ async function bootstrap() {
 
   // Log startup info (never log secrets)
   const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+  const swaggerStatus = swaggerEnabled && (!isProduction || swaggerPassword)
+    ? `📚 Docs: http://localhost:${port}/${apiPrefix}/docs${isProduction ? ' (Basic Auth required)' : ''}`
+    : '📚 Docs: Disabled';
+  
   console.log(`
     🚀 division5 API is running!
     📝 API: http://localhost:${port}/${apiPrefix}
-    📚 Docs: http://localhost:${port}/${apiPrefix}/docs
+    ${swaggerStatus}
     🌍 Environment: ${nodeEnv}
     🔒 Security: ${isProduction ? 'Production mode (strict)' : 'Development mode'}
     ${corsOrigins.length > 0 ? `🌐 CORS: ${corsOrigins.length} origin(s) configured` : '⚠️  CORS: No origins configured'}
@@ -237,6 +283,12 @@ async function bootstrap() {
     
     if (corsOrigins.length === 0) {
       console.error('❌ CRITICAL: CORS_ORIGINS must be configured in production');
+      process.exit(1);
+    }
+    
+    // Validate Swagger security in production
+    if (swaggerEnabled && !swaggerPassword) {
+      console.error('❌ CRITICAL: SWAGGER_PASSWORD must be set in production when Swagger is enabled');
       process.exit(1);
     }
     

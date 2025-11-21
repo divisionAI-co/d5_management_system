@@ -89,5 +89,17 @@ export const configValidationSchema = Joi.object({
     .valid('true', 'false')
     .optional()
     .description('Enable verbose Prisma query logging in development (default: false)'),
+
+  // Swagger Documentation
+  SWAGGER_ENABLED: Joi.string()
+    .valid('true', 'false')
+    .default('true')
+    .description('Enable/disable Swagger API documentation (default: true)'),
+  SWAGGER_USERNAME: Joi.string()
+    .default('admin')
+    .description('Basic auth username for Swagger in production (default: admin)'),
+  SWAGGER_PASSWORD: Joi.string()
+    .optional()
+    .description('Basic auth password for Swagger in production (required in production if SWAGGER_ENABLED=true)'),
 });
 
