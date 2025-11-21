@@ -26,15 +26,19 @@ export default function RecruiterPerformanceReportsPage() {
   const [filterWeekEndingFrom, setFilterWeekEndingFrom] = useState<string>('');
   const [filterWeekEndingTo, setFilterWeekEndingTo] = useState<string>('');
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+  const [hasProcessedInitialState, setHasProcessedInitialState] = useState(false);
 
-  // Auto-open form if positionId is provided in state
+  // Auto-open form if positionId is provided in state (only once)
   useEffect(() => {
-    if (state?.positionId && !showForm) {
+    if (state?.positionId && !showForm && !hasProcessedInitialState) {
       setShowForm(true);
       setInitialPositionId(state.positionId);
       setInitialPositionTitle(state.positionTitle);
+      setHasProcessedInitialState(true);
+      // Clear the state from location to prevent reopening
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [state?.positionId, state?.positionTitle, showForm]);
+  }, [state?.positionId, state?.positionTitle, showForm, hasProcessedInitialState, navigate, location.pathname]);
 
   // Auto-open form in edit mode if editReportId is provided in state
   useEffect(() => {
@@ -68,7 +72,9 @@ export default function RecruiterPerformanceReportsPage() {
         setSelectedReport(null);
         setInitialPositionId(undefined);
         setInitialPositionTitle(undefined);
-        window.history.replaceState({}, document.title);
+        setHasProcessedInitialState(false);
+        // Clear location state
+        navigate(location.pathname, { replace: true, state: {} });
       }
     };
 
@@ -78,7 +84,7 @@ export default function RecruiterPerformanceReportsPage() {
         document.removeEventListener('keydown', handleEscape);
       };
     }
-  }, [showForm]);
+  }, [showForm, navigate, location.pathname]);
 
   const isRecruiter = user?.role === 'RECRUITER';
   const isAdminOrHR = user?.role === 'ADMIN' || user?.role === 'HR';
@@ -136,6 +142,8 @@ export default function RecruiterPerformanceReportsPage() {
     setInitialPositionId(undefined);
     setInitialPositionTitle(undefined);
     setShowForm(true);
+    // Clear any location state
+    navigate(location.pathname, { replace: true, state: {} });
   };
 
   const handleEdit = (report: RecruiterPerformanceReport) => {
@@ -356,23 +364,8 @@ export default function RecruiterPerformanceReportsPage() {
 
       {/* Form Modal */}
       {showForm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={(e) => {
-            // Close modal when clicking outside the form
-            if (e.target === e.currentTarget) {
-              setShowForm(false);
-              setSelectedReport(null);
-              setInitialPositionId(undefined);
-              setInitialPositionTitle(undefined);
-              window.history.replaceState({}, document.title);
-            }
-          }}
-        >
-          <div
-            className="bg-card rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-card rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4">
             <div className="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between z-10">
               <h2 className="text-xl font-semibold text-foreground">
                 {selectedReport ? 'Edit Report' : 'Create Report'}
@@ -383,7 +376,9 @@ export default function RecruiterPerformanceReportsPage() {
                   setSelectedReport(null);
                   setInitialPositionId(undefined);
                   setInitialPositionTitle(undefined);
-                  window.history.replaceState({}, document.title);
+                  setHasProcessedInitialState(false);
+                  // Clear location state
+                  navigate(location.pathname, { replace: true, state: {} });
                 }}
                 className="p-1 rounded hover:bg-muted"
                 type="button"
@@ -401,8 +396,9 @@ export default function RecruiterPerformanceReportsPage() {
                   setSelectedReport(null);
                   setInitialPositionId(undefined);
                   setInitialPositionTitle(undefined);
+                  setHasProcessedInitialState(false);
                   // Clear location state
-                  window.history.replaceState({}, document.title);
+                  navigate(location.pathname, { replace: true, state: {} });
                 }}
                 onSuccess={() => {
                   queryClient.invalidateQueries({ queryKey: ['recruiter-performance-reports'] });
@@ -410,8 +406,9 @@ export default function RecruiterPerformanceReportsPage() {
                   setSelectedReport(null);
                   setInitialPositionId(undefined);
                   setInitialPositionTitle(undefined);
+                  setHasProcessedInitialState(false);
                   // Clear location state
-                  window.history.replaceState({}, document.title);
+                  navigate(location.pathname, { replace: true, state: {} });
                 }}
               />
             </div>

@@ -1,15 +1,20 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
   CustomerType,
   NotificationType,
   Prisma,
+  RecruitmentStatus,
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -20,27 +25,20 @@ import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
 import { CloseOpportunityDto } from './dto/close-opportunity.dto';
 import { SendOpportunityEmailDto } from './dto/send-email.dto';
+import { PreviewOpportunityEmailDto } from './dto/preview-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
-
 @Injectable()
-export class OpportunitiesService {
+export class OpportunitiesService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private formatOpportunity(opportunity: any) {
     if (!opportunity) {
@@ -55,8 +53,9 @@ export class OpportunitiesService {
           : null,
     };
 
-    if (opportunity?.openPosition) {
-      formatted.openPosition = opportunity.openPosition;
+    // Handle multiple positions - for backward compatibility, use first position
+    if (opportunity?.openPositions && opportunity.openPositions.length > 0) {
+      formatted.openPosition = opportunity.openPositions[0];
     }
 
     if (Array.isArray(opportunity?.activities)) {
@@ -71,26 +70,32 @@ export class OpportunitiesService {
   private buildWhereClause(
     filters: FilterOpportunitiesDto,
   ): Prisma.OpportunityWhereInput {
-    const where: Prisma.OpportunityWhereInput = {};
+    // Use QueryBuilder for standard filters, but handle complex search manually
+    const { search, ...baseFilters } = filters;
+    
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.OpportunityWhereInput>(
+      baseFilters,
+    );
 
-    if (filters.search) {
-      where.OR = [
+    // Handle complex search across relations (manual implementation)
+    if (search) {
+      baseWhere.OR = [
         {
           title: {
-            contains: filters.search,
+            contains: search,
             mode: Prisma.QueryMode.insensitive,
           },
         },
         {
           description: {
-            contains: filters.search,
+            contains: search,
             mode: Prisma.QueryMode.insensitive,
           },
         },
         {
           lead: {
             title: {
-              contains: filters.search,
+              contains: search,
               mode: Prisma.QueryMode.insensitive,
             },
           },
@@ -103,19 +108,19 @@ export class OpportunitiesService {
                   OR: [
                     {
                       firstName: {
-                        contains: filters.search,
+                        contains: search,
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
                     {
                       lastName: {
-                        contains: filters.search,
+                        contains: search,
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
                     {
                       companyName: {
-                        contains: filters.search,
+                        contains: search,
                         mode: Prisma.QueryMode.insensitive,
                       },
                     },
@@ -128,7 +133,7 @@ export class OpportunitiesService {
         {
           customer: {
             name: {
-              contains: filters.search,
+              contains: search,
               mode: Prisma.QueryMode.insensitive,
             },
           },
@@ -136,57 +141,28 @@ export class OpportunitiesService {
       ];
     }
 
-    if (filters.customerId) {
-      where.customerId = filters.customerId;
-    }
-
-    if (filters.assignedToId) {
-      where.assignedToId = filters.assignedToId;
-    }
-
-    if (filters.leadId) {
-      where.leadId = filters.leadId;
-    }
-
-    if (filters.type) {
-      where.type = filters.type;
-    }
-
+    // Handle stage filter with case-insensitive matching
     if (filters.stage) {
-      where.stage = {
+      baseWhere.stage = {
         equals: filters.stage,
         mode: Prisma.QueryMode.insensitive,
       };
     }
 
-    if (filters.isClosed !== undefined) {
-      where.isClosed = filters.isClosed;
-    }
-
-    if (filters.isWon !== undefined) {
-      where.isWon = filters.isWon;
-    }
-
-    return where;
+    return baseWhere;
   }
 
   private validateSortField(sortBy?: string) {
-    if (!sortBy) {
-      return;
-    }
-
-    const allowed = ['createdAt', 'updatedAt', 'value', 'stage', 'title'];
-    if (!allowed.includes(sortBy)) {
-      throw new BadRequestException(`Unsupported sort field: ${sortBy}`);
+    try {
+      QueryBuilder.validateSortField(sortBy, ['createdAt', 'updatedAt', 'value', 'stage', 'title']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
     }
   }
 
-  async findAll(
-    filters: FilterOpportunitiesDto,
-  ): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterOpportunitiesDto) {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
-    const skip = (page - 1) * pageSize;
 
     const sortBy = filters.sortBy ?? 'createdAt';
     const sortOrder = filters.sortOrder ?? 'desc';
@@ -194,12 +170,12 @@ export class OpportunitiesService {
 
     const where = this.buildWhereClause(filters);
 
-    const [total, opportunities] = await this.prisma.$transaction([
-      this.prisma.opportunity.count({ where }),
-      this.prisma.opportunity.findMany({
-        where,
-        skip,
-        take: pageSize,
+    const result = await this.paginate(
+      this.prisma.opportunity,
+      where,
+      {
+        page,
+        pageSize,
         orderBy: {
           [sortBy]: sortOrder,
         },
@@ -235,7 +211,7 @@ export class OpportunitiesService {
               },
             },
           },
-          openPosition: {
+          openPositions: {
             select: {
               id: true,
               title: true,
@@ -245,19 +221,14 @@ export class OpportunitiesService {
             },
           },
         },
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: opportunities.map((opportunity) =>
+      ...result,
+      data: result.data.map((opportunity) =>
         this.formatOpportunity(opportunity),
       ),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
     };
   }
 
@@ -298,7 +269,7 @@ export class OpportunitiesService {
             },
           },
         },
-        openPosition: true,
+        openPositions: true,
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -308,7 +279,7 @@ export class OpportunitiesService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     return this.formatOpportunity(opportunity);
@@ -328,7 +299,7 @@ export class OpportunitiesService {
     });
 
     if (!customer) {
-      throw new NotFoundException(`Customer with ID ${customerId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', customerId));
     }
 
     return customer;
@@ -357,7 +328,7 @@ export class OpportunitiesService {
     });
 
     if (!lead) {
-      throw new NotFoundException(`Lead with ID ${leadId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', leadId));
     }
 
     return lead;
@@ -375,16 +346,16 @@ export class OpportunitiesService {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
     }
 
     if (!user.isActive) {
-      throw new BadRequestException('Opportunities can only be assigned to active users.');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('assign opportunity', 'user must be active'));
     }
 
     if (!this.allowedAssigneeRoles.has(user.role)) {
       throw new BadRequestException(
-        'Opportunities can only be assigned to admins or salespeople.',
+        ErrorMessages.OPERATION_NOT_ALLOWED('assign opportunity', 'only admins or salespeople can be assigned')
       );
     }
   }
@@ -444,7 +415,7 @@ export class OpportunitiesService {
         resolvedCustomerId !== lead.convertedCustomerId
       ) {
         throw new BadRequestException(
-          'Lead is already converted to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead is already converted to a different customer')
         );
       }
       resolvedCustomerId = lead.convertedCustomerId ?? undefined;
@@ -457,7 +428,7 @@ export class OpportunitiesService {
       );
       if (contactWithDifferentCustomer) {
         throw new BadRequestException(
-          'Lead contact belongs to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead contact belongs to a different customer')
         );
       }
     }
@@ -490,19 +461,45 @@ export class OpportunitiesService {
         } as Prisma.OpportunityUncheckedCreateInput,
       });
 
-      const shouldCreatePosition = this.shouldCreatePositionFromDto(createDto);
-      if (shouldCreatePosition) {
-        await tx.openPosition.create({
-          data: {
-            opportunityId: opportunity.id,
-            title: createDto.positionTitle ?? createDto.title,
-            description:
-              createDto.positionDescription ??
-              createDto.description ??
-              'TBD',
-            requirements: createDto.positionRequirements,
-            status: 'Open',
-          },
+      // Create positions - support both new array format and legacy single position format
+      const positionsToCreate: Array<{
+        title: string;
+        description?: string;
+        requirements?: string;
+        recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+      }> = [];
+
+      if (createDto.positions && createDto.positions.length > 0) {
+        // New format: array of positions
+        positionsToCreate.push(...createDto.positions);
+      } else if (this.shouldCreatePositionFromDto(createDto)) {
+        // Legacy format: single position from positionTitle/positionDescription/positionRequirements
+        positionsToCreate.push({
+          title: createDto.positionTitle ?? createDto.title,
+          description: createDto.positionDescription ?? createDto.description ?? 'TBD',
+          requirements: createDto.positionRequirements,
+        });
+      }
+
+      if (positionsToCreate.length > 0) {
+        await tx.openPosition.createMany({
+          data: positionsToCreate.map((pos) => {
+            let recruitmentStatus: RecruitmentStatus | null = null;
+            if (pos.recruitmentStatus && pos.recruitmentStatus.trim() !== '') {
+              const statusValue = pos.recruitmentStatus.trim();
+              if (statusValue === 'HEADHUNTING' || statusValue === 'STANDARD') {
+                recruitmentStatus = statusValue as RecruitmentStatus;
+              }
+            }
+            return {
+              opportunityId: opportunity.id,
+              title: pos.title,
+              description: pos.description ?? 'TBD',
+              requirements: pos.requirements,
+              recruitmentStatus,
+              status: 'Open',
+            };
+          }),
         });
       }
 
@@ -551,7 +548,7 @@ export class OpportunitiesService {
               },
             },
           },
-          openPosition: true,
+          openPositions: true,
         },
       });
 
@@ -561,7 +558,7 @@ export class OpportunitiesService {
       // Do this outside the transaction to avoid scoping issues
       if (createDto.title || createDto.description) {
         this.processMentions(formatted.id, createDto.title, createDto.description, createdById).catch((error) => {
-          console.error(`[Mentions] Failed to process mentions for opportunity ${formatted.id}:`, error);
+          this.logger.error(`[Mentions] Failed to process mentions for opportunity ${formatted.id}:`, error);
         });
       }
       return formatted;
@@ -572,17 +569,17 @@ export class OpportunitiesService {
     const existing = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
-        openPosition: true,
+        openPositions: true,
       },
     });
 
     if (!existing) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     const targetLeadId = updateDto.leadId ?? existing.leadId;
     if (!targetLeadId) {
-      throw new BadRequestException('Opportunity must be associated with a lead');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('lead (opportunity must be associated with a lead)'));
     }
 
     const lead = await this.findLeadContext(targetLeadId);
@@ -598,7 +595,7 @@ export class OpportunitiesService {
         resolvedCustomerId !== lead.convertedCustomerId
       ) {
         throw new BadRequestException(
-          'Lead is already converted to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead is already converted to a different customer')
         );
       }
       resolvedCustomerId = lead.convertedCustomerId ?? undefined;
@@ -611,7 +608,7 @@ export class OpportunitiesService {
       );
       if (contactWithDifferentCustomer) {
         throw new BadRequestException(
-          'Lead contact belongs to a different customer',
+          ErrorMessages.OPERATION_NOT_ALLOWED('convert lead', 'lead contact belongs to a different customer')
         );
       }
     }
@@ -661,63 +658,82 @@ export class OpportunitiesService {
         updateDto.title !== undefined;
       const shouldCreatePosition = this.shouldCreatePositionFromDto(updateDto);
 
-      if (existing.openPosition) {
-        if (shouldCreatePosition) {
-          await tx.openPosition.update({
-            where: { id: existing.openPosition.id },
-            data: {
-              title:
-                updateDto.positionTitle ??
-                updateDto.title ??
-                existing.openPosition.title,
-              description:
-                updateDto.positionDescription ??
-                updateDto.description ??
-                existing.openPosition.description ??
-                'TBD',
-              requirements:
-                updateDto.positionRequirements ??
-                existing.openPosition.requirements,
-            },
-          });
+      // Handle positions - support both new array format and legacy single position format
+      const positionsToCreate: Array<{
+        title: string;
+        description?: string;
+        requirements?: string;
+        recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+      }> = [];
+
+      if (updateDto.positions && updateDto.positions.length > 0) {
+        // New format: array of positions - create new ones
+        positionsToCreate.push(...updateDto.positions);
+      } else if (shouldCreatePosition) {
+        // Legacy format: single position from positionTitle/positionDescription/positionRequirements
+        positionsToCreate.push({
+          title: updateDto.positionTitle ?? updateDto.title ?? updated.title,
+          description: updateDto.positionDescription ?? updateDto.description ?? updated.description ?? 'TBD',
+          requirements: updateDto.positionRequirements,
+        });
+      }
+
+      // Handle existing positions
+      const firstPosition = existing.openPositions && existing.openPositions.length > 0 ? existing.openPositions[0] : null;
+      
+      if (firstPosition) {
+        if (positionsToCreate.length > 0) {
+          // Update first position if using legacy format, otherwise create new ones
+          if (!updateDto.positions) {
+            await tx.openPosition.update({
+              where: { id: firstPosition.id },
+              data: {
+                title: positionsToCreate[0].title,
+                description: positionsToCreate[0].description ?? 'TBD',
+                requirements: positionsToCreate[0].requirements,
+              },
+            });
+          }
         }
 
         if (!requiresOpenPosition) {
-          await tx.openPosition.update({
-            where: { id: existing.openPosition.id },
+          // Cancel all positions if opportunity type no longer requires them
+          await tx.openPosition.updateMany({
+            where: { opportunityId: updated.id },
             data: {
               status: 'Cancelled',
-              ...(positionFieldsProvided
+              ...(positionFieldsProvided && !updateDto.positions && firstPosition
                 ? {
-                    title:
-                      updateDto.positionTitle ??
-                      updateDto.title ??
-                      existing.openPosition.title,
-                    description:
-                      updateDto.positionDescription ??
-                      updateDto.description ??
-                      existing.openPosition.description,
-                    requirements:
-                      updateDto.positionRequirements ??
-                      existing.openPosition.requirements,
+                    title: updateDto.positionTitle ?? updateDto.title ?? firstPosition.title,
+                    description: updateDto.positionDescription ?? updateDto.description ?? firstPosition.description,
+                    requirements: updateDto.positionRequirements ?? firstPosition.requirements,
                   }
                 : {}),
             },
           });
         }
-      } else if (shouldCreatePosition) {
-        await tx.openPosition.create({
-          data: {
-            opportunityId: updated.id,
-            title: updateDto.positionTitle ?? updateDto.title ?? updated.title,
-            description:
-              updateDto.positionDescription ??
-              updateDto.description ??
-              updated.description ??
-              'TBD',
-            requirements: updateDto.positionRequirements,
-            status: 'Open',
-          },
+      }
+
+      // Create new positions if provided
+      if (positionsToCreate.length > 0 && (updateDto.positions || !firstPosition)) {
+        await tx.openPosition.createMany({
+          data: positionsToCreate.map((pos) => {
+            let recruitmentStatus: RecruitmentStatus | null = null;
+            if (pos.recruitmentStatus && pos.recruitmentStatus.trim() !== '') {
+              const statusValue = pos.recruitmentStatus.trim();
+              if (statusValue === 'HEADHUNTING' || statusValue === 'STANDARD') {
+                recruitmentStatus = statusValue as RecruitmentStatus;
+              }
+            }
+            return {
+              opportunityId: updated.id,
+              title: pos.title,
+              description: pos.description ?? 'TBD',
+              requirements: pos.requirements,
+              recruitmentStatus,
+              status: 'Open',
+            };
+          }),
         });
       }
 
@@ -755,12 +771,12 @@ export class OpportunitiesService {
               },
             },
           },
-          openPosition: true,
+          openPositions: true,
         },
       });
 
       if (!result) {
-        throw new NotFoundException(`Opportunity with ID ${id} not found after update`);
+        throw new NotFoundException(ErrorMessages.UPDATE_FAILED('Opportunity'));
       }
 
       return this.formatOpportunity(result);
@@ -770,7 +786,7 @@ export class OpportunitiesService {
         const title = updateDto.title ?? formatted.title;
         const description = updateDto.description ?? formatted.description;
         this.processMentions(id, title, description, updatedById).catch((error) => {
-          console.error(`[Mentions] Failed to process mentions for opportunity ${id}:`, error);
+          this.logger.error(`[Mentions] Failed to process mentions for opportunity ${id}:`, error);
         });
       }
       return formatted;
@@ -781,12 +797,12 @@ export class OpportunitiesService {
     const existing = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
-        openPosition: true,
+        openPositions: true,
       },
     });
 
     if (!existing) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -805,8 +821,9 @@ export class OpportunitiesService {
         },
       });
 
-      if (existing.openPosition && closeDto.isWon === false) {
-        await tx.openPosition.update({
+      // Cancel all positions if opportunity is lost
+      if (existing.openPositions && existing.openPositions.length > 0 && closeDto.isWon === false) {
+        await tx.openPosition.updateMany({
           where: { opportunityId: id },
           data: {
             status: 'Cancelled',
@@ -848,7 +865,7 @@ export class OpportunitiesService {
               },
             },
           },
-          openPosition: true,
+          openPositions: true,
         },
       });
 
@@ -899,7 +916,7 @@ export class OpportunitiesService {
             email: true,
           },
         },
-        openPosition: {
+        openPositions: {
           select: {
             id: true,
             title: true,
@@ -911,7 +928,7 @@ export class OpportunitiesService {
     });
 
     if (!opportunity) {
-      throw new NotFoundException(`Opportunity with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
     }
 
     let htmlContent = dto.htmlContent;
@@ -969,11 +986,11 @@ export class OpportunitiesService {
               email: opportunity.assignedTo.email,
             }
           : null,
-        position: opportunity.openPosition
+        position: opportunity.openPositions && opportunity.openPositions.length > 0
           ? {
-              title: opportunity.openPosition.title,
-              description: opportunity.openPosition.description,
-              requirements: opportunity.openPosition.requirements,
+              title: opportunity.openPositions[0].title,
+              description: opportunity.openPositions[0].description,
+              requirements: opportunity.openPositions[0].requirements,
             }
           : null,
       };
@@ -983,7 +1000,7 @@ export class OpportunitiesService {
         htmlContent = rendered.html;
         textContent = rendered.text;
       } catch (templateError) {
-        console.warn(
+        this.logger.warn(
           `[Opportunities] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
           templateError,
         );
@@ -992,9 +1009,7 @@ export class OpportunitiesService {
         textContent = this.getDefaultOpportunityEmailText(opportunity, templateData);
       }
     } else if (!htmlContent) {
-      throw new BadRequestException(
-        'Either templateId or htmlContent must be provided',
-      );
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('templateId or htmlContent'));
     }
 
     // Parse CC and BCC
@@ -1011,7 +1026,7 @@ export class OpportunitiesService {
     });
 
     if (!success) {
-      throw new BadRequestException('Failed to send email');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('send email', 'email service failed'));
     }
 
     return {
@@ -1019,6 +1034,158 @@ export class OpportunitiesService {
       message: 'Email sent successfully',
       to: dto.to,
       subject: dto.subject,
+    };
+  }
+
+  async previewEmail(id: string, dto: PreviewOpportunityEmailDto) {
+    const opportunity = await this.prisma.opportunity.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            city: true,
+            country: true,
+            postalCode: true,
+          },
+        },
+        lead: {
+          include: {
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                    role: true,
+                    companyName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        openPositions: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            requirements: true,
+          },
+        },
+      },
+    });
+
+    if (!opportunity) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
+    }
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with opportunity data
+    if (dto.templateId) {
+      const templateData = {
+        opportunity: {
+          id: opportunity.id,
+          title: opportunity.title,
+          description: opportunity.description,
+          type: opportunity.type,
+          value: opportunity.value ? Number(opportunity.value) : null,
+          stage: opportunity.stage,
+          isClosed: opportunity.isClosed,
+          isWon: opportunity.isWon,
+          createdAt: opportunity.createdAt,
+          updatedAt: opportunity.updatedAt,
+          closedAt: opportunity.closedAt,
+          jobDescriptionUrl: opportunity.jobDescriptionUrl,
+        },
+        customer: opportunity.customer
+          ? {
+              id: opportunity.customer.id,
+              name: opportunity.customer.name,
+              email: opportunity.customer.email,
+              phone: opportunity.customer.phone,
+              address: opportunity.customer.address,
+              city: opportunity.customer.city,
+              country: opportunity.customer.country,
+              postalCode: opportunity.customer.postalCode,
+            }
+          : null,
+        lead: opportunity.lead
+          ? {
+              id: opportunity.lead.id,
+              title: opportunity.lead.title,
+              contact: opportunity.lead.contacts && opportunity.lead.contacts.length > 0
+                ? {
+                    firstName: opportunity.lead.contacts[0].contact.firstName,
+                    lastName: opportunity.lead.contacts[0].contact.lastName,
+                    email: opportunity.lead.contacts[0].contact.email,
+                    phone: opportunity.lead.contacts[0].contact.phone,
+                    role: opportunity.lead.contacts[0].contact.role,
+                    companyName: opportunity.lead.contacts[0].contact.companyName,
+                  }
+                : null,
+            }
+          : null,
+        assignedTo: opportunity.assignedTo
+          ? {
+              firstName: opportunity.assignedTo.firstName,
+              lastName: opportunity.assignedTo.lastName,
+              email: opportunity.assignedTo.email,
+            }
+          : null,
+        position: opportunity.openPositions && opportunity.openPositions.length > 0
+          ? {
+              title: opportunity.openPositions[0].title,
+              description: opportunity.openPositions[0].description,
+              requirements: opportunity.openPositions[0].requirements,
+            }
+          : null,
+      };
+
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        this.logger.warn(
+          `[Opportunities] Failed to render email template ${dto.templateId} for preview:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultOpportunityEmailTemplate(opportunity, templateData);
+        textContent = this.getDefaultOpportunityEmailText(opportunity, templateData);
+      }
+    } else if (!htmlContent) {
+      // For preview, if no template and no HTML, return empty
+      htmlContent = '';
+      textContent = '';
+    }
+
+    // Convert line breaks to <br> tags for HTML content if it's plain text
+    if (htmlContent && !htmlContent.includes('<') && !htmlContent.includes('>')) {
+      htmlContent = htmlContent.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<br>').join('');
+    }
+
+    return {
+      html: htmlContent || '',
+      text: textContent || '',
     };
   }
 
@@ -1123,7 +1290,7 @@ ${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` 
         return;
       }
 
-      console.log(`[Mentions] Processing mentions for opportunity ${opportunityId}:`, {
+      this.logger.log(`[Mentions] Processing mentions for opportunity ${opportunityId}:`, {
         identifiers,
         textPreview: text.substring(0, 100),
       });
@@ -1131,13 +1298,13 @@ ${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` 
       // Find users by mentions
       const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
       
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      this.logger.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
       
       // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
       const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
       
       if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        this.logger.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
         return;
       }
 
@@ -1163,10 +1330,10 @@ ${templateData.position ? `Position: ${templateData.position.title || 'N/A'}\n` 
         opportunityId,
       );
 
-      console.log(`[Mentions] Created ${notifications.length} notifications for opportunity ${opportunityId}`);
+      this.logger.log(`[Mentions] Created ${notifications.length} notifications for opportunity ${opportunityId}`);
     } catch (error) {
       // Log error but don't fail the opportunity creation/update
-      console.error(`[Mentions] Error processing mentions for opportunity ${opportunityId}:`, error);
+      this.logger.error(`[Mentions] Error processing mentions for opportunity ${opportunityId}:`, error);
     }
   }
 }

@@ -79,8 +79,11 @@ export class SalesPerformanceReportsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Delete a sales performance report (Admin only)' })
+  @Roles(UserRole.SALESPERSON, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Delete a sales performance report',
+    description: 'Salespeople can only delete their own reports. Admins can delete any report.',
+  })
   remove(@Param('id') id: string, @Request() req: any) {
     return this.salesPerformanceReportsService.remove(id, req.user.id, req.user.role);
   }

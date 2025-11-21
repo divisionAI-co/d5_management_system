@@ -76,5 +76,13 @@ export class CreateEmployeeDto {
   @IsString()
   @IsOptional()
   cardNumber?: string;
+
+  @ApiPropertyOptional({
+    description: 'Booking calendar link (e.g., Calendly, Google Calendar)',
+    example: 'https://calendly.com/john-doe',
+  })
+  @IsString()
+  @IsOptional()
+  bookingLink?: string;
 }
 

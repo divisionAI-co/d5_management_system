@@ -128,6 +128,22 @@ export class CreateCustomerDto {
   @IsString()
   @IsOptional()
   odooId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Google Drive folder ID containing contracts and documents',
+    example: '1A2b3C4D5E6F7G8H',
+  })
+  @IsString()
+  @IsOptional()
+  driveFolderId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Google Drive folder URL (alternative to driveFolderId)',
+    example: 'https://drive.google.com/drive/folders/1A2b3C4D5E6F7G8H',
+  })
+  @IsString()
+  @IsOptional()
+  driveFolderUrl?: string;
 }
 
 

@@ -1,19 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, NotificationType, TemplateType } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { EmailService } from '../../common/email/email.service';
 import { TemplatesService } from '../templates/templates.service';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly configService: ConfigService,
     private readonly templatesService: TemplatesService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async getRecentNotifications(userId: string, limit = 20) {
     const safeLimit = Math.max(1, Math.min(limit, 50));
@@ -31,7 +35,7 @@ export class NotificationsService {
     });
 
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Notification', notificationId));
     }
 
     if (notification.isRead) {
@@ -57,13 +61,13 @@ export class NotificationsService {
 
     // If no settings exist, default to enabled (opt-in model)
     if (!settings) {
-      console.log(`[Notifications] No settings found for user ${userId}, defaulting to enabled`);
+      this.logger.log(`[Notifications] No settings found for user ${userId}, defaulting to enabled`);
       return true;
     }
 
     // If in-app notifications are disabled globally, don't notify
     if (!settings.inAppEnabled) {
-      console.log(`[Notifications] In-app notifications disabled for user ${userId}`);
+      this.logger.log(`[Notifications] In-app notifications disabled for user ${userId}`);
       return false;
     }
 
@@ -121,7 +125,7 @@ export class NotificationsService {
     // Send email notification if enabled
     this.sendEmailNotification(userId, type, title, message, entityType, entityId).catch(
       (error) => {
-        console.error(`[Notifications] Failed to send email notification to user ${userId}:`, error);
+        this.logger.error(`[Notifications] Failed to send email notification to user ${userId}:`, error);
       },
     );
 
@@ -172,7 +176,7 @@ export class NotificationsService {
     for (const userId of usersToNotify) {
       this.sendEmailNotification(userId, type, title, message, entityType, entityId).catch(
         (error) => {
-          console.error(`[Notifications] Failed to send email notification to user ${userId}:`, error);
+          this.logger.error(`[Notifications] Failed to send email notification to user ${userId}:`, error);
         },
       );
     }
@@ -214,7 +218,7 @@ export class NotificationsService {
     entityType?: string,
     entityId?: string,
   ) {
-    console.log(`[Notifications] Attempting to send email to user ${userId} for type ${type}`);
+    this.logger.log(`[Notifications] Attempting to send email to user ${userId} for type ${type}`);
 
     const settings = await this.prisma.notificationSettings.findUnique({
       where: { userId },
@@ -222,11 +226,11 @@ export class NotificationsService {
 
     // If no settings, default to enabled for email (opt-in model)
     if (!settings) {
-      console.log(`[Notifications] No settings found for user ${userId}, defaulting email to enabled`);
+      this.logger.log(`[Notifications] No settings found for user ${userId}, defaulting email to enabled`);
     } else {
       // If email disabled globally, don't send
       if (!settings.emailEnabled) {
-        console.log(`[Notifications] Email notifications disabled globally for user ${userId}`);
+        this.logger.log(`[Notifications] Email notifications disabled globally for user ${userId}`);
         return;
       }
     }
@@ -238,11 +242,11 @@ export class NotificationsService {
     });
 
     if (!user || !user.email) {
-      console.warn(`[Notifications] User ${userId} has no email address`);
+      this.logger.warn(`[Notifications] User ${userId} has no email address`);
       return;
     }
 
-    console.log(`[Notifications] Sending email to ${user.email} for notification type ${type}`);
+    this.logger.log(`[Notifications] Sending email to ${user.email} for notification type ${type}`);
 
     try {
       // Generate entity link if entityType and entityId are provided
@@ -270,15 +274,15 @@ export class NotificationsService {
 
           // Debug: Log template data for mentions
           if (type === NotificationType.MENTIONED_IN_ACTIVITY) {
-            console.log(`[Notifications] Template data for mention:`, JSON.stringify(templateData, null, 2));
+            this.logger.log(`[Notifications] Template data for mention:`, JSON.stringify(templateData, null, 2));
           }
 
           const rendered = await this.templatesService.renderDefault(templateType, templateData);
           htmlContent = rendered.html;
           textContent = rendered.text;
-          console.log(`[Notifications] ✅ Used template ${templateType} for notification type ${type}`);
+          this.logger.log(`[Notifications] ✅ Used template ${templateType} for notification type ${type}`);
         } catch (templateError) {
-          console.warn(
+          this.logger.warn(
             `[Notifications] ⚠️  Failed to render template ${templateType}, falling back to default HTML:`,
             templateError,
           );
@@ -306,12 +310,12 @@ export class NotificationsService {
       });
 
       if (emailSent) {
-        console.log(`[Notifications] ✅ Email successfully sent to ${user.email} for notification type ${type}`);
+        this.logger.log(`[Notifications] ✅ Email successfully sent to ${user.email} for notification type ${type}`);
       } else {
-        console.error(`[Notifications] ❌ Email service returned false for ${user.email}. Check email configuration (EMAIL_FROM, SMTP_HOST, etc.)`);
+        this.logger.error(`[Notifications] ❌ Email service returned false for ${user.email}. Check email configuration (EMAIL_FROM, SMTP_HOST, etc.)`);
       }
     } catch (error) {
-      console.error(`[Notifications] ❌ Failed to send email to ${user.email}:`, error);
+      this.logger.error(`[Notifications] ❌ Failed to send email to ${user.email}:`, error);
       // Don't throw - we don't want email failures to break notification creation
     }
   }
@@ -481,7 +485,7 @@ export class NotificationsService {
   private async generateEntityLink(entityType: string, entityId: string): Promise<string | null> {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
     if (!frontendUrl) {
-      console.warn('[Notifications] FRONTEND_URL not configured, cannot generate entity links');
+      this.logger.warn('[Notifications] FRONTEND_URL not configured, cannot generate entity links');
       return null;
     }
 
@@ -537,7 +541,7 @@ export class NotificationsService {
 
     const route = routeMap[entityType];
     if (!route) {
-      console.warn(`[Notifications] Unknown entity type: ${entityType}`);
+      this.logger.warn(`[Notifications] Unknown entity type: ${entityType}`);
       return null;
     }
 

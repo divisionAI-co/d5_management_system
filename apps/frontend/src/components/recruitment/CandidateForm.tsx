@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, X, FileText, ChevronLeft, ExternalLink } from 'lucide-react';
+import { X } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
-import { googleDriveApi } from '@/lib/api/google-drive';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { DrivePicker, type DrivePickerMode } from '@/components/shared/DrivePicker';
 import type {
   Candidate,
   CandidateRecruiter,
@@ -14,13 +14,6 @@ import type {
 } from '@/types/recruitment';
 import { CANDIDATE_STAGE_LABELS, CANDIDATE_STAGE_ORDER } from './CandidateBoard';
 import type { DriveFile } from '@/types/integrations';
-
-type DrivePickerMode = 'resume' | 'folder';
-
-interface DriveBreadcrumb {
-  id: string | null;
-  name: string;
-}
 
 interface CandidateFormProps {
   candidate?: Candidate;
@@ -58,6 +51,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
   const isEdit = Boolean(candidate);
   const queryClient = useQueryClient();
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const [drivePickerMode, setDrivePickerMode] = useState<DrivePickerMode>('folder');
   const recruitersQuery = useQuery({
     queryKey: ['candidate-recruiters', 'form'],
     queryFn: () => candidatesApi.listRecruiters(),
@@ -215,293 +209,26 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
     ? driveFolderIdValue.trim()
     : candidate?.driveFolderId ?? undefined;
 
-  const [drivePickerState, setDrivePickerState] = useState<{
-    mode: DrivePickerMode | null;
-    currentFolderId: string | null;
-    breadcrumbs: DriveBreadcrumb[];
-  }>({
-    mode: null,
-    currentFolderId: null,
-    breadcrumbs: [{ id: null, name: 'My Drive' }],
-  });
-
-  const driveFilesQuery = useQuery({
-    queryKey: ['candidate-drive-picker', drivePickerState.currentFolderId],
-    enabled: drivePickerOpen,
-    queryFn: () =>
-      googleDriveApi.listFiles({
-        parentId: drivePickerState.currentFolderId ?? undefined,
-        pageSize: 100,
-      }),
-  });
-
-  const handleOpenDrivePicker = async (mode: DrivePickerMode) => {
-    const startingFolderId = mode === 'resume' && resolvedDriveFolderId
-      ? resolvedDriveFolderId
-      : resolvedDriveFolderId ?? null;
-
-    const baseBreadcrumbs: DriveBreadcrumb[] = [{ id: null, name: 'My Drive' }];
-    if (startingFolderId) {
-      baseBreadcrumbs.push({ id: startingFolderId, name: 'Selected folder' });
-    }
-
-    setDrivePickerState({
-      mode,
-      currentFolderId: startingFolderId ?? null,
-      breadcrumbs: baseBreadcrumbs,
-    });
+  const handleOpenDrivePicker = (mode: DrivePickerMode) => {
+    setDrivePickerMode(mode);
     setDrivePickerOpen(true);
-
-    if (startingFolderId) {
-      try {
-        const metadata = await googleDriveApi.getFile(startingFolderId);
-        setDrivePickerState((prev) => ({
-          ...prev,
-          breadcrumbs: prev.breadcrumbs.map((crumb) =>
-            crumb.id === startingFolderId
-              ? { ...crumb, name: metadata.name ?? 'Selected folder' }
-              : crumb,
-          ),
-        }));
-      } catch (error) {
-        // ignore metadata errors
-      }
-    }
-  };
-
-  const handleCloseDrivePicker = () => {
-    setDrivePickerOpen(false);
-    setDrivePickerState({ mode: null, currentFolderId: null, breadcrumbs: [{ id: null, name: 'My Drive' }] });
   };
 
   const handleSelectDriveFile = (file: DriveFile) => {
     const viewLink = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
     setValue('resume', viewLink, { shouldDirty: true, shouldTouch: true });
-    handleCloseDrivePicker();
   };
 
   const handleSelectDriveFolder = (folder: DriveFile) => {
     const folderLink = folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`;
     setValue('driveFolderUrl', folderLink, { shouldDirty: true, shouldTouch: true });
     setValue('driveFolderId', folder.id, { shouldDirty: true, shouldTouch: true });
-    handleCloseDrivePicker();
   };
 
-  const handleUseCurrentFolder = () => {
-    if (!drivePickerState.currentFolderId) {
-      return;
-    }
-    const link = `https://drive.google.com/drive/folders/${drivePickerState.currentFolderId}`;
+  const handleUseCurrentFolder = (folderId: string) => {
+    const link = `https://drive.google.com/drive/folders/${folderId}`;
     setValue('driveFolderUrl', link, { shouldDirty: true, shouldTouch: true });
-    setValue('driveFolderId', drivePickerState.currentFolderId, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    handleCloseDrivePicker();
-  };
-
-  const handleNavigateToBreadcrumb = (index: number) => {
-    setDrivePickerState((prev) => {
-      const target = prev.breadcrumbs[index];
-      return {
-        ...prev,
-        currentFolderId: target?.id ?? null,
-        breadcrumbs: prev.breadcrumbs.slice(0, index + 1),
-      };
-    });
-  };
-
-  const handleEnterDriveFolder = (folder: DriveFile) => {
-    setDrivePickerState((prev) => ({
-      ...prev,
-      currentFolderId: folder.id,
-      breadcrumbs: [
-        ...prev.breadcrumbs,
-        {
-          id: folder.id,
-          name: folder.name || 'Untitled folder',
-        },
-      ],
-    }));
-  };
-
-  const renderDrivePicker = () => {
-    if (!drivePickerOpen || !drivePickerState.mode) {
-      return null;
-    }
-
-    const isFolderMode = drivePickerState.mode === 'folder';
-    const files = driveFilesQuery.data?.files ?? [];
-    const lastBreadcrumbIndex = drivePickerState.breadcrumbs.length - 1;
-    const currentFolderLink = drivePickerState.currentFolderId
-      ? `https://drive.google.com/drive/folders/${drivePickerState.currentFolderId}`
-      : 'https://drive.google.com/drive/u/0/my-drive';
-
-    return (
-      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4">
-        <div className="relative flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">
-                {isFolderMode ? 'Choose Google Drive Folder' : 'Select document'}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {isFolderMode
-                  ? 'Navigate your Google Drive and pick the folder that stores candidate documents.'
-                  : 'Choose a file from Google Drive to populate the resume link or replace it.'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <a
-                href={currentFolderLink}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open in Drive
-              </a>
-              <button
-                type="button"
-                onClick={handleCloseDrivePicker}
-                className="rounded-full p-2 text-muted-foreground transition hover:bg-muted/70 hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
-            <nav className="flex flex-wrap items-center gap-1 text-sm">
-              {drivePickerState.breadcrumbs.map((breadcrumb, index) => (
-                <span key={`${breadcrumb.id ?? 'root'}-${index}`} className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleNavigateToBreadcrumb(index)}
-                    disabled={index === lastBreadcrumbIndex}
-                    className={`font-semibold transition ${
-                      index === lastBreadcrumbIndex
-                        ? 'cursor-default text-foreground'
-                        : 'text-blue-600 hover:underline'
-                    }`}
-                  >
-                    {index === 0 ? 'My Drive' : breadcrumb.name}
-                  </button>
-                  {index < lastBreadcrumbIndex && <span className="text-muted-foreground">/</span>}
-                </span>
-              ))}
-            </nav>
-            <div className="flex items-center gap-2">
-              {drivePickerState.breadcrumbs.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => handleNavigateToBreadcrumb(Math.max(0, lastBreadcrumbIndex - 1))}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  Back
-                </button>
-              )}
-              {isFolderMode && drivePickerState.currentFolderId && (
-                <button
-                  type="button"
-                  onClick={handleUseCurrentFolder}
-                  className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                >
-                  Use this folder
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="max-h-[70vh] overflow-y-auto px-5 py-6">
-            {driveFilesQuery.isLoading ? (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading Google Drive…
-              </div>
-            ) : driveFilesQuery.isError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-sm text-red-600">
-                We couldn&apos;t load the Google Drive files right now. Please try again later.
-              </div>
-            ) : files.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border bg-muted/40 px-4 py-6 text-center text-sm text-muted-foreground">
-                This folder is empty. Navigate to a different location or upload files in Google Drive.
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {files.map((file) => {
-                  const modifiedLabel = file.modifiedTime
-                    ? `Updated ${new Date(file.modifiedTime).toLocaleDateString()}`
-                    : 'Last update unknown';
-                  const isFolder = Boolean(file.isFolder);
-                  const viewLink = isFolder
-                    ? file.webViewLink || `https://drive.google.com/drive/folders/${file.id}`
-                    : file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
-
-                  return (
-                    <div
-                      key={file.id}
-                      className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-muted/30 transition hover:border-blue-500 hover:bg-blue-50/70"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => window.open(viewLink, '_blank', 'noopener,noreferrer')}
-                        className="group flex flex-col text-left"
-                      >
-                        <div className="aspect-video w-full overflow-hidden bg-muted">
-                          {file.thumbnailLink ? (
-                            <img
-                              src={file.thumbnailLink}
-                              alt={`${file.name} thumbnail`}
-                              className="h-full w-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
-                              <FileText className="h-8 w-8" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-1 flex-col gap-1 px-4 py-3">
-                          <p className="line-clamp-2 text-sm font-semibold text-foreground">{file.name}</p>
-                          <p className="text-xs text-muted-foreground">{modifiedLabel}</p>
-                        </div>
-                      </button>
-                      <div className="flex items-center justify-between border-t border-border bg-card/70 px-4 py-3 text-xs">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            isFolder ? handleEnterDriveFolder(file) : window.open(viewLink, '_blank', 'noopener,noreferrer')
-                          }
-                          className="inline-flex items-center gap-1 font-semibold text-blue-600 transition hover:text-blue-700"
-                        >
-                          {isFolder ? 'Browse' : 'Open'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            isFolder ? handleSelectDriveFolder(file) : handleSelectDriveFile(file)
-                          }
-                          disabled={(isFolder && !isFolderMode) || (!isFolder && isFolderMode)}
-                          className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 font-semibold transition ${
-                            (isFolder && !isFolderMode) || (!isFolder && isFolderMode)
-                              ? 'cursor-not-allowed border border-border text-muted-foreground opacity-60'
-                              : 'border border-blue-600 bg-blue-600 text-white hover:bg-blue-700'
-                          }`}
-                        >
-                          {isFolder ? 'Select folder' : 'Use file'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
+    setValue('driveFolderId', folderId, { shouldDirty: true, shouldTouch: true });
   };
 
   return (
@@ -812,7 +539,7 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
                       </label>
                       <button
                         type="button"
-                        onClick={() => handleOpenDrivePicker('resume')}
+                        onClick={() => handleOpenDrivePicker('file')}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground"
                       >
                         Choose from Drive
@@ -916,7 +643,21 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
           </form>
         </div>
       </div>
-      {renderDrivePicker()}
+      <DrivePicker
+        open={drivePickerOpen}
+        mode={drivePickerMode}
+        initialFolderId={resolvedDriveFolderId}
+        title={drivePickerMode === 'folder' ? 'Choose Google Drive Folder' : 'Select Resume File'}
+        description={
+          drivePickerMode === 'folder'
+            ? 'Navigate your Google Drive and pick the folder that stores candidate documents.'
+            : 'Choose a file from Google Drive to populate the resume link or replace it.'
+        }
+        onClose={() => setDrivePickerOpen(false)}
+        onSelectFile={handleSelectDriveFile}
+        onSelectFolder={handleSelectDriveFolder}
+        onUseCurrentFolder={handleUseCurrentFolder}
+      />
     </div>
   );
 }

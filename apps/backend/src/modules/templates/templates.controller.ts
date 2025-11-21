@@ -28,22 +28,20 @@ export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.HR)
-  @ApiOperation({ summary: 'List available templates' })
+  @ApiOperation({ summary: 'List available templates (readable by all authenticated users)' })
   findAll(@Query() query: ListTemplatesDto) {
     return this.templatesService.findAll(query);
   }
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.HR)
-  @ApiOperation({ summary: 'Create a new template' })
+  @ApiOperation({ summary: 'Create a new template (Admin/HR only)' })
   create(@Body() createTemplateDto: CreateTemplateDto) {
     return this.templatesService.create(createTemplateDto);
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.HR)
-  @ApiOperation({ summary: 'Get template details by ID' })
+  @ApiOperation({ summary: 'Get template details by ID (readable by all authenticated users)' })
   findOne(@Param('id') id: string) {
     return this.templatesService.findOne(id);
   }
@@ -56,8 +54,7 @@ export class TemplatesController {
   }
 
   @Post(':id/preview')
-  @Roles(UserRole.ADMIN, UserRole.HR)
-  @ApiOperation({ summary: 'Render a template using sample data' })
+  @ApiOperation({ summary: 'Render a template using sample data (readable by all authenticated users)' })
   preview(@Param('id') id: string, @Body() previewTemplateDto: PreviewTemplateDto) {
     return this.templatesService.preview(id, previewTemplateDto);
   }

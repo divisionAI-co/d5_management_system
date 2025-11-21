@@ -83,8 +83,7 @@ export class ActivitiesController {
   // Activity Types ----------------------------------------------------------
 
   @Get('settings/activity-types')
-  @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'List activity types' })
+  @ApiOperation({ summary: 'List activity types (readable by all authenticated users)' })
   async listActivityTypes(@Query('includeInactive') includeInactive?: string) {
     const include = includeInactive === 'true';
     return this.activitiesService.listActivityTypes(include);

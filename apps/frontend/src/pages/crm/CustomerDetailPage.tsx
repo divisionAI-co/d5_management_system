@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import clsx from 'clsx';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { DrivePreview } from '@/components/shared/DrivePreview';
 
 const sentimentClass = {
   HAPPY: 'bg-green-100 text-green-700',
@@ -461,6 +462,14 @@ export default function CustomerDetailPage() {
         </div>
 
         <aside className="space-y-6">
+          <DrivePreview
+            folderId={customer.driveFolderId ?? undefined}
+            folderUrl={customer.driveFolderUrl ?? undefined}
+            entityName={customer.name}
+            title="Customer Contracts"
+            description="Files stored for this customer. Click to open in Google Drive."
+            emptyStateMessage="The Google Drive folder is connected but currently empty."
+          />
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-foreground">Invoices Snapshot</h2>
             {customer.invoices && customer.invoices.length > 0 ? (

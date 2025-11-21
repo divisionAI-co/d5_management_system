@@ -119,7 +119,7 @@ export class CreateOpportunityDto {
   isWon?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Optional title override when creating linked open position',
+    description: 'Optional title override when creating linked open position (deprecated - use positions array)',
     example: 'Senior React Developer (US Timezone)',
   })
   @IsString()
@@ -128,18 +128,39 @@ export class CreateOpportunityDto {
   positionTitle?: string;
 
   @ApiPropertyOptional({
-    description: 'Optional detailed description for the linked open position',
+    description: 'Optional detailed description for the linked open position (deprecated - use positions array)',
   })
   @IsString()
   @IsOptional()
   positionDescription?: string;
 
   @ApiPropertyOptional({
-    description: 'Optional requirements summary for the linked open position',
+    description: 'Optional requirements summary for the linked open position (deprecated - use positions array)',
   })
   @IsString()
   @IsOptional()
   positionRequirements?: string;
+
+  @ApiPropertyOptional({
+    description: 'Array of positions to create for this opportunity',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', example: 'Senior React Developer' },
+        description: { type: 'string', example: 'Full-stack developer position' },
+        requirements: { type: 'string', example: '5+ years experience, React, Node.js' },
+        recruitmentStatus: { type: 'string', enum: ['HEADHUNTING', 'STANDARD'] },
+      },
+    },
+  })
+  @IsOptional()
+  positions?: Array<{
+    title: string;
+    description?: string;
+    requirements?: string;
+    recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+  }>;
 }
 
 

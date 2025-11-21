@@ -2,6 +2,8 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import {
   buildEodPayload,
   BuildEodPayloadOptions,
@@ -37,10 +39,12 @@ type EmailIndexEntry = {
 };
 
 @Injectable()
-export class LegacyEodImportService {
+export class LegacyEodImportService extends BaseService {
   private readonly errorLimit = 50;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   async processLegacyImport(params: {
     importId: string;
@@ -375,12 +379,12 @@ export class LegacyEodImportService {
 
     if (ambiguousKey) {
       throw new BadRequestException(
-        `Multiple employees match the identifier "${ambiguousKey}". Please update the import file with the exact work email for those rows.`,
+        ErrorMessages.INVALID_INPUT('employee identifier', `Multiple employees match the identifier "${ambiguousKey}". Please update the import file with the exact work email for those rows.`),
       );
     }
 
     throw new BadRequestException(
-      `Could not match "${email}" to any employee. Update the row with the employee's work email or create the employee first.`,
+      ErrorMessages.NOT_FOUND_BY_FIELD('Employee', 'email', email) + '. Update the row with the employee\'s work email or create the employee first.',
     );
   }
 

@@ -1,25 +1,20 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { LeadStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { FilterContactsDto } from './dto/filter-contacts.dto';
 import { ConvertContactToLeadDto } from './dto/convert-contact-to-lead.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
-
 @Injectable()
-export class ContactsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class ContactsService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private formatContact(contact: any) {
     if (!contact) {
@@ -57,32 +52,23 @@ export class ContactsService {
   }
 
   private buildWhere(filters: FilterContactsDto): Prisma.ContactWhereInput {
-    const where: Prisma.ContactWhereInput = {};
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.ContactWhereInput>(
+      filters,
+      {
+        searchFields: ['firstName', 'lastName', 'email', 'phone', 'companyName'],
+      },
+    );
 
-    if (filters.search) {
-      const search = filters.search.trim();
-      where.OR = [
-        { firstName: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { lastName: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { email: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { phone: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { companyName: { contains: search, mode: Prisma.QueryMode.insensitive } },
-      ];
-    }
-
-    if (filters.customerId) {
-      where.customerId = filters.customerId;
-    }
-
+    // Handle unassigned filter (special case)
     if (filters.unassigned) {
-      where.customerId = null;
+      baseWhere.customerId = null;
     }
 
-    return where;
+    return baseWhere;
   }
 
   async create(createContactDto: CreateContactDto) {
-    try {
+    return this.handlePrismaError(async () => {
       const contact = await this.prisma.contact.create({
         data: {
           firstName: createContactDto.firstName,
@@ -115,17 +101,11 @@ export class ContactsService {
       });
 
       return this.formatContact(contact);
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
-        throw new BadRequestException('A contact with this email already exists.');
-      }
-      throw error;
-    }
+    }, ErrorMessages.CREATE_FAILED('Contact'));
   }
 
-  async findAll(filters: FilterContactsDto): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterContactsDto) {
     const { page = 1, pageSize = 25, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
-    const skip = (page - 1) * pageSize;
 
     const where = this.buildWhere(filters);
 
@@ -133,13 +113,13 @@ export class ContactsService {
       [sortBy]: sortOrder,
     };
 
-    const [total, contacts] = await this.prisma.$transaction([
-      this.prisma.contact.count({ where }),
-      this.prisma.contact.findMany({
-        where,
+    const result = await this.paginate(
+      this.prisma.contact,
+      where,
+      {
+        page,
+        pageSize,
         orderBy,
-        skip,
-        take: pageSize,
         include: {
           customer: {
             select: {
@@ -156,17 +136,12 @@ export class ContactsService {
             },
           },
         },
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: contacts.map((contact) => this.formatContact(contact)),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+      ...result,
+      data: result.data.map((contact) => this.formatContact(contact)),
     };
   }
 
@@ -206,14 +181,14 @@ export class ContactsService {
     });
 
     if (!contact) {
-      throw new NotFoundException(`Contact ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Contact', id));
     }
 
     return this.formatContact(contact);
   }
 
   async update(id: string, updateContactDto: UpdateContactDto) {
-    try {
+    return this.handlePrismaError(async () => {
       const contact = await this.prisma.contact.update({
         where: { id },
         data: {
@@ -254,24 +229,14 @@ export class ContactsService {
       });
 
       return this.formatContact(contact);
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
-        throw new BadRequestException('A contact with this email already exists.');
-      }
-      throw error;
-    }
+    }, ErrorMessages.UPDATE_FAILED('Contact'));
   }
 
   async remove(id: string) {
-    try {
+    return this.handlePrismaError(async () => {
       await this.prisma.contact.delete({ where: { id } });
       return { deleted: true };
-    } catch (error: any) {
-      if (error?.code === 'P2025') {
-        throw new NotFoundException(`Contact ${id} not found`);
-      }
-      throw error;
-    }
+    }, ErrorMessages.DELETE_FAILED('Contact'));
   }
 
   async convertToLead(id: string, dto: ConvertContactToLeadDto) {
@@ -290,7 +255,7 @@ export class ContactsService {
     });
 
     if (!contact) {
-      throw new NotFoundException(`Contact ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Contact', id));
     }
 
     const lead = await this.prisma.lead.create({
@@ -346,7 +311,7 @@ export class ContactsService {
     });
 
     if (!leadWithRelations) {
-      throw new NotFoundException('Lead not found after creation');
+      throw new NotFoundException(ErrorMessages.CREATE_FAILED('Lead'));
     }
 
     return {

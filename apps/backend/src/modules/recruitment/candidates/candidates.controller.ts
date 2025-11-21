@@ -19,6 +19,7 @@ import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
 import { MarkInactiveDto } from './dto/mark-inactive.dto';
 import { SendCandidateEmailDto } from './dto/send-email.dto';
+import { PreviewCandidateEmailDto } from './dto/preview-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -172,6 +173,17 @@ export class CandidatesController {
   })
   sendEmail(@Param('id') id: string, @Body() dto: SendCandidateEmailDto) {
     return this.candidatesService.sendEmail(id, dto);
+  }
+
+  @Post(':id/preview-email')
+  @Roles(UserRole.ADMIN, UserRole.RECRUITER, UserRole.HR)
+  @ApiOperation({
+    summary: 'Preview an email for a candidate',
+    description:
+      'Preview how an email will look using a template or custom content. Returns rendered HTML and text.',
+  })
+  previewEmail(@Param('id') id: string, @Body() dto: PreviewCandidateEmailDto) {
+    return this.candidatesService.previewEmail(id, dto);
   }
 
   @Delete(':id')

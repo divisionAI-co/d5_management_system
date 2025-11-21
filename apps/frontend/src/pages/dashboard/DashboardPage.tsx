@@ -15,6 +15,7 @@ import { dashboardApi } from '@/lib/api/dashboard';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { DashboardResponse } from '@/types/dashboard';
 import { highlightMentions } from '@/lib/utils/mention-highlight';
+import AdminDashboardPage from './AdminDashboardPage';
 
 const formatDate = (value: string | null | undefined, fallback = '—') => {
   if (!value) return fallback;
@@ -68,20 +69,7 @@ export default function DashboardPage() {
   const data = dashboardQuery.data;
 
   if (isAdmin || data?.isAdminView) {
-    return (
-      <div className="space-y-6 p-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="mt-2 text-muted-foreground">
-            Welcome back, {user.firstName}! Admin analytics will be available soon.
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground shadow-sm">
-          Use the navigation above to access CRM, HR, and Operations tools while this overview is
-          under construction.
-        </div>
-      </div>
-    );
+    return <AdminDashboardPage />;
   }
 
   if (!data) {

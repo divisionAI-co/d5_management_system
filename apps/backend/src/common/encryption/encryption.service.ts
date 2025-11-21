@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -11,6 +11,7 @@ import * as crypto from 'crypto';
  */
 @Injectable()
 export class EncryptionService {
+  private readonly logger = new Logger(EncryptionService.name);
   private readonly algorithm = 'aes-256-gcm';
   private readonly key: Buffer;
 
@@ -99,7 +100,7 @@ export class EncryptionService {
     } catch (error) {
       // If decryption fails, it might be unencrypted legacy data
       // Log the error but return the original value to allow migration
-      console.warn('Decryption failed, returning original value (may be unencrypted legacy data):', error);
+      this.logger.warn('Decryption failed, returning original value (may be unencrypted legacy data):', error);
       return encrypted;
     }
   }

@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Integration, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
 
 type IntegrationWithMetadata = Integration & {
@@ -27,12 +29,14 @@ const DEFAULT_INTEGRATIONS: Array<{
 ];
 
 @Injectable()
-export class IntegrationsService {
+export class IntegrationsService extends BaseService {
   private readonly defaultsLookup = new Map(
     DEFAULT_INTEGRATIONS.map((integration) => [integration.name, integration]),
   );
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   private async ensureDefaults() {
     await Promise.all(
@@ -77,7 +81,7 @@ export class IntegrationsService {
     });
 
     if (!integration) {
-      throw new NotFoundException(`Integration '${name}' not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND_BY_FIELD('Integration', 'name', name));
     }
 
     return integration;

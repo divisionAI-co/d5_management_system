@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { AiEntityType, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 
 export interface FieldMetadata {
   key: string;
@@ -250,7 +252,7 @@ type EntitySnapshot =
   | SalesPerformanceReportSnapshot;
 
 @Injectable()
-export class EntityFieldResolver {
+export class EntityFieldResolver extends BaseService {
   private readonly candidateFields: FieldSelector<CandidateSnapshot>[] = [
     {
       key: 'fullName',
@@ -1102,7 +1104,9 @@ export class EntityFieldResolver {
     },
   ];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   listFields(entityType: AiEntityType): FieldMetadata[] {
     const definitions = this.getFieldDefinitions(entityType);
@@ -1111,7 +1115,7 @@ export class EntityFieldResolver {
 
   ensureFieldKeysSupported(entityType: AiEntityType, keys: string[]) {
     if (!keys || keys.length === 0) {
-      throw new BadRequestException('At least one field must be selected');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('field selection'));
     }
 
     const supportedKeys = new Set(
@@ -1120,7 +1124,7 @@ export class EntityFieldResolver {
     const unsupported = keys.filter((key) => !supportedKeys.has(key));
     if (unsupported.length > 0) {
       throw new BadRequestException(
-        `Unsupported field(s) for ${entityType.toLowerCase()} entity: ${unsupported.join(', ')}`,
+        ErrorMessages.INVALID_INPUT('field selection', `Unsupported field(s) for ${entityType.toLowerCase()} entity: ${unsupported.join(', ')}`),
       );
     }
   }
@@ -1130,75 +1134,75 @@ export class EntityFieldResolver {
       case AiEntityType.CANDIDATE: {
         const entity = await this.findCandidate(entityId);
         if (!entity) {
-          throw new NotFoundException(`CANDIDATE with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', entityId));
         }
         return;
       }
       case AiEntityType.OPPORTUNITY: {
         const entity = await this.findOpportunity(entityId);
         if (!entity) {
-          throw new NotFoundException(`OPPORTUNITY with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', entityId));
         }
         return;
       }
       case AiEntityType.EMPLOYEE: {
         const entity = await this.findEmployee(entityId);
         if (!entity) {
-          throw new NotFoundException(`EMPLOYEE with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', entityId));
         }
         return;
       }
       case AiEntityType.CUSTOMER: {
         const entity = await this.findCustomer(entityId);
         if (!entity) {
-          throw new NotFoundException(`CUSTOMER with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', entityId));
         }
         return;
       }
       case AiEntityType.CONTACT: {
         const entity = await this.findContact(entityId);
         if (!entity) {
-          throw new NotFoundException(`CONTACT with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Contact', entityId));
         }
         return;
       }
       case AiEntityType.LEAD: {
         const entity = await this.findLead(entityId);
         if (!entity) {
-          throw new NotFoundException(`LEAD with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', entityId));
         }
         return;
       }
       case AiEntityType.TASK: {
         const entity = await this.findTask(entityId);
         if (!entity) {
-          throw new NotFoundException(`TASK with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', entityId));
         }
         return;
       }
       case AiEntityType.QUOTE: {
         const entity = await this.findQuote(entityId);
         if (!entity) {
-          throw new NotFoundException(`QUOTE with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Quote', entityId));
         }
         return;
       }
       case AiEntityType.RECRUITER_PERFORMANCE_REPORT: {
         const entity = await this.findRecruiterPerformanceReport(entityId);
         if (!entity) {
-          throw new NotFoundException(`RECRUITER_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter performance report', entityId));
         }
         return;
       }
       case AiEntityType.SALES_PERFORMANCE_REPORT: {
         const entity = await this.findSalesPerformanceReport(entityId);
         if (!entity) {
-          throw new NotFoundException(`SALES_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Sales performance report', entityId));
         }
         return;
       }
       default:
-        throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
+        throw new BadRequestException(ErrorMessages.INVALID_INPUT('entity type', `${entityType} is not supported yet`));
     }
   }
 
@@ -1207,75 +1211,75 @@ export class EntityFieldResolver {
       case AiEntityType.CANDIDATE: {
         const entity = await this.findCandidate(entityId);
         if (!entity) {
-          throw new NotFoundException(`CANDIDATE with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.candidateFields);
       }
       case AiEntityType.OPPORTUNITY: {
         const entity = await this.findOpportunity(entityId);
         if (!entity) {
-          throw new NotFoundException(`OPPORTUNITY with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.opportunityFields);
       }
       case AiEntityType.EMPLOYEE: {
         const entity = await this.findEmployee(entityId);
         if (!entity) {
-          throw new NotFoundException(`EMPLOYEE with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.employeeFields);
       }
       case AiEntityType.CUSTOMER: {
         const entity = await this.findCustomer(entityId);
         if (!entity) {
-          throw new NotFoundException(`CUSTOMER with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Customer', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.customerFields);
       }
       case AiEntityType.CONTACT: {
         const entity = await this.findContact(entityId);
         if (!entity) {
-          throw new NotFoundException(`CONTACT with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Contact', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.contactFields);
       }
       case AiEntityType.LEAD: {
         const entity = await this.findLead(entityId);
         if (!entity) {
-          throw new NotFoundException(`LEAD with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Lead', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.leadFields);
       }
       case AiEntityType.TASK: {
         const entity = await this.findTask(entityId);
         if (!entity) {
-          throw new NotFoundException(`TASK with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Task', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.taskFields);
       }
       case AiEntityType.QUOTE: {
         const entity = await this.findQuote(entityId);
         if (!entity) {
-          throw new NotFoundException(`QUOTE with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Quote', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.quoteFields);
       }
       case AiEntityType.RECRUITER_PERFORMANCE_REPORT: {
         const entity = await this.findRecruiterPerformanceReport(entityId);
         if (!entity) {
-          throw new NotFoundException(`RECRUITER_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter performance report', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.recruiterPerformanceReportFields);
       }
       case AiEntityType.SALES_PERFORMANCE_REPORT: {
         const entity = await this.findSalesPerformanceReport(entityId);
         if (!entity) {
-          throw new NotFoundException(`SALES_PERFORMANCE_REPORT with ID ${entityId} was not found`);
+          throw new NotFoundException(ErrorMessages.NOT_FOUND('Sales performance report', entityId));
         }
         return this.mapFieldValues(fieldKeys, entity, this.salesPerformanceReportFields);
       }
       default:
-        throw new BadRequestException(`Entity type ${entityType} is not supported yet`);
+        throw new BadRequestException(ErrorMessages.INVALID_INPUT('entity type', `${entityType} is not supported yet`));
     }
   }
 

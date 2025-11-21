@@ -78,8 +78,11 @@ export class RecruiterPerformanceReportsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN, UserRole.HR)
-  @ApiOperation({ summary: 'Delete a recruiter performance report (Admin/HR only)' })
+  @Roles(UserRole.RECRUITER, UserRole.ADMIN, UserRole.HR)
+  @ApiOperation({
+    summary: 'Delete a recruiter performance report',
+    description: 'Recruiters can only delete their own reports. Admins and HR can delete any report.',
+  })
   remove(@Param('id') id: string, @Request() req: any) {
     return this.recruiterPerformanceReportsService.remove(id, req.user.id, req.user.role);
   }

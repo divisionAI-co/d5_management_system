@@ -1,11 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
 
 @Injectable()
-export class DataCleanupService {
-  private readonly logger = new Logger(DataCleanupService.name);
-
-  constructor(private readonly prisma: PrismaService) {}
+export class DataCleanupService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   /**
    * Clean up contacts, leads, and opportunities for reimport

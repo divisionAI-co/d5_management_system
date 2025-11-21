@@ -1,11 +1,15 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
 import { Prisma, LeaveRequestStatus } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateEodReportDto, EodReportTaskDto } from './dto/create-eod-report.dto';
 import { UpdateEodReportDto } from './dto/update-eod-report.dto';
 import { TemplatesService } from '../../templates/templates.service';
@@ -13,12 +17,14 @@ import { EmailService } from '../../../common/email/email.service';
 import { TemplateType } from '@prisma/client';
 
 @Injectable()
-export class EodReportsService {
+export class EodReportsService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly templatesService: TemplatesService,
     private readonly emailService: EmailService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private async getCompanySettings() {
     return this.prisma.companySettings.findFirst();
@@ -129,7 +135,7 @@ export class EodReportsService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', employeeId));
     }
 
     if (employee.userId !== userId) {
@@ -138,7 +144,7 @@ export class EodReportsService {
 
     const { submit, tasks = [], ...rest } = createDto;
     if (!tasks.length) {
-      throw new BadRequestException('tasksWorkedOn must contain at least 1 entry');
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('tasksWorkedOn (must contain at least 1 entry)'));
     }
 
     this.ensureNotFutureDate(rest.date);
@@ -148,7 +154,7 @@ export class EodReportsService {
     const isWorkingDay = await this.isWorkingDay(userId, reportDate);
     if (!isWorkingDay) {
       throw new BadRequestException(
-        'EOD reports cannot be created for weekends, holidays, or days when you are on approved leave.',
+        ErrorMessages.OPERATION_NOT_ALLOWED('create EOD report', 'EOD reports cannot be created for weekends, holidays, or days when you are on approved leave'),
       );
     }
 
@@ -192,14 +198,14 @@ export class EodReportsService {
       // Send email notification if report was submitted
       if (submit && submittedAt && report.user?.email) {
         this.sendEodReportEmail(report).catch((error) => {
-          console.error('[EodReports] Failed to send email notification:', error);
+          this.logger.error('[EodReports] Failed to send email notification:', error);
         });
       }
 
       return report;
     } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new BadRequestException('An EOD report already exists for this date');
+        throw new BadRequestException(ErrorMessages.ALREADY_EXISTS('EOD report', 'date'));
       }
       throw error;
     }
@@ -263,7 +269,7 @@ export class EodReportsService {
       html = rendered.html;
       text = rendered.text;
     } catch (templateError) {
-      console.warn(
+      this.logger.warn(
         `[EodReportsService] Failed to render EOD template, falling back to default HTML:`,
         templateError,
       );
@@ -310,7 +316,7 @@ export class EodReportsService {
         text,
       });
     } catch (error) {
-      console.error('[EodReportsService] Failed to send EOD report email:', error);
+      this.logger.error('[EodReportsService] Failed to send EOD report email:', error);
       // Don't throw - email failure shouldn't break the report submission
     }
   }
@@ -430,7 +436,7 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
     const skip = (page - 1) * pageSize;
 
     // Debug logging
-    console.log('EOD findAll called with filters:', {
+    this.logger.log('EOD findAll called with filters:', {
       page: filters?.page,
       pageSize: filters?.pageSize,
       computedPage: page,
@@ -441,57 +447,53 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
       endDate: filters?.endDate,
     });
 
-    const where: Prisma.EodReportWhereInput = {};
-
-    if (filters?.userId) {
-      where.userId = filters.userId;
-    }
-
-    if (filters?.startDate || filters?.endDate) {
-      where.date = {
-        gte: filters.startDate ? new Date(filters.startDate) : undefined,
-        lte: filters.endDate ? new Date(filters.endDate) : undefined,
-      };
-    }
-
-    const [total, items] = await this.prisma.$transaction([
-      this.prisma.eodReport.count({ where }),
-      this.prisma.eodReport.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.EodReportWhereInput>(
+      filters || {},
+      {
+        dateFields: ['date'],
+        fieldMappings: {
+          startDate: 'date',
+          endDate: 'date',
         },
       },
-      orderBy: {
-        date: 'desc',
-      },
-        skip,
-        take: pageSize,
-      }),
-    ]);
+    );
 
-    const result = {
-      data: items,
-      meta: {
+    // Handle date range filtering
+    if (filters?.startDate || filters?.endDate) {
+      const dateFilter: Prisma.DateTimeFilter = {};
+      if (filters.startDate) {
+        dateFilter.gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        dateFilter.lte = new Date(filters.endDate);
+      }
+      baseWhere.date = dateFilter;
+    }
+
+    const where = baseWhere;
+
+    const result = await this.paginate(
+      this.prisma.eodReport,
+      where,
+      {
         page,
         pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+            },
+          },
+        },
+        orderBy: {
+          date: 'desc',
+        },
       },
-    };
-
-    console.log('EOD findAll returning:', {
-      dataLength: result.data.length,
-      meta: result.meta,
-      isArray: Array.isArray(result),
-    });
+    );
 
     return result;
   }
@@ -513,7 +515,7 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
     });
 
     if (!report) {
-      throw new NotFoundException(`EOD report with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('EOD report', id));
     }
 
     return report;
@@ -549,9 +551,9 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
       
       // Check if we're still within the grace period
       if (now > gracePeriodEnd) {
-        throw new BadRequestException(
-          `This EOD report can only be edited within ${graceDays} day${graceDays !== 1 ? 's' : ''} after its due date. The grace period ended on ${gracePeriodEnd.toLocaleDateString()}.`
-        );
+      throw new BadRequestException(
+        ErrorMessages.OPERATION_NOT_ALLOWED('edit EOD report', `can only be edited within ${graceDays} day${graceDays !== 1 ? 's' : ''} after its due date. The grace period ended on ${gracePeriodEnd.toLocaleDateString()}`)
+      );
       }
     }
 
@@ -583,9 +585,9 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
         });
 
         if (existingReport && existingReport.id !== id) {
-          throw new BadRequestException(
-            `An EOD report already exists for this user on ${rest.date}. Please delete or update the existing report first.`,
-          );
+        throw new BadRequestException(
+          ErrorMessages.ALREADY_EXISTS('EOD report', `date ${rest.date}. Please delete or update the existing report first`),
+        );
         }
       }
       
@@ -596,7 +598,7 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
 
     if (rest.tasks) {
       if (!rest.tasks.length) {
-        throw new BadRequestException('tasksWorkedOn must contain at least 1 entry');
+        throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('tasksWorkedOn (must contain at least 1 entry)'));
       }
       nextTasks = rest.tasks;
       data.tasksWorkedOn = rest.tasks.map((task) => ({ ...task })) as Prisma.InputJsonValue;
@@ -666,7 +668,7 @@ ${data.summary ? `Summary:\n${data.summary}\n\n` : ''}${data.tasks.length > 0 ? 
     // Send email notification if report was just submitted (wasn't submitted before, but is now)
     if (submit && !report.submittedAt && updatedReport.submittedAt && updatedReport.user?.email) {
       this.sendEodReportEmail(updatedReport).catch((error) => {
-        console.error('[EodReports] Failed to send email notification:', error);
+        this.logger.error('[EodReports] Failed to send email notification:', error);
       });
     }
 

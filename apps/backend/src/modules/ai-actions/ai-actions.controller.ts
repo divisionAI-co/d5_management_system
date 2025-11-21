@@ -151,6 +151,8 @@ export class AiActionsController {
       model: dto.model,
       triggeredById: userId,
       extraInstructions: dto.extraInstructions,
+      operationType: dto.operationType,
+      fieldMappings: dto.fieldMappings,
     });
   }
 
@@ -158,6 +160,15 @@ export class AiActionsController {
   @ApiOperation({ summary: 'List Gemini action executions' })
   listExecutions(@Query() query: ListAiActionExecutionsDto) {
     return this.aiActionsService.listExecutions(query);
+  }
+
+  @Post('executions/:executionId/apply')
+  @ApiOperation({
+    summary: 'Apply proposed changes from execution',
+    description: 'Applies the proposed changes from a successful Gemini action execution to the database.',
+  })
+  async applyChanges(@Param('executionId') executionId: string, @CurrentUser() user: { id: string }) {
+    return this.aiActionExecutor.applyChanges(executionId, user.id);
   }
 }
 

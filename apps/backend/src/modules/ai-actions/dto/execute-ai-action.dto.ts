@@ -37,6 +37,23 @@ export class ExecuteAiActionDto {
   fieldKeys?: string[];
 }
 
+export class FieldMappingDto {
+  @ApiProperty({ description: 'Source key in Gemini JSON response', example: 'functionalProposal' })
+  @IsString()
+  @IsNotEmpty()
+  sourceKey!: string;
+
+  @ApiProperty({ description: 'Target field in the database', example: 'functionalProposal' })
+  @IsString()
+  @IsNotEmpty()
+  targetField!: string;
+
+  @ApiPropertyOptional({ description: 'Optional transformation rule', type: String })
+  @IsString()
+  @IsOptional()
+  transformRule?: string | null;
+}
+
 export class ExecuteAdhocAiActionDto {
   @ApiProperty({ enum: AiEntityType, description: 'Entity type the ad-hoc prompt will target' })
   @IsEnum(AiEntityType)
@@ -78,6 +95,23 @@ export class ExecuteAdhocAiActionDto {
   @IsString()
   @IsOptional()
   extraInstructions?: string;
+
+  @ApiPropertyOptional({
+    description: 'Operation type: UPDATE, CREATE, or READ_ONLY. Required if fieldMappings are provided.',
+    enum: ['UPDATE', 'CREATE', 'READ_ONLY'],
+    default: 'READ_ONLY',
+  })
+  @IsEnum(['UPDATE', 'CREATE', 'READ_ONLY'])
+  @IsOptional()
+  operationType?: 'UPDATE' | 'CREATE' | 'READ_ONLY';
+
+  @ApiPropertyOptional({
+    description: 'Field mappings for UPDATE/CREATE operations. Maps source keys in Gemini JSON response to target database fields.',
+    type: [FieldMappingDto],
+  })
+  @IsArray()
+  @IsOptional()
+  fieldMappings?: FieldMappingDto[];
 }
 
 

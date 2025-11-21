@@ -22,6 +22,15 @@ export class DashboardController {
   getMyDashboard(@CurrentUser('id') userId: string) {
     return this.dashboardService.getMyDashboard(userId);
   }
+
+  @Get('admin')
+  @Version('1')
+  @ApiOperation({ summary: 'Get admin dashboard with company-wide metrics' })
+  @UseInterceptors(CacheInterceptor)
+  @Cache(300, 'admin-dashboard') // Cache for 5 minutes
+  getAdminDashboard(@CurrentUser('id') userId: string) {
+    return this.dashboardService.getAdminDashboard();
+  }
 }
 
 

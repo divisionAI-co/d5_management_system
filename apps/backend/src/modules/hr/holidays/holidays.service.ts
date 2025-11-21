@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateHolidayDto } from './dto/create-holiday.dto';
 import { UpdateHolidayDto } from './dto/update-holiday.dto';
 
 @Injectable()
-export class HolidaysService {
-  constructor(private prisma: PrismaService) {}
+export class HolidaysService extends BaseService {
+  constructor(prisma: PrismaService) {
+    super(prisma);
+  }
 
   async create(createHolidayDto: CreateHolidayDto) {
     const date = new Date(createHolidayDto.date);
@@ -19,7 +23,7 @@ export class HolidaysService {
     });
 
     if (existing) {
-      throw new ConflictException(`A holiday already exists on ${date.toDateString()}`);
+      throw new ConflictException(ErrorMessages.ALREADY_EXISTS('Holiday', 'date'));
     }
 
     return this.prisma.nationalHoliday.create({
@@ -59,7 +63,7 @@ export class HolidaysService {
     });
 
     if (!holiday) {
-      throw new NotFoundException(`Holiday with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Holiday', id));
     }
 
     return holiday;

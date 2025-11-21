@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { AiCollectionFormat, AiCollectionKey, AiEntityType, Prisma } from '@prisma/client';
+import { AiActionOperationType, AiCollectionFormat, AiCollectionKey, AiEntityType, Prisma } from '@prisma/client';
 import { validate as uuidValidate } from 'uuid';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BaseService } from '../../common/services/base.service';
+import { QueryBuilder } from '../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../common/constants/error-messages.const';
 import {
   AttachAiActionDto,
   CreateAiActionDto,
@@ -23,21 +26,22 @@ interface ListOptions {
 }
 
 @Injectable()
-export class AiActionsService {
+export class AiActionsService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly entityFieldResolver: EntityFieldResolver,
     private readonly collectionFieldResolver: CollectionFieldResolver,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   async list(options: ListOptions) {
-    const where: Prisma.AiActionWhereInput = {};
-    if (options.entityType) {
-      where.entityType = options.entityType;
-    }
-    if (!options.includeInactive) {
-      where.isActive = true;
-    }
+    const where = QueryBuilder.buildWhereClause<Prisma.AiActionWhereInput>(
+      {
+        entityType: options.entityType,
+        isActive: options.includeInactive ? undefined : true,
+      },
+    );
 
     const actions = await this.prisma.aiAction.findMany({
       where,
@@ -51,6 +55,9 @@ export class AiActionsService {
           include: {
             fields: { orderBy: { order: 'asc' } },
           },
+        },
+        fieldMappings: {
+          orderBy: { order: 'asc' },
         },
         _count: {
           select: { attachments: true, executions: true },
@@ -70,6 +77,9 @@ export class AiActionsService {
           orderBy: { order: 'asc' },
           include: { fields: { orderBy: { order: 'asc' } } },
         },
+        fieldMappings: {
+          orderBy: { order: 'asc' },
+        },
         attachments: {
           orderBy: { createdAt: 'desc' },
         },
@@ -77,7 +87,7 @@ export class AiActionsService {
     });
 
     if (!action) {
-      throw new NotFoundException('Gemini action not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Gemini action', id));
     }
 
     return this.mapAction(action);
@@ -106,6 +116,7 @@ export class AiActionsService {
         model: dto.model,
         isActive: dto.isActive ?? true,
         isSystem: false,
+        operationType: dto.operationType ?? AiActionOperationType.READ_ONLY,
         createdBy: { connect: { id: createdById } },
         fields: {
           create: dto.fields.map((field, index) => ({
@@ -134,10 +145,21 @@ export class AiActionsService {
               })),
             }
           : undefined,
+        fieldMappings: dto.fieldMappings && dto.fieldMappings.length > 0
+          ? {
+              create: dto.fieldMappings.map((mapping, index) => ({
+                sourceKey: mapping.sourceKey,
+                targetField: mapping.targetField,
+                transformRule: mapping.transformRule ?? null,
+                order: mapping.order ?? index,
+              })),
+            }
+          : undefined,
       },
       include: {
         fields: { orderBy: { order: 'asc' } },
         collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+        fieldMappings: { orderBy: { order: 'asc' } },
       },
     });
 
@@ -151,15 +173,15 @@ export class AiActionsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Gemini action not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Gemini action', id));
     }
 
     if (existing.isSystem) {
-      throw new BadRequestException('System actions cannot be modified');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('modify system actions'));
     }
 
     if (dto.entityType && dto.entityType !== existing.entityType && existing.attachments.length > 0) {
-      throw new BadRequestException('Cannot change entity type while the action is attached to entities');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('change entity type', 'action is attached to entities'));
     }
 
     if (dto.fields) {
@@ -224,6 +246,23 @@ export class AiActionsService {
         }
       }
 
+      if (dto.fieldMappings !== undefined) {
+        await tx.aiActionFieldMapping.deleteMany({ where: { actionId: id } });
+        if (dto.fieldMappings.length > 0) {
+          for (const [index, mapping] of dto.fieldMappings.entries()) {
+            await tx.aiActionFieldMapping.create({
+              data: {
+                actionId: id,
+                sourceKey: mapping.sourceKey,
+                targetField: mapping.targetField,
+                transformRule: mapping.transformRule ?? null,
+                order: mapping.order ?? index,
+              },
+            });
+          }
+        }
+      }
+
       const data: Prisma.AiActionUpdateInput = {
         ...(dto.name !== undefined && { name: dto.name.trim() }),
         ...(dto.description !== undefined && { description: dto.description.trim() }),
@@ -231,6 +270,7 @@ export class AiActionsService {
         ...(dto.entityType !== undefined && { entityType: dto.entityType }),
         ...(dto.model !== undefined && { model: dto.model }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(dto.operationType !== undefined && { operationType: dto.operationType }),
       };
 
       const updated = await tx.aiAction.update({
@@ -239,6 +279,7 @@ export class AiActionsService {
         include: {
           fields: { orderBy: { order: 'asc' } },
           collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+          fieldMappings: { orderBy: { order: 'asc' } },
         },
       });
 
@@ -249,10 +290,10 @@ export class AiActionsService {
   async remove(id: string, userId: string) {
     const existing = await this.prisma.aiAction.findUnique({ where: { id } });
     if (!existing) {
-      throw new NotFoundException('Gemini action not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Gemini action', id));
     }
     if (existing.isSystem) {
-      throw new BadRequestException('System actions cannot be deleted');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('delete system actions'));
     }
 
     await this.prisma.aiAction.delete({ where: { id } });
@@ -274,15 +315,15 @@ export class AiActionsService {
   async attach(actionId: string, dto: AttachAiActionDto, userId: string) {
     const normalizedActionId = actionId.trim();
     if (!uuidValidate(normalizedActionId)) {
-      throw new BadRequestException('Invalid Gemini action identifier.');
+      throw new BadRequestException(ErrorMessages.INVALID_INPUT('Gemini action identifier'));
     }
 
     const action = await this.prisma.aiAction.findUnique({ where: { id: normalizedActionId } });
     if (!action) {
-      throw new NotFoundException('Gemini action not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Gemini action', normalizedActionId));
     }
     if (!action.isActive) {
-      throw new BadRequestException('Action is currently inactive');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('execute action', 'action is currently inactive'));
     }
 
     await this.entityFieldResolver.ensureEntityExists(action.entityType, dto.entityId);
@@ -335,10 +376,10 @@ export class AiActionsService {
       include: { action: true },
     });
     if (!attachment) {
-      throw new NotFoundException('Attachment not found');
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Attachment', attachmentId));
     }
     if (attachment.action.isSystem) {
-      throw new BadRequestException('Cannot detach system action');
+      throw new BadRequestException(ErrorMessages.OPERATION_NOT_ALLOWED('detach system action'));
     }
 
     await this.prisma.aiActionAttachment.delete({ where: { id: attachmentId } });
@@ -359,6 +400,7 @@ export class AiActionsService {
           include: {
             fields: { orderBy: { order: 'asc' } },
             collections: { orderBy: { order: 'asc' }, include: { fields: { orderBy: { order: 'asc' } } } },
+            fieldMappings: { orderBy: { order: 'asc' } },
           },
         },
       },
@@ -479,6 +521,22 @@ export class AiActionsService {
               ) ?? [],
           };
         }) ?? [],
+      fieldMappings:
+        action.fieldMappings?.map(
+          (mapping: {
+            id: string;
+            sourceKey: string;
+            targetField: string;
+            transformRule?: string | null;
+            order: number;
+          }) => ({
+            id: mapping.id,
+            sourceKey: mapping.sourceKey,
+            targetField: mapping.targetField,
+            transformRule: mapping.transformRule ?? undefined,
+            order: mapping.order,
+          }),
+        ) ?? [],
     };
   }
 }

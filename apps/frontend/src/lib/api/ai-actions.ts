@@ -20,6 +20,12 @@ export interface ExecuteSavedActionPayload {
   extraInstructions?: string;
 }
 
+export interface FieldMapping {
+  sourceKey: string;
+  targetField: string;
+  transformRule?: string | null;
+}
+
 export interface ExecuteAdhocActionPayload {
   entityType: AiEntityType;
   entityId?: string; // Optional: omit to run on all records
@@ -27,6 +33,8 @@ export interface ExecuteAdhocActionPayload {
   fieldKeys: string[];
   model?: string;
   extraInstructions?: string;
+  operationType?: 'UPDATE' | 'CREATE' | 'READ_ONLY';
+  fieldMappings?: FieldMapping[];
 }
 
 export const aiActionsApi = {
@@ -114,6 +122,11 @@ export const aiActionsApi = {
     const { data } = await apiClient.get<AiActionExecution[]>('/ai/actions/executions', {
       params,
     });
+    return data;
+  },
+
+  async applyChanges(executionId: string) {
+    const { data } = await apiClient.post<AiActionExecution>(`/ai/actions/executions/${executionId}/apply`);
     return data;
   },
 };

@@ -30,6 +30,8 @@ import {
   Redo,
   Palette,
   Highlighter,
+  Type,
+  ChevronDown,
 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -55,7 +57,22 @@ export function RichTextEditor({
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  const [showFontFamilyPicker, setShowFontFamilyPicker] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
+
+  const fontFamilies = [
+    { label: 'Default', value: '' },
+    { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+    { label: 'Proxima Nova', value: '"Proxima Nova", "Helvetica Neue", Helvetica, Arial, sans-serif' },
+    { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+    { label: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+    { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
+    { label: 'Georgia', value: 'Georgia, serif' },
+    { label: 'Courier New', value: '"Courier New", Courier, monospace' },
+    { label: 'Monaco', value: 'Monaco, "Courier New", monospace' },
+    { label: 'Comic Sans MS', value: '"Comic Sans MS", cursive' },
+    { label: 'Trebuchet MS', value: '"Trebuchet MS", Helvetica, sans-serif' },
+  ];
 
   const editor = useEditor({
     extensions: [
@@ -111,16 +128,17 @@ export function RichTextEditor({
         setShowLinkDialog(false);
         setShowTextColorPicker(false);
         setShowHighlightPicker(false);
+        setShowFontFamilyPicker(false);
       }
     };
 
-    if (showLinkDialog || showTextColorPicker || showHighlightPicker) {
+    if (showLinkDialog || showTextColorPicker || showHighlightPicker || showFontFamilyPicker) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showLinkDialog, showTextColorPicker, showHighlightPicker]);
+  }, [showLinkDialog, showTextColorPicker, showHighlightPicker, showFontFamilyPicker]);
 
   if (!editor) {
     return null;
@@ -140,6 +158,12 @@ export function RichTextEditor({
     editor.chain().focus().unsetLink().run();
     setShowLinkDialog(false);
     setLinkUrl('');
+  };
+
+  const getFontFamily = () => {
+    const fontFamily = editor.getAttributes('textStyle').fontFamily;
+    const matched = fontFamilies.find((f) => f.value === fontFamily);
+    return matched ? matched.label : fontFamily || 'Default';
   };
 
   const ToolbarButton = ({
@@ -226,6 +250,48 @@ export function RichTextEditor({
         >
           <Code className="h-4 w-4" />
         </ToolbarButton>
+
+        <ToolbarSeparator />
+
+        {/* Font Family */}
+        <div className="relative">
+          <ToolbarButton
+            onClick={() => {
+              setShowFontFamilyPicker(!showFontFamilyPicker);
+              setShowTextColorPicker(false);
+              setShowHighlightPicker(false);
+            }}
+            isActive={showFontFamilyPicker}
+            title="Font Family"
+            className="gap-1 pr-1 w-auto min-w-[120px] justify-between"
+          >
+            <Type className="h-4 w-4" />
+            <span className="text-xs">{getFontFamily()}</span>
+            <ChevronDown className="h-3 w-3" />
+          </ToolbarButton>
+          {showFontFamilyPicker && (
+            <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+              {fontFamilies.map((font) => (
+                <button
+                  key={font.value}
+                  type="button"
+                  onClick={() => {
+                    if (font.value) {
+                      editor.chain().focus().setMark('textStyle', { fontFamily: font.value }).run();
+                    } else {
+                      editor.chain().focus().unsetMark('textStyle').run();
+                    }
+                    setShowFontFamilyPicker(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-muted transition"
+                  style={font.value ? { fontFamily: font.value } : {}}
+                >
+                  {font.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <ToolbarSeparator />
 

@@ -26,6 +26,7 @@ import { InvoicesModule } from './modules/invoices/invoices.module';
 // Recruitment
 import { CandidatesModule } from './modules/recruitment/candidates/candidates.module';
 import { OpenPositionsModule } from './modules/recruitment/positions/positions.module';
+import { ApplicationsModule } from './modules/recruitment/applications/applications.module';
 
 // HR & Employees
 import { HrModule } from './modules/hr/hr.module';
@@ -105,6 +106,7 @@ import { CacheModule } from './common/cache/cache.module';
     // Recruitment
     CandidatesModule,
     OpenPositionsModule,
+    ApplicationsModule,
 
     // HR & Employees
     HrModule,

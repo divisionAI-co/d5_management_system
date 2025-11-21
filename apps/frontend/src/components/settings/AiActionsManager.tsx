@@ -49,6 +49,13 @@ interface CollectionModalState {
   index?: number;
 }
 
+interface FieldMapping {
+  sourceKey: string;
+  targetField: string;
+  transformRule?: string;
+  order: number;
+}
+
 interface FormState {
   id?: string;
   name: string;
@@ -57,8 +64,10 @@ interface FormState {
   promptTemplate: string;
   model: string;
   isActive: boolean;
+  operationType: 'READ_ONLY' | 'UPDATE' | 'CREATE';
   selectedFields: SelectedField[];
   collections: AiActionCollectionSummary[];
+  fieldMappings: FieldMapping[];
 }
 
 const DEFAULT_FORM: FormState = {
@@ -68,8 +77,10 @@ const DEFAULT_FORM: FormState = {
   promptTemplate: '',
   model: '',
   isActive: true,
+  operationType: 'READ_ONLY',
   selectedFields: [],
   collections: [],
+  fieldMappings: [],
 };
 
 const ENTITY_OPTIONS: Array<{ label: string; value: AiEntityType }> = [
@@ -222,6 +233,7 @@ export function AiActionsManager() {
       promptTemplate: action.promptTemplate,
       model: action.model ?? '',
       isActive: action.isActive,
+      operationType: action.operationType ?? 'READ_ONLY',
       selectedFields: action.fields.map((field) => ({
         key: field.fieldKey,
         label: field.fieldLabel,
@@ -248,6 +260,13 @@ export function AiActionsManager() {
               order: field.order ?? 0,
               metadata: field.metadata ?? undefined,
             })) ?? [],
+        })) ?? [],
+      fieldMappings:
+        action.fieldMappings?.map((mapping) => ({
+          sourceKey: mapping.sourceKey,
+          targetField: mapping.targetField,
+          transformRule: mapping.transformRule ?? undefined,
+          order: mapping.order,
         })) ?? [],
     });
     setShowForm(true);
@@ -410,12 +429,22 @@ export function AiActionsManager() {
       promptTemplate: formState.promptTemplate,
       model: formState.model.trim() || undefined,
       isActive: formState.isActive,
+      operationType: formState.operationType,
       fields: formState.selectedFields.map((field, index) => ({
         fieldKey: field.key,
         fieldLabel: field.label,
         metadata: field.description ? { description: field.description } : undefined,
         order: index,
       })),
+      fieldMappings:
+        formState.operationType !== 'READ_ONLY' && (formState.fieldMappings?.length ?? 0) > 0
+          ? (formState.fieldMappings ?? []).map((mapping) => ({
+              sourceKey: mapping.sourceKey,
+              targetField: mapping.targetField,
+              transformRule: mapping.transformRule || undefined,
+              order: mapping.order,
+            }))
+          : undefined,
     collections:
       formState.collections.length > 0
         ? formState.collections.map((collection) => ({
@@ -728,8 +757,8 @@ export function AiActionsManager() {
 
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-4xl rounded-xl border border-border bg-card-elevated shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-card-elevated shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-blue-500" />
                 <h3 className="text-lg font-semibold text-foreground">
@@ -745,7 +774,7 @@ export function AiActionsManager() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="grid gap-6 px-6 py-6 md:grid-cols-[1.5fr_1fr]">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto grid gap-6 px-6 py-6 md:grid-cols-[1.5fr_1fr]">
               <div className="space-y-4">
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
@@ -812,6 +841,35 @@ export function AiActionsManager() {
                       placeholder="gemini-1.5-flash-latest (optional)"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-muted-foreground">
+                    Operation Type
+                  </label>
+                  <select
+                    value={formState.operationType}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        operationType: event.target.value as 'READ_ONLY' | 'UPDATE' | 'CREATE',
+                        fieldMappings: event.target.value === 'READ_ONLY' ? [] : (prev.fieldMappings ?? []),
+                      }))
+                    }
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="READ_ONLY">Read Only (default)</option>
+                    <option value="UPDATE">Update Existing Record</option>
+                    <option value="CREATE">Create New Record</option>
+                  </select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formState.operationType === 'READ_ONLY' &&
+                      'Action will only read and analyze data, no changes will be made.'}
+                    {formState.operationType === 'UPDATE' &&
+                      'Action will update fields on the existing record based on Gemini response.'}
+                    {formState.operationType === 'CREATE' &&
+                      'Action will create a new record based on Gemini response.'}
+                  </p>
                 </div>
 
                 <div>
@@ -1041,6 +1099,101 @@ export function AiActionsManager() {
                   </div>
                 </div>
 
+                {formState.operationType !== 'READ_ONLY' && (
+                  <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">Field Mappings</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Map keys from Gemini's JSON response to database fields. Gemini should return JSON with these
+                          keys.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormState((prev) => ({
+                            ...prev,
+                            fieldMappings: [
+                              ...(prev.fieldMappings ?? []),
+                              {
+                                sourceKey: '',
+                                targetField: '',
+                                transformRule: '',
+                                order: prev.fieldMappings?.length ?? 0,
+                              },
+                            ],
+                          }));
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-2 py-1 text-xs font-semibold transition hover:border-blue-500 hover:text-blue-600 dark:bg-card"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add Mapping
+                      </button>
+                    </div>
+
+                    {(formState.fieldMappings?.length ?? 0) === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No field mappings configured. Add mappings to enable automatic field updates.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(formState.fieldMappings ?? []).map((mapping, index) => (
+                          <div
+                            key={index}
+                            className="grid grid-cols-[1fr_1fr_auto] gap-2 rounded-lg border border-border bg-white p-2 dark:bg-card"
+                          >
+                            <div>
+                              <label className="mb-0.5 block text-[10px] font-semibold uppercase text-muted-foreground">
+                                Source Key (from Gemini)
+                              </label>
+                              <input
+                                type="text"
+                                value={mapping.sourceKey}
+                                onChange={(event) => {
+                                  const updated = [...(formState.fieldMappings ?? [])];
+                                  updated[index].sourceKey = event.target.value;
+                                  setFormState((prev) => ({ ...prev, fieldMappings: updated }));
+                                }}
+                                placeholder="e.g., extractedSkills"
+                                className="w-full rounded border border-border px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-0.5 block text-[10px] font-semibold uppercase text-muted-foreground">
+                                Target Field (database)
+                              </label>
+                              <input
+                                type="text"
+                                value={mapping.targetField}
+                                onChange={(event) => {
+                                  const updated = [...(formState.fieldMappings ?? [])];
+                                  updated[index].targetField = event.target.value;
+                                  setFormState((prev) => ({ ...prev, fieldMappings: updated }));
+                                }}
+                                placeholder="e.g., skills"
+                                className="w-full rounded border border-border px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormState((prev) => ({
+                                  ...prev,
+                                  fieldMappings: (prev.fieldMappings ?? []).filter((_, i) => i !== index),
+                                }));
+                              }}
+                              className="mt-5 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-red-500"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs font-semibold uppercase text-muted-foreground">
                   <input
                     type="checkbox"
@@ -1069,7 +1222,7 @@ export function AiActionsManager() {
                 </div>
               </div>
 
-              <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-border pt-4">
+              <div className="md:col-span-2 flex items-center justify-end gap-3 border-t border-border pt-4 flex-shrink-0">
                 <button
                   type="button"
                   onClick={closeForm}
@@ -1093,7 +1246,7 @@ export function AiActionsManager() {
             </form>
 
             {availableFieldsQuery.isError && (
-              <div className="border-t border-border bg-red-50 px-6 py-3 text-xs text-red-600">
+              <div className="border-t border-border bg-red-50 px-6 py-3 text-xs text-red-600 flex-shrink-0">
                 Could not load entity fields. Ensure the selected entity has field mappings configured.
               </div>
             )}

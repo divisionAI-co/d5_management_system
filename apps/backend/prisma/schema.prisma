@@ -47,38 +47,38 @@ model User {
   lastLoginAt DateTime?
 
   // Relations
-  employee              Employee?
-  assignedLeads         Lead[]
-  assignedOpportunities Opportunity[]
-  assignedTasks         Task[]                    @relation("AssignedTasks")
-  taskAssignments       TaskAssignee[]            @relation("TaskAssigneeUser")
-  createdTasks          Task[]                    @relation("CreatedTasks")
-  createdTaskTemplates  TaskTemplate[]            @relation("CreatedTaskTemplates")
-  activities            Activity[]
-  assignedActivities    Activity[]                @relation("AssignedActivities")
-  notifications         Notification[]
-  notificationSettings  NotificationSettings?
-  eodReports            EodReport[]
-  leaveRequests         LeaveRequest[]
-  remoteWorkLogs        RemoteWorkLog[]
-  createdInvoices       Invoice[]                 @relation("InvoiceCreator")
-  calendarIntegrations  UserCalendarIntegration[]
-  sentCampaigns         EmailCampaign[]
-  passwordResetTokens   PasswordResetToken[]
+  employee                    Employee?
+  assignedLeads               Lead[]
+  assignedOpportunities       Opportunity[]
+  assignedTasks               Task[]                       @relation("AssignedTasks")
+  taskAssignments             TaskAssignee[]               @relation("TaskAssigneeUser")
+  createdTasks                Task[]                       @relation("CreatedTasks")
+  createdTaskTemplates        TaskTemplate[]               @relation("CreatedTaskTemplates")
+  activities                  Activity[]
+  assignedActivities          Activity[]                   @relation("AssignedActivities")
+  notifications               Notification[]
+  notificationSettings        NotificationSettings?
+  eodReports                  EodReport[]
+  leaveRequests               LeaveRequest[]
+  remoteWorkLogs              RemoteWorkLog[]
+  createdInvoices             Invoice[]                    @relation("InvoiceCreator")
+  calendarIntegrations        UserCalendarIntegration[]
+  sentCampaigns               EmailCampaign[]
+  passwordResetTokens         PasswordResetToken[]
   recruiterPerformanceReports RecruiterPerformanceReport[]
-  createdActivityTypes  ActivityType[]            @relation("ActivityTypeCreatedBy")
-  aiActions             AiAction[]                @relation("AiActionsCreatedBy")
-  feedbackReportsAsHR   FeedbackReport[]          @relation("FeedbackReportHRUpdater")
-  feedbackReportsAsAM   FeedbackReport[]          @relation("FeedbackReportAMUpdater")
-  aiActionAttachments   AiActionAttachment[]      @relation("AiActionAttachmentsByUser")
-  aiActionExecutions    AiActionExecution[]       @relation("AiActionExecutionsTriggeredBy")
-  sessions              UserSession[]
-  recruitedCandidates   Candidate[]               @relation("CandidateRecruiter")
-  failedLoginAttempts   FailedLoginAttempt[]
-  accountLockout        AccountLockout?
-  sentQuotes            Quote[]
-  importedCheckInOuts   CheckInOut[]              @relation("CheckInOutImportedBy")
-  salesPerformanceReports SalesPerformanceReport[] @relation("SalesPerformanceReports")
+  createdActivityTypes        ActivityType[]               @relation("ActivityTypeCreatedBy")
+  aiActions                   AiAction[]                   @relation("AiActionsCreatedBy")
+  feedbackReportsAsHR         FeedbackReport[]             @relation("FeedbackReportHRUpdater")
+  feedbackReportsAsAM         FeedbackReport[]             @relation("FeedbackReportAMUpdater")
+  aiActionAttachments         AiActionAttachment[]         @relation("AiActionAttachmentsByUser")
+  aiActionExecutions          AiActionExecution[]          @relation("AiActionExecutionsTriggeredBy")
+  sessions                    UserSession[]
+  recruitedCandidates         Candidate[]                  @relation("CandidateRecruiter")
+  failedLoginAttempts         FailedLoginAttempt[]
+  accountLockout              AccountLockout?
+  sentQuotes                  Quote[]
+  importedCheckInOuts         CheckInOut[]                 @relation("CheckInOutImportedBy")
+  salesPerformanceReports     SalesPerformanceReport[]     @relation("SalesPerformanceReports")
 
   @@map("users")
 }
@@ -88,15 +88,15 @@ model NotificationSettings {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  emailEnabled      Boolean @default(true)
-  inAppEnabled      Boolean @default(true)
-  taskAssigned      Boolean @default(true)
-  taskDueSoon       Boolean @default(true)
-  leaveApproved     Boolean @default(true)
-  performanceReview Boolean @default(true)
-  feedbackReport    Boolean @default(true)
-  newCandidate      Boolean @default(true)
-  newOpportunity    Boolean @default(true)
+  emailEnabled        Boolean @default(true)
+  inAppEnabled        Boolean @default(true)
+  taskAssigned        Boolean @default(true)
+  taskDueSoon         Boolean @default(true)
+  leaveApproved       Boolean @default(true)
+  performanceReview   Boolean @default(true)
+  feedbackReport      Boolean @default(true)
+  newCandidate        Boolean @default(true)
+  newOpportunity      Boolean @default(true)
   mentionedInActivity Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -172,6 +172,9 @@ model Customer {
   notes String?
   tags  String[]
 
+  // Google Drive Integration
+  driveFolderId String? // Google Drive folder containing contracts and documents
+
   // Odoo Migration
   odooId String? @unique
 
@@ -205,7 +208,7 @@ model Contact {
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   leadContacts LeadContact[]
-  activities Activity[]
+  activities   Activity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -215,9 +218,9 @@ model Contact {
 }
 
 model Lead {
-  id        String  @id @default(uuid())
+  id        String        @id @default(uuid())
   // Legacy field for backward compatibility - kept for migration
-  contactId String? @map("contactId")
+  contactId String?       @map("contactId")
   // New many-to-many relationship
   contacts  LeadContact[]
 
@@ -303,9 +306,9 @@ model Opportunity {
   closedAt  DateTime?
 
   // Relations
-  openPosition OpenPosition?
-  activities   Activity[]
-  quotes       Quote[]
+  openPositions OpenPosition[]
+  activities    Activity[]
+  quotes        Quote[]
 
   @@index([customerId])
   @@index([type])
@@ -322,18 +325,18 @@ model Quote {
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
   // Quote details
-  quoteNumber String @unique // Auto-generated or manual
+  quoteNumber String  @unique // Auto-generated or manual
   title       String
   description String? @db.Text
 
   // Quote sections
   overview           String? @db.Text
   functionalProposal String? @db.Text
-  technicalProposal String? @db.Text
-  teamComposition   String? @db.Text
-  milestones        String? @db.Text // Free text milestones with formatting
-  paymentTerms      String? @db.Text
-  warrantyPeriod    String? // e.g., "12 months", "6 months"
+  technicalProposal  String? @db.Text
+  teamComposition    String? @db.Text
+  milestones         String? @db.Text // Free text milestones with formatting
+  paymentTerms       String? @db.Text
+  warrantyPeriod     String? // e.g., "12 months", "6 months"
 
   // Financial
   totalValue Decimal? @db.Decimal(10, 2)
@@ -343,10 +346,10 @@ model Quote {
   status QuoteStatus @default(DRAFT)
 
   // Email tracking
-  sentAt    DateTime?
-  sentTo    String? // Customer email
-  sentBy    String?
-  sentByUser User?  @relation(fields: [sentBy], references: [id], onDelete: SetNull)
+  sentAt     DateTime?
+  sentTo     String? // Customer email
+  sentBy     String?
+  sentByUser User?     @relation(fields: [sentBy], references: [id], onDelete: SetNull)
 
   // PDF
   pdfUrl String?
@@ -584,7 +587,7 @@ model Candidate {
   portfolioUrl      String?
   driveFolderId     String? // Google Drive folder containing interviews/CV
   recruiterId       String?
-  recruiter         User?   @relation("CandidateRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
+  recruiter         User?    @relation("CandidateRecruiter", fields: [recruiterId], references: [id], onDelete: SetNull)
 
   // Recruitment
   stage    CandidateStage @default(VALIDATION)
@@ -624,24 +627,24 @@ model Candidate {
 }
 
 model OpenPosition {
-  id            String      @id @default(uuid())
-  opportunityId String?     @unique
+  id            String       @id @default(uuid())
+  opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
   title        String
   description  String  @db.Text
   requirements String? @db.Text
 
-  status String @default("Open") // Open, Filled, Cancelled
+  status            String             @default("Open") // Open, Filled, Cancelled
   recruitmentStatus RecruitmentStatus? // Headhunting or standard
-  isArchived Boolean @default(false)
+  isArchived        Boolean            @default(false)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   filledAt  DateTime?
 
   // Relations
-  candidates CandidatePosition[]
+  candidates                  CandidatePosition[]
   recruiterPerformanceReports RecruiterPerformanceReport[]
 
   @@index([status])
@@ -675,7 +678,7 @@ model RecruiterPerformanceReport {
   position   OpenPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
   
   recruiterId String
-  recruiter   User @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
+  recruiter   User   @relation(fields: [recruiterId], references: [id], onDelete: Cascade)
 
   // Reporting period
   weekEnding DateTime // Week ending date (e.g., 24/10/2025)
@@ -687,17 +690,17 @@ model RecruiterPerformanceReport {
   candidatesContactedActual Int @default(0)
   candidatesContactedTarget Int @default(0)
   
-  culturalCallsActual Int @default(0)
-  culturalCallsTarget Int @default(0)
+  culturalCallsActual          Int      @default(0)
+  culturalCallsTarget          Int      @default(0)
   culturalCallsEfficiencyRatio Decimal? @db.Decimal(5, 2) // e.g., 66.7%
   
-  technicalCallsActual Int @default(0)
-  technicalCallsTarget Int @default(0)
+  technicalCallsActual          Int      @default(0)
+  technicalCallsTarget          Int      @default(0)
   technicalCallsEfficiencyRatio Decimal? @db.Decimal(5, 2) // e.g., 75%
   
-  clientInterviewsScheduledActual Int @default(0)
-  clientInterviewsScheduledTarget Int @default(0)
-  submissionToInterviewRatio Decimal? @db.Decimal(5, 2) // e.g., 40-60%
+  clientInterviewsScheduledActual Int      @default(0)
+  clientInterviewsScheduledTarget Int      @default(0)
+  submissionToInterviewRatio      Decimal? @db.Decimal(5, 2) // e.g., 40-60%
   
   placementsThisWeek Int @default(0)
 
@@ -723,10 +726,10 @@ model RecruiterPerformanceReport {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([positionId, recruiterId, weekEnding])
   @@index([positionId])
   @@index([recruiterId])
   @@index([weekEnding])
-  @@unique([positionId, recruiterId, weekEnding])
   @@map("recruiter_performance_reports")
 }
 
@@ -735,25 +738,25 @@ model SalesPerformanceReport {
 
   // Relations
   salespersonId String
-  salesperson   User @relation("SalesPerformanceReports", fields: [salespersonId], references: [id], onDelete: Cascade)
+  salesperson   User   @relation("SalesPerformanceReports", fields: [salespersonId], references: [id], onDelete: Cascade)
 
   // Reporting period
   weekEnding DateTime // Week ending date (e.g., 24/10/2025)
 
   // LinkedIn Campaigns
-  linkedinConnectionRequests Int @default(0)
-  linkedinAccepted Int @default(0)
-  linkedinAcceptedPercentage Decimal? @db.Decimal(5, 2) // Calculated: (accepted / requests) * 100
-  linkedinMeetingsScheduled Int @default(0)
+  linkedinConnectionRequests          Int      @default(0)
+  linkedinAccepted                    Int      @default(0)
+  linkedinAcceptedPercentage          Decimal? @db.Decimal(5, 2) // Calculated: (accepted / requests) * 100
+  linkedinMeetingsScheduled           Int      @default(0)
   linkedinMeetingsScheduledPercentage Decimal? @db.Decimal(5, 2) // Calculated: (meetings / accepted) * 100
-  linkedinAccountsCount Int @default(0)
-  linkedinMarketsTargeted String? // Comma-separated or JSON array
+  linkedinAccountsCount               Int      @default(0)
+  linkedinMarketsTargeted             String? // Comma-separated or JSON array
 
   // InMail Campaigns
-  inmailSent Int @default(0)
-  inmailReplies Int @default(0)
-  inmailRepliesPercentage Decimal? @db.Decimal(5, 2) // Calculated: (replies / sent) * 100
-  inmailMeetingsScheduled Int @default(0)
+  inmailSent                        Int      @default(0)
+  inmailReplies                     Int      @default(0)
+  inmailRepliesPercentage           Decimal? @db.Decimal(5, 2) // Calculated: (replies / sent) * 100
+  inmailMeetingsScheduled           Int      @default(0)
   inmailMeetingsScheduledPercentage Decimal? @db.Decimal(5, 2) // Calculated: (meetings / replies) * 100
 
   // PDF Export
@@ -762,9 +765,9 @@ model SalesPerformanceReport {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([salespersonId, weekEnding])
   @@index([salespersonId])
   @@index([weekEnding])
-  @@unique([salespersonId, weekEnding])
   @@map("sales_performance_reports")
 }
 
@@ -821,6 +824,9 @@ model Employee {
 
   // Card Number for check-in/check-out
   cardNumber String?
+
+  // Booking link for scheduling meetings/appointments
+  bookingLink String? // URL to booking calendar (e.g., Calendly, Google Calendar)
 
   // Documents
   documents Json? // Array of document objects with name, url, type
@@ -891,32 +897,32 @@ model FeedbackReport {
   bankHolidays          Json? // Array of holiday objects for next month
 
   // HR Section
-  hrFeedback              String? @db.Text
-  hrActionDescription     String? @db.Text
-  hrUpdatedAt             DateTime?
-  hrUpdatedBy             String?
-  hrUpdatedByUser         User?   @relation("FeedbackReportHRUpdater", fields: [hrUpdatedBy], references: [id], onDelete: SetNull)
+  hrFeedback          String?   @db.Text
+  hrActionDescription String?   @db.Text
+  hrUpdatedAt         DateTime?
+  hrUpdatedBy         String?
+  hrUpdatedByUser     User?     @relation("FeedbackReportHRUpdater", fields: [hrUpdatedBy], references: [id], onDelete: SetNull)
 
   // Account Manager Section
-  amFeedback              String? @db.Text
-  amActionDescription     String? @db.Text
-  amUpdatedAt             DateTime?
-  amUpdatedBy             String?
-  amUpdatedByUser         User?   @relation("FeedbackReportAMUpdater", fields: [amUpdatedBy], references: [id], onDelete: SetNull)
+  amFeedback          String?   @db.Text
+  amActionDescription String?   @db.Text
+  amUpdatedAt         DateTime?
+  amUpdatedBy         String?
+  amUpdatedByUser     User?     @relation("FeedbackReportAMUpdater", fields: [amUpdatedBy], references: [id], onDelete: SetNull)
 
   // Employee Section (Ratings 1-5)
-  communicationRating Int? // 1-5
-  collaborationRating Int? // 1-5
+  communicationRating  Int? // 1-5
+  collaborationRating  Int? // 1-5
   taskEstimationRating Int? // 1-5
-  timelinessRating Int? // 1-5
-  employeeSummary String? @db.Text
-  employeeUpdatedAt DateTime?
+  timelinessRating     Int? // 1-5
+  employeeSummary      String?   @db.Text
+  employeeUpdatedAt    DateTime?
 
   // Status and submission
-  status FeedbackReportStatus @default(DRAFT)
+  status      FeedbackReportStatus @default(DRAFT)
   submittedAt DateTime?
-  sentAt DateTime?
-  sentTo String? // Customer email
+  sentAt      DateTime?
+  sentTo      String? // Customer email
 
   // PDF Export
   pdfUrl String?
@@ -1031,12 +1037,12 @@ model CompanySettings {
   annualLeaveAllowanceDays Int @default(20)
 
   // Email Template Configuration
-  emailTemplateEodReportSubmittedId String?
-  emailTemplateLeaveRequestCreatedId String?
-  emailTemplateLeaveRequestApprovedId String?
-  emailTemplateLeaveRequestRejectedId String?
-  emailTemplateTaskAssignedId String?
-  emailTemplateMentionNotificationId String?
+  emailTemplateEodReportSubmittedId     String?
+  emailTemplateLeaveRequestCreatedId    String?
+  emailTemplateLeaveRequestApprovedId   String?
+  emailTemplateLeaveRequestRejectedId   String?
+  emailTemplateTaskAssignedId           String?
+  emailTemplateMentionNotificationId    String?
   emailTemplateRemoteWorkWindowOpenedId String?
 
   updatedAt DateTime @updatedAt
@@ -1079,9 +1085,9 @@ enum CheckInOutStatus {
 }
 
 model CheckInOut {
-  id         String           @id @default(uuid())
+  id         String   @id @default(uuid())
   employeeId String
-  employee   Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   // Date and time combined
   dateTime DateTime
@@ -1090,9 +1096,9 @@ model CheckInOut {
   status CheckInOutStatus
 
   // Import metadata
-  importedAt DateTime?
-  importedBy String?
-  importedByUser User? @relation("CheckInOutImportedBy", fields: [importedBy], references: [id], onDelete: SetNull)
+  importedAt     DateTime?
+  importedBy     String?
+  importedByUser User?     @relation("CheckInOutImportedBy", fields: [importedBy], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1138,9 +1144,9 @@ model Task {
   assignees TaskAssignee[]
 
   // Recurring task template (if this task was generated from a template)
-  templateId String?
-  template   TaskTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  generatedAt DateTime? // When this task instance was generated from template
+  templateId       String?
+  template         TaskTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  generatedAt      DateTime? // When this task instance was generated from template
   generatedForDate DateTime? // The date this task instance is for (for daily recurring tasks)
 
   createdById String
@@ -1205,13 +1211,13 @@ model TaskTemplate {
   priority TaskPriority @default(MEDIUM)
 
   // Recurrence configuration
-  recurrenceType TaskRecurrenceType
-  recurrenceInterval Int @default(1) // Every N days/weeks/months/years (e.g., every 2 weeks = interval 2, type WEEKLY)
-  isActive Boolean @default(true) // Whether to continue generating tasks
+  recurrenceType     TaskRecurrenceType
+  recurrenceInterval Int                @default(1) // Every N days/weeks/months/years (e.g., every 2 weeks = interval 2, type WEEKLY)
+  isActive           Boolean            @default(true) // Whether to continue generating tasks
 
   // Start and end dates for recurrence
   startDate DateTime // When to start generating tasks
-  endDate DateTime? // When to stop generating tasks (null = no end date)
+  endDate   DateTime? // When to stop generating tasks (null = no end date)
 
   // Default assignees (users who will be assigned to generated tasks)
   defaultAssigneeIds String[] // Array of user IDs
@@ -1220,7 +1226,7 @@ model TaskTemplate {
   defaultCustomerId String?
 
   // Default metadata
-  defaultTags String[]
+  defaultTags           String[]
   defaultEstimatedHours Decimal? @db.Decimal(5, 2)
 
   // Creator
@@ -1231,7 +1237,7 @@ model TaskTemplate {
   updatedAt DateTime @updatedAt
 
   // Relations
-  generatedTasks Task[] // Tasks generated from this template
+  generatedTasks    Task[] // Tasks generated from this template
   lastGeneratedDate DateTime? // Last date a task was generated (to prevent duplicates)
 
   @@index([createdById])
@@ -1382,23 +1388,31 @@ enum AiCollectionFormat {
   PLAIN_TEXT
 }
 
+enum AiActionOperationType {
+  READ_ONLY
+  UPDATE
+  CREATE
+}
+
 model AiAction {
-  id             String               @id @default(uuid())
+  id             String                 @id @default(uuid())
   name           String
   description    String?
-  promptTemplate String               @db.Text
+  promptTemplate String                 @db.Text
   entityType     AiEntityType
   model          String? // Optional override, defaults in service
-  isSystem       Boolean              @default(false)
-  isActive       Boolean              @default(true)
+  isSystem       Boolean                @default(false)
+  isActive       Boolean                @default(true)
+  operationType  AiActionOperationType  @default(READ_ONLY) // READ_ONLY, UPDATE, or CREATE
   createdById    String?
-  createdBy      User?                @relation("AiActionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy      User?                  @relation("AiActionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   fields         AiActionField[]
   collections    AiActionCollection[]
   attachments    AiActionAttachment[]
   executions     AiActionExecution[]
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  fieldMappings  AiActionFieldMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@index([entityType])
   @@index([isActive])
@@ -1464,26 +1478,43 @@ model AiActionAttachment {
   @@map("ai_action_attachments")
 }
 
+model AiActionFieldMapping {
+  id            String   @id @default(uuid())
+  actionId      String
+  action        AiAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  sourceKey     String // Key from Gemini response (e.g., "extractedSkills")
+  targetField   String // Database field to update (e.g., "skills")
+  transformRule String?  @db.Text // Optional transformation (e.g., JSON path, format conversion)
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@unique([actionId, sourceKey, targetField])
+  @@map("ai_action_field_mappings")
+}
+
 model AiActionExecution {
-  id            String                  @id @default(uuid())
-  actionId      String?
-  action        AiAction?               @relation(fields: [actionId], references: [id], onDelete: SetNull)
-  attachmentId  String?
-  attachment    AiActionAttachment?     @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
-  entityType    AiEntityType
-  entityId      String
-  prompt        String                  @db.Text
-  inputs        Json?
-  output        Json?
-  rawOutput     String?                 @db.Text
-  status        AiActionExecutionStatus @default(PENDING)
-  errorMessage  String?
-  triggeredById String?
-  triggeredBy   User?                   @relation("AiActionExecutionsTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
-  activityId    String?
-  activity      Activity?               @relation("ActivityExecutions", fields: [activityId], references: [id], onDelete: SetNull)
-  createdAt     DateTime                @default(now())
-  completedAt   DateTime?
+  id              String                  @id @default(uuid())
+  actionId        String?
+  action          AiAction?               @relation(fields: [actionId], references: [id], onDelete: SetNull)
+  attachmentId    String?
+  attachment      AiActionAttachment?     @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  entityType      AiEntityType
+  entityId        String
+  prompt          String                  @db.Text
+  inputs          Json?
+  output          Json?
+  rawOutput       String?                 @db.Text
+  status          AiActionExecutionStatus @default(PENDING)
+  errorMessage    String?
+  triggeredById   String?
+  triggeredBy     User?                   @relation("AiActionExecutionsTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+  activityId      String?
+  activity        Activity?               @relation("ActivityExecutions", fields: [activityId], references: [id], onDelete: SetNull)
+  proposedChanges Json? // Preview of changes to be applied (for UPDATE/CREATE operations)
+  appliedChanges  Json? // Actual changes that were applied
+  appliedAt       DateTime? // When changes were applied (for UPDATE/CREATE operations)
+  createdAt       DateTime                @default(now())
+  completedAt     DateTime?
 
   @@index([entityType, entityId])
   @@index([status])
@@ -1792,8 +1823,8 @@ model AuditLog {
 
 model RateLimitAttempt {
   id         String   @id @default(uuid())
-  identifier String   // IP address or username/email
-  type       String   // "ip" or "username"
+  identifier String // IP address or username/email
+  type       String // "ip" or "username"
   success    Boolean  @default(false)
   createdAt  DateTime @default(now())
 
@@ -1815,13 +1846,13 @@ model FailedLoginAttempt {
 }
 
 model AccountLockout {
-  id         String    @id @default(uuid())
-  userId     String    @unique
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lockedUntil DateTime
-  reason     String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  reason      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([lockedUntil])

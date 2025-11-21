@@ -1,11 +1,15 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
 import { FeedbackReportStatus, LeaveRequestStatus, UserRole, Prisma, TemplateType } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { CreateFeedbackReportDto } from './dto/create-feedback-report.dto';
 import { UpdateHrSectionDto } from './dto/update-hr-section.dto';
 import { UpdateAmSectionDto } from './dto/update-am-section.dto';
@@ -19,14 +23,16 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { NotificationType } from '@prisma/client';
 
 @Injectable()
-export class FeedbackReportsService {
+export class FeedbackReportsService extends BaseService {
   constructor(
-    private prisma: PrismaService,
+    prisma: PrismaService,
     private pdfService: PdfService,
     private emailService: EmailService,
     private templatesService: TemplatesService,
     private notificationsService: NotificationsService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private readonly reportInclude = {
     employee: {
@@ -253,7 +259,7 @@ export class FeedbackReportsService {
     });
 
     if (!employee) {
-      throw new NotFoundException(`Employee with ID ${createDto.employeeId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Employee', createDto.employeeId));
     }
 
     // Check if report already exists for this employee/month/year
@@ -311,7 +317,7 @@ export class FeedbackReportsService {
         report.id,
       )
       .catch((error) => {
-        console.error(
+        this.logger.error(
           `[FeedbackReports] Failed to send notification to employee ${employeeUserId}:`,
           error,
         );
@@ -324,7 +330,10 @@ export class FeedbackReportsService {
    * Find all feedback reports with filters
    */
   async findAll(filters: FilterFeedbackReportsDto, userId: string, userRole: UserRole) {
-    const where: Prisma.FeedbackReportWhereInput = {};
+    // Build base where clause using QueryBuilder
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.FeedbackReportWhereInput>(
+      filters,
+    );
 
     // Role-based access control
     if (userRole === UserRole.EMPLOYEE) {
@@ -338,22 +347,12 @@ export class FeedbackReportsService {
         return [];
       }
 
-      where.employeeId = employee.id;
+      baseWhere.employeeId = employee.id;
     } else if (filters.employeeId) {
-      where.employeeId = filters.employeeId;
+      baseWhere.employeeId = filters.employeeId;
     }
 
-    if (filters.month) {
-      where.month = filters.month;
-    }
-
-    if (filters.year) {
-      where.year = filters.year;
-    }
-
-    if (filters.status) {
-      where.status = filters.status;
-    }
+    const where = baseWhere;
 
     const reports = await this.prisma.feedbackReport.findMany({
       where,
@@ -375,7 +374,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -384,7 +383,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     // Role-based access control
@@ -409,7 +408,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -417,7 +416,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -444,7 +443,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -452,7 +451,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -483,7 +482,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -498,7 +497,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     if (report.employee.userId !== userId) {
@@ -528,7 +527,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -536,7 +535,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     if (report.status !== FeedbackReportStatus.DRAFT) {
@@ -572,7 +571,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -580,7 +579,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     if (report.status === FeedbackReportStatus.SENT) {
@@ -778,7 +777,7 @@ export class FeedbackReportsService {
     const trimmedId = id?.trim();
     
     if (!trimmedId) {
-      throw new NotFoundException(`Feedback report ID is required`);
+      throw new NotFoundException(ErrorMessages.MISSING_REQUIRED_FIELD('Feedback report ID'));
     }
 
     const report = await this.prisma.feedbackReport.findUnique({
@@ -786,7 +785,7 @@ export class FeedbackReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException(`Feedback report with ID ${trimmedId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Feedback report', trimmedId));
     }
 
     if (report.status === FeedbackReportStatus.SENT) {

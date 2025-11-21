@@ -2,17 +2,22 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CandidateStage, EmploymentStatus, Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { BaseService } from '../../../common/services/base.service';
+import { QueryBuilder } from '../../../common/utils/query-builder.util';
+import { ErrorMessages } from '../../../common/constants/error-messages.const';
 import { EmailService } from '../../../common/email/email.service';
 import { TemplatesService } from '../../templates/templates.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { UsersService } from '../../users/users.service';
 import { extractMentionIdentifiers } from '../../../common/utils/mention-parser';
+import { extractDriveFolderId, generateDriveFolderUrl } from '../../../common/utils/drive-folder.util';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { UpdateCandidateDto } from './dto/update-candidate.dto';
 import { FilterCandidatesDto } from './dto/filter-candidates.dto';
@@ -21,6 +26,7 @@ import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
 import { MarkInactiveDto } from './dto/mark-inactive.dto';
 import { SendCandidateEmailDto } from './dto/send-email.dto';
+import { PreviewCandidateEmailDto } from './dto/preview-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 const RECRUITER_SELECT = {
@@ -28,28 +34,22 @@ const RECRUITER_SELECT = {
   firstName: true,
   lastName: true,
   email: true,
+  phone: true,
   avatar: true,
+  role: true,
 };
 
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    page: number;
-    pageSize: number;
-    total: number;
-    pageCount: number;
-  };
-}
-
 @Injectable()
-export class CandidatesService {
+export class CandidatesService extends BaseService {
   constructor(
-    private readonly prisma: PrismaService,
+    prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly templatesService: TemplatesService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
-  ) {}
+  ) {
+    super(prisma);
+  }
 
   private candidateInclude() {
     return {
@@ -73,7 +73,9 @@ export class CandidatesService {
       },
       employee: true,
       recruiter: {
-        select: RECRUITER_SELECT,
+        include: {
+          employee: true,
+        },
       },
     };
   }
@@ -124,7 +126,7 @@ export class CandidatesService {
 
     formatted.driveFolderId = candidate.driveFolderId ?? null;
     formatted.driveFolderUrl = candidate.driveFolderId
-      ? `https://drive.google.com/drive/folders/${candidate.driveFolderId}`
+      ? generateDriveFolderUrl(candidate.driveFolderId)
       : null;
 
     formatted.recruiter = candidate.recruiter
@@ -146,83 +148,35 @@ export class CandidatesService {
     return formatted;
   }
 
-  private extractDriveFolderId(input?: string | null): string | undefined {
-    if (!input) {
-      return undefined;
-    }
-
-    const trimmed = input.trim();
-
-    if (!trimmed) {
-      return undefined;
-    }
-
-    const idPattern = /[-\w]{10,}/;
-
-    // If it does not look like a URL, assume it's already an ID.
-    if (!trimmed.includes('/')) {
-      const maybeId = trimmed.match(idPattern)?.[0];
-      return maybeId ?? undefined;
-    }
-
-    try {
-      const url = new URL(trimmed);
-
-      // Only extract folder IDs, not file IDs
-      // Check for folder pattern first: /drive/folders/ID or /folders/ID
-      const folderMatch = url.pathname.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/) || 
-                         url.pathname.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-      if (folderMatch?.[1]) {
-        return folderMatch[1];
-      }
-
-      // If it's a file URL (/file/d/ID), reject it - this is not a folder
-      const fileMatch = url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-      if (fileMatch?.[1]) {
-        // This is a file, not a folder - return undefined
-        return undefined;
-      }
-
-      const idFromQuery = url.searchParams.get('id');
-      if (idFromQuery) {
-        return idFromQuery;
-      }
-    } catch {
-      // Not a valid URL; fall back to regex below.
-    }
-
-    const fallbackMatch = trimmed.match(idPattern);
-    return fallbackMatch?.[0];
-  }
 
   private validateSortField(sortBy?: string) {
-    if (!sortBy) {
-      return;
-    }
-
-    const allowed = ['createdAt', 'updatedAt', 'stage', 'rating', 'firstName'];
-    if (!allowed.includes(sortBy)) {
-      throw new BadRequestException(`Unsupported sort field: ${sortBy}`);
+    try {
+      QueryBuilder.validateSortField(sortBy, ['createdAt', 'updatedAt', 'stage', 'rating', 'firstName', 'lastName', 'email', 'recruiterId']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
     }
   }
 
   private buildWhereClause(
     filters: FilterCandidatesDto,
   ): Prisma.CandidateWhereInput {
-    const where: Prisma.CandidateWhereInput = {
-      // Filter out deleted candidates by default
-      deletedAt: null,
-    };
+    // Exclude complex filters from QueryBuilder
+    const { search, positionId, hasOpenPosition, skills, ...baseFilters } = filters;
+    
+    const baseWhere = QueryBuilder.buildWhereClause<Prisma.CandidateWhereInput>(
+      baseFilters,
+      {
+        searchFields: ['firstName', 'lastName', 'email', 'city', 'country'],
+      },
+    );
 
-    // Only filter by isActive if explicitly provided
-    // If not provided, show all candidates (both active and inactive)
-    if (filters.isActive !== undefined) {
-      where.isActive = filters.isActive;
-    }
+    // Filter out deleted candidates by default
+    baseWhere.deletedAt = null;
 
-    if (filters.search) {
-      const searchTerm = filters.search.trim();
-      where.OR = [
+    // Handle complex search manually (override QueryBuilder's search to include city and country)
+    if (search) {
+      const searchTerm = search.trim();
+      baseWhere.OR = [
         {
           firstName: {
             contains: searchTerm,
@@ -256,25 +210,18 @@ export class CandidatesService {
       ];
     }
 
-    if (filters.stage) {
-      where.stage = filters.stage;
-    }
-
-    if (filters.recruiterId) {
-      where.recruiterId = filters.recruiterId;
-    }
-
+    // Handle position filters (complex relation filtering)
     const positionFilters: Prisma.CandidatePositionListRelationFilter = {};
 
-    if (filters.positionId) {
+    if (positionId) {
       positionFilters.some = {
         ...(positionFilters.some ?? {}),
-        positionId: filters.positionId,
+        positionId: positionId,
       };
     }
 
-    if (filters.hasOpenPosition !== undefined) {
-      if (filters.hasOpenPosition) {
+    if (hasOpenPosition !== undefined) {
+      if (hasOpenPosition) {
         positionFilters.some = {
           ...(positionFilters.some ?? {}),
           position: {
@@ -295,16 +242,17 @@ export class CandidatesService {
     }
 
     if (Object.keys(positionFilters).length > 0) {
-      where.positions = positionFilters;
+      baseWhere.positions = positionFilters;
     }
 
-    if (filters.skills && filters.skills.length > 0) {
-      where.skills = {
-        hasSome: filters.skills,
+    // Handle skills array filter
+    if (skills && skills.length > 0) {
+      baseWhere.skills = {
+        hasSome: skills,
       };
     }
 
-    return where;
+    return baseWhere;
   }
 
   private async ensureCandidateExists(id: string) {
@@ -314,7 +262,7 @@ export class CandidatesService {
     });
 
     if (!candidate) {
-      throw new NotFoundException(`Candidate with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
     }
 
     return candidate;
@@ -327,12 +275,12 @@ export class CandidatesService {
 
     if (existing) {
       throw new ConflictException(
-        `Candidate with email ${createDto.email} already exists`,
+        ErrorMessages.ALREADY_EXISTS('Candidate', 'email'),
       );
     }
 
     const inputValue = createDto.driveFolderId ?? createDto.driveFolderUrl;
-    const driveFolderId = this.extractDriveFolderId(inputValue);
+    const driveFolderId = extractDriveFolderId(inputValue);
 
     // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
     // throw an error for create (since we need valid data), but allow null for updates
@@ -384,45 +332,44 @@ export class CandidatesService {
     // Process @mentions in notes and create notifications
     if (createDto.notes) {
       this.processMentions(candidate.id, createDto.notes, userId).catch((error) => {
-        console.error(`[Mentions] Failed to process mentions for candidate ${candidate.id}:`, error);
+        this.logger.error(`[Mentions] Failed to process mentions for candidate ${candidate.id}:`, error);
       });
     }
 
     return this.formatCandidate(candidate);
   }
 
-  async findAll(filters: FilterCandidatesDto): Promise<PaginatedResult<any>> {
+  async findAll(filters: FilterCandidatesDto) {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
-    const skip = (page - 1) * pageSize;
 
     const sortBy = filters.sortBy ?? 'createdAt';
     const sortOrder = filters.sortOrder ?? 'desc';
-    this.validateSortField(sortBy);
+    
+    try {
+      QueryBuilder.validateSortField(sortBy, ['createdAt', 'updatedAt', 'firstName', 'lastName', 'email', 'stage', 'recruiterId']);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : `Unsupported sort field: ${sortBy}`);
+    }
 
     const where = this.buildWhereClause(filters);
 
-    const [total, candidates] = await this.prisma.$transaction([
-      this.prisma.candidate.count({ where }),
-      this.prisma.candidate.findMany({
-        where,
-        skip,
-        take: pageSize,
+    const result = await this.paginate(
+      this.prisma.candidate,
+      where,
+      {
+        page,
+        pageSize,
         orderBy: {
           [sortBy]: sortOrder,
         },
         include: this.candidateInclude(),
-      }),
-    ]);
+      }
+    );
 
     return {
-      data: candidates.map((candidate) => this.formatCandidate(candidate)),
-      meta: {
-        page,
-        pageSize,
-        total,
-        pageCount: Math.ceil(total / pageSize),
-      },
+      ...result,
+      data: result.data.map((candidate) => this.formatCandidate(candidate)),
     };
   }
 
@@ -443,7 +390,7 @@ export class CandidatesService {
     });
 
     if (!candidate) {
-      throw new NotFoundException(`Candidate with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
     }
 
     return this.formatCandidate(candidate);
@@ -463,7 +410,7 @@ export class CandidatesService {
       if (!inputValue || (typeof inputValue === 'string' && inputValue.trim().length === 0)) {
         driveFolderIdUpdate = null;
       } else {
-        const resolved = this.extractDriveFolderId(inputValue);
+        const resolved = extractDriveFolderId(inputValue);
 
         // If a value was provided but couldn't be extracted (e.g., file URL in folder field),
         // silently ignore it rather than throwing an error - this allows users to clear invalid values
@@ -529,7 +476,7 @@ export class CandidatesService {
       // Process @mentions if notes were updated
       if (updateDto.notes !== undefined) {
         this.processMentions(id, updateDto.notes, userId).catch((error) => {
-          console.error(`[Mentions] Failed to process mentions for candidate ${id}:`, error);
+          this.logger.error(`[Mentions] Failed to process mentions for candidate ${id}:`, error);
         });
       }
 
@@ -672,7 +619,7 @@ export class CandidatesService {
     });
 
     if (!updated) {
-      throw new NotFoundException(`Candidate with ID ${candidateId} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', candidateId));
     }
 
     return this.formatCandidate(updated);
@@ -903,7 +850,7 @@ export class CandidatesService {
     });
 
     if (!candidate) {
-      throw new NotFoundException(`Candidate with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
     }
 
     if (!candidate.deletedAt) {
@@ -942,7 +889,7 @@ export class CandidatesService {
     });
 
     if (!updated) {
-      throw new NotFoundException(`Candidate with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
     }
 
     // Send email if requested
@@ -974,7 +921,7 @@ export class CandidatesService {
           emailBody = rendered.html;
           emailSubject = `Update on Your Application - ${updated.firstName} ${updated.lastName}`;
         } catch (templateError: any) {
-          console.warn(
+          this.logger.warn(
             `[Candidates] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
             templateError,
           );
@@ -1001,7 +948,7 @@ export class CandidatesService {
         });
       } catch (error: any) {
         // Log error but don't fail the operation
-        console.error('Failed to send email to candidate:', error);
+        this.logger.error('Failed to send email to candidate:', error);
         // Still return the updated candidate even if email fails
       }
     }
@@ -1034,7 +981,7 @@ export class CandidatesService {
     });
 
     if (!candidateRaw) {
-      throw new NotFoundException(`Candidate with ID ${id} not found`);
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
     }
 
     const candidate = this.formatCandidate(candidateRaw);
@@ -1044,33 +991,40 @@ export class CandidatesService {
 
     // If template is provided, render it with candidate data
     if (dto.templateId) {
+      // Use candidateRaw for template data to preserve recruiter.employee relation
       const templateData = {
         candidate: {
-          id: candidate.id,
-          firstName: candidate.firstName,
-          lastName: candidate.lastName,
-          fullName: `${candidate.firstName} ${candidate.lastName}`,
-          email: candidate.email,
-          phone: candidate.phone,
-          currentTitle: candidate.currentTitle,
-          yearsOfExperience: candidate.yearsOfExperience,
-          skills: candidate.skills,
-          stage: candidate.stage,
-          rating: candidate.rating,
-          notes: candidate.notes,
-          city: candidate.city,
-          country: candidate.country,
-          availableFrom: candidate.availableFrom,
-          expectedSalary: candidate.expectedSalary ? Number(candidate.expectedSalary) : null,
-          salaryCurrency: candidate.salaryCurrency,
-          createdAt: candidate.createdAt,
-          updatedAt: candidate.updatedAt,
+          id: candidateRaw.id,
+          firstName: candidateRaw.firstName,
+          lastName: candidateRaw.lastName,
+          fullName: `${candidateRaw.firstName} ${candidateRaw.lastName}`,
+          email: candidateRaw.email,
+          phone: candidateRaw.phone,
+          currentTitle: candidateRaw.currentTitle,
+          yearsOfExperience: candidateRaw.yearsOfExperience,
+          skills: candidateRaw.skills,
+          stage: candidateRaw.stage,
+          rating: candidateRaw.rating,
+          notes: candidateRaw.notes,
+          city: candidateRaw.city,
+          country: candidateRaw.country,
+          availableFrom: candidateRaw.availableFrom,
+          expectedSalary: candidateRaw.expectedSalary ? Number(candidateRaw.expectedSalary) : null,
+          salaryCurrency: candidateRaw.salaryCurrency,
+          createdAt: candidateRaw.createdAt,
+          updatedAt: candidateRaw.updatedAt,
         },
-        recruiter: candidate.recruiter
+        recruiter: candidateRaw.recruiter
           ? {
-              firstName: candidate.recruiter.firstName,
-              lastName: candidate.recruiter.lastName,
-              email: candidate.recruiter.email,
+              id: candidateRaw.recruiter.id,
+              firstName: candidateRaw.recruiter.firstName,
+              lastName: candidateRaw.recruiter.lastName,
+              fullName: `${candidateRaw.recruiter.firstName} ${candidateRaw.recruiter.lastName}`,
+              email: candidateRaw.recruiter.email,
+              phone: candidateRaw.recruiter.phone || null,
+              role: candidateRaw.recruiter.role,
+              avatar: candidateRaw.recruiter.avatar || null,
+              bookingLink: (candidateRaw.recruiter.employee as any)?.bookingLink || null,
             }
           : null,
         positions: candidate.positions?.map((cp: any) => ({
@@ -1093,7 +1047,7 @@ export class CandidatesService {
         htmlContent = rendered.html;
         textContent = rendered.text;
       } catch (templateError) {
-        console.warn(
+        this.logger.warn(
           `[Candidates] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
           templateError,
         );
@@ -1129,6 +1083,104 @@ export class CandidatesService {
       message: 'Email sent successfully',
       to: dto.to,
       subject: dto.subject,
+    };
+  }
+
+  async previewEmail(id: string, dto: PreviewCandidateEmailDto) {
+    const candidateRaw = await this.prisma.candidate.findUnique({
+      where: { id },
+      include: this.candidateInclude(),
+    });
+
+    if (!candidateRaw) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
+    }
+
+    const candidate = this.formatCandidate(candidateRaw);
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with candidate data
+    if (dto.templateId) {
+      // Use candidateRaw for template data to preserve recruiter.employee relation
+      const templateData = {
+        candidate: {
+          id: candidateRaw.id,
+          firstName: candidateRaw.firstName,
+          lastName: candidateRaw.lastName,
+          fullName: `${candidateRaw.firstName} ${candidateRaw.lastName}`,
+          email: candidateRaw.email,
+          phone: candidateRaw.phone,
+          currentTitle: candidateRaw.currentTitle,
+          yearsOfExperience: candidateRaw.yearsOfExperience,
+          skills: candidateRaw.skills,
+          stage: candidateRaw.stage,
+          rating: candidateRaw.rating,
+          notes: candidateRaw.notes,
+          city: candidateRaw.city,
+          country: candidateRaw.country,
+          availableFrom: candidateRaw.availableFrom,
+          expectedSalary: candidateRaw.expectedSalary ? Number(candidateRaw.expectedSalary) : null,
+          salaryCurrency: candidateRaw.salaryCurrency,
+          createdAt: candidateRaw.createdAt,
+          updatedAt: candidateRaw.updatedAt,
+        },
+        recruiter: candidateRaw.recruiter
+          ? {
+              id: candidateRaw.recruiter.id,
+              firstName: candidateRaw.recruiter.firstName,
+              lastName: candidateRaw.recruiter.lastName,
+              fullName: `${candidateRaw.recruiter.firstName} ${candidateRaw.recruiter.lastName}`,
+              email: candidateRaw.recruiter.email,
+              phone: candidateRaw.recruiter.phone || null,
+              role: candidateRaw.recruiter.role,
+              avatar: candidateRaw.recruiter.avatar || null,
+              bookingLink: (candidateRaw.recruiter.employee as any)?.bookingLink || null,
+            }
+          : null,
+        positions: candidate.positions?.map((cp: any) => ({
+          title: cp.position?.title,
+          description: cp.position?.description,
+          requirements: cp.position?.requirements,
+          status: cp.status,
+          appliedAt: cp.appliedAt,
+          customer: cp.position?.opportunity?.customer
+            ? {
+                name: cp.position.opportunity.customer.name,
+                email: cp.position.opportunity.customer.email || null,
+              }
+            : null,
+        })),
+      };
+
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        this.logger.warn(
+          `[Candidates] Failed to render email template ${dto.templateId} for preview:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultCandidateSendEmailTemplate(candidateRaw, templateData);
+        textContent = this.getDefaultCandidateSendEmailText(candidateRaw, templateData);
+      }
+    } else if (!htmlContent) {
+      // For preview, if no template and no HTML, return empty
+      htmlContent = '';
+      textContent = '';
+    }
+
+    // Convert line breaks to <br> tags for HTML content if it's plain text
+    if (htmlContent && !htmlContent.includes('<') && !htmlContent.includes('>')) {
+      htmlContent = htmlContent.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<br>').join('');
+    }
+
+    return {
+      html: htmlContent || '',
+      text: textContent || '',
     };
   }
 
@@ -1286,7 +1338,7 @@ ${candidate.email ? `Email: ${candidate.email}\n` : ''}${candidate.phone ? `Phon
         return;
       }
 
-      console.log(`[Mentions] Processing mentions for candidate ${candidateId}:`, {
+      this.logger.log(`[Mentions] Processing mentions for candidate ${candidateId}:`, {
         identifiers,
         textPreview: notes.substring(0, 100),
       });
@@ -1294,13 +1346,13 @@ ${candidate.email ? `Email: ${candidate.email}\n` : ''}${candidate.phone ? `Phon
       // Find users by mentions
       const mentionedUserIds = await this.usersService.findUsersByMentions(identifiers);
       
-      console.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
+      this.logger.log(`[Mentions] Found ${mentionedUserIds.length} users for mentions:`, mentionedUserIds);
       
       // Remove the creator from mentioned users (they don't need to be notified about their own mentions)
       const userIdsToNotify = mentionedUserIds.filter((id) => id !== createdById);
       
       if (userIdsToNotify.length === 0) {
-        console.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
+        this.logger.log(`[Mentions] No users to notify (all mentions were by creator or no matches found)`);
         return;
       }
 
@@ -1334,10 +1386,10 @@ ${candidate.email ? `Email: ${candidate.email}\n` : ''}${candidate.phone ? `Phon
         candidateId,
       );
 
-      console.log(`[Mentions] Created ${notifications.length} notifications for candidate ${candidateId}`);
+      this.logger.log(`[Mentions] Created ${notifications.length} notifications for candidate ${candidateId}`);
     } catch (error) {
       // Log error but don't fail the candidate creation/update
-      console.error(`[Mentions] Error processing mentions for candidate ${candidateId}:`, error);
+      this.logger.error(`[Mentions] Error processing mentions for candidate ${candidateId}:`, error);
     }
   }
 }
