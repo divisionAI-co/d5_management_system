@@ -170,7 +170,7 @@ export class EmailService {
           },
           requireTLS: this.getBooleanEnv('SMTP_REQUIRE_TLS', false),
           tls: this.buildSmtpTlsOptions(),
-        } as SMTPTransport.Options);
+        } as unknown as SMTPTransport.Options);
         this.logger.log('SMTP email provider initialized');
         break;
     }

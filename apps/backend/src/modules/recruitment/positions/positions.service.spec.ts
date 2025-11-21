@@ -108,10 +108,7 @@ describe('OpenPositionsService', () => {
         opportunityId: 'opp-1',
       };
 
-      prismaService.opportunity.findUnique.mockResolvedValue({
-        ...mockOpportunity,
-        openPosition: null,
-      });
+      prismaService.opportunity.findUnique.mockResolvedValue(mockOpportunity);
       prismaService.openPosition.create.mockResolvedValue({
         ...mockPosition,
         opportunityId: 'opp-1',
@@ -123,6 +120,30 @@ describe('OpenPositionsService', () => {
       expect(prismaService.opportunity.findUnique).toHaveBeenCalled();
     });
 
+    it('should allow linking multiple positions to the same opportunity', async () => {
+      const dtoWithOpportunity: CreatePositionDto = {
+        ...createDto,
+        opportunityId: 'opp-1',
+      };
+
+      // Opportunity already has a position, but we should still allow linking another
+      const opportunityWithPosition = {
+        ...mockOpportunity,
+        openPositions: [{ id: 'position-existing' }],
+      };
+
+      prismaService.opportunity.findUnique.mockResolvedValue(opportunityWithPosition);
+      prismaService.openPosition.create.mockResolvedValue({
+        ...mockPosition,
+        opportunityId: 'opp-1',
+      });
+
+      const result = await service.create(dtoWithOpportunity);
+
+      expect(result).toBeDefined();
+      expect(prismaService.openPosition.create).toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException when opportunity does not exist', async () => {
       const dtoWithOpportunity: CreatePositionDto = {
         ...createDto,
@@ -132,24 +153,6 @@ describe('OpenPositionsService', () => {
       prismaService.opportunity.findUnique.mockResolvedValue(null);
 
       await expect(service.create(dtoWithOpportunity)).rejects.toThrow(NotFoundException);
-    });
-
-    it('should throw BadRequestException when opportunity already has position', async () => {
-      const opportunityWithPosition = {
-        ...mockOpportunity,
-        openPosition: {
-          id: 'position-existing',
-        },
-      };
-
-      const dtoWithOpportunity: CreatePositionDto = {
-        ...createDto,
-        opportunityId: 'opp-1',
-      };
-
-      prismaService.opportunity.findUnique.mockResolvedValue(opportunityWithPosition);
-
-      await expect(service.create(dtoWithOpportunity)).rejects.toThrow(BadRequestException);
     });
 
     it('should use default description when not provided', async () => {
@@ -336,12 +339,10 @@ describe('OpenPositionsService', () => {
       );
     });
 
-    it('should throw BadRequestException when opportunity already linked to different position', async () => {
-      const opportunityWithPosition = {
+    it('should allow linking to opportunity that already has other positions', async () => {
+      const opportunityWithPositions = {
         ...mockOpportunity,
-        openPosition: {
-          id: 'position-other',
-        },
+        openPositions: [{ id: 'position-other' }],
       };
 
       const updateWithOpportunity: UpdatePositionDto = {
@@ -349,9 +350,16 @@ describe('OpenPositionsService', () => {
       };
 
       prismaService.openPosition.findUnique.mockResolvedValue(mockPosition);
-      prismaService.opportunity.findUnique.mockResolvedValue(opportunityWithPosition);
+      prismaService.opportunity.findUnique.mockResolvedValue(opportunityWithPositions);
+      prismaService.openPosition.update.mockResolvedValue({
+        ...mockPosition,
+        opportunityId: 'opp-1',
+      });
 
-      await expect(service.update('position-1', updateWithOpportunity)).rejects.toThrow(BadRequestException);
+      const result = await service.update('position-1', updateWithOpportunity);
+
+      expect(result).toBeDefined();
+      expect(prismaService.openPosition.update).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when opportunity does not exist', async () => {

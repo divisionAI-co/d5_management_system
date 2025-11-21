@@ -216,5 +216,36 @@ export class RateLimitingService {
       },
     });
   }
+
+  /**
+   * Unlock a user account (admin action)
+   * Removes account lockout and clears all failed login attempts
+   */
+  async unlockAccount(userId: string): Promise<void> {
+    await Promise.all([
+      // Remove account lockout
+      this.prisma.accountLockout.deleteMany({
+        where: { userId },
+      }),
+      // Clear all failed login attempts for this user
+      this.prisma.failedLoginAttempt.deleteMany({
+        where: { userId },
+      }),
+    ]);
+  }
+
+  /**
+   * Reset login cooldown by clearing rate limit attempts for a user's email
+   * This allows the user to attempt login again without waiting for cooldown
+   */
+  async resetLoginCooldown(userEmail: string): Promise<void> {
+    // Clear rate limit attempts for this email (username type)
+    await this.prisma.rateLimitAttempt.deleteMany({
+      where: {
+        identifier: userEmail.toLowerCase().trim(),
+        type: 'username',
+      },
+    });
+  }
 }
 

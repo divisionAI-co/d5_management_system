@@ -16,6 +16,7 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { EmailService } from '../../common/email/email.service';
+import { RateLimitingService } from '../../common/rate-limiting/rate-limiting.service';
 
 const USER_PROFILE_SELECT = Prisma.validator<Prisma.UserSelect>()({
   id: true,
@@ -61,6 +62,7 @@ export class UsersService extends BaseService {
     prisma: PrismaService,
     private emailService: EmailService,
     private configService: ConfigService,
+    private rateLimitingService: RateLimitingService,
   ) {
     super(prisma);
   }
@@ -650,6 +652,40 @@ export class UsersService extends BaseService {
 
     return {
       message: 'Password reset email has been sent.',
+    };
+  }
+
+  /**
+   * Unlock a user account (admin action)
+   * Removes account lockout and clears all failed login attempts
+   */
+  async unlockAccount(userId: string): Promise<{ message: string }> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
+    }
+
+    await this.rateLimitingService.unlockAccount(userId);
+
+    return {
+      message: 'Account has been unlocked successfully.',
+    };
+  }
+
+  /**
+   * Reset login cooldown for a user (admin action)
+   * Clears rate limit attempts to allow login without waiting for cooldown
+   */
+  async resetLoginCooldown(userId: string): Promise<{ message: string }> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
+    }
+
+    await this.rateLimitingService.resetLoginCooldown(user.email);
+
+    return {
+      message: 'Login cooldown has been reset successfully.',
     };
   }
 }

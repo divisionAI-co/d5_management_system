@@ -7,6 +7,7 @@ import { addHours } from 'date-fns';
 import { UsersService } from './users.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { EmailService } from '../../common/email/email.service';
+import { RateLimitingService } from '../../common/rate-limiting/rate-limiting.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -22,6 +23,7 @@ describe('UsersService', () => {
   let prismaService: any;
   let emailService: any;
   let configService: any;
+  let rateLimitingService: any;
 
   const mockUser = {
     id: 'user-1',
@@ -74,6 +76,11 @@ describe('UsersService', () => {
       get: jest.fn(),
     };
 
+    const mockRateLimitingService = {
+      unlockAccount: jest.fn(),
+      resetLoginCooldown: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
@@ -89,6 +96,10 @@ describe('UsersService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: RateLimitingService,
+          useValue: mockRateLimitingService,
+        },
       ],
     }).compile();
 
@@ -96,6 +107,7 @@ describe('UsersService', () => {
     prismaService = module.get(PrismaService);
     emailService = module.get(EmailService);
     configService = module.get(ConfigService);
+    rateLimitingService = module.get(RateLimitingService);
   });
 
   afterEach(() => {
@@ -952,6 +964,52 @@ describe('UsersService', () => {
       await expect(service.findByIdWithSecret('nonexistent')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('unlockAccount', () => {
+    it('should unlock user account successfully', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser as any);
+      rateLimitingService.unlockAccount.mockResolvedValue(undefined);
+
+      const result = await service.unlockAccount('user-1');
+
+      expect(result.message).toBe('Account has been unlocked successfully.');
+      expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        select: expect.any(Object),
+      });
+      expect(rateLimitingService.unlockAccount).toHaveBeenCalledWith('user-1');
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      prismaService.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.unlockAccount('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(rateLimitingService.unlockAccount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetLoginCooldown', () => {
+    it('should reset login cooldown successfully', async () => {
+      prismaService.user.findUnique.mockResolvedValue(mockUser as any);
+      rateLimitingService.resetLoginCooldown.mockResolvedValue(undefined);
+
+      const result = await service.resetLoginCooldown('user-1');
+
+      expect(result.message).toBe('Login cooldown has been reset successfully.');
+      expect(prismaService.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        select: expect.any(Object),
+      });
+      expect(rateLimitingService.resetLoginCooldown).toHaveBeenCalledWith(mockUser.email);
+    });
+
+    it('should throw NotFoundException when user does not exist', async () => {
+      prismaService.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.resetLoginCooldown('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(rateLimitingService.resetLoginCooldown).not.toHaveBeenCalled();
     });
   });
 });

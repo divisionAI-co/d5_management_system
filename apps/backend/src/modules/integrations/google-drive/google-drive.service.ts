@@ -415,6 +415,34 @@ export class GoogleDriveService extends BaseService {
     }
   }
 
+  async createFolder(name: string, parentId?: string, userId?: string): Promise<DriveFile> {
+    if (!name || !name.trim()) {
+      throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('folder name'));
+    }
+
+    const drive = await this.getDriveClient(userId);
+    const sharedDriveId = this.getSharedDriveId();
+    const destinationParent = parentId || sharedDriveId;
+
+    try {
+      const { data } = await drive.files.create({
+        supportsAllDrives: true,
+        fields:
+          'id, name, mimeType, size, parents, createdTime, modifiedTime, webViewLink, iconLink, owners(displayName,emailAddress)',
+        requestBody: {
+          name: name.trim(),
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: destinationParent ? [destinationParent] : undefined,
+        },
+      });
+
+      return this.mapFile(data);
+    } catch (error) {
+      this.logger.error('Failed to create folder in Google Drive', error as Error);
+      throw new InternalServerErrorException(ErrorMessages.CREATE_FAILED('folder in Google Drive'));
+    }
+  }
+
   async uploadFile(file: Express.Multer.File, parentId?: string, userId?: string): Promise<DriveFile> {
     if (!file) {
       throw new BadRequestException(ErrorMessages.MISSING_REQUIRED_FIELD('file'));

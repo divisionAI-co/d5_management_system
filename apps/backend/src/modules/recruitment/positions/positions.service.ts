@@ -52,22 +52,11 @@ export class OpenPositionsService extends BaseService {
     if (createDto.opportunityId) {
       const opportunity = await this.prisma.opportunity.findUnique({
         where: { id: createDto.opportunityId },
-        include: {
-          openPosition: {
-            select: { id: true },
-          },
-        },
       });
 
       if (!opportunity) {
         throw new NotFoundException(
           ErrorMessages.NOT_FOUND('Opportunity', createDto.opportunityId),
-        );
-      }
-
-      if (opportunity.openPosition) {
-        throw new BadRequestException(
-          ErrorMessages.ALREADY_EXISTS('Opportunity', 'linked job position'),
         );
       }
     }
@@ -262,6 +251,88 @@ export class OpenPositionsService extends BaseService {
     return position;
   }
 
+  /**
+   * Public method for website showcase - returns only open, non-archived positions
+   * without sensitive candidate information
+   */
+  async findAllPublic(filters: FilterPositionsDto) {
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 25;
+
+    const sortBy = filters.sortBy ?? 'createdAt';
+    const sortOrder = filters.sortOrder ?? 'desc';
+    this.validateSortField(sortBy);
+
+    // Build where clause but force public filters
+    const where = this.buildWhereClause({
+      ...filters,
+      // Force public filters: only open, non-archived positions
+      status: 'Open',
+      isArchived: false,
+    });
+
+    const result = await this.paginate(
+      this.prisma.openPosition,
+      where,
+      {
+        page,
+        pageSize,
+        orderBy: {
+          [sortBy]: sortOrder,
+        },
+        // Exclude opportunity and candidates for public endpoint
+      }
+    );
+
+    // Format and sanitize for public display
+    return {
+      ...result,
+      data: result.data.map((position) => this.formatPublicPosition(position)),
+    };
+  }
+
+  /**
+   * Public method for website showcase - returns a single position
+   * without sensitive candidate information
+   */
+  async findOnePublic(id: string) {
+    const position = await this.prisma.openPosition.findUnique({
+      where: { 
+        id,
+        status: 'Open',
+        isArchived: false,
+      },
+      // Exclude opportunity and candidates for public endpoint
+    });
+
+    if (!position) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', id));
+    }
+
+    return this.formatPublicPosition(position);
+  }
+
+  /**
+   * Format position for public display (no sensitive data, no opportunity info)
+   */
+  private formatPublicPosition(position: any) {
+    if (!position) {
+      return position;
+    }
+
+    return {
+      id: position.id,
+      title: position.title,
+      description: position.description,
+      requirements: position.requirements,
+      status: position.status,
+      recruitmentStatus: position.recruitmentStatus,
+      createdAt: position.createdAt,
+      updatedAt: position.updatedAt,
+      // Explicitly exclude opportunity, candidates, and other sensitive data
+    };
+  }
+
   async findAll(filters: FilterPositionsDto) {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 25;
@@ -372,36 +443,16 @@ export class OpenPositionsService extends BaseService {
   async update(id: string, updateDto: UpdatePositionDto) {
     const existingPosition = await this.ensurePositionExists(id);
 
-    // If updating opportunityId, validate the new opportunity
-    if (updateDto.opportunityId !== undefined) {
-      if (updateDto.opportunityId === null || updateDto.opportunityId === '') {
-        // Unlinking opportunity - check if current position has one
-        if (existingPosition.opportunityId) {
-          // Allow unlinking
-        }
-      } else {
-        // Linking to a new opportunity - validate it exists and isn't already linked
-        const opportunity = await this.prisma.opportunity.findUnique({
-          where: { id: updateDto.opportunityId },
-          include: {
-            openPosition: {
-              select: { id: true },
-            },
-          },
-        });
+    // If updating opportunityId, validate the new opportunity exists
+    if (updateDto.opportunityId !== undefined && updateDto.opportunityId !== null && updateDto.opportunityId !== '') {
+      const opportunity = await this.prisma.opportunity.findUnique({
+        where: { id: updateDto.opportunityId },
+      });
 
-        if (!opportunity) {
-          throw new NotFoundException(
-            ErrorMessages.NOT_FOUND('Opportunity', updateDto.opportunityId),
-          );
-        }
-
-        // If opportunity is already linked to a different position, prevent the update
-        if (opportunity.openPosition && opportunity.openPosition.id !== id) {
-          throw new BadRequestException(
-            ErrorMessages.ALREADY_EXISTS('Opportunity', 'linked job position'),
-          );
-        }
+      if (!opportunity) {
+        throw new NotFoundException(
+          ErrorMessages.NOT_FOUND('Opportunity', updateDto.opportunityId),
+        );
       }
     }
 

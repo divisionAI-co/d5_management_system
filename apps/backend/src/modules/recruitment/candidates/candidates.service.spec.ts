@@ -37,7 +37,12 @@ describe('CandidatesService', () => {
     firstName: 'Jane',
     lastName: 'Recruiter',
     email: 'jane@example.com',
+    phone: '+1234567890',
+    role: UserRole.RECRUITER,
     avatar: null,
+    employee: {
+      bookingLink: 'https://calendly.com/jane-recruiter',
+    },
   };
 
   const mockCandidate = {
@@ -842,7 +847,56 @@ describe('CandidatesService', () => {
 
       await service.sendEmail('candidate-1', dtoWithTemplate);
 
-      expect(templatesService.render).toHaveBeenCalled();
+      expect(templatesService.render).toHaveBeenCalledWith(
+        'template-1',
+        expect.objectContaining({
+          recruiter: expect.objectContaining({
+            id: 'recruiter-1',
+            firstName: 'Jane',
+            lastName: 'Recruiter',
+            fullName: 'Jane Recruiter',
+            email: 'jane@example.com',
+            phone: '+1234567890',
+            role: UserRole.RECRUITER,
+            avatar: null,
+            bookingLink: 'https://calendly.com/jane-recruiter',
+          }),
+        }),
+      );
+    });
+
+    it('should handle recruiter without employee record (bookingLink null)', async () => {
+      const candidateWithoutEmployee = {
+        ...mockCandidate,
+        recruiter: {
+          ...mockRecruiter,
+          employee: null,
+        },
+      };
+
+      const dtoWithTemplate: SendCandidateEmailDto = {
+        ...sendEmailDto,
+        templateId: 'template-1',
+        htmlContent: undefined,
+      };
+
+      prismaService.candidate.findUnique.mockResolvedValue(candidateWithoutEmployee);
+      templatesService.render.mockResolvedValue({
+        html: '<p>Template content</p>',
+        text: 'Template content',
+      });
+      emailService.sendEmail.mockResolvedValue(true);
+
+      await service.sendEmail('candidate-1', dtoWithTemplate);
+
+      expect(templatesService.render).toHaveBeenCalledWith(
+        'template-1',
+        expect.objectContaining({
+          recruiter: expect.objectContaining({
+            bookingLink: null,
+          }),
+        }),
+      );
     });
 
     it('should throw BadRequestException when email sending fails', async () => {

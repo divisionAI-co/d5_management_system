@@ -8,6 +8,7 @@ import {
   CustomerType,
   NotificationType,
   Prisma,
+  RecruitmentStatus,
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma/prisma.service';
@@ -24,6 +25,7 @@ import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
 import { CloseOpportunityDto } from './dto/close-opportunity.dto';
 import { SendOpportunityEmailDto } from './dto/send-email.dto';
+import { PreviewOpportunityEmailDto } from './dto/preview-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 @Injectable()
@@ -51,8 +53,9 @@ export class OpportunitiesService extends BaseService {
           : null,
     };
 
-    if (opportunity?.openPosition) {
-      formatted.openPosition = opportunity.openPosition;
+    // Handle multiple positions - for backward compatibility, use first position
+    if (opportunity?.openPositions && opportunity.openPositions.length > 0) {
+      formatted.openPosition = opportunity.openPositions[0];
     }
 
     if (Array.isArray(opportunity?.activities)) {
@@ -208,7 +211,7 @@ export class OpportunitiesService extends BaseService {
               },
             },
           },
-          openPosition: {
+          openPositions: {
             select: {
               id: true,
               title: true,
@@ -266,7 +269,7 @@ export class OpportunitiesService extends BaseService {
             },
           },
         },
-        openPosition: true,
+        openPositions: true,
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -458,19 +461,45 @@ export class OpportunitiesService extends BaseService {
         } as Prisma.OpportunityUncheckedCreateInput,
       });
 
-      const shouldCreatePosition = this.shouldCreatePositionFromDto(createDto);
-      if (shouldCreatePosition) {
-        await tx.openPosition.create({
-          data: {
-            opportunityId: opportunity.id,
-            title: createDto.positionTitle ?? createDto.title,
-            description:
-              createDto.positionDescription ??
-              createDto.description ??
-              'TBD',
-            requirements: createDto.positionRequirements,
-            status: 'Open',
-          },
+      // Create positions - support both new array format and legacy single position format
+      const positionsToCreate: Array<{
+        title: string;
+        description?: string;
+        requirements?: string;
+        recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+      }> = [];
+
+      if (createDto.positions && createDto.positions.length > 0) {
+        // New format: array of positions
+        positionsToCreate.push(...createDto.positions);
+      } else if (this.shouldCreatePositionFromDto(createDto)) {
+        // Legacy format: single position from positionTitle/positionDescription/positionRequirements
+        positionsToCreate.push({
+          title: createDto.positionTitle ?? createDto.title,
+          description: createDto.positionDescription ?? createDto.description ?? 'TBD',
+          requirements: createDto.positionRequirements,
+        });
+      }
+
+      if (positionsToCreate.length > 0) {
+        await tx.openPosition.createMany({
+          data: positionsToCreate.map((pos) => {
+            let recruitmentStatus: RecruitmentStatus | null = null;
+            if (pos.recruitmentStatus && pos.recruitmentStatus.trim() !== '') {
+              const statusValue = pos.recruitmentStatus.trim();
+              if (statusValue === 'HEADHUNTING' || statusValue === 'STANDARD') {
+                recruitmentStatus = statusValue as RecruitmentStatus;
+              }
+            }
+            return {
+              opportunityId: opportunity.id,
+              title: pos.title,
+              description: pos.description ?? 'TBD',
+              requirements: pos.requirements,
+              recruitmentStatus,
+              status: 'Open',
+            };
+          }),
         });
       }
 
@@ -519,7 +548,7 @@ export class OpportunitiesService extends BaseService {
               },
             },
           },
-          openPosition: true,
+          openPositions: true,
         },
       });
 
@@ -540,7 +569,7 @@ export class OpportunitiesService extends BaseService {
     const existing = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
-        openPosition: true,
+        openPositions: true,
       },
     });
 
@@ -629,63 +658,82 @@ export class OpportunitiesService extends BaseService {
         updateDto.title !== undefined;
       const shouldCreatePosition = this.shouldCreatePositionFromDto(updateDto);
 
-      if (existing.openPosition) {
-        if (shouldCreatePosition) {
-          await tx.openPosition.update({
-            where: { id: existing.openPosition.id },
-            data: {
-              title:
-                updateDto.positionTitle ??
-                updateDto.title ??
-                existing.openPosition.title,
-              description:
-                updateDto.positionDescription ??
-                updateDto.description ??
-                existing.openPosition.description ??
-                'TBD',
-              requirements:
-                updateDto.positionRequirements ??
-                existing.openPosition.requirements,
-            },
-          });
+      // Handle positions - support both new array format and legacy single position format
+      const positionsToCreate: Array<{
+        title: string;
+        description?: string;
+        requirements?: string;
+        recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+      }> = [];
+
+      if (updateDto.positions && updateDto.positions.length > 0) {
+        // New format: array of positions - create new ones
+        positionsToCreate.push(...updateDto.positions);
+      } else if (shouldCreatePosition) {
+        // Legacy format: single position from positionTitle/positionDescription/positionRequirements
+        positionsToCreate.push({
+          title: updateDto.positionTitle ?? updateDto.title ?? updated.title,
+          description: updateDto.positionDescription ?? updateDto.description ?? updated.description ?? 'TBD',
+          requirements: updateDto.positionRequirements,
+        });
+      }
+
+      // Handle existing positions
+      const firstPosition = existing.openPositions && existing.openPositions.length > 0 ? existing.openPositions[0] : null;
+      
+      if (firstPosition) {
+        if (positionsToCreate.length > 0) {
+          // Update first position if using legacy format, otherwise create new ones
+          if (!updateDto.positions) {
+            await tx.openPosition.update({
+              where: { id: firstPosition.id },
+              data: {
+                title: positionsToCreate[0].title,
+                description: positionsToCreate[0].description ?? 'TBD',
+                requirements: positionsToCreate[0].requirements,
+              },
+            });
+          }
         }
 
         if (!requiresOpenPosition) {
-          await tx.openPosition.update({
-            where: { id: existing.openPosition.id },
+          // Cancel all positions if opportunity type no longer requires them
+          await tx.openPosition.updateMany({
+            where: { opportunityId: updated.id },
             data: {
               status: 'Cancelled',
-              ...(positionFieldsProvided
+              ...(positionFieldsProvided && !updateDto.positions && firstPosition
                 ? {
-                    title:
-                      updateDto.positionTitle ??
-                      updateDto.title ??
-                      existing.openPosition.title,
-                    description:
-                      updateDto.positionDescription ??
-                      updateDto.description ??
-                      existing.openPosition.description,
-                    requirements:
-                      updateDto.positionRequirements ??
-                      existing.openPosition.requirements,
+                    title: updateDto.positionTitle ?? updateDto.title ?? firstPosition.title,
+                    description: updateDto.positionDescription ?? updateDto.description ?? firstPosition.description,
+                    requirements: updateDto.positionRequirements ?? firstPosition.requirements,
                   }
                 : {}),
             },
           });
         }
-      } else if (shouldCreatePosition) {
-        await tx.openPosition.create({
-          data: {
-            opportunityId: updated.id,
-            title: updateDto.positionTitle ?? updateDto.title ?? updated.title,
-            description:
-              updateDto.positionDescription ??
-              updateDto.description ??
-              updated.description ??
-              'TBD',
-            requirements: updateDto.positionRequirements,
-            status: 'Open',
-          },
+      }
+
+      // Create new positions if provided
+      if (positionsToCreate.length > 0 && (updateDto.positions || !firstPosition)) {
+        await tx.openPosition.createMany({
+          data: positionsToCreate.map((pos) => {
+            let recruitmentStatus: RecruitmentStatus | null = null;
+            if (pos.recruitmentStatus && pos.recruitmentStatus.trim() !== '') {
+              const statusValue = pos.recruitmentStatus.trim();
+              if (statusValue === 'HEADHUNTING' || statusValue === 'STANDARD') {
+                recruitmentStatus = statusValue as RecruitmentStatus;
+              }
+            }
+            return {
+              opportunityId: updated.id,
+              title: pos.title,
+              description: pos.description ?? 'TBD',
+              requirements: pos.requirements,
+              recruitmentStatus,
+              status: 'Open',
+            };
+          }),
         });
       }
 
@@ -723,7 +771,7 @@ export class OpportunitiesService extends BaseService {
               },
             },
           },
-          openPosition: true,
+          openPositions: true,
         },
       });
 
@@ -749,7 +797,7 @@ export class OpportunitiesService extends BaseService {
     const existing = await this.prisma.opportunity.findUnique({
       where: { id },
       include: {
-        openPosition: true,
+        openPositions: true,
       },
     });
 
@@ -773,8 +821,9 @@ export class OpportunitiesService extends BaseService {
         },
       });
 
-      if (existing.openPosition && closeDto.isWon === false) {
-        await tx.openPosition.update({
+      // Cancel all positions if opportunity is lost
+      if (existing.openPositions && existing.openPositions.length > 0 && closeDto.isWon === false) {
+        await tx.openPosition.updateMany({
           where: { opportunityId: id },
           data: {
             status: 'Cancelled',
@@ -816,7 +865,7 @@ export class OpportunitiesService extends BaseService {
               },
             },
           },
-          openPosition: true,
+          openPositions: true,
         },
       });
 
@@ -867,7 +916,7 @@ export class OpportunitiesService extends BaseService {
             email: true,
           },
         },
-        openPosition: {
+        openPositions: {
           select: {
             id: true,
             title: true,
@@ -937,11 +986,11 @@ export class OpportunitiesService extends BaseService {
               email: opportunity.assignedTo.email,
             }
           : null,
-        position: opportunity.openPosition
+        position: opportunity.openPositions && opportunity.openPositions.length > 0
           ? {
-              title: opportunity.openPosition.title,
-              description: opportunity.openPosition.description,
-              requirements: opportunity.openPosition.requirements,
+              title: opportunity.openPositions[0].title,
+              description: opportunity.openPositions[0].description,
+              requirements: opportunity.openPositions[0].requirements,
             }
           : null,
       };
@@ -985,6 +1034,158 @@ export class OpportunitiesService extends BaseService {
       message: 'Email sent successfully',
       to: dto.to,
       subject: dto.subject,
+    };
+  }
+
+  async previewEmail(id: string, dto: PreviewOpportunityEmailDto) {
+    const opportunity = await this.prisma.opportunity.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            city: true,
+            country: true,
+            postalCode: true,
+          },
+        },
+        lead: {
+          include: {
+            contacts: {
+              include: {
+                contact: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    phone: true,
+                    role: true,
+                    companyName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        openPositions: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            requirements: true,
+          },
+        },
+      },
+    });
+
+    if (!opportunity) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Opportunity', id));
+    }
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with opportunity data
+    if (dto.templateId) {
+      const templateData = {
+        opportunity: {
+          id: opportunity.id,
+          title: opportunity.title,
+          description: opportunity.description,
+          type: opportunity.type,
+          value: opportunity.value ? Number(opportunity.value) : null,
+          stage: opportunity.stage,
+          isClosed: opportunity.isClosed,
+          isWon: opportunity.isWon,
+          createdAt: opportunity.createdAt,
+          updatedAt: opportunity.updatedAt,
+          closedAt: opportunity.closedAt,
+          jobDescriptionUrl: opportunity.jobDescriptionUrl,
+        },
+        customer: opportunity.customer
+          ? {
+              id: opportunity.customer.id,
+              name: opportunity.customer.name,
+              email: opportunity.customer.email,
+              phone: opportunity.customer.phone,
+              address: opportunity.customer.address,
+              city: opportunity.customer.city,
+              country: opportunity.customer.country,
+              postalCode: opportunity.customer.postalCode,
+            }
+          : null,
+        lead: opportunity.lead
+          ? {
+              id: opportunity.lead.id,
+              title: opportunity.lead.title,
+              contact: opportunity.lead.contacts && opportunity.lead.contacts.length > 0
+                ? {
+                    firstName: opportunity.lead.contacts[0].contact.firstName,
+                    lastName: opportunity.lead.contacts[0].contact.lastName,
+                    email: opportunity.lead.contacts[0].contact.email,
+                    phone: opportunity.lead.contacts[0].contact.phone,
+                    role: opportunity.lead.contacts[0].contact.role,
+                    companyName: opportunity.lead.contacts[0].contact.companyName,
+                  }
+                : null,
+            }
+          : null,
+        assignedTo: opportunity.assignedTo
+          ? {
+              firstName: opportunity.assignedTo.firstName,
+              lastName: opportunity.assignedTo.lastName,
+              email: opportunity.assignedTo.email,
+            }
+          : null,
+        position: opportunity.openPositions && opportunity.openPositions.length > 0
+          ? {
+              title: opportunity.openPositions[0].title,
+              description: opportunity.openPositions[0].description,
+              requirements: opportunity.openPositions[0].requirements,
+            }
+          : null,
+      };
+
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        this.logger.warn(
+          `[Opportunities] Failed to render email template ${dto.templateId} for preview:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultOpportunityEmailTemplate(opportunity, templateData);
+        textContent = this.getDefaultOpportunityEmailText(opportunity, templateData);
+      }
+    } else if (!htmlContent) {
+      // For preview, if no template and no HTML, return empty
+      htmlContent = '';
+      textContent = '';
+    }
+
+    // Convert line breaks to <br> tags for HTML content if it's plain text
+    if (htmlContent && !htmlContent.includes('<') && !htmlContent.includes('>')) {
+      htmlContent = htmlContent.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<br>').join('');
+    }
+
+    return {
+      html: htmlContent || '',
+      text: textContent || '',
     };
   }
 

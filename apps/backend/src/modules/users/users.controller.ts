@@ -129,5 +129,19 @@ export class UsersController {
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
+
+  @Post(':id/unlock')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Unlock a user account' })
+  unlockAccount(@Param('id') id: string) {
+    return this.usersService.unlockAccount(id);
+  }
+
+  @Post(':id/reset-cooldown')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Reset login cooldown for a user' })
+  resetLoginCooldown(@Param('id') id: string) {
+    return this.usersService.resetLoginCooldown(id);
+  }
 }
 

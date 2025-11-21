@@ -324,9 +324,15 @@ export class SalesPerformanceReportsService extends BaseService {
       throw new NotFoundException(ErrorMessages.NOT_FOUND('Sales performance report', id));
     }
 
-    // Only admins can delete reports
+    // Admins can delete any report
+    // Salespeople can only delete their own reports
     if (userRole !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only admins can delete performance reports');
+      if (userRole === UserRole.SALESPERSON && report.salespersonId !== userId) {
+        throw new ForbiddenException('You can only delete your own performance reports');
+      }
+      if (userRole !== UserRole.SALESPERSON) {
+        throw new ForbiddenException('Only salespeople and admins can delete performance reports');
+      }
     }
 
     await this.prisma.salesPerformanceReport.delete({

@@ -360,9 +360,15 @@ export class RecruiterPerformanceReportsService extends BaseService {
       throw new NotFoundException(ErrorMessages.NOT_FOUND('Recruiter performance report', id));
     }
 
-    // Only admins and HR can delete reports
+    // Admins and HR can delete any report
+    // Recruiters can only delete their own reports
     if (userRole !== UserRole.ADMIN && userRole !== UserRole.HR) {
-      throw new ForbiddenException('Only admins and HR can delete performance reports');
+      if (userRole === UserRole.RECRUITER && report.recruiterId !== userId) {
+        throw new ForbiddenException('You can only delete your own performance reports');
+      }
+      if (userRole !== UserRole.RECRUITER) {
+        throw new ForbiddenException('Only recruiters, admins, and HR can delete performance reports');
+      }
     }
 
     await this.prisma.recruiterPerformanceReport.delete({

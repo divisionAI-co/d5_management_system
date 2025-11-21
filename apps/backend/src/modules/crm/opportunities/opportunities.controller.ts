@@ -20,6 +20,7 @@ import { FilterOpportunitiesDto } from './dto/filter-opportunities.dto';
 import { UpdateOpportunityDto } from './dto/update-opportunity.dto';
 import { CloseOpportunityDto } from './dto/close-opportunity.dto';
 import { SendOpportunityEmailDto } from './dto/send-email.dto';
+import { PreviewOpportunityEmailDto } from './dto/preview-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -102,6 +103,20 @@ export class OpportunitiesController {
   })
   sendEmail(@Param('id') id: string, @Body() dto: SendOpportunityEmailDto) {
     return this.opportunitiesService.sendEmail(id, dto);
+  }
+
+  @Post(':id/preview-email')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.SALESPERSON,
+  )
+  @ApiOperation({
+    summary: 'Preview an email for an opportunity',
+    description:
+      'Preview how an email will look using a template or custom content. Returns rendered HTML and text.',
+  })
+  previewEmail(@Param('id') id: string, @Body() dto: PreviewOpportunityEmailDto) {
+    return this.opportunitiesService.previewEmail(id, dto);
   }
 
   @Delete(':id')

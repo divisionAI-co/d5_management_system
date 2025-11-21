@@ -26,6 +26,7 @@ import { LinkCandidatePositionDto } from './dto/link-position.dto';
 import { ConvertCandidateToEmployeeDto } from './dto/convert-candidate-to-employee.dto';
 import { MarkInactiveDto } from './dto/mark-inactive.dto';
 import { SendCandidateEmailDto } from './dto/send-email.dto';
+import { PreviewCandidateEmailDto } from './dto/preview-email.dto';
 import { ACTIVITY_SUMMARY_INCLUDE, mapActivitySummary } from '../../activities/activity.mapper';
 
 const RECRUITER_SELECT = {
@@ -33,7 +34,9 @@ const RECRUITER_SELECT = {
   firstName: true,
   lastName: true,
   email: true,
+  phone: true,
   avatar: true,
+  role: true,
 };
 
 @Injectable()
@@ -70,7 +73,9 @@ export class CandidatesService extends BaseService {
       },
       employee: true,
       recruiter: {
-        select: RECRUITER_SELECT,
+        include: {
+          employee: true,
+        },
       },
     };
   }
@@ -986,33 +991,40 @@ export class CandidatesService extends BaseService {
 
     // If template is provided, render it with candidate data
     if (dto.templateId) {
+      // Use candidateRaw for template data to preserve recruiter.employee relation
       const templateData = {
         candidate: {
-          id: candidate.id,
-          firstName: candidate.firstName,
-          lastName: candidate.lastName,
-          fullName: `${candidate.firstName} ${candidate.lastName}`,
-          email: candidate.email,
-          phone: candidate.phone,
-          currentTitle: candidate.currentTitle,
-          yearsOfExperience: candidate.yearsOfExperience,
-          skills: candidate.skills,
-          stage: candidate.stage,
-          rating: candidate.rating,
-          notes: candidate.notes,
-          city: candidate.city,
-          country: candidate.country,
-          availableFrom: candidate.availableFrom,
-          expectedSalary: candidate.expectedSalary ? Number(candidate.expectedSalary) : null,
-          salaryCurrency: candidate.salaryCurrency,
-          createdAt: candidate.createdAt,
-          updatedAt: candidate.updatedAt,
+          id: candidateRaw.id,
+          firstName: candidateRaw.firstName,
+          lastName: candidateRaw.lastName,
+          fullName: `${candidateRaw.firstName} ${candidateRaw.lastName}`,
+          email: candidateRaw.email,
+          phone: candidateRaw.phone,
+          currentTitle: candidateRaw.currentTitle,
+          yearsOfExperience: candidateRaw.yearsOfExperience,
+          skills: candidateRaw.skills,
+          stage: candidateRaw.stage,
+          rating: candidateRaw.rating,
+          notes: candidateRaw.notes,
+          city: candidateRaw.city,
+          country: candidateRaw.country,
+          availableFrom: candidateRaw.availableFrom,
+          expectedSalary: candidateRaw.expectedSalary ? Number(candidateRaw.expectedSalary) : null,
+          salaryCurrency: candidateRaw.salaryCurrency,
+          createdAt: candidateRaw.createdAt,
+          updatedAt: candidateRaw.updatedAt,
         },
-        recruiter: candidate.recruiter
+        recruiter: candidateRaw.recruiter
           ? {
-              firstName: candidate.recruiter.firstName,
-              lastName: candidate.recruiter.lastName,
-              email: candidate.recruiter.email,
+              id: candidateRaw.recruiter.id,
+              firstName: candidateRaw.recruiter.firstName,
+              lastName: candidateRaw.recruiter.lastName,
+              fullName: `${candidateRaw.recruiter.firstName} ${candidateRaw.recruiter.lastName}`,
+              email: candidateRaw.recruiter.email,
+              phone: candidateRaw.recruiter.phone || null,
+              role: candidateRaw.recruiter.role,
+              avatar: candidateRaw.recruiter.avatar || null,
+              bookingLink: (candidateRaw.recruiter.employee as any)?.bookingLink || null,
             }
           : null,
         positions: candidate.positions?.map((cp: any) => ({
@@ -1071,6 +1083,104 @@ export class CandidatesService extends BaseService {
       message: 'Email sent successfully',
       to: dto.to,
       subject: dto.subject,
+    };
+  }
+
+  async previewEmail(id: string, dto: PreviewCandidateEmailDto) {
+    const candidateRaw = await this.prisma.candidate.findUnique({
+      where: { id },
+      include: this.candidateInclude(),
+    });
+
+    if (!candidateRaw) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Candidate', id));
+    }
+
+    const candidate = this.formatCandidate(candidateRaw);
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with candidate data
+    if (dto.templateId) {
+      // Use candidateRaw for template data to preserve recruiter.employee relation
+      const templateData = {
+        candidate: {
+          id: candidateRaw.id,
+          firstName: candidateRaw.firstName,
+          lastName: candidateRaw.lastName,
+          fullName: `${candidateRaw.firstName} ${candidateRaw.lastName}`,
+          email: candidateRaw.email,
+          phone: candidateRaw.phone,
+          currentTitle: candidateRaw.currentTitle,
+          yearsOfExperience: candidateRaw.yearsOfExperience,
+          skills: candidateRaw.skills,
+          stage: candidateRaw.stage,
+          rating: candidateRaw.rating,
+          notes: candidateRaw.notes,
+          city: candidateRaw.city,
+          country: candidateRaw.country,
+          availableFrom: candidateRaw.availableFrom,
+          expectedSalary: candidateRaw.expectedSalary ? Number(candidateRaw.expectedSalary) : null,
+          salaryCurrency: candidateRaw.salaryCurrency,
+          createdAt: candidateRaw.createdAt,
+          updatedAt: candidateRaw.updatedAt,
+        },
+        recruiter: candidateRaw.recruiter
+          ? {
+              id: candidateRaw.recruiter.id,
+              firstName: candidateRaw.recruiter.firstName,
+              lastName: candidateRaw.recruiter.lastName,
+              fullName: `${candidateRaw.recruiter.firstName} ${candidateRaw.recruiter.lastName}`,
+              email: candidateRaw.recruiter.email,
+              phone: candidateRaw.recruiter.phone || null,
+              role: candidateRaw.recruiter.role,
+              avatar: candidateRaw.recruiter.avatar || null,
+              bookingLink: (candidateRaw.recruiter.employee as any)?.bookingLink || null,
+            }
+          : null,
+        positions: candidate.positions?.map((cp: any) => ({
+          title: cp.position?.title,
+          description: cp.position?.description,
+          requirements: cp.position?.requirements,
+          status: cp.status,
+          appliedAt: cp.appliedAt,
+          customer: cp.position?.opportunity?.customer
+            ? {
+                name: cp.position.opportunity.customer.name,
+                email: cp.position.opportunity.customer.email || null,
+              }
+            : null,
+        })),
+      };
+
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        this.logger.warn(
+          `[Candidates] Failed to render email template ${dto.templateId} for preview:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultCandidateSendEmailTemplate(candidateRaw, templateData);
+        textContent = this.getDefaultCandidateSendEmailText(candidateRaw, templateData);
+      }
+    } else if (!htmlContent) {
+      // For preview, if no template and no HTML, return empty
+      htmlContent = '';
+      textContent = '';
+    }
+
+    // Convert line breaks to <br> tags for HTML content if it's plain text
+    if (htmlContent && !htmlContent.includes('<') && !htmlContent.includes('>')) {
+      htmlContent = htmlContent.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<br>').join('');
+    }
+
+    return {
+      html: htmlContent || '',
+      text: textContent || '',
     };
   }
 

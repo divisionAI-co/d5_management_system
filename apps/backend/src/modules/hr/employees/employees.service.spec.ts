@@ -31,6 +31,7 @@ describe('EmployeesService', () => {
     salary: 50000,
     salaryCurrency: 'USD',
     managerId: null,
+    bookingLink: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     user: mockUser,
@@ -145,6 +146,30 @@ describe('EmployeesService', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             terminationDate: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should handle booking link when provided', async () => {
+      const dtoWithBookingLink = {
+        ...createEmployeeDto,
+        bookingLink: 'https://calendly.com/john-doe',
+      };
+
+      prismaService.user.findUnique.mockResolvedValue(mockUser);
+      prismaService.employee.findUnique.mockResolvedValue(null);
+      prismaService.employee.create.mockResolvedValue({
+        ...mockEmployee,
+        bookingLink: 'https://calendly.com/john-doe',
+      });
+
+      await service.create(dtoWithBookingLink);
+
+      expect(prismaService.employee.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            bookingLink: 'https://calendly.com/john-doe',
           }),
         }),
       );
@@ -315,6 +340,28 @@ describe('EmployeesService', () => {
           data: expect.objectContaining({
             hireDate: expect.any(Date),
             terminationDate: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should handle booking link updates', async () => {
+      const updateWithBookingLink: UpdateEmployeeDto = {
+        bookingLink: 'https://calendly.com/john-doe-updated',
+      };
+
+      prismaService.employee.findUnique.mockResolvedValue(mockEmployee);
+      prismaService.employee.update.mockResolvedValue({
+        ...mockEmployee,
+        bookingLink: 'https://calendly.com/john-doe-updated',
+      });
+
+      await service.update('emp-1', updateWithBookingLink);
+
+      expect(prismaService.employee.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            bookingLink: 'https://calendly.com/john-doe-updated',
           }),
         }),
       );
