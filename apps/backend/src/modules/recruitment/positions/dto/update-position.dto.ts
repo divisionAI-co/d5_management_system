@@ -49,6 +49,22 @@ export class UpdatePositionDto {
   @IsOptional()
   @IsEnum(RecruitmentStatus)
   recruitmentStatus?: RecruitmentStatus;
+
+  @ApiPropertyOptional({
+    description: 'URL to position image/logo',
+    example: 'https://example.com/position-image.png',
+  })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'URL-friendly slug for the position (auto-generated from title if title changes)',
+    example: 'senior-react-engineer',
+  })
+  @IsOptional()
+  @IsString()
+  slug?: string;
 }
 
 

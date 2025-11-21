@@ -5,7 +5,7 @@ import { quotesApi } from '@/lib/api/crm';
 import { format } from 'date-fns';
 import { ArrowLeft, Edit, Mail, Trash2, Download, Eye, X, PenSquare } from 'lucide-react';
 import { QuoteForm } from '@/components/crm/quotes/QuoteForm';
-import { SendQuoteModal } from '@/components/crm/quotes/SendQuoteModal';
+import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { SafeHtml } from '@/components/ui/SafeHtml';
 import clsx from 'clsx';
@@ -404,13 +404,19 @@ export default function QuoteDetailPage() {
         />
       )}
 
-      {showSendModal && (
-        <SendQuoteModal
-          quote={quote}
+      {showSendModal && quote && (
+        <SendEmailModal
+          title={`Send Quote - ${quote.title || quote.quoteNumber}`}
+          defaultTo={quote.lead?.contacts?.[0]?.email || ''}
+          defaultSubject={`Quote: ${quote.title || quote.quoteNumber} - ${quote.quoteNumber}`}
           onClose={() => setShowSendModal(false)}
-          onSuccess={() => {
+          onSend={async (payload) => {
+            await quotesApi.send(quote.id, payload);
             setShowSendModal(false);
             quoteQuery.refetch();
+          }}
+          previewEmail={async (payload) => {
+            return await quotesApi.previewEmail(quote.id, payload);
           }}
         />
       )}

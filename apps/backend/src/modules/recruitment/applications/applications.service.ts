@@ -114,6 +114,23 @@ export class ApplicationsService extends BaseService {
 
       this.logger.log(`Uploaded CV: ${uploadedFile.id} (${uploadedFile.name})`);
 
+      // Get position title if positionId is provided
+      let positionTitle: string | undefined;
+      if (dto.positionId) {
+        const position = await this.prisma.openPosition.findUnique({
+          where: { id: dto.positionId },
+          select: { title: true, status: true, isArchived: true },
+        });
+
+        if (position && position.status === 'Open' && !position.isArchived) {
+          positionTitle = position.title;
+        } else if (position) {
+          this.logger.warn(`Position ${dto.positionId} is not open or is archived, skipping title and link`);
+        } else {
+          this.logger.warn(`Position ${dto.positionId} not found, skipping title and link`);
+        }
+      }
+
       // Create candidate record
       const candidate = await this.prisma.candidate.create({
         data: {
@@ -125,31 +142,26 @@ export class ApplicationsService extends BaseService {
           driveFolderId: candidateFolder.id,
           stage: 'VALIDATION',
           isActive: true,
+          // New fields
+          availableFrom: dto.availability ? new Date(dto.availability) : undefined,
+          expectedSalary: dto.expectedNetSalary ? dto.expectedNetSalary : undefined,
+          referralSource: dto.referralSource || undefined,
+          // Set title from position if available
+          currentTitle: positionTitle,
         },
       });
 
-      // Link to position if provided
-      if (dto.positionId) {
-        // Verify position exists and is open
-        const position = await this.prisma.openPosition.findUnique({
-          where: { id: dto.positionId },
+      // Link to position if provided and position is valid
+      if (dto.positionId && positionTitle) {
+        // Position was already validated above, create link
+        await this.prisma.candidatePosition.create({
+          data: {
+            candidateId: candidate.id,
+            positionId: dto.positionId,
+            status: 'Under Review',
+          },
         });
-
-        if (!position) {
-          this.logger.warn(`Position ${dto.positionId} not found, skipping link`);
-        } else if (position.status !== 'Open' || position.isArchived) {
-          this.logger.warn(`Position ${dto.positionId} is not open, skipping link`);
-        } else {
-          // Create candidate-position link
-          await this.prisma.candidatePosition.create({
-            data: {
-              candidateId: candidate.id,
-              positionId: dto.positionId,
-              status: 'Under Review',
-            },
-          });
-          this.logger.log(`Linked candidate to position: ${dto.positionId}`);
-        }
+        this.logger.log(`Linked candidate to position: ${dto.positionId} with title: ${positionTitle}`);
       }
 
       return {

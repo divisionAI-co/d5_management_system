@@ -49,10 +49,12 @@ export class OpenPositionsController {
             properties: {
               id: { type: 'string', format: 'uuid' },
               title: { type: 'string' },
+              slug: { type: 'string' },
               description: { type: 'string' },
               requirements: { type: 'string', nullable: true },
               status: { type: 'string', enum: ['Open'] },
               recruitmentStatus: { type: 'string', nullable: true },
+              imageUrl: { type: 'string', nullable: true, format: 'uri' },
               createdAt: { type: 'string', format: 'date-time' },
               updatedAt: { type: 'string', format: 'date-time' },
             },
@@ -78,7 +80,7 @@ export class OpenPositionsController {
   @Get('public/:id')
   @ApiOperation({
     summary: 'Get a specific position for public website (no authentication required)',
-    description: 'Returns position details suitable for public display. No sensitive candidate information is included.',
+    description: 'Returns position details suitable for public display. No sensitive candidate information is included. Can be accessed by ID (UUID) or slug.',
   })
   @ApiResponse({
     status: 200,
@@ -88,18 +90,28 @@ export class OpenPositionsController {
       properties: {
         id: { type: 'string', format: 'uuid' },
         title: { type: 'string' },
+        slug: { type: 'string' },
         description: { type: 'string' },
         requirements: { type: 'string', nullable: true },
         status: { type: 'string', enum: ['Open'] },
         recruitmentStatus: { type: 'string', nullable: true },
+        imageUrl: { type: 'string', nullable: true, format: 'uri' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
       },
     },
   })
   @ApiResponse({ status: 404, description: 'Position not found or not open' })
-  findOnePublic(@Param('id') id: string) {
-    return this.positionsService.findOnePublic(id);
+  findOnePublic(@Param('id') idOrSlug: string) {
+    // Try to find by slug first (if it's not a UUID), otherwise by ID
+    // UUIDs are 36 characters with dashes, slugs are typically shorter and don't match UUID pattern
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    
+    if (isUuid) {
+      return this.positionsService.findOnePublic(idOrSlug);
+    } else {
+      return this.positionsService.findOnePublicBySlug(idOrSlug);
+    }
   }
 
   // ============================================

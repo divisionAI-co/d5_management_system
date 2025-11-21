@@ -45,6 +45,13 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'Content',
+    items: [
+      { name: 'Blogs', href: '/content/blogs', roles: ROLE_PERMISSIONS.CONTENT_MANAGEMENT },
+      { name: 'Case Studies', href: '/content/case-studies', roles: ROLE_PERMISSIONS.CONTENT_MANAGEMENT },
+    ],
+  },
+  {
     label: 'Employee',
     items: [
       { name: 'Employees', href: '/employees', roles: ROLE_PERMISSIONS.EMPLOYEE_DIRECTORY },

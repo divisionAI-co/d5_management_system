@@ -41,10 +41,12 @@ curl -X GET "http://localhost:3000/api/v1/recruitment/positions/public?page=1&pa
     {
       "id": "uuid-here",
       "title": "Senior Software Engineer",
+      "slug": "senior-software-engineer",
       "description": "We are looking for an experienced software engineer...",
       "requirements": "5+ years of experience, React, Node.js...",
       "status": "Open",
       "recruitmentStatus": "STANDARD",
+      "imageUrl": "https://example.com/position-image.png",
       "createdAt": "2024-01-15T10:00:00Z",
       "updatedAt": "2024-01-20T15:30:00Z"
     }
@@ -62,16 +64,20 @@ curl -X GET "http://localhost:3000/api/v1/recruitment/positions/public?page=1&pa
 
 **Endpoint**: `GET /api/v1/recruitment/positions/public/:id`
 
-**Description**: Returns details for a specific open position.
+**Description**: Returns details for a specific open position. Can be accessed by position ID (UUID) or slug.
 
 **Authentication**: None required (public endpoint)
 
 **Path Parameters**:
-- `id` (required) - The position ID (UUID)
+- `id` (required) - The position ID (UUID) or slug (e.g., `senior-software-engineer`)
 
-**Example Request**:
+**Example Requests**:
 ```bash
+# By UUID
 curl -X GET "http://localhost:3000/api/v1/recruitment/positions/public/uuid-here"
+
+# By slug (SEO-friendly)
+curl -X GET "http://localhost:3000/api/v1/recruitment/positions/public/senior-software-engineer"
 ```
 
 **Example Response**:
@@ -79,10 +85,12 @@ curl -X GET "http://localhost:3000/api/v1/recruitment/positions/public/uuid-here
 {
   "id": "uuid-here",
   "title": "Senior Software Engineer",
+  "slug": "senior-software-engineer",
   "description": "We are looking for an experienced software engineer...",
   "requirements": "5+ years of experience, React, Node.js...",
   "status": "Open",
   "recruitmentStatus": "STANDARD",
+  "imageUrl": "https://example.com/position-image.png",
   "createdAt": "2024-01-15T10:00:00Z",
   "updatedAt": "2024-01-20T15:30:00Z"
 }
@@ -208,6 +216,9 @@ You can test the API using:
 - `email` (required) - Candidate email address
 - `phone` (optional) - Phone number
 - `positionId` (optional) - UUID of the position to apply for
+- `availability` (optional) - Availability date when candidate can start (format: YYYY-MM-DD, e.g., "2024-02-01")
+- `expectedNetSalary` (optional) - Expected net salary after taxes (number, e.g., 5000)
+- `referralSource` (optional) - Where the candidate heard about us. Options: "Website", "LinkedIn", "Referral", "Job Board", "Social Media", "Other"
 - `cv` (required) - CV file (PDF, DOC, or DOCX)
 
 **Example Request** (using curl):
@@ -218,6 +229,9 @@ curl -X POST "http://localhost:3000/api/v1/recruitment/applications/public" \
   -F "email=john.doe@example.com" \
   -F "phone=+1234567890" \
   -F "positionId=uuid-of-position" \
+  -F "availability=2024-02-01" \
+  -F "expectedNetSalary=5000" \
+  -F "referralSource=Website" \
   -F "cv=@/path/to/resume.pdf"
 ```
 
@@ -260,6 +274,9 @@ formData.append('lastName', 'Doe');
 formData.append('email', 'john.doe@example.com');
 formData.append('phone', '+1234567890');
 formData.append('positionId', 'position-uuid');
+formData.append('availability', '2024-02-01'); // Optional: when candidate can start
+formData.append('expectedNetSalary', '5000'); // Optional: expected net salary
+formData.append('referralSource', 'Website'); // Optional: where they heard from us
 formData.append('cv', fileInput.files[0]); // File from input element
 
 const result = await submitApplication(formData);
@@ -274,6 +291,9 @@ function JobApplicationForm({ positionId }: { positionId?: string }) {
     lastName: '',
     email: '',
     phone: '',
+    availability: '',
+    expectedNetSalary: '',
+    referralSource: '',
   });
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -289,6 +309,9 @@ function JobApplicationForm({ positionId }: { positionId?: string }) {
     submitData.append('email', formData.email);
     if (formData.phone) submitData.append('phone', formData.phone);
     if (positionId) submitData.append('positionId', positionId);
+    if (formData.availability) submitData.append('availability', formData.availability);
+    if (formData.expectedNetSalary) submitData.append('expectedNetSalary', formData.expectedNetSalary);
+    if (formData.referralSource) submitData.append('referralSource', formData.referralSource);
     if (cvFile) submitData.append('cv', cvFile);
 
     try {
@@ -337,6 +360,31 @@ function JobApplicationForm({ positionId }: { positionId?: string }) {
         value={formData.phone}
         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
       />
+      <input
+        type="date"
+        placeholder="Availability (optional)"
+        value={formData.availability}
+        onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+      />
+      <input
+        type="number"
+        placeholder="Expected Net Salary (optional)"
+        value={formData.expectedNetSalary}
+        onChange={(e) => setFormData({ ...formData, expectedNetSalary: e.target.value })}
+        min="0"
+      />
+      <select
+        value={formData.referralSource}
+        onChange={(e) => setFormData({ ...formData, referralSource: e.target.value })}
+      >
+        <option value="">Where did you hear about us? (optional)</option>
+        <option value="Website">Website</option>
+        <option value="LinkedIn">LinkedIn</option>
+        <option value="Referral">Referral</option>
+        <option value="Job Board">Job Board</option>
+        <option value="Social Media">Social Media</option>
+        <option value="Other">Other</option>
+      </select>
       <input
         type="file"
         accept=".pdf,.doc,.docx"

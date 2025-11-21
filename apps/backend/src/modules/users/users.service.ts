@@ -555,21 +555,77 @@ export class UsersService extends BaseService {
     });
   }
 
+  /**
+   * Get notification fields that are applicable to a user's role
+   */
+  private getApplicableNotificationFields(userRole: UserRole): Set<keyof UpdateNotificationSettingsDto> {
+    const applicableFields = new Set<keyof UpdateNotificationSettingsDto>([
+      'emailEnabled',
+      'inAppEnabled',
+      'taskAssigned',
+      'taskDueSoon',
+      'leaveApproved',
+      'performanceReview',
+    ]);
+
+    // newCandidate is only for recruitment roles
+    if (['ADMIN', 'HR', 'RECRUITER'].includes(userRole)) {
+      applicableFields.add('newCandidate');
+    }
+
+    // newOpportunity is only for sales roles
+    if (['ADMIN', 'SALESPERSON', 'ACCOUNT_MANAGER'].includes(userRole)) {
+      applicableFields.add('newOpportunity');
+    }
+
+    return applicableFields;
+  }
+
   async updateNotificationSettings(
     userId: string,
     settings: UpdateNotificationSettingsDto,
   ) {
+    // Get user's role to determine applicable notification fields
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
+    }
+
+    // Filter settings to only include fields applicable to the user's role
+    const applicableFields = this.getApplicableNotificationFields(user.role);
+    const filteredSettings: UpdateNotificationSettingsDto = {};
+
+    for (const [key, value] of Object.entries(settings)) {
+      if (applicableFields.has(key as keyof UpdateNotificationSettingsDto)) {
+        filteredSettings[key as keyof UpdateNotificationSettingsDto] = value;
+      }
+    }
+
     return this.prisma.notificationSettings.upsert({
       where: { userId },
-      update: settings,
+      update: filteredSettings,
       create: {
         userId,
-        ...settings,
+        ...filteredSettings,
       },
     });
   }
 
   async getNotificationSettings(userId: string) {
+    // Get user's role to determine applicable notification fields
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('User', userId));
+    }
+
     let settings = await this.prisma.notificationSettings.findUnique({
       where: { userId },
     });
@@ -580,7 +636,22 @@ export class UsersService extends BaseService {
       });
     }
 
-    return settings;
+    // Filter settings to only return fields applicable to the user's role
+    const applicableFields = this.getApplicableNotificationFields(user.role);
+    const filteredSettings: Record<string, any> = {
+      id: settings.id,
+      userId: settings.userId,
+      createdAt: settings.createdAt,
+      updatedAt: settings.updatedAt,
+    };
+
+    for (const field of applicableFields) {
+      if (field in settings) {
+        filteredSettings[field] = (settings as any)[field];
+      }
+    }
+
+    return filteredSettings;
   }
 
   async updateStatus(id: string, dto: UpdateUserStatusDto) {

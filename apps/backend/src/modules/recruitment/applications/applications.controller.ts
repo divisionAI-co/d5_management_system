@@ -68,6 +68,22 @@ export class ApplicationsController {
           format: 'uuid',
           description: 'Position ID to apply for (optional)',
         },
+        availability: {
+          type: 'string',
+          format: 'date',
+          description: 'Availability date - when candidate can start (optional)',
+          example: '2024-02-01',
+        },
+        expectedNetSalary: {
+          type: 'number',
+          description: 'Expected net salary after taxes (optional)',
+          example: 5000,
+        },
+        referralSource: {
+          type: 'string',
+          enum: ['Website', 'LinkedIn', 'Referral', 'Job Board', 'Social Media', 'Other'],
+          description: 'Where the candidate heard about us (optional)',
+        },
         cv: {
           type: 'string',
           format: 'binary',

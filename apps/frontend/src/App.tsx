@@ -33,6 +33,12 @@ import CandidateDetailPage from '@/pages/recruitment/CandidateDetailPage';
 import OpenPositionsPage from '@/pages/recruitment/OpenPositionsPage';
 import PositionDetailPage from '@/pages/recruitment/PositionDetailPage';
 
+// Content Management
+import BlogsPage from '@/pages/content/BlogsPage';
+import BlogDetailPage from '@/pages/content/BlogDetailPage';
+import CaseStudiesPage from '@/pages/content/CaseStudiesPage';
+import CaseStudyDetailPage from '@/pages/content/CaseStudyDetailPage';
+
 // Employees & HR
 import EmployeesPage from '@/pages/employees/EmployeesPage';
 import EmployeeDetailPage from '@/pages/employees/EmployeeDetailPage';
@@ -129,6 +135,14 @@ function App() {
             <Route path="candidates/:id" element={<CandidateDetailPage />} />
             <Route path="positions" element={<OpenPositionsPage />} />
             <Route path="positions/:id" element={<PositionDetailPage />} />
+          </Route>
+
+          {/* Content Management */}
+          <Route path="content">
+            <Route path="blogs" element={<BlogsPage />} />
+            <Route path="blogs/:id" element={<BlogDetailPage />} />
+            <Route path="case-studies" element={<CaseStudiesPage />} />
+            <Route path="case-studies/:id" element={<CaseStudyDetailPage />} />
           </Route>
 
           {/* Employees */}

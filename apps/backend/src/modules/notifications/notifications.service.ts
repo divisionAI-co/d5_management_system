@@ -208,6 +208,51 @@ export class NotificationsService extends BaseService {
   }
 
   /**
+   * Check if user has email notification preference enabled for a specific type
+   */
+  async shouldSendEmailNotification(userId: string, notificationType: NotificationType): Promise<boolean> {
+    const settings = await this.prisma.notificationSettings.findUnique({
+      where: { userId },
+    });
+
+    // If no settings exist, default to enabled (opt-in model)
+    if (!settings) {
+      this.logger.log(`[Notifications] No settings found for user ${userId}, defaulting email to enabled`);
+      return true;
+    }
+
+    // If email disabled globally, don't send
+    if (!settings.emailEnabled) {
+      this.logger.log(`[Notifications] Email notifications disabled globally for user ${userId}`);
+      return false;
+    }
+
+    // Check type-specific preference
+    switch (notificationType) {
+      case NotificationType.TASK_ASSIGNED:
+        return settings.taskAssigned ?? true; // Default to true if not set
+      case NotificationType.TASK_DUE_SOON:
+        return settings.taskDueSoon ?? true;
+      case NotificationType.LEAVE_APPROVED:
+      case NotificationType.LEAVE_REJECTED:
+      case NotificationType.LEAVE_REQUEST:
+        return settings.leaveApproved ?? true;
+      case NotificationType.PERFORMANCE_REVIEW:
+        return settings.performanceReview ?? true;
+      case NotificationType.FEEDBACK_REPORT:
+        return settings.feedbackReport ?? true;
+      case NotificationType.NEW_CANDIDATE:
+        return settings.newCandidate ?? true;
+      case NotificationType.NEW_OPPORTUNITY:
+        return settings.newOpportunity ?? true;
+      case NotificationType.MENTIONED_IN_ACTIVITY:
+        return settings.mentionedInActivity ?? true; // Default to true if not set
+      default:
+        return true; // Default to enabled for other types
+    }
+  }
+
+  /**
    * Send email notification if user has email notifications enabled
    */
   private async sendEmailNotification(
@@ -220,19 +265,11 @@ export class NotificationsService extends BaseService {
   ) {
     this.logger.log(`[Notifications] Attempting to send email to user ${userId} for type ${type}`);
 
-    const settings = await this.prisma.notificationSettings.findUnique({
-      where: { userId },
-    });
-
-    // If no settings, default to enabled for email (opt-in model)
-    if (!settings) {
-      this.logger.log(`[Notifications] No settings found for user ${userId}, defaulting email to enabled`);
-    } else {
-      // If email disabled globally, don't send
-      if (!settings.emailEnabled) {
-        this.logger.log(`[Notifications] Email notifications disabled globally for user ${userId}`);
-        return;
-      }
+    // Check if user wants email notifications for this specific type
+    const shouldSend = await this.shouldSendEmailNotification(userId, type);
+    if (!shouldSend) {
+      this.logger.log(`[Notifications] Email notifications disabled for user ${userId} for type ${type}`);
+      return;
     }
 
     // Get user email

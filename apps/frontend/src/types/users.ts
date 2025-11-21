@@ -4,7 +4,8 @@ export type UserRole =
   | 'ACCOUNT_MANAGER'
   | 'RECRUITER'
   | 'HR'
-  | 'EMPLOYEE';
+  | 'EMPLOYEE'
+  | 'CONTENT_EDITOR';
 
 export type UserSortField =
   | 'firstName'

@@ -15,6 +15,41 @@ export class OpenPositionsService extends BaseService {
     super(prisma);
   }
 
+  /**
+   * Generate a URL-friendly slug from a title
+   */
+  private generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  }
+
+  /**
+   * Ensure slug is unique by appending a number if needed
+   */
+  private async ensureUniqueSlug(slug: string, excludeId?: string): Promise<string> {
+    let uniqueSlug = slug;
+    let counter = 1;
+
+    while (true) {
+      const existing = await this.prisma.openPosition.findUnique({
+        where: { slug: uniqueSlug },
+      });
+
+      if (!existing || existing.id === excludeId) {
+        break;
+      }
+
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
+    return uniqueSlug;
+  }
+
   private formatPosition(position: any) {
     if (!position) {
       return position;
@@ -61,13 +96,20 @@ export class OpenPositionsService extends BaseService {
       }
     }
 
+    // Generate slug if not provided
+    const slug = createDto.slug
+      ? await this.ensureUniqueSlug(createDto.slug)
+      : await this.ensureUniqueSlug(this.generateSlug(createDto.title));
+
     const positionData: Prisma.OpenPositionUncheckedCreateInput = {
       title: createDto.title,
+      slug,
       description: createDto.description ?? 'TBD',
       requirements: createDto.requirements,
       status: createDto.status ?? 'Open',
       ...(createDto.recruitmentStatus !== undefined && { recruitmentStatus: createDto.recruitmentStatus }),
       ...(createDto.opportunityId !== undefined && { opportunityId: createDto.opportunityId || null }),
+      ...(createDto.imageUrl !== undefined && { imageUrl: createDto.imageUrl }),
     };
 
     const position = await this.prisma.openPosition.create({
@@ -297,16 +339,37 @@ export class OpenPositionsService extends BaseService {
    */
   async findOnePublic(id: string) {
     const position = await this.prisma.openPosition.findUnique({
-      where: { 
-        id,
-        status: 'Open',
-        isArchived: false,
-      },
-      // Exclude opportunity and candidates for public endpoint
+      where: { id },
     });
 
     if (!position) {
       throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', id));
+    }
+
+    // Ensure it's open and not archived (public safety check)
+    if (position.status !== 'Open' || position.isArchived) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', id));
+    }
+
+    return this.formatPublicPosition(position);
+  }
+
+  /**
+   * Public method for website showcase - returns a single position by slug
+   * without sensitive candidate information
+   */
+  async findOnePublicBySlug(slug: string) {
+    const position = await this.prisma.openPosition.findUnique({
+      where: { slug },
+    });
+
+    if (!position) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', slug));
+    }
+
+    // Ensure it's open and not archived (public safety check)
+    if (position.status !== 'Open' || position.isArchived) {
+      throw new NotFoundException(ErrorMessages.NOT_FOUND('Open position', slug));
     }
 
     return this.formatPublicPosition(position);
@@ -323,10 +386,12 @@ export class OpenPositionsService extends BaseService {
     return {
       id: position.id,
       title: position.title,
+      slug: position.slug,
       description: position.description,
       requirements: position.requirements,
       status: position.status,
       recruitmentStatus: position.recruitmentStatus,
+      imageUrl: position.imageUrl,
       createdAt: position.createdAt,
       updatedAt: position.updatedAt,
       // Explicitly exclude opportunity, candidates, and other sensitive data
@@ -456,10 +521,19 @@ export class OpenPositionsService extends BaseService {
       }
     }
 
+    // Regenerate slug if title changes or if slug is explicitly provided
+    let slugUpdate: { slug: string } | {} = {};
+    if (updateDto.slug !== undefined) {
+      slugUpdate = { slug: await this.ensureUniqueSlug(updateDto.slug, id) };
+    } else if (updateDto.title !== undefined && updateDto.title !== existingPosition.title) {
+      slugUpdate = { slug: await this.ensureUniqueSlug(this.generateSlug(updateDto.title), id) };
+    }
+
     const position = await this.prisma.openPosition.update({
       where: { id },
       data: {
         title: updateDto.title,
+        ...slugUpdate,
         description: updateDto.description,
         requirements: updateDto.requirements,
         status: updateDto.status,
@@ -471,6 +545,8 @@ export class OpenPositionsService extends BaseService {
         ...(updateDto.recruitmentStatus !== undefined
           ? { recruitmentStatus: updateDto.recruitmentStatus || null }
           : {}),
+        // Handle imageUrl update
+        ...(updateDto.imageUrl !== undefined && { imageUrl: updateDto.imageUrl }),
       },
       include: {
         opportunity: {

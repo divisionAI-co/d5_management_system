@@ -40,6 +40,46 @@ export class OpportunitiesService extends BaseService {
     super(prisma);
   }
 
+  /**
+   * Generate a URL-friendly slug from a title
+   */
+  private generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '') // Remove special characters
+      .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+      .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+  }
+
+  /**
+   * Ensure slug is unique by appending a number if needed
+   * Uses a transaction-aware check
+   */
+  private async ensureUniqueSlug(
+    slug: string,
+    tx: Prisma.TransactionClient,
+    excludeId?: string,
+  ): Promise<string> {
+    let uniqueSlug = slug;
+    let counter = 1;
+
+    while (true) {
+      const existing = await tx.openPosition.findUnique({
+        where: { slug: uniqueSlug },
+      });
+
+      if (!existing || existing.id === excludeId) {
+        break;
+      }
+
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+    }
+
+    return uniqueSlug;
+  }
+
   private formatOpportunity(opportunity: any) {
     if (!opportunity) {
       return opportunity;
@@ -482,8 +522,9 @@ export class OpportunitiesService extends BaseService {
       }
 
       if (positionsToCreate.length > 0) {
-        await tx.openPosition.createMany({
-          data: positionsToCreate.map((pos) => {
+        // Generate slugs for all positions
+        const positionsWithSlugs = await Promise.all(
+          positionsToCreate.map(async (pos) => {
             let recruitmentStatus: RecruitmentStatus | null = null;
             if (pos.recruitmentStatus && pos.recruitmentStatus.trim() !== '') {
               const statusValue = pos.recruitmentStatus.trim();
@@ -491,15 +532,24 @@ export class OpportunitiesService extends BaseService {
                 recruitmentStatus = statusValue as RecruitmentStatus;
               }
             }
+            const slug = await this.ensureUniqueSlug(
+              this.generateSlug(pos.title),
+              tx,
+            );
             return {
               opportunityId: opportunity.id,
               title: pos.title,
+              slug,
               description: pos.description ?? 'TBD',
               requirements: pos.requirements,
               recruitmentStatus,
               status: 'Open',
             };
           }),
+        );
+
+        await tx.openPosition.createMany({
+          data: positionsWithSlugs,
         });
       }
 
@@ -716,8 +766,9 @@ export class OpportunitiesService extends BaseService {
 
       // Create new positions if provided
       if (positionsToCreate.length > 0 && (updateDto.positions || !firstPosition)) {
-        await tx.openPosition.createMany({
-          data: positionsToCreate.map((pos) => {
+        // Generate slugs for all positions
+        const positionsWithSlugs = await Promise.all(
+          positionsToCreate.map(async (pos) => {
             let recruitmentStatus: RecruitmentStatus | null = null;
             if (pos.recruitmentStatus && pos.recruitmentStatus.trim() !== '') {
               const statusValue = pos.recruitmentStatus.trim();
@@ -725,15 +776,24 @@ export class OpportunitiesService extends BaseService {
                 recruitmentStatus = statusValue as RecruitmentStatus;
               }
             }
+            const slug = await this.ensureUniqueSlug(
+              this.generateSlug(pos.title),
+              tx,
+            );
             return {
               opportunityId: updated.id,
               title: pos.title,
+              slug,
               description: pos.description ?? 'TBD',
               requirements: pos.requirements,
               recruitmentStatus,
               status: 'Open',
             };
           }),
+        );
+
+        await tx.openPosition.createMany({
+          data: positionsWithSlugs,
         });
       }
 

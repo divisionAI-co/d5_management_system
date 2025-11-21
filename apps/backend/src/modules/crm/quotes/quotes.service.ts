@@ -16,6 +16,7 @@ import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { FilterQuotesDto } from './dto/filter-quotes.dto';
 import { SendQuoteDto } from './dto/send-quote.dto';
+import { PreviewQuoteEmailDto } from './dto/preview-email.dto';
 
 @Injectable()
 export class QuotesService extends BaseService {
@@ -449,47 +450,82 @@ export class QuotesService extends BaseService {
       throw new BadRequestException('Recipient email address is required');
     }
 
-    // Prepare email content
-    const quoteTitle = quote.title || `Quote ${quote.quoteNumber}`;
-    const subject =
-      sendDto.subject || `Quote: ${quoteTitle} - ${quote.quoteNumber}`;
+    let htmlContent = sendDto.htmlContent;
+    let textContent = sendDto.textContent;
 
-    // Try to get email template, fallback to default
-    let emailHtml: string;
-    let emailText: string;
-    try {
-      const templateData = this.prepareTemplateData(quote);
-      const rendered = await this.templatesService.renderDefault(TemplateType.EMAIL, {
-        ...templateData,
-        recipientName: primaryContact
-          ? `${primaryContact.firstName} ${primaryContact.lastName}`
-          : 'Customer',
-        message: sendDto.message || '',
-      });
-      emailHtml = rendered.html;
-      emailText = rendered.text;
-    } catch (error) {
-      // Fallback to simple email template
-      emailHtml = `
-        <p>Dear ${primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : 'Customer'},</p>
-        <p>Please find attached the quote for your review.</p>
-        ${sendDto.message ? `<p>${sendDto.message}</p>` : ''}
-        <p>Quote Number: ${quote.quoteNumber}</p>
-        <p>Quote Title: ${quoteTitle}</p>
-        ${quote.totalValue ? `<p>Total Value: ${quote.currency || 'USD'} ${Number(quote.totalValue).toFixed(2)}</p>` : ''}
-        <p>Best regards,<br/>Division 5 Team</p>
-      `;
-      emailText = emailHtml.replace(/<[^>]*>/g, '');
+    // If template is provided, render it with quote data
+    if (sendDto.templateId) {
+      const templateData = {
+        quote: {
+          id: quote.id,
+          quoteNumber: quote.quoteNumber,
+          title: quote.title,
+          description: quote.description || '',
+          overview: quote.overview || '',
+          functionalProposal: quote.functionalProposal || '',
+          technicalProposal: quote.technicalProposal || '',
+          teamComposition: quote.teamComposition || '',
+          milestones: quote.milestones || '',
+          paymentTerms: quote.paymentTerms || '',
+          warrantyPeriod: quote.warrantyPeriod || '',
+          totalValue: quote.totalValue ? Number(quote.totalValue) : null,
+          currency: quote.currency || 'USD',
+          status: quote.status,
+          createdAt: quote.createdAt,
+          updatedAt: quote.updatedAt,
+        },
+        lead: lead
+          ? {
+              id: lead.id,
+              title: lead.title || '',
+              description: lead.description || '',
+              prospectCompanyName: lead.prospectCompanyName || '',
+              prospectWebsite: lead.prospectWebsite || '',
+              prospectIndustry: lead.prospectIndustry || '',
+            }
+          : null,
+        contact: primaryContact
+          ? {
+              id: primaryContact.id,
+              firstName: primaryContact.firstName || '',
+              lastName: primaryContact.lastName || '',
+              email: primaryContact.email || '',
+              phone: primaryContact.phone || '',
+              companyName: primaryContact.companyName || '',
+            }
+          : null,
+      };
+
+      try {
+        const rendered = await this.templatesService.render(sendDto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        this.logger.warn(
+          `[Quotes] Failed to render email template ${sendDto.templateId}, falling back to default HTML:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultQuoteEmailTemplate(quote, primaryContact);
+        textContent = this.getDefaultQuoteEmailText(quote, primaryContact);
+      }
+    } else if (!htmlContent) {
+      throw new BadRequestException(
+        'Either templateId or htmlContent must be provided',
+      );
     }
 
-    // Send email
-    await this.emailService.sendEmail({
+    // Parse CC and BCC
+    const cc = sendDto.cc ? sendDto.cc.split(',').map((email) => email.trim()) : undefined;
+    const bcc = sendDto.bcc ? sendDto.bcc.split(',').map((email) => email.trim()) : undefined;
+
+    const success = await this.emailService.sendEmail({
       to: recipientEmail,
-      cc: sendDto.cc ? sendDto.cc.split(',').map((e) => e.trim()) : undefined,
-      bcc: sendDto.bcc ? sendDto.bcc.split(',').map((e) => e.trim()) : undefined,
-      subject,
-      html: emailHtml,
-      text: emailText,
+      subject: sendDto.subject,
+      html: htmlContent,
+      text: textContent,
+      cc,
+      bcc,
       attachments: [
         {
           filename: `quote-${quote.quoteNumber}.pdf`,
@@ -497,6 +533,10 @@ export class QuotesService extends BaseService {
         },
       ],
     });
+
+    if (!success) {
+      throw new BadRequestException('Failed to send email');
+    }
 
     // Update quote status
     const updatedQuote = await this.prisma.quote.update({
@@ -511,6 +551,100 @@ export class QuotesService extends BaseService {
     });
 
     return this.formatQuote(updatedQuote);
+  }
+
+  async previewEmail(id: string, dto: PreviewQuoteEmailDto) {
+    const quote = await this.findOne(id);
+
+    const lead = quote.lead;
+    const contacts = lead.contacts || [];
+    const primaryContact = contacts[0]?.contact || null;
+
+    let htmlContent = dto.htmlContent;
+    let textContent = dto.textContent;
+
+    // If template is provided, render it with quote data
+    if (dto.templateId) {
+      const templateData = {
+        quote: {
+          id: quote.id,
+          quoteNumber: quote.quoteNumber,
+          title: quote.title,
+          description: quote.description || '',
+          overview: quote.overview || '',
+          functionalProposal: quote.functionalProposal || '',
+          technicalProposal: quote.technicalProposal || '',
+          teamComposition: quote.teamComposition || '',
+          milestones: quote.milestones || '',
+          paymentTerms: quote.paymentTerms || '',
+          warrantyPeriod: quote.warrantyPeriod || '',
+          totalValue: quote.totalValue ? Number(quote.totalValue) : null,
+          currency: quote.currency || 'USD',
+          status: quote.status,
+          createdAt: quote.createdAt,
+          updatedAt: quote.updatedAt,
+        },
+        lead: lead
+          ? {
+              id: lead.id,
+              title: lead.title || '',
+              description: lead.description || '',
+              prospectCompanyName: lead.prospectCompanyName || '',
+              prospectWebsite: lead.prospectWebsite || '',
+              prospectIndustry: lead.prospectIndustry || '',
+            }
+          : null,
+        contact: primaryContact
+          ? {
+              id: primaryContact.id,
+              firstName: primaryContact.firstName || '',
+              lastName: primaryContact.lastName || '',
+              email: primaryContact.email || '',
+              phone: primaryContact.phone || '',
+              companyName: primaryContact.companyName || '',
+            }
+          : null,
+      };
+
+      try {
+        const rendered = await this.templatesService.render(dto.templateId, templateData);
+        htmlContent = rendered.html;
+        textContent = rendered.text;
+      } catch (templateError) {
+        this.logger.warn(
+          `[Quotes] Failed to render email template ${dto.templateId}, falling back to default HTML:`,
+          templateError,
+        );
+        // Fallback to default HTML template
+        htmlContent = this.getDefaultQuoteEmailTemplate(quote, primaryContact);
+        textContent = this.getDefaultQuoteEmailText(quote, primaryContact);
+      }
+    } else if (!htmlContent) {
+      throw new BadRequestException(
+        'Either templateId or htmlContent must be provided',
+      );
+    }
+
+    // Convert plain text to HTML if only textContent is provided
+    if (!htmlContent && textContent) {
+      htmlContent = textContent
+        .split('\n')
+        .map((line) => {
+          const trimmed = line.trim();
+          return trimmed ? `<p>${trimmed}</p>` : '<br>';
+        })
+        .join('');
+    }
+
+    // Generate text from HTML if only htmlContent is provided
+    if (!textContent && htmlContent) {
+      textContent = htmlContent.replace(/<[^>]*>/g, '').trim();
+    }
+
+    return {
+      html: htmlContent || '',
+      text: textContent || '',
+    };
   }
 
   async getActivities(id: string) {
@@ -673,6 +807,69 @@ export class QuotesService extends BaseService {
           : null,
       },
     };
+  }
+
+  private getDefaultQuoteEmailTemplate(quote: any, primaryContact: any): string {
+    const quoteTitle = quote.title || `Quote ${quote.quoteNumber}`;
+    const contactName = primaryContact
+      ? `${primaryContact.firstName} ${primaryContact.lastName}`
+      : 'Customer';
+    const totalValue = quote.totalValue
+      ? `${quote.currency || 'USD'} ${Number(quote.totalValue).toFixed(2)}`
+      : 'N/A';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+          .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
+          .section { margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0;">Quote: ${quoteTitle}</h1>
+        </div>
+        <div class="content">
+          <div class="section">
+            <p>Dear ${contactName},</p>
+            <p>Please find attached the quote for your review.</p>
+            <p><strong>Quote Number:</strong> ${quote.quoteNumber}</p>
+            <p><strong>Quote Title:</strong> ${quoteTitle}</p>
+            ${quote.totalValue ? `<p><strong>Total Value:</strong> ${totalValue}</p>` : ''}
+            <p>If you have any questions, please don't hesitate to contact us.</p>
+            <p>Best regards,<br />Division 5 Team</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getDefaultQuoteEmailText(quote: any, primaryContact: any): string {
+    const quoteTitle = quote.title || `Quote ${quote.quoteNumber}`;
+    const contactName = primaryContact
+      ? `${primaryContact.firstName} ${primaryContact.lastName}`
+      : 'Customer';
+    const totalValue = quote.totalValue
+      ? `${quote.currency || 'USD'} ${Number(quote.totalValue).toFixed(2)}`
+      : 'N/A';
+
+    return `Dear ${contactName},
+
+Please find attached the quote for your review.
+
+Quote Number: ${quote.quoteNumber}
+Quote Title: ${quoteTitle}
+${quote.totalValue ? `Total Value: ${totalValue}` : ''}
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+Division 5 Team`;
   }
 
   private getDefaultTemplate(): string {

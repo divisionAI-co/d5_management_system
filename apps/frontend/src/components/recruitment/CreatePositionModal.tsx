@@ -29,6 +29,8 @@ interface CreatePositionModalProps {
 
 interface FormValues {
   title: string;
+  slug?: string;
+  imageUrl?: string;
   description?: string;
   requirements?: string;
   opportunityId?: string;
@@ -60,6 +62,8 @@ export function CreatePositionModal({
   } = useForm<FormValues>({
     defaultValues: {
       title: position?.title ?? defaultOpportunity?.title ?? '',
+      slug: position?.slug ?? '',
+      imageUrl: position?.imageUrl ?? '',
       description: position?.description ?? '',
       requirements: position?.requirements ?? '',
       // Default to empty string (no opportunity link) when creating new position
@@ -121,6 +125,8 @@ export function CreatePositionModal({
   useEffect(() => {
     reset({
       title: position?.title ?? defaultOpportunity?.title ?? '',
+      slug: position?.slug ?? '',
+      imageUrl: position?.imageUrl ?? '',
       description: position?.description ?? '',
       requirements: position?.requirements ?? '',
       opportunityId: position?.opportunity?.id ?? defaultOpportunity?.id ?? '',
@@ -176,6 +182,8 @@ export function CreatePositionModal({
     if (isEditMode && position) {
       const payload: UpdatePositionDto = {
         title: values.title.trim(),
+        slug: values.slug?.trim() || undefined,
+        imageUrl: values.imageUrl?.trim() || undefined,
         description: values.description?.trim() || undefined,
         requirements: values.requirements?.trim() || undefined,
         status: values.status,
@@ -190,6 +198,8 @@ export function CreatePositionModal({
 
     const payload: CreatePositionDto = {
       title: values.title.trim(),
+      slug: values.slug?.trim() || undefined,
+      imageUrl: values.imageUrl?.trim() || undefined,
       description: values.description?.trim() || undefined,
       requirements: values.requirements?.trim() || undefined,
       status: values.status,
@@ -249,6 +259,38 @@ export function CreatePositionModal({
                 <p className="mt-1 text-xs text-rose-600">{errors.title.message}</p>
               )}
             </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">
+                Slug (URL-friendly)
+              </label>
+              <input
+                type="text"
+                {...register('slug')}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="auto-generated-from-title"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                URL-friendly identifier. Auto-generated from title if not provided.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-muted-foreground">
+              Position Image URL
+            </label>
+            <input
+              type="url"
+              {...register('imageUrl')}
+              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              placeholder="https://example.com/image.jpg or Google Drive link"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Image URL for the position card. Supports Google Drive links.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
 
             <div>
               <label className="mb-1 block text-sm font-medium text-muted-foreground">

@@ -144,6 +144,14 @@ export class CreateCustomerDto {
   @IsString()
   @IsOptional()
   driveFolderUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'URL to customer logo/image',
+    example: 'https://example.com/logo.png',
+  })
+  @IsUrl()
+  @IsOptional()
+  imageUrl?: string;
 }
 
 

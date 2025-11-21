@@ -18,6 +18,7 @@ import { CreateQuoteDto } from './dto/create-quote.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { FilterQuotesDto } from './dto/filter-quotes.dto';
 import { SendQuoteDto } from './dto/send-quote.dto';
+import { PreviewQuoteEmailDto } from './dto/preview-email.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
@@ -97,6 +98,17 @@ export class QuotesController {
   ) {
     const userId = req.user.id;
     return this.quotesService.send(id, sendQuoteDto, userId);
+  }
+
+  @Post(':id/preview-email')
+  @Roles(UserRole.ADMIN, UserRole.SALESPERSON, UserRole.ACCOUNT_MANAGER)
+  @ApiOperation({
+    summary: 'Preview an email for a quote',
+    description:
+      'Preview how an email will look using a template or custom content. Returns rendered HTML and text.',
+  })
+  previewEmail(@Param('id') id: string, @Body() dto: PreviewQuoteEmailDto) {
+    return this.quotesService.previewEmail(id, dto);
   }
 
   @Get(':id/activities')

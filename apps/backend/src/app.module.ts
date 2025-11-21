@@ -28,6 +28,10 @@ import { CandidatesModule } from './modules/recruitment/candidates/candidates.mo
 import { OpenPositionsModule } from './modules/recruitment/positions/positions.module';
 import { ApplicationsModule } from './modules/recruitment/applications/applications.module';
 
+// Content Management
+import { BlogsModule } from './modules/content/blogs/blogs.module';
+import { CaseStudiesModule } from './modules/content/case-studies/case-studies.module';
+
 // HR & Employees
 import { HrModule } from './modules/hr/hr.module';
 // import { EodReportsModule } from './modules/employees/eod-reports/eod-reports.module';
@@ -107,6 +111,10 @@ import { CacheModule } from './common/cache/cache.module';
     CandidatesModule,
     OpenPositionsModule,
     ApplicationsModule,
+
+    // Content Management
+    BlogsModule,
+    CaseStudiesModule,
 
     // HR & Employees
     HrModule,

@@ -35,6 +35,7 @@ export interface CustomerBase {
   currency?: string | null;
   notes?: string | null;
   tags: string[];
+  imageUrl?: string | null;
   driveFolderId?: string | null;
   driveFolderUrl?: string | null;
   odooId?: string | null;
@@ -589,8 +590,10 @@ export interface UpdateQuotePayload extends Partial<CreateQuotePayload> {}
 
 export interface SendQuotePayload {
   to: string;
-  subject?: string;
-  message?: string;
+  subject: string;
+  templateId?: string;
+  htmlContent?: string;
+  textContent?: string;
   cc?: string;
   bcc?: string;
 }

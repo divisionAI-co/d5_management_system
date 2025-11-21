@@ -106,25 +106,47 @@ async function bootstrap() {
     console.log(`🌐 CORS: Configured ${corsOrigins.length} origin(s): ${corsOrigins.join(', ')}`);
   }
 
-  app.enableCors({
-    origin:
-      corsOrigins.length > 0
-        ? (origin, callback) => {
-            // Allow requests with no origin (mobile apps, Postman, etc.)
-            if (!origin) {
-              return callback(null, true);
-            }
-            
-            // Normalize origin for comparison (lowercase, remove trailing slash)
+  // Custom CORS middleware that handles both public and protected endpoints
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const path = req.path.toLowerCase();
+    const origin = req.headers.origin;
+    
+    // Check if this is a public API endpoint (check both with and without /api/v1 prefix)
+    const isPublicEndpoint = 
+      path.includes('/recruitment/positions/public') ||
+      path.includes('/recruitment/applications/public') ||
+      path.includes('/content/blogs/public') ||
+      path.includes('/content/case-studies/public') ||
+      path.includes('positions/public') ||
+      path.includes('applications/public') ||
+      path.includes('blogs/public') ||
+      path.includes('case-studies/public');
+    
+    if (isPublicEndpoint) {
+      // Allow all origins for public endpoints
+      if (origin) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-API-Key');
+      res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Page-Count');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      
+      // Handle preflight OPTIONS requests
+      if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+      }
+    } else {
+      // For protected endpoints, use standard CORS with origin checking
+      if (corsOrigins.length > 0 && origin) {
             const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-            
-            // Check if origin matches any configured origin
             const isAllowed = corsOrigins.some((allowed) => {
-              // Exact match
               if (normalizedOrigin === allowed) {
                 return true;
               }
-              // Subdomain wildcard match (e.g., *.example.com)
               if (allowed.startsWith('*.')) {
                 const domain = allowed.substring(2);
                 return normalizedOrigin.endsWith('.' + domain) || normalizedOrigin === domain;
@@ -133,21 +155,43 @@ async function bootstrap() {
             });
             
             if (isAllowed) {
-              callback(null, true);
+          res.setHeader('Access-Control-Allow-Origin', origin);
+          res.setHeader('Access-Control-Allow-Credentials', 'true');
+          res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-API-Key');
+          res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Page-Count');
+          res.setHeader('Access-Control-Max-Age', '86400');
+          
+          if (req.method === 'OPTIONS') {
+            return res.status(200).end();
+          }
             } else {
-              // Log blocked origin for debugging (only in development or if DEBUG env is set)
+          // Log blocked origin for debugging
               if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
                 console.warn(`🚫 CORS blocked: ${origin} (normalized: ${normalizedOrigin}). Allowed: ${corsOrigins.join(', ')}`);
               }
-              callback(new Error('Not allowed by CORS'));
+          return res.status(403).json({ message: 'Not allowed by CORS' });
             }
-          }
-        : true, // Allow all if not configured (more lenient)
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['X-Total-Count', 'X-Page-Count'],
-    maxAge: 86400, // 24 hours
+      } else if (corsOrigins.length === 0) {
+        // No CORS restrictions configured, allow all
+        if (origin) {
+          res.setHeader('Access-Control-Allow-Origin', origin);
+        } else {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+        }
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-API-Key');
+        res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count, X-Page-Count');
+        res.setHeader('Access-Control-Max-Age', '86400');
+        
+        if (req.method === 'OPTIONS') {
+          return res.status(200).end();
+        }
+      }
+    }
+    
+    next();
   });
 
   // Global prefix

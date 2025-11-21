@@ -48,8 +48,8 @@ export function SendQuoteModal({ quote, onClose, onSuccess }: SendQuoteModalProp
   const onSubmit = async (data: FormValues) => {
     const payload: SendQuotePayload = {
       to: data.to,
-      subject: data.subject,
-      message: data.message,
+      subject: data.subject || `Quote: ${quote.title} - ${quote.quoteNumber}`,
+      textContent: data.message,
       cc: data.cc,
       bcc: data.bcc,
     };

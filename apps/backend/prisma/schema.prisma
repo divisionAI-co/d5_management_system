@@ -21,6 +21,7 @@ enum UserRole {
   RECRUITER
   HR
   EMPLOYEE
+  CONTENT_EDITOR
 }
 
 model User {
@@ -79,6 +80,8 @@ model User {
   sentQuotes                  Quote[]
   importedCheckInOuts         CheckInOut[]                 @relation("CheckInOutImportedBy")
   salesPerformanceReports     SalesPerformanceReport[]     @relation("SalesPerformanceReports")
+  createdBlogs                Blog[]
+  createdCaseStudies          CaseStudy[]
 
   @@map("users")
 }
@@ -171,6 +174,7 @@ model Customer {
   // Metadata
   notes String?
   tags  String[]
+  imageUrl String? // URL to customer logo/image
 
   // Google Drive Integration
   driveFolderId String? // Google Drive folder containing contracts and documents
@@ -603,6 +607,7 @@ model Candidate {
   availableFrom  DateTime?
   expectedSalary Decimal?  @db.Decimal(10, 2)
   salaryCurrency String?   @default("USD")
+  referralSource String? // Where candidate heard about us (e.g., "Website", "LinkedIn", "Referral", "Job Board", "Social Media", "Other")
 
   // Odoo Migration
   odooId String? @unique
@@ -632,8 +637,10 @@ model OpenPosition {
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
   title        String
+  slug        String  @unique
   description  String  @db.Text
   requirements String? @db.Text
+  imageUrl     String? // URL to position image/logo
 
   status            String             @default("Open") // Open, Filled, Cancelled
   recruitmentStatus RecruitmentStatus? // Headhunting or standard
@@ -649,6 +656,7 @@ model OpenPosition {
 
   @@index([status])
   @@index([isArchived])
+  @@index([slug])
   @@map("open_positions")
 }
 
@@ -1857,4 +1865,88 @@ model AccountLockout {
   @@index([userId])
   @@index([lockedUntil])
   @@map("account_lockouts")
+}
+
+// ============================================
+// CONTENT MANAGEMENT MODULE
+// ============================================
+
+enum BlogStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Blog {
+  id          String    @id @default(uuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?   @db.Text
+  content     String    @db.Text
+  featuredImage String?
+  status      BlogStatus @default(DRAFT)
+  publishedAt DateTime?
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String? @db.Text
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([authorId])
+  @@index([publishedAt])
+  @@index([slug])
+  @@map("blogs")
+}
+
+enum CaseStudyStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model CaseStudy {
+  id          String           @id @default(uuid())
+  title       String
+  slug        String           @unique
+  excerpt     String?          @db.Text
+  content     String           @db.Text
+  featuredImage String?
+  status      CaseStudyStatus  @default(DRAFT)
+  publishedAt DateTime?
+  authorId    String
+  author      User             @relation(fields: [authorId], references: [id])
+  
+  // Structured case study content
+  challenge   String?          @db.Text // The challenge the customer faced
+  solution    String?          @db.Text // The solution provided
+  aboutCustomer String?        @db.Text // Information about the customer
+  
+  // Client information
+  clientName  String?
+  clientLogo  String?
+  industry    String?
+  projectDate DateTime?
+  
+  // Results/metrics (stored as JSON)
+  results     Json?
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String? @db.Text
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([authorId])
+  @@index([publishedAt])
+  @@index([slug])
+  @@map("case_studies")
 }

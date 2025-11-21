@@ -212,6 +212,17 @@ export class EodReportsService extends BaseService {
   }
 
   private async sendEodReportEmail(report: any) {
+    // Check if user has email notifications enabled
+    const settings = await this.prisma.notificationSettings.findUnique({
+      where: { userId: report.userId },
+    });
+
+    // If email notifications are disabled, don't send
+    if (settings && !settings.emailEnabled) {
+      this.logger.log(`[EodReportsService] Email notifications disabled for user ${report.userId}, skipping EOD report email`);
+      return;
+    }
+
     const tasks = Array.isArray(report.tasksWorkedOn) ? report.tasksWorkedOn : [];
     const totalHours = tasks.reduce((sum: number, task: any) => {
       // Convert timeSpentOnTicket to number, handling Decimal, string, or number types

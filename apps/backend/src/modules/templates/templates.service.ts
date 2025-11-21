@@ -265,7 +265,7 @@ export class TemplatesService extends BaseService {
       if (fileId) {
         // Use backend proxy endpoint to serve Google Drive images
         // This bypasses CORS restrictions that prevent direct loading in iframes
-        // uc?export=view returns the full resolution image
+        // The proxy uses export=download to return the original full resolution image without compression
         const proxyUrl = `/api/v1/templates/proxy/google-drive-image?fileId=${fileId}`;
         
         return `${imgTag}${srcPrefix}${quote}${proxyUrl}${quoteEnd}${rest}`;

@@ -254,7 +254,7 @@ export const convertGoogleDriveUrl = (url: string): string => {
     // Use backend proxy to bypass CORS restrictions from Google Drive
     // This allows images to load properly in iframes and email clients
     // Use absolute URL for iframe compatibility
-    // uc?export=view returns the full resolution image
+    // The proxy uses export=download to return the original full resolution image without compression
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
     return `${apiUrl}/templates/proxy/google-drive-image?fileId=${fileId}`;
   }

@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { settingsApi } from '@/lib/api/settings';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import type { UserRole } from '@/types/users';
 import type {
   NotificationSettings,
   UpdateNotificationSettingsPayload,
@@ -32,21 +34,21 @@ const DEFAULT_VALUES: NotificationFormValues = {
 };
 
 const mapToFormValues = (
-  source?: NotificationSettings,
+  source?: NotificationSettings | Partial<NotificationSettings>,
 ): NotificationFormValues => {
   if (!source) {
     return DEFAULT_VALUES;
   }
 
   return {
-    emailEnabled: source.emailEnabled,
-    inAppEnabled: source.inAppEnabled,
-    taskAssigned: source.taskAssigned,
-    taskDueSoon: source.taskDueSoon,
-    leaveApproved: source.leaveApproved,
-    performanceReview: source.performanceReview,
-    newCandidate: source.newCandidate,
-    newOpportunity: source.newOpportunity,
+    emailEnabled: source.emailEnabled ?? DEFAULT_VALUES.emailEnabled,
+    inAppEnabled: source.inAppEnabled ?? DEFAULT_VALUES.inAppEnabled,
+    taskAssigned: source.taskAssigned ?? DEFAULT_VALUES.taskAssigned,
+    taskDueSoon: source.taskDueSoon ?? DEFAULT_VALUES.taskDueSoon,
+    leaveApproved: source.leaveApproved ?? DEFAULT_VALUES.leaveApproved,
+    performanceReview: source.performanceReview ?? DEFAULT_VALUES.performanceReview,
+    newCandidate: source.newCandidate ?? DEFAULT_VALUES.newCandidate,
+    newOpportunity: source.newOpportunity ?? DEFAULT_VALUES.newOpportunity,
   };
 };
 
@@ -54,6 +56,7 @@ const NOTIFICATION_GROUPS: Array<{
   key: keyof NotificationFormValues;
   title: string;
   description: string;
+  applicableRoles?: UserRole[];
 }> = [
   {
     key: 'emailEnabled',
@@ -89,21 +92,48 @@ const NOTIFICATION_GROUPS: Array<{
     key: 'newCandidate',
     title: 'New candidate added',
     description: 'Notify recruiters when new candidates enter the pipeline.',
+    applicableRoles: ['ADMIN', 'HR', 'RECRUITER'],
   },
   {
     key: 'newOpportunity',
     title: 'New opportunity created',
     description: 'Notify sales and account managers of new opportunities.',
+    applicableRoles: ['ADMIN', 'SALESPERSON', 'ACCOUNT_MANAGER'],
   },
 ];
 
+/**
+ * Get notification groups that are applicable to the user's role
+ */
+function getApplicableNotifications(userRole: UserRole | undefined) {
+  if (!userRole) {
+    return NOTIFICATION_GROUPS;
+  }
+
+  return NOTIFICATION_GROUPS.filter((group) => {
+    // If no applicableRoles specified, it applies to all roles
+    if (!group.applicableRoles) {
+      return true;
+    }
+    // Otherwise, check if user's role is in the applicable roles
+    return group.applicableRoles.includes(userRole);
+  });
+}
+
 export function NotificationPreferencesForm() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ['notification-settings'],
     queryFn: settingsApi.getNotificationSettings,
   });
+
+  // Filter notifications based on user role
+  const applicableNotifications = useMemo(
+    () => getApplicableNotifications(user?.role),
+    [user?.role],
+  );
 
   const {
     register,
@@ -127,7 +157,25 @@ export function NotificationPreferencesForm() {
   });
 
   const onSubmit = (values: NotificationFormValues) => {
-    const payload: UpdateNotificationSettingsPayload = { ...values };
+    // Only include notification settings that are applicable to the user's role
+    const applicableKeys = applicableNotifications.map((n) => n.key);
+    const payload: UpdateNotificationSettingsPayload = {};
+    
+    // Always include global settings
+    if (applicableKeys.includes('emailEnabled')) {
+      payload.emailEnabled = values.emailEnabled;
+    }
+    if (applicableKeys.includes('inAppEnabled')) {
+      payload.inAppEnabled = values.inAppEnabled;
+    }
+    
+    // Include role-specific settings
+    applicableKeys.forEach((key) => {
+      if (key !== 'emailEnabled' && key !== 'inAppEnabled') {
+        payload[key] = values[key];
+      }
+    });
+    
     mutation.mutate(payload);
   };
 
@@ -146,7 +194,7 @@ export function NotificationPreferencesForm() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 px-6 py-6">
         <div className="space-y-4">
-          {NOTIFICATION_GROUPS.map((setting) => (
+          {applicableNotifications.map((setting) => (
             <label
               key={setting.key}
               className="flex w-full items-start justify-between gap-4 rounded-lg border border-border px-4 py-3 transition hover:bg-muted"

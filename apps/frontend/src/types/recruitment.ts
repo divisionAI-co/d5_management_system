@@ -165,10 +165,12 @@ export interface OpportunitySummary {
 export interface OpenPositionSummary {
   id: string;
   title: string;
+  slug: string;
   description?: string | null;
   requirements?: string | null;
   status: PositionStatus;
   recruitmentStatus?: RecruitmentStatus | null;
+  imageUrl?: string | null;
   isArchived?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -212,20 +214,24 @@ export interface PositionFilters {
 
 export interface CreatePositionDto {
   title: string;
+  slug?: string;
   description?: string;
   requirements?: string;
   status?: PositionStatus;
   recruitmentStatus?: RecruitmentStatus;
   opportunityId?: string;
+  imageUrl?: string;
 }
 
 export interface UpdatePositionDto {
   title?: string;
+  slug?: string;
   description?: string;
   requirements?: string;
   status?: PositionStatus;
   recruitmentStatus?: RecruitmentStatus;
   opportunityId?: string | null;
+  imageUrl?: string;
 }
 
 export interface ClosePositionDto {

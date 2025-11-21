@@ -10,7 +10,7 @@ export class GoogleDriveProxyController {
   private readonly logger = new Logger(GoogleDriveProxyController.name);
   @Public()
   @Get('google-drive-image')
-  @ApiOperation({ summary: 'Proxy Google Drive images to bypass CORS restrictions (public endpoint). Returns full resolution image.' })
+  @ApiOperation({ summary: 'Proxy Google Drive images to bypass CORS restrictions (public endpoint). Returns original full resolution image without compression.' })
   @ApiQuery({ name: 'fileId', description: 'Google Drive file ID', required: true })
   async proxyGoogleDriveImage(
     @Query('fileId') fileId: string,
@@ -25,10 +25,13 @@ export class GoogleDriveProxyController {
       throw new BadRequestException('Invalid fileId format');
     }
 
-    // Use uc?export=view endpoint which returns the full resolution image
-    const googleDriveUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    // For full resolution images, we use uc?export=download which returns the original file
+    // This preserves the original image quality without compression
+    // For public files shared with "Anyone with the link", this works without authentication
+    // Note: For very large files, Google may show a virus scan warning, which we handle below
+    const googleDriveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
 
-    const fetchImage = (url: string, redirectCount = 0) => {
+    const fetchImage = (url: string, redirectCount = 0, isRetry = false) => {
       if (redirectCount > 5) {
         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Too many redirects');
         return;
@@ -38,7 +41,7 @@ export class GoogleDriveProxyController {
         // Handle redirects (301, 302, 303, 307, 308)
         if (proxyRes.statusCode && proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
           this.logger.log(`Following redirect to: ${proxyRes.headers.location}`);
-          fetchImage(proxyRes.headers.location, redirectCount + 1);
+          fetchImage(proxyRes.headers.location, redirectCount + 1, isRetry);
           return;
         }
 
@@ -48,7 +51,35 @@ export class GoogleDriveProxyController {
           return;
         }
 
-        // Set appropriate headers
+        // Check if we got HTML (virus scan warning page) instead of the image
+        const contentType = proxyRes.headers['content-type'] || '';
+        if (contentType.includes('text/html') && !isRetry) {
+          // This is likely a virus scan warning page, try to extract the download link
+          let htmlData = '';
+          proxyRes.on('data', (chunk) => {
+            htmlData += chunk.toString();
+          });
+          proxyRes.on('end', () => {
+            // Try to extract the confirm token from the virus scan warning page
+            // The page usually contains: /uc?export=download&confirm=TOKEN&id=FILE_ID
+            const confirmMatch = htmlData.match(/confirm=([a-zA-Z0-9_-]+)/);
+            if (confirmMatch && confirmMatch[1] && confirmMatch[1] !== 't' && confirmMatch[1].length > 1) {
+              // Use the confirm parameter to get the actual download
+              const confirmUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=${confirmMatch[1]}`;
+              this.logger.log(`Extracted confirm token, retrying download with token`);
+              fetchImage(confirmUrl, redirectCount + 1, true);
+            } else {
+              // If we can't extract the token, try the direct download method
+              // For images, we can also try uc?id=FILE_ID which sometimes works better
+              const directUrl = `https://drive.google.com/uc?id=${fileId}`;
+              this.logger.log(`Virus scan warning detected, trying direct download method`);
+              fetchImage(directUrl, redirectCount + 1, true);
+            }
+          });
+          return;
+        }
+
+        // Set appropriate headers for the image response
         res.set({
           'Content-Type': proxyRes.headers['content-type'] || 'image/jpeg',
           'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
