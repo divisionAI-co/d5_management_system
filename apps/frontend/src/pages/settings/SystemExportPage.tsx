@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { systemExportApi } from '@/lib/api/system-export';
 import { Download, Upload, AlertTriangle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export default function SystemExportPage() {
   const [isExporting, setIsExporting] = useState(false);
@@ -14,6 +15,7 @@ export default function SystemExportPage() {
     errors: string[];
   } | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -46,11 +48,15 @@ export default function SystemExportPage() {
     }
 
     if (clearExisting) {
-      const confirmed = window.confirm(
-        'WARNING: This will clear all existing data before importing. This action cannot be undone. Are you sure?'
-      );
-      if (!confirmed) return;
+      setShowClearConfirm(true);
+      return;
     }
+
+    performImport(false);
+  };
+
+  const performImport = async (clearExisting: boolean) => {
+    if (!selectedFile) return;
 
     if (clearExisting) {
       setIsImportingWithClear(true);
@@ -292,6 +298,19 @@ export default function SystemExportPage() {
           </div>
         </div>
       </div>
+      <ConfirmationDialog
+        open={showClearConfirm}
+        title="Clear All Data Before Import"
+        message="WARNING: This will clear all existing data before importing. This action cannot be undone. Are you sure?"
+        confirmLabel="Yes, Clear and Import"
+        variant="danger"
+        onConfirm={() => {
+          setShowClearConfirm(false);
+          performImport(true);
+        }}
+        onCancel={() => setShowClearConfirm(false)}
+        isPending={isImportingWithClear}
+      />
     </div>
   );
 }

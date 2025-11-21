@@ -4,6 +4,7 @@ import { holidaysApi } from '@/lib/api/hr';
 import { HolidaysList } from '@/components/hr/holidays/HolidaysList';
 import { HolidayForm } from '@/components/hr/holidays/HolidayForm';
 import type { NationalHoliday } from '@/types/hr';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function HolidaysPage() {
   const [showForm, setShowForm] = useState(false);
@@ -11,11 +12,18 @@ export default function HolidaysPage() {
   const [deleteHoliday, setDeleteHoliday] = useState<NationalHoliday | null>(null);
   const queryClient = useQueryClient();
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => holidaysApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      setSuccessMessage('Holiday deleted successfully');
       setDeleteHoliday(null);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to delete holiday');
     },
   });
 
@@ -77,6 +85,20 @@ export default function HolidaysPage() {
             </div>
           </div>
         </div>
+      )}
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
       )}
     </div>
   );

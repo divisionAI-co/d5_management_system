@@ -8,6 +8,7 @@ import { checkInOutsApi } from '@/lib/api/hr';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
 import type { CheckInOut } from '@/types/hr/check-in-out';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export default function CheckInOutsPage() {
   const location = useLocation();
@@ -20,6 +21,7 @@ export default function CheckInOutsPage() {
   const [selectedRecord, setSelectedRecord] = useState<CheckInOut | null>(null);
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
+  const [deleteConfirmRecord, setDeleteConfirmRecord] = useState<CheckInOut | null>(null);
   const { user } = useAuthStore();
   const canImport = user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
 
@@ -41,8 +43,13 @@ export default function CheckInOutsPage() {
   });
 
   const handleDelete = (record: CheckInOut) => {
-    if (window.confirm('Are you sure you want to delete this check-in/out record?')) {
-      deleteMutation.mutate(record.id);
+    setDeleteConfirmRecord(record);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmRecord) {
+      deleteMutation.mutate(deleteConfirmRecord.id);
+      setDeleteConfirmRecord(null);
     }
   };
 
@@ -93,6 +100,16 @@ export default function CheckInOutsPage() {
           onClose={() => setImportOpen(false)}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmRecord}
+        title="Delete Check-In/Out Record"
+        message="Are you sure you want to delete this check-in/out record?"
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmRecord(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

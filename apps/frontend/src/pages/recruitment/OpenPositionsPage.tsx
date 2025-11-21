@@ -12,6 +12,7 @@ import type {
 import { OpenPositionsTable } from '@/components/recruitment/OpenPositionsTable';
 import { CreatePositionModal } from '@/components/recruitment/CreatePositionModal';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const STATUS_OPTIONS: Array<{ value: PositionStatus | 'ALL'; label: string }> = [
   { value: 'ALL', label: 'All statuses' },
@@ -41,6 +42,9 @@ export default function OpenPositionsPage() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState<OpenPosition | null>(null);
+  const [closeConfirmPosition, setCloseConfirmPosition] = useState<OpenPositionSummary | null>(null);
+  const [archiveConfirmPosition, setArchiveConfirmPosition] = useState<OpenPositionSummary | null>(null);
+  const [deleteConfirmPosition, setDeleteConfirmPosition] = useState<OpenPositionSummary | null>(null);
 
   useEffect(() => {
     if (highlightId) {
@@ -142,20 +146,19 @@ export default function OpenPositionsPage() {
   };
 
   const handleClosePosition = (position: OpenPositionSummary) => {
-    const confirmClose = window.confirm(
-      `Mark "${position.title}" as filled? This will close the associated opportunity.`,
-    );
+    setCloseConfirmPosition(position);
+  };
 
-    if (!confirmClose) {
-      return;
+  const confirmClosePosition = () => {
+    if (closeConfirmPosition) {
+      closeMutation.mutate({
+        id: closeConfirmPosition.id,
+        payload: {
+          filledAt: new Date().toISOString(),
+        },
+      });
+      setCloseConfirmPosition(null);
     }
-
-    closeMutation.mutate({
-      id: position.id,
-      payload: {
-        filledAt: new Date().toISOString(),
-      },
-    });
   };
 
   const handleEditPositionFromSummary = (position: OpenPositionSummary) => {
@@ -275,23 +278,13 @@ export default function OpenPositionsPage() {
         onClosePosition={handleClosePosition}
         onEdit={handleEditPositionFromSummary}
         onArchive={(position) => {
-          const confirmArchive = window.confirm(
-            `Archive "${position.title}"? Archived positions are hidden from the default view but can be restored later.`,
-          );
-          if (confirmArchive) {
-            archiveMutation.mutate(position.id);
-          }
+          setArchiveConfirmPosition(position);
         }}
         onUnarchive={(position) => {
           unarchiveMutation.mutate(position.id);
         }}
         onDelete={(position) => {
-          const confirmDelete = window.confirm(
-            `Are you sure you want to delete "${position.title}"? This action cannot be undone.\n\nNote: Positions with linked candidates cannot be deleted.`,
-          );
-          if (confirmDelete) {
-            deleteMutation.mutate(position.id);
-          }
+          setDeleteConfirmPosition(position);
         }}
       />
 
@@ -314,6 +307,53 @@ export default function OpenPositionsPage() {
           onUpdated={handlePositionUpdated}
         />
       )}
+      <ConfirmationDialog
+        open={!!closeConfirmPosition}
+        title="Close Position"
+        message={`Mark "${closeConfirmPosition?.title}" as filled? This will close the associated opportunity.`}
+        confirmLabel="Mark as Filled"
+        variant="info"
+        onConfirm={confirmClosePosition}
+        onCancel={() => setCloseConfirmPosition(null)}
+        isPending={closeMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!archiveConfirmPosition}
+        title="Archive Position"
+        message={`Archive "${archiveConfirmPosition?.title}"? Archived positions are hidden from the default view but can be restored later.`}
+        confirmLabel="Archive"
+        variant="warning"
+        onConfirm={() => {
+          if (archiveConfirmPosition) {
+            archiveMutation.mutate(archiveConfirmPosition.id);
+            setArchiveConfirmPosition(null);
+          }
+        }}
+        onCancel={() => setArchiveConfirmPosition(null)}
+        isPending={archiveMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!deleteConfirmPosition}
+        title="Delete Position"
+        message={
+          <>
+            Are you sure you want to delete &quot;{deleteConfirmPosition?.title}&quot;? This action cannot be undone.
+            <br />
+            <br />
+            <span className="text-sm">Note: Positions with linked candidates cannot be deleted.</span>
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirmPosition) {
+            deleteMutation.mutate(deleteConfirmPosition.id);
+            setDeleteConfirmPosition(null);
+          }
+        }}
+        onCancel={() => setDeleteConfirmPosition(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

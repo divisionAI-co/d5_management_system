@@ -13,6 +13,7 @@ import type {
   UpdatePositionDto,
 } from '@/types/recruitment';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface CreatePositionModalProps {
   onClose: () => void;
@@ -46,6 +47,7 @@ export function CreatePositionModal({
   const [opportunitySearch, setOpportunitySearch] = useState('');
   const [isOpportunityDropdownOpen, setIsOpportunityDropdownOpen] = useState(false);
   const opportunityDropdownRef = useRef<HTMLDivElement>(null);
+  const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
   const isEditMode = Boolean(position);
 
   const {
@@ -141,6 +143,13 @@ export function CreatePositionModal({
       onCreated?.(position);
       onClose();
     },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to create position. Please try again.';
+      setErrorFeedback(errorMessage);
+    },
   });
 
   const updateMutation = useMutation({
@@ -151,6 +160,13 @@ export function CreatePositionModal({
       queryClient.invalidateQueries({ queryKey: ['position', position.id] });
       onUpdated?.(position);
       onClose();
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to update position. Please try again.';
+      setErrorFeedback(errorMessage);
     },
   });
 
@@ -188,8 +204,16 @@ export function CreatePositionModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
+    <>
+      {errorFeedback && (
+        <FeedbackToast
+          message={errorFeedback}
+          onDismiss={() => setErrorFeedback(null)}
+          tone="error"
+        />
+      )}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="flex h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-6 py-4 flex-shrink-0">
           <div>
             <h2 className="text-2xl font-semibold text-foreground">
@@ -431,5 +455,6 @@ export function CreatePositionModal({
         </form>
       </div>
     </div>
+    </>
   );
 }

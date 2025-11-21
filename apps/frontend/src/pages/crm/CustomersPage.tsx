@@ -16,6 +16,7 @@ import { CustomersTable } from '@/components/crm/customers/CustomersTable';
 import { CustomerStatusForm } from '@/components/crm/customers/CustomerStatusForm';
 import { Filter, Plus, RefreshCw } from 'lucide-react';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type SortField = 'name' | 'createdAt' | 'updatedAt' | 'monthlyValue';
 
@@ -65,6 +66,7 @@ export default function CustomersPage() {
   const [statusCustomer, setStatusCustomer] = useState<CustomerDetail | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteConfirmCustomer, setDeleteConfirmCustomer] = useState<CustomerSummary | null>(null);
 
   const sanitizedFilters = useMemo(() => {
     const payload = {
@@ -149,12 +151,13 @@ export default function CustomersPage() {
   };
 
   const handleDelete = (customerSummary: CustomerSummary) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete ${customerSummary.name}? This will remove associated contacts, opportunities and invoices.`,
-      )
-    ) {
-      deleteMutation.mutate(customerSummary.id);
+    setDeleteConfirmCustomer(customerSummary);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmCustomer) {
+      deleteMutation.mutate(deleteConfirmCustomer.id);
+      setDeleteConfirmCustomer(null);
     }
   };
 
@@ -322,6 +325,21 @@ export default function CustomersPage() {
           }}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmCustomer}
+        title="Delete Customer"
+        message={
+          <>
+            Are you sure you want to delete <span className="font-semibold">{deleteConfirmCustomer?.name}</span>?
+            This will remove associated contacts, opportunities and invoices.
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmCustomer(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

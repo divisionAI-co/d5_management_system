@@ -84,4 +84,14 @@ export const usersApi = {
     );
     return data;
   },
+
+  unlockAccount: async (id: string) => {
+    const { data } = await apiClient.post<{ message: string }>(`/users/${id}/unlock`);
+    return data;
+  },
+
+  resetLoginCooldown: async (id: string) => {
+    const { data } = await apiClient.post<{ message: string }>(`/users/${id}/reset-cooldown`);
+    return data;
+  },
 };

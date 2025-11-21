@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { employeesApi } from '@/lib/api/hr';
 import { usersApi } from '@/lib/api/users';
 import type { CreateEmployeeDto, UpdateEmployeeDto, Employee, ContractType, EmploymentStatus } from '@/types/hr';
 import { X } from 'lucide-react';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface EmployeeFormProps {
   employee?: Employee;
@@ -15,6 +16,8 @@ interface EmployeeFormProps {
 export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps) {
   const queryClient = useQueryClient();
   const isEdit = !!employee;
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: usersResponse, isLoading: isUsersLoading } = useQuery({
     queryKey: ['users', 'employee-select'],
@@ -50,6 +53,7 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
       emergencyContactPhone: employee.emergencyContactPhone || '',
       emergencyContactRelation: employee.emergencyContactRelation || '',
       cardNumber: employee.cardNumber || '',
+      bookingLink: employee.bookingLink || '',
     } : {
       userId: '',
       salaryCurrency: 'USD',
@@ -62,8 +66,14 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
     mutationFn: (data: CreateEmployeeDto) => employeesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setSuccessMessage('Employee created successfully');
       onSuccess();
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create employee');
     },
   });
 
@@ -72,8 +82,14 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       queryClient.invalidateQueries({ queryKey: ['employee', employee!.id] });
+      setSuccessMessage('Employee updated successfully');
       onSuccess();
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update employee');
     },
   });
 
@@ -172,6 +188,21 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
                   className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="123456"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Booking Link
+                </label>
+                <input
+                  type="url"
+                  {...register('bookingLink')}
+                  className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://calendly.com/john-doe"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Link to your booking calendar (e.g., Calendly, Google Calendar)
+                </p>
               </div>
 
               <div>
@@ -365,6 +396,20 @@ export function EmployeeForm({ employee, onClose, onSuccess }: EmployeeFormProps
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

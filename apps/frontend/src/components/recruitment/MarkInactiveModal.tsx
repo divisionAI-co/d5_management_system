@@ -5,6 +5,7 @@ import { X, Send, Loader2, Mail } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment/candidates';
 import { templatesApi } from '@/lib/api/templates';
 import type { Candidate, MarkInactivePayload } from '@/types/recruitment';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface MarkInactiveModalProps {
   candidate: Candidate;
@@ -48,6 +49,8 @@ Recruitment Team`;
 export function MarkInactiveModal({ candidate, onClose, onSuccess }: MarkInactiveModalProps) {
   const queryClient = useQueryClient();
   const [selectedReason, setSelectedReason] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -81,7 +84,14 @@ export function MarkInactiveModal({ candidate, onClose, onSuccess }: MarkInactiv
     mutationFn: (payload: MarkInactivePayload) => candidatesApi.markInactive(candidate.id, payload),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      setSuccessMessage('Candidate unlinked from positions successfully');
       onSuccess(updated);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to unlink candidate from positions');
     },
   });
 
@@ -351,6 +361,20 @@ export function MarkInactiveModal({ candidate, onClose, onSuccess }: MarkInactiv
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

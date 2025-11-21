@@ -30,6 +30,7 @@ import { SendEmailModal } from '@/components/shared/SendEmailModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { SafeHtml } from '@/components/ui/SafeHtml';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const VALUE_FORMATTER = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -57,6 +58,7 @@ export default function OpportunityDetailPage() {
     (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
   );
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Open activity sidebar if navigating from notification or email link
   useEffect(() => {
@@ -150,9 +152,12 @@ export default function OpportunityDetailPage() {
   const statusLabel = opportunity.isClosed ? (opportunity.isWon ? 'Won' : 'Lost') : 'Open';
 
   const handleDelete = () => {
-    if (window.confirm(`Delete opportunity "${opportunity.title}"? This action cannot be undone.`)) {
-      deleteMutation.mutate();
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate();
+    setShowDeleteConfirm(false);
   };
 
   const handleEditSuccess = (updated: OpportunityDetail) => {
@@ -422,36 +427,86 @@ export default function OpportunityDetailPage() {
             </div>
           </div>
 
-          {opportunity.openPosition ? (
+          {(opportunity.openPositions && opportunity.openPositions.length > 0) || opportunity.openPosition ? (
             <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <Activity className="h-5 w-5 text-emerald-500" /> Open Position
-              </h2>
-              <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Title</p>
-                  <p className="text-foreground">{opportunity.openPosition.title}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">Status</p>
-                  <p className="text-foreground">{opportunity.openPosition.status}</p>
-                </div>
-                {opportunity.openPosition.description ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
-                    <div className="prose prose-sm max-w-none">
-                      <SafeHtml html={opportunity.openPosition.description} />
+              <div className="flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <Activity className="h-5 w-5 text-emerald-500" /> 
+                  {opportunity.openPositions && opportunity.openPositions.length > 1 
+                    ? `Open Positions (${opportunity.openPositions.length})` 
+                    : 'Open Position'}
+                </h2>
+                {opportunity.openPositions && opportunity.openPositions.length > 0 && (
+                  <Link
+                    to={`/recruitment/positions?opportunityId=${opportunity.id}`}
+                    className="text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    View All
+                  </Link>
+                )}
+              </div>
+              <div className="mt-4 space-y-4">
+                {(opportunity.openPositions && opportunity.openPositions.length > 0
+                  ? opportunity.openPositions
+                  : opportunity.openPosition
+                    ? [opportunity.openPosition]
+                    : []
+                ).map((position, index) => (
+                  <div
+                    key={position.id || index}
+                    className={`rounded-lg border border-border bg-muted/40 p-4 ${
+                      opportunity.openPositions && opportunity.openPositions.length > 1 ? 'border-blue-200' : ''
+                    }`}
+                  >
+                    {opportunity.openPositions && opportunity.openPositions.length > 1 && (
+                      <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">
+                          Position {index + 1}
+                        </span>
+                        <Link
+                          to={`/recruitment/positions/${position.id}`}
+                          className="text-xs font-medium text-blue-600 hover:underline"
+                        >
+                          View Details →
+                        </Link>
+                      </div>
+                    )}
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Title</p>
+                        <p className="text-foreground">{position.title}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">Status</p>
+                        <p className="text-foreground">{position.status}</p>
+                      </div>
+                      {position.recruitmentStatus && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground">Recruitment Type</p>
+                          <p className="text-foreground">
+                            {position.recruitmentStatus === 'HEADHUNTING' ? 'Headhunting' : 'Standard'}
+                          </p>
+                        </div>
+                      )}
+                      {position.description ? (
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground">Description</p>
+                          <div className="prose prose-sm max-w-none">
+                            <SafeHtml html={position.description} />
+                          </div>
+                        </div>
+                      ) : null}
+                      {position.requirements ? (
+                        <div>
+                          <p className="text-xs font-semibold uppercase text-muted-foreground">Requirements</p>
+                          <div className="prose prose-sm max-w-none">
+                            <SafeHtml html={position.requirements} />
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
-                ) : null}
-                {opportunity.openPosition.requirements ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase text-muted-foreground">Requirements</p>
-                    <div className="prose prose-sm max-w-none">
-                      <SafeHtml html={opportunity.openPosition.requirements} />
-                    </div>
-                  </div>
-                ) : null}
+                ))}
               </div>
             </div>
           ) : null}
@@ -496,6 +551,16 @@ export default function OpportunityDetailPage() {
           }}
         />
       ) : null}
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        title="Delete Opportunity"
+        message={`Are you sure you want to delete "${opportunity?.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

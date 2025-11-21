@@ -7,6 +7,8 @@ import { LeaveApprovalModal } from '@/components/hr/leave-requests/LeaveApproval
 import type { LeaveRequest } from '@/types/hr';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { leaveRequestsApi } from '@/lib/api/hr';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type ApprovalMode = 'approve' | 'reject';
 
@@ -21,6 +23,7 @@ export default function LeaveRequestsPage() {
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>('approve');
   const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelConfirmRequest, setCancelConfirmRequest] = useState<LeaveRequest | null>(null);
   const queryClient = useQueryClient();
   const userRole = useAuthStore((store) => store.user?.role);
 
@@ -28,6 +31,9 @@ export default function LeaveRequestsPage() {
     () => userRole === 'ADMIN' || userRole === 'HR',
     [userRole],
   );
+
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => leaveRequestsApi.cancel(id),
@@ -42,6 +48,10 @@ export default function LeaveRequestsPage() {
       if (employeeIdFilter) {
         queryClient.invalidateQueries({ queryKey: ['leave-requests', employeeIdFilter] });
       }
+      setSuccessMessage('Leave request cancelled successfully');
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to cancel leave request');
     },
   });
 
@@ -69,13 +79,14 @@ export default function LeaveRequestsPage() {
     if (cancelMutation.isPending) {
       return;
     }
+    setCancelConfirmRequest(request);
+  };
 
-    const confirmed = window.confirm('Cancel this leave request?');
-    if (!confirmed) {
-      return;
+  const confirmCancelRequest = () => {
+    if (cancelConfirmRequest) {
+      cancelMutation.mutate(cancelConfirmRequest.id);
+      setCancelConfirmRequest(null);
     }
-
-    cancelMutation.mutate(request.id);
   };
 
   return (
@@ -134,6 +145,30 @@ export default function LeaveRequestsPage() {
           }}
         />
       )}
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
+      <ConfirmationDialog
+        open={!!cancelConfirmRequest}
+        title="Cancel Leave Request"
+        message="Are you sure you want to cancel this leave request?"
+        confirmLabel="Cancel Request"
+        variant="warning"
+        onConfirm={confirmCancelRequest}
+        onCancel={() => setCancelConfirmRequest(null)}
+        isPending={cancelMutation.isPending}
+      />
     </div>
   );
 }

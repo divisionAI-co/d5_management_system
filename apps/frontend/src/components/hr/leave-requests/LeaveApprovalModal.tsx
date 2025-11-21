@@ -5,6 +5,7 @@ import type { LeaveRequest } from '@/types/hr';
 import { LeaveRequestStatus } from '@/types/hr';
 import { XCircle, CheckCircle, X } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface LeaveApprovalModalProps {
   request: LeaveRequest;
@@ -16,6 +17,8 @@ interface LeaveApprovalModalProps {
 export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveApprovalModalProps) {
   const [reason, setReason] = useState(request.rejectionReason || '');
   const queryClient = useQueryClient();
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -28,8 +31,14 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       queryClient.invalidateQueries({ queryKey: ['leave-request', request.id] });
+      setSuccessMessage(mode === 'approve' ? 'Leave request approved successfully' : 'Leave request rejected successfully');
       onSuccess();
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || `Failed to ${mode} leave request`);
     },
   });
 
@@ -124,6 +133,20 @@ export function LeaveApprovalModal({ request, mode, onClose, onSuccess }: LeaveA
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

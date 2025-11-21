@@ -12,14 +12,22 @@ import type {
   Lead,
   CustomerType,
 } from '@/types/crm';
-import { Loader2, X, ChevronDown, Search } from 'lucide-react';
+import { Loader2, X, ChevronDown, Search, Plus, Trash2 } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface OpportunityFormProps {
   opportunityId?: string;
   onClose: () => void;
   onSuccess: (opportunity: OpportunityDetail) => void;
 }
+
+type PositionFormData = {
+  title: string;
+  description?: string;
+  requirements?: string;
+  recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+};
 
 type FormValues = {
   leadId: string;
@@ -31,9 +39,10 @@ type FormValues = {
   stage: string;
   assignedToId?: string;
   jobDescriptionUrl?: string;
-  positionTitle?: string;
-  positionDescription?: string;
-  positionRequirements?: string;
+  positionTitle?: string; // Legacy - kept for backward compatibility
+  positionDescription?: string; // Legacy
+  positionRequirements?: string; // Legacy
+  positions?: PositionFormData[]; // New array format
 };
 
 const CUSTOMER_TYPE_OPTIONS: Array<{ label: string; value: CustomerType }> = [
@@ -47,6 +56,8 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
   const isEdit = Boolean(opportunityId);
   const stageStoreStages = useOpportunityStagesStore((state) => state.stages);
   const registerStages = useOpportunityStagesStore((state) => state.registerStages);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const opportunityQuery = useQuery({
     queryKey: ['opportunity', opportunityId],
@@ -256,8 +267,20 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
         positionTitle: '',
         positionDescription: '',
         positionRequirements: '',
+        positions: [],
       };
     }
+
+    // Use new array format if openPositions exists
+    const positionsArray: PositionFormData[] = 
+      opportunity.openPositions && opportunity.openPositions.length > 0
+        ? opportunity.openPositions.map((pos) => ({
+            title: pos.title,
+            description: pos.description ?? '',
+            requirements: pos.requirements ?? '',
+            recruitmentStatus: pos.recruitmentStatus ?? undefined,
+          }))
+        : [];
 
     return {
       leadId: opportunity.lead?.id ?? '',
@@ -269,9 +292,10 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
       stage: opportunity.stage ?? defaultStageValue,
       assignedToId: opportunity.assignedToId ?? undefined,
       jobDescriptionUrl: opportunity.jobDescriptionUrl ?? '',
-      positionTitle: opportunity.openPosition?.title ?? '',
-      positionDescription: opportunity.openPosition?.description ?? '',
-      positionRequirements: opportunity.openPosition?.requirements ?? '',
+      positionTitle: '', // Always use array format now
+      positionDescription: '',
+      positionRequirements: '',
+      positions: positionsArray.length > 0 ? positionsArray : [],
     };
   }, [opportunity, defaultStageValue]);
 
@@ -287,7 +311,7 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
   });
 
   const descriptionValue = watch('description') || '';
-  const positionDescriptionValue = watch('positionDescription') || '';
+  const positions = watch('positions') || [];
 
   const selectedType = watch('type');
   const selectedLeadId = watch('leadId');
@@ -346,7 +370,14 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
     mutationFn: (payload: CreateOpportunityPayload) => opportunitiesApi.create(payload),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
+      setSuccessMessage('Opportunity created successfully');
       onSuccess(data);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create opportunity');
     },
   });
 
@@ -356,7 +387,14 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['opportunities'] });
       queryClient.invalidateQueries({ queryKey: ['opportunity', opportunityId] });
+      setSuccessMessage('Opportunity updated successfully');
       onSuccess(data);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update opportunity');
     },
   });
 
@@ -374,9 +412,17 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
     };
 
     if (requiresPositionDetails) {
-      payload.positionTitle = values.positionTitle || undefined;
-      payload.positionDescription = values.positionDescription || undefined;
-      payload.positionRequirements = values.positionRequirements || undefined;
+      // Use new array format if positions are provided, otherwise fall back to legacy format
+      if (values.positions && values.positions.length > 0) {
+        payload.positions = values.positions.filter(
+          (pos) => pos.title && pos.title.trim().length > 0
+        );
+      } else {
+        // Legacy format for backward compatibility
+        payload.positionTitle = values.positionTitle || undefined;
+        payload.positionDescription = values.positionDescription || undefined;
+        payload.positionRequirements = values.positionRequirements || undefined;
+      }
     }
 
     if (isEdit) {
@@ -637,40 +683,115 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
 
           {requiresPositionDetails ? (
             <div className="space-y-4 rounded-lg border border-blue-100 bg-blue-50/60 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-800">
-                Staffing Details
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-blue-900">Position Title</label>
-                  <input
-                    type="text"
-                    {...register('positionTitle')}
-                    placeholder="Role title for recruiters"
-                    className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-blue-900">Requirements</label>
-                  <input
-                    type="text"
-                    {...register('positionRequirements')}
-                    placeholder="Key skills or requirements"
-                    className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-blue-900">Position Description</label>
-                  <MentionInput
-                    value={positionDescriptionValue}
-                    onChange={(value) => setValue('positionDescription', value)}
-                    rows={3}
-                    placeholder="Share detailed context for recruiters. Type @ to mention someone"
-                    multiline={true}
-                    className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-800">
+                  Staffing Details
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentPositions = watch('positions') || [];
+                    setValue('positions', [
+                      ...currentPositions,
+                      { title: '', description: '', requirements: '' },
+                    ]);
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Position
+                </button>
               </div>
+
+              {positions.length > 0 ? (
+                <div className="space-y-4">
+                  {positions.map((_, index) => (
+                    <div
+                      key={index}
+                      className="rounded-lg border border-blue-200 bg-white p-4"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-blue-900">
+                          Position {index + 1}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentPositions = watch('positions') || [];
+                            setValue(
+                              'positions',
+                              currentPositions.filter((_, i) => i !== index)
+                            );
+                          }}
+                          className="rounded p-1 text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-blue-900">
+                            Position Title<span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            {...register(`positions.${index}.title` as const, {
+                              required: 'Position title is required',
+                            })}
+                            placeholder="Role title for recruiters"
+                            className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-blue-900">
+                            Recruitment Status
+                          </label>
+                          <select
+                            {...register(`positions.${index}.recruitmentStatus` as const)}
+                            className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Standard</option>
+                            <option value="HEADHUNTING">Headhunting</option>
+                            <option value="STANDARD">Standard</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-blue-900">
+                            Requirements
+                          </label>
+                          <input
+                            type="text"
+                            {...register(`positions.${index}.requirements` as const)}
+                            placeholder="Key skills or requirements"
+                            className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="mb-1 block text-sm font-medium text-blue-900">
+                            Position Description
+                          </label>
+                          <MentionInput
+                            value={watch(`positions.${index}.description` as const) || ''}
+                            onChange={(value) =>
+                              setValue(`positions.${index}.description` as const, value)
+                            }
+                            rows={3}
+                            placeholder="Share detailed context for recruiters. Type @ to mention someone"
+                            multiline={true}
+                            className="w-full rounded-lg border border-blue-200 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-blue-300 bg-white p-6 text-center">
+                  <p className="text-sm text-blue-700">
+                    No positions added yet. Click "Add Position" to create staffing requirements.
+                  </p>
+                </div>
+              )}
             </div>
           ) : null}
 
@@ -693,6 +814,20 @@ export function OpportunityForm({ opportunityId, onClose, onSuccess }: Opportuni
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

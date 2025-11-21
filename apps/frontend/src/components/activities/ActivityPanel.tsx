@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { GeminiActionsSection } from './GeminiActionsSection';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { highlightMentions } from '@/lib/utils/mention-highlight';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
 
@@ -54,6 +55,7 @@ function buildFilter(entityType: EntityType, entityId: string) {
   };
 }
 
+
 interface ActivityItemProps {
   activity: Activity;
   getTypeStyles: (activity: Activity) => { backgroundColor: string; color: string; borderColor: string };
@@ -65,6 +67,7 @@ interface ActivityItemProps {
   >;
   pinMutation: UseMutationResult<unknown, unknown, { id: string; isPinned: boolean }, unknown>;
   deleteMutation: UseMutationResult<unknown, unknown, string, unknown>;
+  onDeleteClick: (activityId: string) => void;
 }
 
 function ActivityItem({
@@ -73,6 +76,7 @@ function ActivityItem({
   completionMutation,
   pinMutation,
   deleteMutation,
+  onDeleteClick,
 }: ActivityItemProps) {
   const isAiActivity = useMemo(() => {
     const typeKey = activity.activityType?.key?.toUpperCase();
@@ -236,21 +240,15 @@ function ActivityItem({
             </>
           )}
         </button>
-        {isAiActivity && (
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm('Are you sure you want to delete this Gemini action result?')) {
-                deleteMutation.mutate(activity.id);
-              }
-            }}
-            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-red-50 hover:border-red-200 hover:text-red-600"
-            disabled={deleteMutation?.isPending ?? false}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => onDeleteClick(activity.id)}
+          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+          disabled={deleteMutation?.isPending ?? false}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </button>
       </div>
     </div>
   );
@@ -289,6 +287,7 @@ export function ActivityPanel({
   const [showComposer, setShowComposer] = useState(false);
   const [showGeminiSection, setShowGeminiSection] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
+  const [deleteConfirmActivityId, setDeleteConfirmActivityId] = useState<string | null>(null);
 
   const activityTypesQuery = useQuery({
     queryKey: ['activity-types', { includeInactive: false }],
@@ -673,6 +672,7 @@ export function ActivityPanel({
               completionMutation={completionMutation}
               pinMutation={pinMutation}
               deleteMutation={deleteMutation}
+              onDeleteClick={(activityId) => setDeleteConfirmActivityId(activityId)}
             />
           ))
         )}
@@ -704,6 +704,21 @@ export function ActivityPanel({
           </div>
         )}
       </div>
+      <ConfirmationDialog
+        open={!!deleteConfirmActivityId}
+        title="Delete Activity"
+        message="Are you sure you want to delete this activity? This cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirmActivityId) {
+            deleteMutation.mutate(deleteConfirmActivityId);
+            setDeleteConfirmActivityId(null);
+          }
+        }}
+        onCancel={() => setDeleteConfirmActivityId(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

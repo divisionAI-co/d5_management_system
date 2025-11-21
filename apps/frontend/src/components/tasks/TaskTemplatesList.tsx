@@ -4,6 +4,7 @@ import { tasksApi } from '@/lib/api/tasks';
 import type { TaskTemplate, TaskRecurrenceType } from '@/types/tasks';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { useState } from 'react';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const RECURRENCE_LABELS: Record<TaskRecurrenceType, string> = {
   DAILY: 'Daily',
@@ -21,6 +22,7 @@ export function TaskTemplatesList({ onEdit }: TaskTemplatesListProps) {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<TaskTemplate | null>(null);
 
   const templatesQuery = useQuery({
     queryKey: ['task-templates'],
@@ -209,15 +211,7 @@ export function TaskTemplatesList({ onEdit }: TaskTemplatesListProps) {
                     <Edit2 className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Delete template "${template.title}"? This will not delete already generated tasks.`
-                        )
-                      ) {
-                        deleteMutation.mutate(template.id);
-                      }
-                    }}
+                    onClick={() => setDeleteConfirmTemplate(template)}
                     disabled={deleteMutation.isPending}
                     className="rounded-lg p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                     title="Delete template"
@@ -248,6 +242,21 @@ export function TaskTemplatesList({ onEdit }: TaskTemplatesListProps) {
           </button>
         </div>
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmTemplate}
+        title="Delete Template"
+        message={`Delete template "${deleteConfirmTemplate?.title}"? This will not delete already generated tasks.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirmTemplate) {
+            deleteMutation.mutate(deleteConfirmTemplate.id);
+            setDeleteConfirmTemplate(null);
+          }
+        }}
+        onCancel={() => setDeleteConfirmTemplate(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

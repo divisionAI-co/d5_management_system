@@ -77,6 +77,7 @@ export interface Employee {
   emergencyContactPhone?: string | null;
   emergencyContactRelation?: string | null;
   cardNumber?: string | null;
+  bookingLink?: string | null;
   documents?: any;
   createdAt: string;
   updatedAt: string;
@@ -126,6 +127,7 @@ export interface CreateEmployeeDto {
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
   cardNumber?: string;
+  bookingLink?: string;
 }
 
 export interface UpdateEmployeeDto extends Partial<CreateEmployeeDto> {}

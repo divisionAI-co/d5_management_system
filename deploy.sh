@@ -1324,6 +1324,53 @@ build_application() {
     
     cd $APP_DIR
     
+    # Check if swap exists and get swap size
+    SWAP_SIZE=0
+    if swapon --show | grep -q .; then
+        SWAP_SIZE=$(free -m | awk '/^Swap:/{print $2}')
+        print_info "Swap space detected: ${SWAP_SIZE}MB"
+    fi
+    
+    # Check available memory and set appropriate Node.js memory limit
+    AVAILABLE_MEM=$(free -m | awk '/^Mem:/{print $7}')
+    
+    # If swap is available (>= 2GB), we can use higher memory limits
+    if [ "$SWAP_SIZE" -ge 2048 ]; then
+        # Swap available - use 4GB for Node.js (will use swap if needed)
+        NODE_MEM_LIMIT=4096
+        print_info "Swap space available (${SWAP_SIZE}MB). Using 4GB Node.js limit (will use swap if needed)."
+    elif [ "$AVAILABLE_MEM" -lt 2048 ]; then
+        # Less than 2GB available - use 1GB for Node.js
+        NODE_MEM_LIMIT=1024
+        print_warning "Low memory detected (${AVAILABLE_MEM}MB available). Using 1GB Node.js limit."
+    elif [ "$AVAILABLE_MEM" -lt 4096 ]; then
+        # 2-4GB available - use 1.5GB for Node.js
+        NODE_MEM_LIMIT=1536
+        print_info "Moderate memory detected (${AVAILABLE_MEM}MB available). Using 1.5GB Node.js limit."
+    else
+        # 4GB+ available - use 2GB for Node.js
+        NODE_MEM_LIMIT=2048
+        print_info "Sufficient memory detected (${AVAILABLE_MEM}MB available). Using 2GB Node.js limit."
+    fi
+    
+    # Check if swap exists, create if not
+    if ! swapon --show | grep -q .; then
+        print_warning "No swap space detected. Creating 4GB swap file..."
+        if [ ! -f /swapfile ]; then
+            sudo fallocate -l 4G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            if ! grep -q "/swapfile" /etc/fstab; then
+                echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            fi
+            print_success "Swap space created and activated"
+            # Update memory limit now that swap is available
+            NODE_MEM_LIMIT=4096
+            print_info "Updated to use 4GB Node.js limit with swap."
+        fi
+    fi
+    
     # Ensure proper ownership before building
     sudo chown -R $APP_USER:$APP_USER $APP_DIR
     
@@ -1348,14 +1395,18 @@ build_application() {
     cd apps/backend
     # Ensure ownership of backend directory
     sudo chown -R $APP_USER:$APP_USER .
-    sudo -u $APP_USER npm run build
+    # Set Node.js memory limit based on available system memory
+    print_info "Building with NODE_OPTIONS=--max-old-space-size=${NODE_MEM_LIMIT}"
+    sudo -u $APP_USER env NODE_OPTIONS="--max-old-space-size=${NODE_MEM_LIMIT}" npm run build
     
     # Build frontend
     print_info "Building frontend..."
     cd ../frontend
     # Ensure ownership of frontend directory
     sudo chown -R $APP_USER:$APP_USER .
-    sudo -u $APP_USER npm run build
+    # Set Node.js memory limit based on available system memory
+    print_info "Building with NODE_OPTIONS=--max-old-space-size=${NODE_MEM_LIMIT}"
+    sudo -u $APP_USER env NODE_OPTIONS="--max-old-space-size=${NODE_MEM_LIMIT}" npm run build
     
     # Final ownership check
     cd $APP_DIR
@@ -1376,7 +1427,7 @@ module.exports = {
   apps: [
     {
       name: 'd5-backend',
-      script: './apps/backend/dist/src/main.js',
+      script: './apps/backend/dist/main.js',
       cwd: '${APP_DIR}',
       instances: 2,
       exec_mode: 'cluster',
@@ -1603,6 +1654,19 @@ npm install
 
 # Build backend
 cd apps/backend
+
+# Check if swap is available and set memory limit accordingly
+SWAP_SIZE=$(free -m | awk '/^Swap:/{print $2}' 2>/dev/null || echo "0")
+if [ "$SWAP_SIZE" -ge 2048 ]; then
+    # Swap available (>= 2GB) - use 4GB for Node.js
+    export NODE_OPTIONS="--max-old-space-size=4096"
+    echo "Using 4GB Node.js limit (swap available: ${SWAP_SIZE}MB)"
+else
+    # No swap or insufficient swap - use 1.5GB
+    export NODE_OPTIONS="--max-old-space-size=1536"
+    echo "Using 1.5GB Node.js limit (swap: ${SWAP_SIZE}MB)"
+fi
+
 npm run build
 npx prisma generate
 
@@ -1611,6 +1675,8 @@ npx prisma migrate deploy
 
 # Build frontend
 cd ../frontend
+
+# Use same memory limit for frontend
 npm run build
 
 # Restart backend

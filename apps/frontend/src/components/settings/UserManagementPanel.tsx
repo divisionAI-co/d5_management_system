@@ -10,6 +10,8 @@ import {
   Wand2,
   Loader2,
   Mail,
+  Unlock,
+  Clock,
 } from 'lucide-react';
 
 import { usersApi } from '@/lib/api/users';
@@ -25,6 +27,7 @@ import type {
   UserSummary,
 } from '@/types/users';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const DEFAULT_FORM: CreateUserPayload = {
   firstName: '',
@@ -76,6 +79,9 @@ export function UserManagementPanel() {
   const [formSendInvite, setFormSendInvite] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserSummary | null>(null);
+  const [unlockConfirmUser, setUnlockConfirmUser] = useState<UserSummary | null>(null);
+  const [resetCooldownConfirmUser, setResetCooldownConfirmUser] = useState<UserSummary | null>(null);
 
   const sanitizedFilters = useMemo(() => {
     const payload: UserListFilters = {
@@ -150,6 +156,27 @@ export function UserManagementPanel() {
     },
     onError: (error: any) => {
       setErrorMessage(error?.response?.data?.message ?? 'Unable to resend password reset email.');
+    },
+  });
+
+  const unlockAccountMutation = useMutation({
+    mutationFn: (id: string) => usersApi.unlockAccount(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setFeedback('Account unlocked successfully.');
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message ?? 'Unable to unlock account.');
+    },
+  });
+
+  const resetCooldownMutation = useMutation({
+    mutationFn: (id: string) => usersApi.resetLoginCooldown(id),
+    onSuccess: () => {
+      setFeedback('Login cooldown reset successfully.');
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message ?? 'Unable to reset login cooldown.');
     },
   });
 
@@ -281,12 +308,13 @@ export function UserManagementPanel() {
   };
 
   const handleDelete = (userRecord: UserSummary) => {
-    if (
-      window.confirm(
-        `Delete ${userRecord.firstName} ${userRecord.lastName}? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate(userRecord.id);
+    setDeleteConfirmUser(userRecord);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmUser) {
+      deleteMutation.mutate(deleteConfirmUser.id);
+      setDeleteConfirmUser(null);
     }
   };
 
@@ -483,6 +511,38 @@ export function UserManagementPanel() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
+                        {user?.role === 'ADMIN' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setUnlockConfirmUser(userRecord)}
+                              disabled={unlockAccountMutation.isPending}
+                              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Unlock account (clear lockout and failed attempts)"
+                            >
+                              {unlockAccountMutation.isPending ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Unlock className="h-3.5 w-3.5" />
+                              )}
+                              <span className="hidden sm:inline">Unlock</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setResetCooldownConfirmUser(userRecord)}
+                              disabled={resetCooldownMutation.isPending}
+                              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                              title="Reset login cooldown (clear rate limit attempts)"
+                            >
+                              {resetCooldownMutation.isPending ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Clock className="h-3.5 w-3.5" />
+                              )}
+                              <span className="hidden sm:inline">Reset cooldown</span>
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleResendReset(userRecord)}
@@ -746,6 +806,46 @@ export function UserManagementPanel() {
           </div>
         </div>
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmUser}
+        title="Delete User"
+        message={`Delete ${deleteConfirmUser?.firstName} ${deleteConfirmUser?.lastName}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmUser(null)}
+        isPending={deleteMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!unlockConfirmUser}
+        title="Unlock Account"
+        message={`Unlock account for ${unlockConfirmUser?.firstName} ${unlockConfirmUser?.lastName}? This will clear account lockout and failed login attempts.`}
+        confirmLabel="Unlock"
+        variant="info"
+        onConfirm={() => {
+          if (unlockConfirmUser) {
+            unlockAccountMutation.mutate(unlockConfirmUser.id);
+            setUnlockConfirmUser(null);
+          }
+        }}
+        onCancel={() => setUnlockConfirmUser(null)}
+        isPending={unlockAccountMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!resetCooldownConfirmUser}
+        title="Reset Login Cooldown"
+        message={`Reset login cooldown for ${resetCooldownConfirmUser?.firstName} ${resetCooldownConfirmUser?.lastName}? This will allow them to attempt login immediately without waiting.`}
+        confirmLabel="Reset Cooldown"
+        variant="info"
+        onConfirm={() => {
+          if (resetCooldownConfirmUser) {
+            resetCooldownMutation.mutate(resetCooldownConfirmUser.id);
+            setResetCooldownConfirmUser(null);
+          }
+        }}
+        onCancel={() => setResetCooldownConfirmUser(null)}
+        isPending={resetCooldownMutation.isPending}
+      />
     </div>
   );
 }

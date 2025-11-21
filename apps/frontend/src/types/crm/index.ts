@@ -367,6 +367,7 @@ export interface OpportunityOpenPosition {
   status: string;
   description?: string | null;
   requirements?: string | null;
+  recruitmentStatus?: 'HEADHUNTING' | 'STANDARD' | null;
   createdAt: string;
   updatedAt: string;
   filledAt?: string | null;
@@ -412,7 +413,8 @@ export interface Opportunity {
   customer?: OpportunityCustomer | null;
   assignedTo?: OpportunityAssignee | null;
   lead: OpportunityLead;
-  openPosition?: OpportunityOpenPosition | null;
+  openPosition?: OpportunityOpenPosition | null; // Legacy - kept for backward compatibility
+  openPositions?: OpportunityOpenPosition[]; // New array format
 }
 
 export interface OpportunityDetail extends Opportunity {
@@ -456,9 +458,15 @@ export interface CreateOpportunityPayload {
   stage?: string;
   isClosed?: boolean;
   isWon?: boolean;
-  positionTitle?: string;
-  positionDescription?: string;
-  positionRequirements?: string;
+  positionTitle?: string; // Legacy - kept for backward compatibility
+  positionDescription?: string; // Legacy
+  positionRequirements?: string; // Legacy
+  positions?: Array<{
+    title: string;
+    description?: string;
+    requirements?: string;
+    recruitmentStatus?: 'HEADHUNTING' | 'STANDARD';
+  }>;
 }
 
 export interface UpdateOpportunityPayload extends Partial<CreateOpportunityPayload> {}

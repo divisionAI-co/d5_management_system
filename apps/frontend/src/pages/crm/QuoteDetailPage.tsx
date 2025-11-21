@@ -9,6 +9,7 @@ import { SendQuoteModal } from '@/components/crm/quotes/SendQuoteModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { SafeHtml } from '@/components/ui/SafeHtml';
 import clsx from 'clsx';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-200',
@@ -28,6 +29,7 @@ export default function QuoteDetailPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [showActivities, setShowActivities] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Redirect to quotes page with query params if id is "new"
   // Do this immediately before any queries run
@@ -61,9 +63,13 @@ export default function QuoteDetailPage() {
 
   const handleDelete = () => {
     if (!id) return;
-    if (window.confirm('Are you sure you want to delete this quote?')) {
-      deleteMutation.mutate(id);
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (!id) return;
+    deleteMutation.mutate(id);
+    setShowDeleteConfirm(false);
   };
 
   const handleDownloadPdf = async () => {
@@ -459,6 +465,16 @@ export default function QuoteDetailPage() {
         entityType="quote"
         title="Quote Activities"
         emptyState="No activities yet. Capture emails, calls, notes, and reminders to track quote progress."
+      />
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        title="Delete Quote"
+        message="Are you sure you want to delete this quote?"
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isPending={deleteMutation.isPending}
       />
     </div>
   );

@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { contactsApi, customersApi } from '@/lib/api/crm';
 import type { ContactDetail, ContactSummary, CreateContactPayload } from '@/types/crm';
 import { X } from 'lucide-react';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface ContactFormProps {
   contact?: ContactSummary | ContactDetail;
@@ -26,6 +27,8 @@ type FormValues = {
 export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(contact);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const customersQuery = useQuery({
     queryKey: ['customers', 'contact-options'],
@@ -73,7 +76,14 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setSuccessMessage('Contact created successfully');
       onSuccess(data);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create contact');
     },
   });
 
@@ -83,7 +93,14 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
       queryClient.invalidateQueries({ queryKey: ['contacts'] });
       queryClient.invalidateQueries({ queryKey: ['contact', contact!.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setSuccessMessage('Contact updated successfully');
       onSuccess(data);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update contact');
     },
   });
 
@@ -244,6 +261,20 @@ export function ContactForm({ contact, onClose, onSuccess }: ContactFormProps) {
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { performanceReviewsApi, employeesApi } from '@/lib/api/hr';
@@ -9,6 +9,7 @@ import type {
 } from '@/types/hr';
 import { X } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface PerformanceReviewFormProps {
   review?: PerformanceReview;
@@ -40,6 +41,8 @@ export function PerformanceReviewForm({
 }: PerformanceReviewFormProps) {
   const queryClient = useQueryClient();
   const isEdit = !!review;
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: employees } = useQuery({
     queryKey: ['employees', 'select'],
@@ -101,8 +104,14 @@ export function PerformanceReviewForm({
     mutationFn: (payload: CreatePerformanceReviewDto) => performanceReviewsApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['performance-reviews'] });
+      setSuccessMessage('Performance review created successfully');
       onSuccess();
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create performance review');
     },
   });
 
@@ -112,8 +121,14 @@ export function PerformanceReviewForm({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['performance-reviews'] });
       queryClient.invalidateQueries({ queryKey: ['performance-review', review!.id] });
+      setSuccessMessage('Performance review updated successfully');
       onSuccess();
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update performance review');
     },
   });
 
@@ -352,6 +367,20 @@ export function PerformanceReviewForm({
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

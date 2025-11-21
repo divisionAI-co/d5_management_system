@@ -11,6 +11,7 @@ import {
 import { CreatePositionModal } from '@/components/recruitment/CreatePositionModal';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { SafeHtml } from '@/components/ui/SafeHtml';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export default function PositionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,8 @@ export default function PositionDetailPage() {
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [editingPosition, setEditingPosition] = useState<OpenPosition | null>(null);
+  const [archiveConfirmPosition, setArchiveConfirmPosition] = useState<OpenPosition | null>(null);
+  const [deleteConfirmPosition, setDeleteConfirmPosition] = useState<OpenPosition | null>(null);
 
   const positionQuery = useQuery({
     queryKey: ['position', id],
@@ -201,14 +204,7 @@ export default function PositionDetailPage() {
           </button>
           {!position.isArchived && (
             <button
-              onClick={() => {
-                const confirmArchive = window.confirm(
-                  `Archive "${position.title}"? Archived positions are hidden from the default view but can be restored later.`,
-                );
-                if (confirmArchive) {
-                  archiveMutation.mutate(position.id);
-                }
-              }}
+              onClick={() => setArchiveConfirmPosition(position)}
               disabled={archiveMutation.isPending}
               className="inline-flex items-center gap-2 rounded-lg border border-amber-200 px-3 py-2 text-sm font-medium text-amber-600 transition hover:bg-amber-50 disabled:opacity-60"
             >
@@ -225,14 +221,7 @@ export default function PositionDetailPage() {
             </button>
           )}
           <button
-            onClick={() => {
-              const confirmDelete = window.confirm(
-                `Are you sure you want to delete "${position.title}"? This action cannot be undone.\n\nNote: Positions with linked candidates cannot be deleted.`,
-              );
-              if (confirmDelete) {
-                deleteMutation.mutate(position.id);
-              }
-            }}
+            onClick={() => setDeleteConfirmPosition(position)}
             disabled={deleteMutation.isPending}
             className="inline-flex items-center gap-2 rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-60"
           >
@@ -408,6 +397,43 @@ export default function PositionDetailPage() {
           onUpdated={handlePositionUpdated}
         />
       )}
+      <ConfirmationDialog
+        open={!!archiveConfirmPosition}
+        title="Archive Position"
+        message={`Archive "${archiveConfirmPosition?.title}"? Archived positions are hidden from the default view but can be restored later.`}
+        confirmLabel="Archive"
+        variant="warning"
+        onConfirm={() => {
+          if (archiveConfirmPosition) {
+            archiveMutation.mutate(archiveConfirmPosition.id);
+            setArchiveConfirmPosition(null);
+          }
+        }}
+        onCancel={() => setArchiveConfirmPosition(null)}
+        isPending={archiveMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!deleteConfirmPosition}
+        title="Delete Position"
+        message={
+          <>
+            Are you sure you want to delete &quot;{deleteConfirmPosition?.title}&quot;? This action cannot be undone.
+            <br />
+            <br />
+            <span className="text-sm">Note: Positions with linked candidates cannot be deleted.</span>
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (deleteConfirmPosition) {
+            deleteMutation.mutate(deleteConfirmPosition.id);
+            setDeleteConfirmPosition(null);
+          }
+        }}
+        onCancel={() => setDeleteConfirmPosition(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

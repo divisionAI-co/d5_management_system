@@ -23,6 +23,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { UserRole } from '@/types/enums';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { candidatesApi } from '@/lib/api/recruitment/candidates';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 interface LocalFilters {
   search?: string;
@@ -70,6 +71,8 @@ export default function CandidatesPage() {
   const [emailModalCandidate, setEmailModalCandidate] = useState<Candidate | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [archiveConfirmCandidate, setArchiveConfirmCandidate] = useState<Candidate | null>(null);
+  const [deleteConfirmCandidate, setDeleteConfirmCandidate] = useState<Candidate | null>(null);
   const { user } = useAuthStore();
   const canImport = user?.role === UserRole.ADMIN || user?.role === UserRole.HR || user?.role === UserRole.RECRUITER;
   const canDelete = user?.role === UserRole.ADMIN || user?.role === UserRole.HR;
@@ -237,22 +240,24 @@ export default function CandidatesPage() {
   };
 
   const handleArchiveCandidate = (candidate: Candidate) => {
-    if (
-      window.confirm(
-        `Archive "${candidate.firstName} ${candidate.lastName}"? They will be hidden from the candidate list but can be restored later.`,
-      )
-    ) {
-      archiveMutation.mutate(candidate.id);
+    setArchiveConfirmCandidate(candidate);
+  };
+
+  const confirmArchiveCandidate = () => {
+    if (archiveConfirmCandidate) {
+      archiveMutation.mutate(archiveConfirmCandidate.id);
+      setArchiveConfirmCandidate(null);
     }
   };
 
   const handleDeleteCandidate = (candidate: Candidate) => {
-    if (
-      window.confirm(
-        `Permanently delete "${candidate.firstName} ${candidate.lastName}"? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate(candidate.id);
+    setDeleteConfirmCandidate(candidate);
+  };
+
+  const confirmDeleteCandidate = () => {
+    if (deleteConfirmCandidate) {
+      deleteMutation.mutate(deleteConfirmCandidate.id);
+      setDeleteConfirmCandidate(null);
     }
   };
 
@@ -767,6 +772,26 @@ export default function CandidatesPage() {
           }}
         />
       ) : null}
+      <ConfirmationDialog
+        open={!!archiveConfirmCandidate}
+        title="Archive Candidate"
+        message={`Archive "${archiveConfirmCandidate?.firstName} ${archiveConfirmCandidate?.lastName}"? They will be hidden from the candidate list but can be restored later.`}
+        confirmLabel="Archive"
+        variant="warning"
+        onConfirm={confirmArchiveCandidate}
+        onCancel={() => setArchiveConfirmCandidate(null)}
+        isPending={archiveMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!deleteConfirmCandidate}
+        title="Delete Candidate"
+        message={`Permanently delete "${deleteConfirmCandidate?.firstName} ${deleteConfirmCandidate?.lastName}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDeleteCandidate}
+        onCancel={() => setDeleteConfirmCandidate(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOpportunityStagesStore } from '@/lib/stores/opportunity-stages-store';
 import { OPPORTUNITY_STAGES } from '@/constants/opportunities';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const TYPE_FILTERS: Array<{ label: string; value?: CustomerType }> = [
   { label: 'All types', value: undefined },
@@ -79,6 +80,7 @@ export default function OpportunitiesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
   const [closingOpportunity, setClosingOpportunity] = useState<Opportunity | undefined>(undefined);
+  const [deleteConfirmOpportunity, setDeleteConfirmOpportunity] = useState<Opportunity | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [positionModalOpportunity, setPositionModalOpportunity] = useState<Opportunity | null>(null);
@@ -428,12 +430,13 @@ export default function OpportunitiesPage() {
   };
 
   const handleDelete = (opportunity: Opportunity) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete the opportunity "${opportunity.title}"? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate(opportunity.id);
+    setDeleteConfirmOpportunity(opportunity);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmOpportunity) {
+      deleteMutation.mutate(deleteConfirmOpportunity.id);
+      setDeleteConfirmOpportunity(null);
     }
   };
 
@@ -886,6 +889,16 @@ export default function OpportunitiesPage() {
           }}
         />
       ) : null}
+      <ConfirmationDialog
+        open={!!deleteConfirmOpportunity}
+        title="Delete Opportunity"
+        message={`Are you sure you want to delete "${deleteConfirmOpportunity?.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmOpportunity(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

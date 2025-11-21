@@ -6,6 +6,7 @@ import type { Quote, QuoteFilters, QuoteStatus, QuotesListResponse } from '@/typ
 import { QuotesTable } from '@/components/crm/quotes/QuotesTable';
 import { QuoteForm } from '@/components/crm/quotes/QuoteForm';
 import { Filter, Plus } from 'lucide-react';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const STATUS_FILTER_OPTIONS: Array<{ label: string; value?: QuoteStatus }> = [
   { label: 'All statuses', value: undefined },
@@ -55,6 +56,7 @@ export default function QuotesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteConfirmQuote, setDeleteConfirmQuote] = useState<Quote | null>(null);
 
   // Open form if on "/quotes/new" route or "new=true" query param is present
   useEffect(() => {
@@ -121,8 +123,13 @@ export default function QuotesPage() {
   };
 
   const handleDelete = (quote: Quote) => {
-    if (window.confirm(`Delete quote "${quote.title}"?`)) {
-      deleteMutation.mutate(quote.id);
+    setDeleteConfirmQuote(quote);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmQuote) {
+      deleteMutation.mutate(deleteConfirmQuote.id);
+      setDeleteConfirmQuote(null);
     }
   };
 
@@ -297,6 +304,16 @@ export default function QuotesPage() {
           }}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmQuote}
+        title="Delete Quote"
+        message={`Are you sure you want to delete "${deleteConfirmQuote?.title}"?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmQuote(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

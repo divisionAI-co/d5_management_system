@@ -6,6 +6,7 @@ import { usersApi } from '@/lib/api/users';
 import type { CreateLeadPayload, Lead, LeadStatus, LeadType, LeadContactPayload, Contact } from '@/types/crm';
 import { X, Search, ChevronDown, XCircle } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface LeadFormProps {
   lead?: Lead;
@@ -38,6 +39,8 @@ const LEAD_TYPES: LeadType[] = ['END_CUSTOMER', 'INTERMEDIARY'];
 export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(lead);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [contactSearch, setContactSearch] = useState('');
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
@@ -266,7 +269,14 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     mutationFn: (payload: CreateLeadPayload) => leadsApi.create(payload),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      setSuccessMessage('Lead created successfully');
       onSuccess(data);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create lead');
     },
   });
 
@@ -275,7 +285,14 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['lead', lead!.id] });
+      setSuccessMessage('Lead updated successfully');
       onSuccess(data);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update lead');
     },
   });
 
@@ -704,6 +721,20 @@ export function LeadForm({ lead, onClose, onSuccess }: LeadFormProps) {
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

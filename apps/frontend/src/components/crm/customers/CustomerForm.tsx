@@ -14,6 +14,7 @@ import { X } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
 import { DrivePicker } from '@/components/shared/DrivePicker';
 import type { DriveFile } from '@/types/integrations';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 const CUSTOMER_TYPES: { label: string; value: CustomerType }[] = [
   { label: 'Staff Augmentation', value: 'STAFF_AUGMENTATION' },
@@ -69,6 +70,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
   const queryClient = useQueryClient();
   const isEdit = Boolean(customer);
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const defaultValues = useMemo<FormValues>(() => {
     if (!customer) {
@@ -195,14 +198,28 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         onSuccess: (updated) => {
           queryClient.invalidateQueries({ queryKey: ['customers'] });
           queryClient.invalidateQueries({ queryKey: ['customer', updated.id] });
+          setSuccessMessage('Customer updated successfully');
           onSuccess(updated);
+          setTimeout(() => {
+            onClose();
+          }, 1000);
+        },
+        onError: (error: any) => {
+          setErrorMessage(error?.response?.data?.message || 'Failed to update customer');
         },
       });
     } else {
       createMutation.mutate(payload, {
         onSuccess: (created) => {
           queryClient.invalidateQueries({ queryKey: ['customers'] });
+          setSuccessMessage('Customer created successfully');
           onSuccess(created);
+          setTimeout(() => {
+            onClose();
+          }, 1000);
+        },
+        onError: (error: any) => {
+          setErrorMessage(error?.response?.data?.message || 'Failed to create customer');
         },
       });
     }
@@ -501,6 +518,20 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         onSelectFolder={handleSelectDriveFolder}
         onUseCurrentFolder={handleUseCurrentFolder}
       />
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

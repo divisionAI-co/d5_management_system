@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, ShieldCheck, UserPlus } from 'lucide-react';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type { Candidate } from '@/types/recruitment';
 import type {
   ConvertCandidateToEmployeePayload,
@@ -111,14 +112,19 @@ export function CandidateConvertToEmployeeModal({
     }
   }, [availableUsers, candidate.email, setValue]);
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const convertMutation = useMutation({
     mutationFn: (payload: ConvertCandidateToEmployeePayload) =>
       candidatesApi.convertToEmployee(candidate.id, payload),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setSuccessMessage('Candidate converted to employee successfully');
       onSuccess(data);
+      setTimeout(() => {
       onClose();
+      }, 1000);
     },
     onError: (error: any) => {
       const message =
@@ -539,6 +545,13 @@ export function CandidateConvertToEmployeeModal({
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
     </div>
   );
 }

@@ -26,6 +26,7 @@ import type {
 } from '@/types/tasks';
 import type { UsersListResponse, UserSummary } from '@/types/users';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const STATUS_ORDER: TaskStatus[] = [
   'TODO',
@@ -92,6 +93,7 @@ export default function TasksPage() {
   const [eodPrompt, setEodPrompt] = useState<TaskEodLinkResponse | null>(null);
   const [showActivitySidebar, setShowActivitySidebar] = useState(false);
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<Task | null>(null);
   
   // Timer state - using persistent store
   const { runningTimer, setRunningTimer, clearTimer } = useTimerStore();
@@ -327,12 +329,13 @@ export default function TasksPage() {
   };
 
   const handleDeleteTask = (task: Task) => {
-    if (
-      window.confirm(
-        `Delete task "${task.title}"? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate(task.id);
+    setDeleteConfirmTask(task);
+  };
+
+  const confirmDeleteTask = () => {
+    if (deleteConfirmTask) {
+      deleteMutation.mutate(deleteConfirmTask.id);
+      setDeleteConfirmTask(null);
     }
   };
 
@@ -793,6 +796,16 @@ export default function TasksPage() {
           isSubmitting={logTimeMutation.isPending}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmTask}
+        title="Delete Task"
+        message={`Are you sure you want to delete "${deleteConfirmTask?.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDeleteTask}
+        onCancel={() => setDeleteConfirmTask(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

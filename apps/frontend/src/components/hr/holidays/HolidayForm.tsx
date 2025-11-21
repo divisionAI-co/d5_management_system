@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { holidaysApi } from '@/lib/api/hr';
 import type { NationalHoliday, CreateHolidayDto, UpdateHolidayDto } from '@/types/hr';
 import { X } from 'lucide-react';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface HolidayFormProps {
   holiday?: NationalHoliday;
@@ -19,6 +21,8 @@ type FormValues = {
 export function HolidayForm({ holiday, onClose, onSuccess }: HolidayFormProps) {
   const queryClient = useQueryClient();
   const isEdit = !!holiday;
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -42,8 +46,14 @@ export function HolidayForm({ holiday, onClose, onSuccess }: HolidayFormProps) {
     mutationFn: (payload: CreateHolidayDto) => holidaysApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
+      setSuccessMessage('Holiday created successfully');
       onSuccess();
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create holiday');
     },
   });
 
@@ -52,8 +62,14 @@ export function HolidayForm({ holiday, onClose, onSuccess }: HolidayFormProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['holidays'] });
       queryClient.invalidateQueries({ queryKey: ['holiday', holiday!.id] });
+      setSuccessMessage('Holiday updated successfully');
       onSuccess();
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update holiday');
     },
   });
 
@@ -144,6 +160,20 @@ export function HolidayForm({ holiday, onClose, onSuccess }: HolidayFormProps) {
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

@@ -560,6 +560,9 @@ export default function CandidateDetailPage() {
             setFeedback(`Email sent successfully to ${payload.to}`);
             setShowEmailModal(false);
           }}
+          previewEmail={async (payload) => {
+            return await candidatesApi.previewEmail(candidate.id, payload);
+          }}
         />
       ) : null}
     </div>

@@ -7,6 +7,7 @@ import { PerformanceReviewForm } from '@/components/hr/performance-reviews/Perfo
 import { PerformanceReviewDetailsModal } from '@/components/hr/performance-reviews/PerformanceReviewDetailsModal';
 import type { PerformanceReview } from '@/types/hr';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 export default function PerformanceReviewsPage() {
   const location = useLocation();
@@ -23,6 +24,9 @@ export default function PerformanceReviewsPage() {
   const { user } = useAuthStore();
   const canManage = user?.role === 'ADMIN' || user?.role === 'HR';
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => performanceReviewsApi.delete(id),
     onSuccess: () => {
@@ -30,7 +34,11 @@ export default function PerformanceReviewsPage() {
       if (employeeIdFilter) {
         queryClient.invalidateQueries({ queryKey: ['performance-reviews', employeeIdFilter] });
       }
+      setSuccessMessage('Performance review deleted successfully');
       setDeleteReview(null);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to delete performance review');
     },
   });
 
@@ -156,6 +164,20 @@ export default function PerformanceReviewsPage() {
         <div className="fixed bottom-6 right-6 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white shadow-lg">
           Preparing PDF download...
         </div>
+      )}
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
       )}
     </div>
   );

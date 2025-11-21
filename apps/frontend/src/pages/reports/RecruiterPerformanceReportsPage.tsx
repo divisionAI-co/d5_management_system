@@ -6,6 +6,7 @@ import { positionsApi } from '@/lib/api/recruitment/positions';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { Plus, Edit, Trash2, Download, FileText, X, Eye } from 'lucide-react';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import type {
   RecruiterPerformanceReport,
 } from '@/types/recruiter-performance-reports';
@@ -27,6 +28,7 @@ export default function RecruiterPerformanceReportsPage() {
   const [filterWeekEndingTo, setFilterWeekEndingTo] = useState<string>('');
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'error' | 'info' | 'warning' } | null>(null);
   const [hasProcessedInitialState, setHasProcessedInitialState] = useState(false);
+  const [deleteConfirmReport, setDeleteConfirmReport] = useState<RecruiterPerformanceReport | null>(null);
 
   // Auto-open form if positionId is provided in state (only once)
   useEffect(() => {
@@ -156,8 +158,13 @@ export default function RecruiterPerformanceReportsPage() {
   };
 
   const handleDelete = (report: RecruiterPerformanceReport) => {
-    if (confirm('Are you sure you want to delete this report?')) {
-      deleteMutation.mutate(report.id);
+    setDeleteConfirmReport(report);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmReport) {
+      deleteMutation.mutate(deleteConfirmReport.id);
+      setDeleteConfirmReport(null);
     }
   };
 
@@ -415,6 +422,16 @@ export default function RecruiterPerformanceReportsPage() {
           </div>
         </div>
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmReport}
+        title="Delete Report"
+        message="Are you sure you want to delete this report?"
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmReport(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

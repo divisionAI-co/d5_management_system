@@ -137,6 +137,18 @@ export const candidatesApi = {
     );
     return data;
   },
+
+  async previewEmail(id: string, payload: {
+    templateId?: string;
+    htmlContent?: string;
+    textContent?: string;
+  }) {
+    const { data } = await apiClient.post<{ html: string; text: string }>(
+      `/recruitment/candidates/${id}/preview-email`,
+      payload,
+    );
+    return data;
+  },
 };
 
 

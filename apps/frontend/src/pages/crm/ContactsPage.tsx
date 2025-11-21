@@ -15,6 +15,7 @@ import { ContactDetailPanel } from '@/components/crm/contacts/ContactDetailPanel
 import { ContactImportDialog } from '@/components/crm/contacts/ContactImportDialog';
 import { Filter, Plus, UploadCloud } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const SORT_OPTIONS: Array<{ label: string; value: NonNullable<ContactFilters['sortBy']> }> = [
   { label: 'Created', value: 'createdAt' },
@@ -39,6 +40,7 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<ContactSummary | undefined>();
   const [detailContactId, setDetailContactId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [deleteConfirmContact, setDeleteConfirmContact] = useState<ContactSummary | null>(null);
 
   const { user } = useAuthStore();
 
@@ -142,8 +144,13 @@ export default function ContactsPage() {
   };
 
   const handleDelete = (contact: ContactSummary) => {
-    if (window.confirm(`Delete contact ${contact.firstName} ${contact.lastName}?`)) {
-      deleteMutation.mutate(contact.id);
+    setDeleteConfirmContact(contact);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmContact) {
+      deleteMutation.mutate(deleteConfirmContact.id);
+      setDeleteConfirmContact(null);
     }
   };
 
@@ -365,6 +372,16 @@ export default function ContactsPage() {
         open={importOpen}
         customers={customers}
         onClose={() => setImportOpen(false)}
+      />
+      <ConfirmationDialog
+        open={!!deleteConfirmContact}
+        title="Delete Contact"
+        message={`Are you sure you want to delete ${deleteConfirmContact?.firstName} ${deleteConfirmContact?.lastName}?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmContact(null)}
+        isPending={deleteMutation.isPending}
       />
     </div>
   );

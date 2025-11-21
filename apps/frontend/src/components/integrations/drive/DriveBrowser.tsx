@@ -7,6 +7,7 @@ import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { DrivePermissionsModal } from './DrivePermissionsModal';
 import { useToast } from '@/components/ui/use-toast';
 import type { DriveFile, UserFilePermissions } from '@/types/integrations';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type Breadcrumb = {
   id: string | null;
@@ -48,6 +49,7 @@ export function DriveBrowser() {
   const [recursiveSearch, setRecursiveSearch] = useState(false);
   const [copySuccessId, setCopySuccessId] = useState<string | null>(null);
   const [permissionsModalFile, setPermissionsModalFile] = useState<DriveFile | null>(null);
+  const [deleteConfirmFile, setDeleteConfirmFile] = useState<DriveFile | null>(null);
   const [filePermissions, setFilePermissions] = useState<Record<string, UserFilePermissions>>({});
 
   const parentId = useMemo(() => breadcrumbs[breadcrumbs.length - 1]?.id ?? undefined, [breadcrumbs]);
@@ -264,15 +266,17 @@ export function DriveBrowser() {
 
   const handleDelete = useCallback(
     (file: DriveFile) => {
-      const confirmed = window.confirm(`Delete "${file.name}" from Google Drive?`);
-      if (!confirmed) {
-        return;
-      }
-
-      deleteMutation.mutate(file.id);
+      setDeleteConfirmFile(file);
     },
-    [deleteMutation],
+    [],
   );
+
+  const confirmDelete = useCallback(() => {
+    if (deleteConfirmFile) {
+      deleteMutation.mutate(deleteConfirmFile.id);
+      setDeleteConfirmFile(null);
+    }
+  }, [deleteConfirmFile, deleteMutation]);
 
   const handleCopyLink = useCallback((file: DriveFile) => {
     const viewLink = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
@@ -668,6 +672,16 @@ export function DriveBrowser() {
           onClose={() => setPermissionsModalFile(null)}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmFile}
+        title="Delete File"
+        message={`Delete "${deleteConfirmFile?.name}" from Google Drive?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmFile(null)}
+        isPending={deleteMutation.isPending}
+      />
     </>
   );
 }

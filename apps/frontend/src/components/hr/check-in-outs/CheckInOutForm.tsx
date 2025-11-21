@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { checkInOutsApi, employeesApi } from '@/lib/api/hr';
 import type { CreateCheckInOutDto, UpdateCheckInOutDto, CheckInOut } from '@/types/hr/check-in-out';
 import { CheckInOutStatus } from '@/types/hr/check-in-out';
 import { X } from 'lucide-react';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface CheckInOutFormProps {
   record?: CheckInOut;
@@ -15,6 +16,8 @@ interface CheckInOutFormProps {
 export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormProps) {
   const queryClient = useQueryClient();
   const isEdit = !!record;
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: employeesResponse } = useQuery({
     queryKey: ['employees', 'select'],
@@ -60,8 +63,14 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
     mutationFn: (data: CreateCheckInOutDto) => checkInOutsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['check-in-outs'] });
+      setSuccessMessage('Check-in/out record created successfully');
       onSuccess();
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create check-in/out record');
     },
   });
 
@@ -69,8 +78,14 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
     mutationFn: (data: UpdateCheckInOutDto) => checkInOutsApi.update(record!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['check-in-outs'] });
+      setSuccessMessage('Check-in/out record updated successfully');
       onSuccess();
-      onClose();
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update check-in/out record');
     },
   });
 
@@ -171,6 +186,20 @@ export function CheckInOutForm({ record, onClose, onSuccess }: CheckInOutFormPro
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -8,6 +8,7 @@ import type { CreateQuotePayload, Quote, QuoteStatus } from '@/types/crm';
 import { X } from 'lucide-react';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { LeadSelect } from './LeadSelect';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface QuoteFormProps {
   quote?: Quote;
@@ -40,6 +41,8 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const isEdit = Boolean(quote);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
 
   const templatesQuery = useQuery({
@@ -160,7 +163,14 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
     mutationFn: (payload: CreateQuotePayload) => quotesApi.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      setSuccessMessage('Quote created successfully');
       onSuccess();
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create quote');
     },
   });
 
@@ -169,7 +179,14 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['quotes', quote!.id] });
+      setSuccessMessage('Quote updated successfully');
       onSuccess();
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update quote');
     },
   });
 
@@ -368,11 +385,11 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">Payment Terms</label>
-            <textarea
-              {...register('paymentTerms')}
-              rows={4}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            <RichTextEditor
+              value={watch('paymentTerms') || ''}
+              onChange={(html) => setValue('paymentTerms', html)}
               placeholder="Describe payment terms and schedule..."
+              minHeight="200px"
             />
           </div>
 
@@ -447,6 +464,20 @@ export function QuoteForm({ quote, onClose, onSuccess }: QuoteFormProps) {
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

@@ -56,6 +56,18 @@ export const opportunitiesApi = {
     );
     return data;
   },
+
+  previewEmail: async (id: string, payload: {
+    templateId?: string;
+    htmlContent?: string;
+    textContent?: string;
+  }) => {
+    const { data } = await apiClient.post<{ html: string; text: string }>(
+      `/crm/opportunities/${id}/preview-email`,
+      payload,
+    );
+    return data;
+  },
 };
 
 

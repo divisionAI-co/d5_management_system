@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { SalesPerformanceReportForm } from '@/components/crm/sales-performance-reports/SalesPerformanceReportForm';
 import { SalesPerformanceReportPreviewDialog } from '@/components/crm/sales-performance-reports/SalesPerformanceReportPreviewDialog';
 import { SalesPerformanceReportSendDialog } from '@/components/crm/sales-performance-reports/SalesPerformanceReportSendDialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export default function SalesPerformanceReportsPage() {
   const { user } = useAuthStore();
@@ -22,6 +23,7 @@ export default function SalesPerformanceReportsPage() {
   const [filterWeekEndingFrom, setFilterWeekEndingFrom] = useState<string>('');
   const [filterWeekEndingTo, setFilterWeekEndingTo] = useState<string>('');
   const [feedback, setFeedback] = useState<{ message: string; tone: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+  const [deleteConfirmReport, setDeleteConfirmReport] = useState<SalesPerformanceReport | null>(null);
 
   const isSalesperson = user?.role === 'SALESPERSON';
   const isAdmin = user?.role === 'ADMIN';
@@ -75,8 +77,13 @@ export default function SalesPerformanceReportsPage() {
   };
 
   const handleDelete = (report: SalesPerformanceReport) => {
-    if (confirm('Are you sure you want to delete this report?')) {
-      deleteMutation.mutate(report.id);
+    setDeleteConfirmReport(report);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmReport) {
+      deleteMutation.mutate(deleteConfirmReport.id);
+      setDeleteConfirmReport(null);
     }
   };
 
@@ -327,6 +334,16 @@ export default function SalesPerformanceReportsPage() {
           }}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmReport}
+        title="Delete Report"
+        message="Are you sure you want to delete this report?"
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmReport(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

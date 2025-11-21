@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 import { useToast } from '@/components/ui/use-toast';
 import { MarkdownRenderer } from '@/components/shared/MarkdownRenderer';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type FormMode = 'create' | 'edit';
 
@@ -108,6 +109,7 @@ export function AiActionsManager() {
   const [showRunModal, setShowRunModal] = useState(false);
   const [selectedActionForRun, setSelectedActionForRun] = useState<AiActionSummary | null>(null);
   const [executionResult, setExecutionResult] = useState<AiActionExecution | null>(null);
+  const [deleteConfirmAction, setDeleteConfirmAction] = useState<AiActionSummary | null>(null);
   const { toast } = useToast();
 
   const actionsQuery = useQuery({
@@ -393,8 +395,13 @@ export function AiActionsManager() {
       setError('System actions cannot be deleted.');
       return;
     }
-    if (window.confirm(`Delete Gemini action "${action.name}"? This cannot be undone.`)) {
-      deleteMutation.mutate(action.id);
+    setDeleteConfirmAction(action);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmAction) {
+      deleteMutation.mutate(deleteConfirmAction.id);
+      setDeleteConfirmAction(null);
     }
   };
 
@@ -1268,6 +1275,16 @@ export function AiActionsManager() {
           onSubmit={handleCollectionSave}
         />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmAction}
+        title="Delete Gemini Action"
+        message={`Delete Gemini action "${deleteConfirmAction?.name}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmAction(null)}
+        isPending={deleteMutation.isPending}
+      />
     </>
   );
 }

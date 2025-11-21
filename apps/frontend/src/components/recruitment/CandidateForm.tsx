@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { candidatesApi } from '@/lib/api/recruitment';
 import { MentionInput } from '@/components/shared/MentionInput';
 import { DrivePicker, type DrivePickerMode } from '@/components/shared/DrivePicker';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   Candidate,
   CandidateRecruiter,
@@ -52,6 +53,8 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
   const queryClient = useQueryClient();
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
   const [drivePickerMode, setDrivePickerMode] = useState<DrivePickerMode>('folder');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const recruitersQuery = useQuery({
     queryKey: ['candidate-recruiters', 'form'],
     queryFn: () => candidatesApi.listRecruiters(),
@@ -107,8 +110,14 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
     mutationFn: (payload: CreateCandidateDto) => candidatesApi.create(payload),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      setSuccessMessage('Candidate created successfully');
       onSuccess?.(created);
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to create candidate');
     },
   });
 
@@ -118,8 +127,14 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       queryClient.invalidateQueries({ queryKey: ['candidate', candidate!.id] });
+      setSuccessMessage('Candidate updated successfully');
       onSuccess?.(updated);
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to update candidate');
     },
   });
 
@@ -658,6 +673,20 @@ export function CandidateForm({ candidate, onClose, onSuccess }: CandidateFormPr
         onSelectFolder={handleSelectDriveFolder}
         onUseCurrentFolder={handleUseCurrentFolder}
       />
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

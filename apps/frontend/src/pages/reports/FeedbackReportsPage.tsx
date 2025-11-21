@@ -7,6 +7,7 @@ import { Plus, Eye, Download, Send, RefreshCw, Trash2, FileText, X } from 'lucid
 import type { FeedbackReport, CreateFeedbackReportDto } from '@/types/feedback-reports';
 import { FeedbackReportStatus } from '@/types/feedback-reports';
 import { formatReportPeriod, getStatusBadgeColor, getRatingLabel } from '@/lib/api/feedback-reports';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export default function FeedbackReportsPage() {
   const { user } = useAuthStore();
@@ -21,6 +22,9 @@ export default function FeedbackReportsPage() {
   const [filterMonth, setFilterMonth] = useState<number | undefined>();
   const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const [submitConfirmReport, setSubmitConfirmReport] = useState<FeedbackReport | null>(null);
+  const [recompileConfirmReport, setRecompileConfirmReport] = useState<FeedbackReport | null>(null);
+  const [deleteConfirmReport, setDeleteConfirmReport] = useState<FeedbackReport | null>(null);
 
   const isHR = user?.role === 'HR' || user?.role === 'ADMIN';
   const isAM = user?.role === 'ACCOUNT_MANAGER' || user?.role === 'ADMIN';
@@ -166,20 +170,35 @@ export default function FeedbackReportsPage() {
   };
 
   const handleSubmit = (report: FeedbackReport) => {
-    if (window.confirm('Submit this report? It will be ready to send to the customer.')) {
-      submitMutation.mutate(report.id);
+    setSubmitConfirmReport(report);
+  };
+
+  const confirmSubmit = () => {
+    if (submitConfirmReport) {
+      submitMutation.mutate(submitConfirmReport.id);
+      setSubmitConfirmReport(null);
     }
   };
 
   const handleRecompile = (report: FeedbackReport) => {
-    if (window.confirm('Recompile auto-calculated data? This will update tasks count, days off, and bank holidays.')) {
-      recompileMutation.mutate(report.id);
+    setRecompileConfirmReport(report);
+  };
+
+  const confirmRecompile = () => {
+    if (recompileConfirmReport) {
+      recompileMutation.mutate(recompileConfirmReport.id);
+      setRecompileConfirmReport(null);
     }
   };
 
   const handleDelete = (report: FeedbackReport) => {
-    if (window.confirm('Delete this report? This action cannot be undone.')) {
-      deleteMutation.mutate(report.id);
+    setDeleteConfirmReport(report);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmReport) {
+      deleteMutation.mutate(deleteConfirmReport.id);
+      setDeleteConfirmReport(null);
     }
   };
 
@@ -480,6 +499,36 @@ export default function FeedbackReportsPage() {
           isLoading={sendMutation.isPending}
         />
       )}
+      <ConfirmationDialog
+        open={!!submitConfirmReport}
+        title="Submit Report"
+        message="Submit this report? It will be ready to send to the customer."
+        confirmLabel="Submit"
+        variant="info"
+        onConfirm={confirmSubmit}
+        onCancel={() => setSubmitConfirmReport(null)}
+        isPending={submitMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!recompileConfirmReport}
+        title="Recompile Report"
+        message="Recompile auto-calculated data? This will update tasks count, days off, and bank holidays."
+        confirmLabel="Recompile"
+        variant="info"
+        onConfirm={confirmRecompile}
+        onCancel={() => setRecompileConfirmReport(null)}
+        isPending={recompileMutation.isPending}
+      />
+      <ConfirmationDialog
+        open={!!deleteConfirmReport}
+        title="Delete Report"
+        message="Delete this report? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmReport(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

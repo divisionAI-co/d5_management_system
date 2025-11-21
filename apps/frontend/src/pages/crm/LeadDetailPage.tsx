@@ -29,6 +29,7 @@ import { LeadStatusForm } from '@/components/crm/leads/LeadStatusForm';
 import { LeadConvertModal } from '@/components/crm/leads/LeadConvertModal';
 import { ActivitySidebar } from '@/components/activities/ActivitySidebar';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 const STATUS_COLORS: Record<string, string> = {
   NEW: 'bg-blue-100 text-blue-700',
@@ -48,6 +49,7 @@ export default function LeadDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showStatus, setShowStatus] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showActivities, setShowActivities] = useState(
     (location.state as any)?.openActivitySidebar ?? (searchParams.get('openActivitySidebar') === 'true'),
@@ -108,9 +110,12 @@ export default function LeadDetailPage() {
 
   const handleDelete = () => {
     if (!leadQuery.data) return;
-    if (window.confirm(`Delete lead "${leadQuery.data.title}"? This action cannot be undone.`)) {
-      deleteMutation.mutate();
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    deleteMutation.mutate();
+    setShowDeleteConfirm(false);
   };
 
   if (!id) {
@@ -523,6 +528,16 @@ export default function LeadDetailPage() {
         entityType="lead"
         title="Lead Activities"
         emptyState="No activities yet. Capture emails, calls, notes, and reminders to keep momentum."
+      />
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        title="Delete Lead"
+        message={`Are you sure you want to delete "${leadQuery.data?.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+        isPending={deleteMutation.isPending}
       />
     </div>
   );

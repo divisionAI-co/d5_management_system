@@ -5,6 +5,7 @@ import { Palette, Pencil, Plus, RefreshCw, Shield, Trash2 } from 'lucide-react';
 import { activitiesApi } from '@/lib/api/activities';
 import type { ActivityType, ActivityTypePayload, ActivityTypeUpdatePayload } from '@/types/activities';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type FormMode = 'create' | 'edit';
 
@@ -26,6 +27,7 @@ export default function ActivityTypesPage() {
   const [formState, setFormState] = useState<ActivityTypePayload>(DEFAULT_FORM);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [deleteConfirmType, setDeleteConfirmType] = useState<ActivityType | null>(null);
 
   const activityTypesQuery = useQuery({
     queryKey: ['activity-types', { includeInactive: true }],
@@ -149,13 +151,13 @@ export default function ActivityTypesPage() {
       setError('System activity types cannot be deleted.');
       return;
     }
+    setDeleteConfirmType(activityType);
+  };
 
-    if (
-      window.confirm(
-        `Delete activity type "${activityType.name}"? This cannot be undone if it is not used.`,
-      )
-    ) {
-      deleteMutation.mutate(activityType.id);
+  const confirmDelete = () => {
+    if (deleteConfirmType) {
+      deleteMutation.mutate(deleteConfirmType.id);
+      setDeleteConfirmType(null);
     }
   };
 
@@ -475,6 +477,16 @@ export default function ActivityTypesPage() {
           </div>
         </div>
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmType}
+        title="Delete Activity Type"
+        message={`Delete activity type "${deleteConfirmType?.name}"? This cannot be undone if it is not used.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmType(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

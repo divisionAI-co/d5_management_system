@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Search, X } from 'lucide-react';
 import { positionsApi } from '@/lib/api/recruitment';
 import { candidatesApi } from '@/lib/api/recruitment/candidates';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
 import type {
   Candidate,
   LinkCandidatePositionDto,
@@ -25,6 +26,8 @@ export function LinkCandidatePositionModal({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<PositionStatus | 'ALL'>('Open');
   const deferredSearch = useDeferredValue(searchTerm.trim());
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: positionsResponse, isLoading: isLoadingPositions } = useQuery({
     queryKey: ['positions', 'candidate-link', { statusFilter, search: deferredSearch }],
@@ -78,8 +81,14 @@ export function LinkCandidatePositionModal({
     mutationFn: (payload: LinkCandidatePositionDto) =>
       candidatesApi.linkPosition(candidate.id, payload),
     onSuccess: (updated) => {
+      setSuccessMessage('Position linked successfully');
       onSuccess?.(updated);
+      setTimeout(() => {
       onClose();
+      }, 1000);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to link position');
     },
   });
 
@@ -235,6 +244,20 @@ export function LinkCandidatePositionModal({
           </div>
         </form>
       </div>
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
+        />
+      )}
     </div>
   );
 }

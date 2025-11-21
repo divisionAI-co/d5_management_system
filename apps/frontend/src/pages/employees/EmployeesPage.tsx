@@ -7,6 +7,8 @@ import { EmployeeImportDialog } from '@/components/hr/employees/EmployeeImportDi
 import { employeesApi } from '@/lib/api/hr';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { Employee } from '@/types/hr';
+import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 export default function EmployeesPage() {
   const navigate = useNavigate();
@@ -18,11 +20,18 @@ export default function EmployeesPage() {
   const { user } = useAuthStore();
   const canImport = user?.role === 'ADMIN' || user?.role === 'HR';
 
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => employeesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setSuccessMessage('Employee deleted successfully');
       setShowDeleteConfirm(null);
+    },
+    onError: (error: any) => {
+      setErrorMessage(error?.response?.data?.message || 'Failed to delete employee');
     },
   });
 
@@ -78,42 +87,43 @@ export default function EmployeesPage() {
         />
       )}
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">
-              Delete Employee
-            </h3>
-            <p className="text-muted-foreground mb-6">
+      <ConfirmationDialog
+        open={!!showDeleteConfirm}
+        title="Delete Employee"
+        message={
+          <>
               Are you sure you want to delete{' '}
               <span className="font-semibold">
-                {showDeleteConfirm.user?.firstName} {showDeleteConfirm.user?.lastName}
+              {showDeleteConfirm?.user?.firstName} {showDeleteConfirm?.user?.lastName}
               </span>
               ? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="px-4 py-2 text-muted-foreground bg-card border border-border rounded-lg hover:bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleteMutation.isPending}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </>
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(null)}
+        isPending={deleteMutation.isPending}
+      />
 
       {canImport && importOpen && (
         <EmployeeImportDialog
           open={importOpen}
           onClose={() => setImportOpen(false)}
+        />
+      )}
+      {successMessage && (
+        <FeedbackToast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          tone="success"
+        />
+      )}
+      {errorMessage && (
+        <FeedbackToast
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+          tone="error"
         />
       )}
     </div>

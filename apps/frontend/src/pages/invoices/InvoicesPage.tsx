@@ -27,6 +27,7 @@ import type {
 } from '@/types/invoices';
 import type { CustomerSummary } from '@/types/crm';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type SortOption = {
   label: string;
@@ -72,6 +73,7 @@ export default function InvoicesPage() {
   const [markInvoiceId, setMarkInvoiceId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [deleteConfirmInvoice, setDeleteConfirmInvoice] = useState<InvoiceSummary | null>(null);
 
   const sanitizedFilters = useMemo(() => {
     const payload: InvoiceFilters = {
@@ -225,12 +227,13 @@ export default function InvoicesPage() {
   };
 
   const handleDelete = (invoice: InvoiceSummary) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete invoice ${invoice.invoiceNumber}? This action cannot be undone.`,
-      )
-    ) {
-      deleteMutation.mutate(invoice.id);
+    setDeleteConfirmInvoice(invoice);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmInvoice) {
+      deleteMutation.mutate(deleteConfirmInvoice.id);
+      setDeleteConfirmInvoice(null);
     }
   };
 
@@ -601,6 +604,16 @@ export default function InvoicesPage() {
       {canImport && importOpen && (
         <InvoiceImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
       )}
+      <ConfirmationDialog
+        open={!!deleteConfirmInvoice}
+        title="Delete Invoice"
+        message={`Are you sure you want to delete invoice ${deleteConfirmInvoice?.invoiceNumber}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmInvoice(null)}
+        isPending={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { LeadsTable } from '@/components/crm/leads/LeadsTable';
 import { LeadForm } from '@/components/crm/leads/LeadForm';
 import { LeadStatusForm } from '@/components/crm/leads/LeadStatusForm';
 import { LeadConvertModal } from '@/components/crm/leads/LeadConvertModal';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { LeadsImportDialog } from '@/components/crm/leads/LeadsImportDialog';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Filter, Plus, UploadCloud } from 'lucide-react';
@@ -45,6 +46,7 @@ export default function LeadsPage() {
   const [statusLead, setStatusLead] = useState<Lead | undefined>();
   const [convertLead, setConvertLead] = useState<Lead | undefined>();
   const [importOpen, setImportOpen] = useState(false);
+  const [deleteConfirmLead, setDeleteConfirmLead] = useState<Lead | null>(null);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
   const [showFilters, setShowFilters] = useState(false);
@@ -115,8 +117,13 @@ export default function LeadsPage() {
   };
 
   const handleDelete = (lead: Lead) => {
-    if (window.confirm(`Delete lead "${lead.title}"?`)) {
-      deleteMutation.mutate(lead.id);
+    setDeleteConfirmLead(lead);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmLead) {
+      deleteMutation.mutate(deleteConfirmLead.id);
+      setDeleteConfirmLead(null);
     }
   };
 
@@ -329,6 +336,16 @@ export default function LeadsPage() {
         open={importOpen}
         customers={customers}
         onClose={() => setImportOpen(false)}
+      />
+      <ConfirmationDialog
+        open={!!deleteConfirmLead}
+        title="Delete Lead"
+        message={`Are you sure you want to delete "${deleteConfirmLead?.title}"?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirmLead(null)}
+        isPending={deleteMutation.isPending}
       />
     </div>
   );
