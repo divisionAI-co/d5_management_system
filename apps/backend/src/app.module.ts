@@ -59,6 +59,7 @@ import { PdfModule } from './common/pdf/pdf.module';
 import { EncryptionModule } from './common/encryption/encryption.module';
 import { RateLimitingModule } from './common/rate-limiting/rate-limiting.module';
 import { CacheModule } from './common/cache/cache.module';
+import { StorageModule } from './common/storage/storage.module';
 
 @Module({
   imports: [
@@ -143,6 +144,7 @@ import { CacheModule } from './common/cache/cache.module';
     EncryptionModule,
     RateLimitingModule,
     CacheModule,
+    StorageModule,
   ],
 })
 export class AppModule {}

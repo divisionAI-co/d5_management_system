@@ -6,7 +6,8 @@ import { Link } from '@tiptap/extension-link';
 import { Color } from '@tiptap/extension-color';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Highlight } from '@tiptap/extension-highlight';
-import { useEffect, useState, useRef } from 'react';
+import Image from '@tiptap/extension-image';
+import { useEffect, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Bold,
@@ -32,6 +33,9 @@ import {
   Highlighter,
   Type,
   ChevronDown,
+  Image as ImageIcon,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -42,22 +46,33 @@ interface RichTextEditorProps {
   minHeight?: string;
 }
 
+export interface RichTextEditorRef {
+  insertImage: (url: string, alt?: string) => void;
+  getEditor: () => any;
+}
+
 /**
  * RichTextEditor - A comprehensive rich text editor component using TipTap
  * Provides word processor-like editing capabilities with extensive formatting options
  */
-export function RichTextEditor({
+export const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(({
   value,
   onChange,
   placeholder = 'Start typing...',
   className,
   minHeight = '200px',
-}: RichTextEditorProps) {
+}, ref) => {
   const [linkUrl, setLinkUrl] = useState('');
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const [showFontFamilyPicker, setShowFontFamilyPicker] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageAlt, setImageAlt] = useState('');
+  const [imageWidth, setImageWidth] = useState<string>('');
+  const [imageAlign, setImageAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [selectedImage, setSelectedImage] = useState<{ node: any; pos: number } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
   const fontFamilies = [
@@ -83,7 +98,7 @@ export function RichTextEditor({
       }),
       Underline,
       TextAlign.configure({
-        types: ['heading', 'paragraph'],
+        types: ['heading', 'paragraph', 'image'],
       }),
       Link.configure({
         openOnClick: false,
@@ -96,17 +111,47 @@ export function RichTextEditor({
       Highlight.configure({
         multicolor: true,
       }),
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'rounded-lg max-w-full h-auto',
+        },
+      }),
     ],
     content: value || '',
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none p-3 text-foreground',
       },
+      handleClick: (view, pos, event) => {
+        const node = view.state.doc.nodeAt(pos);
+        if (node && node.type.name === 'image') {
+          setSelectedImage({ node, pos });
+          setImageUrl(node.attrs.src || '');
+          setImageAlt(node.attrs.alt || '');
+          setImageWidth(node.attrs.width || '');
+          setImageAlign(node.attrs.align || 'center');
+          setShowImageDialog(true);
+          return true;
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
   });
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    insertImage: (url: string, alt: string = '') => {
+      if (editor) {
+        editor.chain().focus().setImage({ src: url, alt }).run();
+      }
+    },
+    getEditor: () => editor,
+  }));
 
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
@@ -164,6 +209,53 @@ export function RichTextEditor({
     const fontFamily = editor.getAttributes('textStyle').fontFamily;
     const matched = fontFamilies.find((f) => f.value === fontFamily);
     return matched ? matched.label : fontFamily || 'Default';
+  };
+
+  const insertImage = () => {
+    if (imageUrl) {
+      const attrs: any = {
+        src: imageUrl,
+        alt: imageAlt || '',
+      };
+      
+      if (imageWidth) {
+        attrs.width = imageWidth;
+      }
+      
+      // Add alignment style
+      let style = 'display: block;';
+      if (imageAlign === 'center') {
+        style += ' margin: 0 auto;';
+      } else if (imageAlign === 'right') {
+        style += ' margin-left: auto;';
+      } else {
+        style += ' margin-right: auto;';
+      }
+      attrs.style = style;
+
+      if (selectedImage) {
+        // Update existing image
+        editor.chain().focus().setNodeSelection(selectedImage.pos).updateAttributes('image', attrs).run();
+      } else {
+        // Insert new image at cursor
+        editor.chain().focus().setImage(attrs).run();
+      }
+      
+      setShowImageDialog(false);
+      setImageUrl('');
+      setImageAlt('');
+      setImageWidth('');
+      setImageAlign('center');
+      setSelectedImage(null);
+    }
+  };
+
+  const removeImage = () => {
+    if (selectedImage) {
+      editor.chain().focus().setNodeSelection(selectedImage.pos).deleteSelection().run();
+      setShowImageDialog(false);
+      setSelectedImage(null);
+    }
   };
 
   const ToolbarButton = ({
@@ -493,6 +585,34 @@ export function RichTextEditor({
 
         <ToolbarSeparator />
 
+        {/* Image */}
+        <ToolbarButton
+          onClick={() => {
+            const { from } = editor.state.selection;
+            const node = editor.state.doc.nodeAt(from);
+            if (node && node.type.name === 'image') {
+              setSelectedImage({ node, pos: from });
+              setImageUrl(node.attrs.src || '');
+              setImageAlt(node.attrs.alt || '');
+              setImageWidth(node.attrs.width || '');
+              setImageAlign(node.attrs.align || 'center');
+            } else {
+              setSelectedImage(null);
+              setImageUrl('');
+              setImageAlt('');
+              setImageWidth('');
+              setImageAlign('center');
+            }
+            setShowImageDialog(true);
+          }}
+          isActive={editor.isActive('image')}
+          title="Insert/Edit Image"
+        >
+          <ImageIcon className="h-4 w-4" />
+        </ToolbarButton>
+
+        <ToolbarSeparator />
+
         {/* Link */}
         <ToolbarButton
           onClick={() => {
@@ -580,11 +700,117 @@ export function RichTextEditor({
         </div>
       )}
 
+      {/* Image Dialog */}
+      {showImageDialog && (
+        <div className="absolute left-1/2 top-full z-50 mt-1 w-80 -translate-x-1/2 rounded-lg border border-border bg-card p-4 shadow-lg">
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Image URL
+              </label>
+              <input
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:border-blue-500 focus:outline-none"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Alt Text
+              </label>
+              <input
+                type="text"
+                value={imageAlt}
+                onChange={(e) => setImageAlt(e.target.value)}
+                placeholder="Description of image"
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Width (px)
+                </label>
+              <input
+                type="number"
+                value={imageWidth}
+                onChange={(e) => setImageWidth(e.target.value)}
+                placeholder="Auto"
+                min="0"
+                className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:border-blue-500 focus:outline-none"
+              />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Alignment
+                </label>
+                <select
+                  value={imageAlign}
+                  onChange={(e) => setImageAlign(e.target.value as 'left' | 'center' | 'right')}
+                  className="w-full rounded border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+            </div>
+            {imageUrl && (
+              <div className="rounded border border-border p-2">
+                <img
+                  src={imageUrl}
+                  alt={imageAlt || 'Preview'}
+                  className="max-h-32 w-full object-contain rounded"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={insertImage}
+                className="flex-1 rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+              >
+                {selectedImage ? 'Update' : 'Insert'}
+              </button>
+              {selectedImage && (
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="rounded border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+                >
+                  Remove
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImageDialog(false);
+                  setImageUrl('');
+                  setImageAlt('');
+                  setImageWidth('');
+                  setImageAlign('center');
+                  setSelectedImage(null);
+                }}
+                className="rounded border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Editor Content */}
       <div className="relative overflow-y-auto" style={{ minHeight: `calc(${minHeight} - 50px)` }}>
         <EditorContent
           editor={editor}
-          className="[&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[150px] [&_.ProseMirror]:p-3 [&_.ProseMirror_prose]:max-w-none [&_.ProseMirror_a]:text-blue-600 [&_.ProseMirror_a]:underline [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-muted [&_.ProseMirror_code]:px-1 [&_.ProseMirror_code]:py-0.5 [&_.ProseMirror_code]:text-sm [&_.ProseMirror_pre]:rounded [&_.ProseMirror_pre]:bg-muted [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_blockquote]:border-l-4 [&_.ProseMirror_blockquote]:border-border [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:italic"
+          className="[&_.ProseMirror]:outline-none [&_.ProseMirror]:min-h-[150px] [&_.ProseMirror]:p-3 [&_.ProseMirror_prose]:max-w-none [&_.ProseMirror_a]:text-blue-600 [&_.ProseMirror_a]:underline [&_.ProseMirror_code]:rounded [&_.ProseMirror_code]:bg-muted [&_.ProseMirror_code]:px-1 [&_.ProseMirror_code]:py-0.5 [&_.ProseMirror_code]:text-sm [&_.ProseMirror_pre]:rounded [&_.ProseMirror_pre]:bg-muted [&_.ProseMirror_pre]:p-3 [&_.ProseMirror_blockquote]:border-l-4 [&_.ProseMirror_blockquote]:border-border [&_.ProseMirror_blockquote]:pl-4 [&_.ProseMirror_blockquote]:italic [&_.ProseMirror_img]:max-w-full [&_.ProseMirror_img]:h-auto [&_.ProseMirror_img]:rounded-lg"
         />
         {!editor.getText() && (
           <div className="pointer-events-none absolute left-3 top-3 text-sm text-muted-foreground">
@@ -594,4 +820,6 @@ export function RichTextEditor({
       </div>
     </div>
   );
-}
+});
+
+RichTextEditor.displayName = 'RichTextEditor';

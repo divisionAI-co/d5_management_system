@@ -101,5 +101,13 @@ export const configValidationSchema = Joi.object({
   SWAGGER_PASSWORD: Joi.string()
     .optional()
     .description('Basic auth password for Swagger in production (required in production if SWAGGER_ENABLED=true)'),
+
+  // File Storage (optional)
+  STORAGE_ROOT: Joi.string()
+    .default('./storage')
+    .description('Root directory for file storage (default: ./storage)'),
+  STORAGE_PUBLIC_URL_PREFIX: Joi.string()
+    .default('/storage/files')
+    .description('Public URL prefix for accessing stored files (default: /storage/files). Note: /api/v1 is automatically added by NestJS.'),
 });
 

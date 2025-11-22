@@ -8,6 +8,7 @@ The content management system provides public APIs for:
 - **Blogs** - Blog posts with rich content
 - **Case Studies** - Client success stories and project showcases
 - **Job Positions** - Open positions for recruitment
+- **Customer Logos** - Customer logos for website display
 
 All endpoints are public (no authentication required) and designed for external website integration.
 
@@ -267,6 +268,7 @@ interface Blog {
   slug: string;
   excerpt?: string;
   featuredImage?: string;
+  featured: boolean;
   publishedAt?: string;
   author: {
     firstName: string;
@@ -351,6 +353,7 @@ interface Blog {
   slug: string;
   content: string;
   featuredImage?: string;
+  featured: boolean;
   publishedAt?: string;
   author: {
     firstName: string;
@@ -437,6 +440,7 @@ interface CaseStudy {
   slug: string;
   excerpt?: string;
   featuredImage?: string;
+  featured: boolean;
   challenge?: string; // The challenge the customer faced
   solution?: string; // The solution provided
   aboutCustomer?: string; // Information about the customer
@@ -533,6 +537,7 @@ interface CaseStudy {
   excerpt?: string;
   content: string;
   featuredImage?: string;
+  featured: boolean;
   challenge?: string;
   solution?: string;
   aboutCustomer?: string;
@@ -962,6 +967,7 @@ export interface Blog {
   excerpt?: string;
   content: string;
   featuredImage?: string;
+  featured: boolean;
   publishedAt?: string;
   author: {
     id: string;
@@ -982,6 +988,7 @@ export interface CaseStudy {
   excerpt?: string;
   content: string;
   featuredImage?: string;
+  featured: boolean;
   challenge?: string; // The challenge the customer faced
   solution?: string; // The solution provided
   aboutCustomer?: string; // Information about the customer
@@ -1010,6 +1017,13 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
+
+export interface CustomerLogo {
+  id: string;
+  name: string;
+  imageUrl: string;
+  website?: string | null;
+}
 ```
 
 ---
@@ -1023,4 +1037,383 @@ export interface PaginatedResponse<T> {
 5. **Add position detail pages** - Create detail pages that link from the cards
 
 For more details on the API endpoints, see [PUBLIC_POSITIONS_API.md](./PUBLIC_POSITIONS_API.md).
+
+---
+
+## Customer Logos Implementation
+
+### API Endpoint
+
+- `GET /api/v1/crm/customers/public/logos` - Get customer logos for website display
+
+### Customer Logos Component
+
+```tsx
+import { useEffect, useState } from 'react';
+
+interface CustomerLogo {
+  id: string;
+  name: string;
+  imageUrl: string;
+  website?: string | null;
+}
+
+function CustomerLogosSection() {
+  const [logos, setLogos] = useState<CustomerLogo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLogos() {
+      try {
+        const response = await fetch(
+          'http://localhost:3000/api/v1/crm/customers/public/logos'
+        );
+        const data = await response.json();
+        setLogos(data);
+      } catch (error) {
+        console.error('Failed to load customer logos:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLogos();
+  }, []);
+
+  if (loading) return <div>Loading logos...</div>;
+
+  return (
+    <section className="py-16 bg-gray-50">
+      <div className="container mx-auto px-4">
+        <h2 className="text-3xl font-bold text-center mb-12">Our Customers</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 items-center">
+          {logos.map((customer) => (
+            <div
+              key={customer.id}
+              className="flex items-center justify-center p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+            >
+              {customer.website ? (
+                <a
+                  href={customer.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <img
+                    src={customer.imageUrl}
+                    alt={customer.name}
+                    className="h-12 w-auto object-contain grayscale hover:grayscale-0 transition-all"
+                  />
+                </a>
+              ) : (
+                <img
+                  src={customer.imageUrl}
+                  alt={customer.name}
+                  className="h-12 w-auto object-contain grayscale"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+```
+
+### Complete Example: Customer Logos with Hover Effects
+
+```tsx
+import { useEffect, useState } from 'react';
+
+interface CustomerLogo {
+  id: string;
+  name: string;
+  imageUrl: string;
+  website?: string | null;
+}
+
+function CustomerLogosShowcase() {
+  const [logos, setLogos] = useState<CustomerLogo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLogos() {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'}/crm/customers/public/logos`
+        );
+        const data = await response.json();
+        setLogos(data);
+      } catch (error) {
+        console.error('Failed to load customer logos:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLogos();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-4 text-gray-600">Loading customer logos...</p>
+      </div>
+    );
+  }
+
+  if (logos.length === 0) {
+    return null; // Don't show section if no logos
+  }
+
+  return (
+    <section className="py-16 bg-white">
+      <div className="container mx-auto px-4">
+        <h2 className="text-3xl font-bold text-center mb-4">Trusted By</h2>
+        <p className="text-center text-gray-600 mb-12">
+          We're proud to work with industry leaders
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 items-center">
+          {logos.map((customer) => (
+            <div
+              key={customer.id}
+              className="flex items-center justify-center p-6 bg-gray-50 rounded-xl hover:bg-white hover:shadow-lg transition-all duration-300 group"
+            >
+              {customer.website ? (
+                <a
+                  href={customer.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full"
+                  title={customer.name}
+                >
+                  <img
+                    src={customer.imageUrl}
+                    alt={customer.name}
+                    className="h-10 w-auto object-contain mx-auto opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+                  />
+                </a>
+              ) : (
+                <img
+                  src={customer.imageUrl}
+                  alt={customer.name}
+                  className="h-10 w-auto object-contain mx-auto opacity-60"
+                  title={customer.name}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default CustomerLogosShowcase;
+```
+
+### API Response Format
+
+The endpoint returns an array of customer logo objects:
+
+```typescript
+[
+  {
+    "id": "uuid",
+    "name": "Company Name",
+    "imageUrl": "https://example.com/logo.png",
+    "website": "https://company.com" // or null
+  },
+  // ... more customers
+]
+```
+
+### Notes
+
+- Only **active and featured customers** with logos are returned
+- Customers must have `featured: true` to appear in the public API
+- Logos are sorted alphabetically by customer name
+- The `website` field is optional and can be `null`
+- Google Drive image URLs are automatically converted to proxy URLs (if applicable)
+
+---
+
+## File Storage and Image Access
+
+### Overview
+
+The system provides a generic file storage service for uploading and retrieving files (images, documents) for blogs, case studies, and other content. All uploaded files are publicly accessible via dedicated endpoints.
+
+### Public File Access Endpoints
+
+#### 1. Get File by Category and Stored Name
+
+```
+GET /api/v1/storage/files/:category/:storedName
+```
+
+**Description**: Retrieves a file by its category and stored name. This is the primary method for accessing uploaded files.
+
+**Parameters**:
+- `category` (path): File category (e.g., `image`, `document`, `other`)
+- `storedName` (path): The unique stored filename (UUID + extension)
+
+**Example**:
+```typescript
+// Access an uploaded image
+const imageUrl = 'https://your-domain.com/api/v1/storage/files/image/550e8400-e29b-41d4-a716-446655440000.jpg';
+
+// Use in img tag
+<img src={imageUrl} alt="Uploaded image" />
+```
+
+#### 2. Get File by ID
+
+```
+GET /api/v1/storage/files/id/:id
+```
+
+**Description**: Retrieves a file by its database ID. Alternative method for file access.
+
+**Parameters**:
+- `id` (path): The file's database UUID
+
+**Example**:
+```typescript
+const fileId = '550e8400-e29b-41d4-a716-446655440000';
+const imageUrl = `https://your-domain.com/api/v1/storage/files/id/${fileId}`;
+```
+
+### File URL Format
+
+When files are uploaded, the system returns a URL in the following format:
+
+```
+/api/v1/storage/files/{category}/{storedName}
+```
+
+Where:
+- `category` is the lowercase file category (`image`, `document`, `other`)
+- `storedName` is a UUID with the original file extension (e.g., `550e8400-e29b-41d4-a716-446655440000.jpg`)
+
+### How Images Are Stored in Content
+
+When images are uploaded through the admin interface:
+
+1. **Upload Process**: The image is uploaded via `POST /api/v1/content/blogs/:id/upload-image` or `POST /api/v1/content/case-studies/:id/upload-image`
+2. **URL Returned**: The API returns a response with the file URL:
+   ```json
+   {
+     "id": "550e8400-e29b-41d4-a716-446655440000",
+     "filename": "my-image.jpg",
+     "storedName": "550e8400-e29b-41d4-a716-446655440000.jpg",
+     "mimeType": "image/jpeg",
+     "size": 123456,
+     "category": "IMAGE",
+     "url": "/api/v1/storage/files/image/550e8400-e29b-41d4-a716-446655440000.jpg",
+     "path": "image/550e8400-e29b-41d4-a716-446655440000.jpg"
+   }
+   ```
+3. **Insertion into Content**: The image URL is automatically inserted into the rich text editor as an `<img>` tag:
+   ```html
+   <img src="/api/v1/storage/files/image/550e8400-e29b-41d4-a716-446655440000.jpg" alt="my-image.jpg" />
+   ```
+4. **Content Storage**: The HTML content (including the image tag) is stored in the blog/case study's `content` field
+
+### Extracting Images from Content
+
+When displaying blog or case study content on your public website, images are already embedded in the HTML content:
+
+```typescript
+// Example: Displaying blog content with embedded images
+function BlogPost({ blog }: { blog: Blog }) {
+  return (
+    <div>
+      <h1>{blog.title}</h1>
+      {/* Images are already in the HTML content */}
+      <div dangerouslySetInnerHTML={{ __html: blog.content }} />
+    </div>
+  );
+}
+```
+
+The images will automatically load from the public storage endpoints. Make sure to:
+
+1. **Use absolute URLs**: If your frontend is on a different domain, convert relative URLs to absolute:
+   ```typescript
+   const API_BASE_URL = 'https://your-api-domain.com';
+   
+   // Convert relative URLs to absolute
+   const contentWithAbsoluteUrls = blog.content.replace(
+     /src="(\/api\/v1\/storage\/files\/[^"]+)"/g,
+     `src="${API_BASE_URL}$1"`
+   );
+   ```
+
+2. **Handle CORS**: Ensure your backend allows cross-origin requests for the storage endpoints (they're already marked as `@Public()`)
+
+### Example: Complete Image Handling
+
+```typescript
+interface Blog {
+  id: string;
+  title: string;
+  content: string; // HTML content with embedded images
+  featuredImage?: string;
+  // ... other fields
+}
+
+function BlogPost({ blog }: { blog: Blog }) {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  
+  // Convert relative image URLs to absolute if needed
+  const processContent = (html: string) => {
+    return html.replace(
+      /src="(\/api\/v1\/storage\/files\/[^"]+)"/g,
+      `src="${API_BASE_URL}$1"`
+    );
+  };
+  
+  return (
+    <article>
+      <h1>{blog.title}</h1>
+      
+      {/* Featured image */}
+      {blog.featuredImage && (
+        <img 
+          src={blog.featuredImage.startsWith('http') 
+            ? blog.featuredImage 
+            : `${API_BASE_URL}${blog.featuredImage}`
+          } 
+          alt={blog.title} 
+        />
+      )}
+      
+      {/* Content with embedded images */}
+      <div 
+        dangerouslySetInnerHTML={{ 
+          __html: processContent(blog.content) 
+        }} 
+      />
+    </article>
+  );
+}
+```
+
+### File Categories
+
+Files are automatically categorized based on their MIME type:
+
+- **IMAGE**: `image/jpeg`, `image/png`, `image/gif`, `image/webp`, `image/svg+xml`
+- **DOCUMENT**: `application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/plain`
+- **OTHER**: All other file types
+
+### Notes
+
+- All file endpoints are **public** (no authentication required)
+- Files are served with appropriate `Content-Type` headers
+- File URLs are stable and can be cached
+- Maximum file size: 10MB (configurable)
+- Supported image formats: JPEG, PNG, GIF, WebP, SVG
+- Supported document formats: PDF, DOC, DOCX, TXT
 

@@ -7,6 +7,7 @@ export interface ListFilesParams {
   pageSize?: number;
   search?: string;
   recursive?: boolean;
+  mimeTypeFilter?: 'image'; // Filter by mime type (e.g., 'image' for images only)
 }
 
 export const googleDriveApi = {

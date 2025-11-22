@@ -82,6 +82,7 @@ model User {
   salesPerformanceReports     SalesPerformanceReport[]     @relation("SalesPerformanceReports")
   createdBlogs                Blog[]
   createdCaseStudies          CaseStudy[]
+  uploadedFiles               StoredFile[]                @relation("StoredFilesUploadedBy")
 
   @@map("users")
 }
@@ -175,6 +176,7 @@ model Customer {
   notes String?
   tags  String[]
   imageUrl String? // URL to customer logo/image
+  featured Boolean @default(false) // Featured customers shown on public website
 
   // Google Drive Integration
   driveFolderId String? // Google Drive folder containing contracts and documents
@@ -1884,10 +1886,14 @@ model Blog {
   excerpt     String?   @db.Text
   content     String    @db.Text
   featuredImage String?
+  featured     Boolean  @default(false)
   status      BlogStatus @default(DRAFT)
   publishedAt DateTime?
   authorId    String
   author      User      @relation(fields: [authorId], references: [id])
+  
+  // File associations
+  storedFiles StoredFile[]
   
   // SEO
   metaTitle       String?
@@ -1917,10 +1923,14 @@ model CaseStudy {
   excerpt     String?          @db.Text
   content     String           @db.Text
   featuredImage String?
+  featured     Boolean  @default(false)
   status      CaseStudyStatus  @default(DRAFT)
   publishedAt DateTime?
   authorId    String
   author      User             @relation(fields: [authorId], references: [id])
+  
+  // File associations
+  storedFiles StoredFile[]
   
   // Structured case study content
   challenge   String?          @db.Text // The challenge the customer faced
@@ -1949,4 +1959,44 @@ model CaseStudy {
   @@index([publishedAt])
   @@index([slug])
   @@map("case_studies")
+}
+
+// ============================================
+// FILE STORAGE
+// ============================================
+
+enum FileCategory {
+  IMAGE
+  DOCUMENT
+  OTHER
+}
+
+model StoredFile {
+  id          String      @id @default(uuid())
+  filename    String      // Original filename
+  storedName  String      // Name on disk (UUID-based)
+  mimeType    String
+  size        Int         // Size in bytes
+  category    FileCategory
+  path        String      // Relative path from storage root
+  url         String      // Public URL to access the file
+  
+  // Metadata
+  uploadedById String?
+  uploadedBy   User?      @relation("StoredFilesUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  
+  // Optional associations
+  blogId       String?
+  blog         Blog?      @relation(fields: [blogId], references: [id], onDelete: SetNull)
+  caseStudyId  String?
+  caseStudy    CaseStudy? @relation(fields: [caseStudyId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  @@index([uploadedById])
+  @@index([blogId])
+  @@index([caseStudyId])
+  @@index([category])
+  @@map("stored_files")
 }

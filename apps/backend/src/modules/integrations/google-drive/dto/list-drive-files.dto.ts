@@ -36,6 +36,10 @@ export class ListDriveFilesDto {
     return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
   })
   recursive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  mimeTypeFilter?: string; // Filter by mime type (e.g., 'image' for images only)
 }
 
 

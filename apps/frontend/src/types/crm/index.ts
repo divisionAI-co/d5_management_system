@@ -36,6 +36,7 @@ export interface CustomerBase {
   notes?: string | null;
   tags: string[];
   imageUrl?: string | null;
+  featured?: boolean;
   driveFolderId?: string | null;
   driveFolderUrl?: string | null;
   odooId?: string | null;
@@ -167,6 +168,8 @@ export interface CreateCustomerPayload {
   currency?: string;
   notes?: string;
   tags?: string[];
+  imageUrl?: string;
+  featured?: boolean;
   driveFolderId?: string;
   driveFolderUrl?: string;
   odooId?: string;

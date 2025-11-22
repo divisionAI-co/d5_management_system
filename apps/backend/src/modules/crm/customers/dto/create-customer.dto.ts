@@ -9,6 +9,7 @@ import {
   IsUrl,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { CustomerSentiment, CustomerStatus, CustomerType } from '@prisma/client';
@@ -30,7 +31,7 @@ export class CreateCustomerDto {
   phone?: string;
 
   @ApiPropertyOptional({ description: 'Company website URL' })
-  @IsUrl()
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
   @IsOptional()
   website?: string;
 
@@ -149,9 +150,16 @@ export class CreateCustomerDto {
     description: 'URL to customer logo/image',
     example: 'https://example.com/logo.png',
   })
-  @IsUrl()
   @IsOptional()
+  @IsString()
   imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Featured customer (shown on public website)',
+    default: false,
+  })
+  @IsOptional()
+  featured?: boolean;
 }
 
 

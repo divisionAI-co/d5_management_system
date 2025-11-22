@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsOptional, IsString, IsInt, Min, Max, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { BlogStatus } from '@prisma/client';
 
 export class FilterBlogsDto {
@@ -42,6 +42,22 @@ export class FilterBlogsDto {
   @IsOptional()
   @IsEnum(BlogStatus)
   status?: BlogStatus;
+
+  @ApiPropertyOptional({
+    description: 'Filter by featured status',
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    return value === 'true';
+  })
+  featured?: boolean;
 
   @ApiPropertyOptional({
     description: 'Sort field',

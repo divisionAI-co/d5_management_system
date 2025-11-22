@@ -7,6 +7,19 @@ import type {
   PaginatedResponse,
 } from '@/types/content';
 
+export interface UploadFileResult {
+  id: string;
+  filename: string;
+  storedName: string;
+  mimeType: string;
+  size: number;
+  category: 'IMAGE' | 'DOCUMENT' | 'OTHER';
+  url: string;
+  path: string;
+}
+
+const multipartHeaders = { 'Content-Type': 'multipart/form-data' };
+
 export const blogsApi = {
   async list(filters?: BlogFilters) {
     const { data } = await apiClient.get<PaginatedResponse<Blog>>(
@@ -40,6 +53,19 @@ export const blogsApi = {
 
   async delete(id: string) {
     const { data } = await apiClient.delete<{ message: string }>(`/content/blogs/${id}`);
+    return data;
+  },
+
+  async uploadImage(blogId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await apiClient.post<UploadFileResult>(
+      `/content/blogs/${blogId}/upload-image`,
+      formData,
+      {
+        headers: multipartHeaders,
+      },
+    );
     return data;
   },
 };

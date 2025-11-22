@@ -122,6 +122,7 @@ export class BlogsService extends BaseService {
       excerpt: createDto.excerpt,
       content: processedContent,
       featuredImage: processedFeaturedImage,
+      featured: createDto.featured ?? false,
       status: createDto.status ?? BlogStatus.DRAFT,
       publishedAt: createDto.publishedAt ? new Date(createDto.publishedAt) : null,
       metaTitle: createDto.metaTitle,
@@ -152,7 +153,7 @@ export class BlogsService extends BaseService {
   }
 
   async findAll(filters: FilterBlogsDto, userId?: string) {
-    const { page = 1, pageSize = 25, search, status, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
+    const { page = 1, pageSize = 25, search, status, featured, sortBy = 'createdAt', sortOrder = 'desc' } = filters;
 
     const where: Prisma.BlogWhereInput = {};
 
@@ -166,6 +167,10 @@ export class BlogsService extends BaseService {
 
     if (status) {
       where.status = status;
+    }
+
+    if (featured !== undefined) {
+      where.featured = featured;
     }
 
     const [data, total] = await Promise.all([
@@ -282,6 +287,10 @@ export class BlogsService extends BaseService {
 
     if (updateDto.featuredImage !== undefined) {
       updateData.featuredImage = convertGoogleDriveUrl(updateDto.featuredImage);
+    }
+
+    if (updateDto.featured !== undefined) {
+      updateData.featured = updateDto.featured;
     }
 
     if (updateDto.status !== undefined) {

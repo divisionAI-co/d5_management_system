@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/crm';
+import { storageApi } from '@/lib/api/storage';
+import { googleDriveApi } from '@/lib/api/google-drive';
 import type {
   CreateCustomerPayload,
   CustomerDetail,
@@ -10,7 +12,7 @@ import type {
   CustomerType,
   UpdateCustomerPayload,
 } from '@/types/crm';
-import { X } from 'lucide-react';
+import { X, Upload, FolderOpen } from 'lucide-react';
 import { MentionInput } from '@/components/shared/MentionInput';
 import { DrivePicker } from '@/components/shared/DrivePicker';
 import type { DriveFile } from '@/types/integrations';
@@ -55,6 +57,8 @@ type FormValues = {
   currency?: string;
   notes?: string;
   tags?: string;
+  imageUrl?: string;
+  featured?: boolean;
   driveFolderId?: string;
   driveFolderUrl?: string;
   odooId?: string;
@@ -70,6 +74,9 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
   const queryClient = useQueryClient();
   const isEdit = Boolean(customer);
   const [drivePickerOpen, setDrivePickerOpen] = useState(false);
+  const [showImageDrivePicker, setShowImageDrivePicker] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -83,6 +90,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         sentiment: 'NEUTRAL',
         currency: 'USD',
         tags: '',
+        imageUrl: '',
+        featured: false,
         taxId: '',
         registrationId: '',
         driveFolderId: '',
@@ -112,6 +121,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
       currency: customer.currency ?? 'USD',
       notes: customer.notes ?? '',
       tags: customer.tags?.join(', ') ?? '',
+      imageUrl: customer.imageUrl ?? '',
+      featured: customer.featured ?? false,
       driveFolderId: customer.driveFolderId ?? '',
       driveFolderUrl: customer.driveFolderUrl ?? '',
       odooId: customer.odooId ?? '',
@@ -146,6 +157,108 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
     const link = `https://drive.google.com/drive/folders/${folderId}`;
     setValue('driveFolderUrl', link, { shouldDirty: true, shouldTouch: true });
     setValue('driveFolderId', folderId, { shouldDirty: true, shouldTouch: true });
+  };
+
+  const uploadImageMutation = useMutation({
+    mutationFn: (file: File) => {
+      return storageApi.upload(file);
+    },
+    onSuccess: (result) => {
+      // Construct full URL for image
+      // result.url is a relative path like /storage/files/image/...
+      // The storage service returns a path like /storage/files/image/abc123.jpg
+      // We need to prepend the API base URL
+      
+      if (!result || !result.url) {
+        setErrorMessage('Upload succeeded but no URL was returned. Please try again.');
+        setUploadingImage(false);
+        return;
+      }
+      
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      
+      // Get the relative path from result.url
+      let urlPath = result.url.trim();
+      
+      // Remove /api/v1 from urlPath if present (to avoid duplication)
+      if (urlPath.startsWith('/api/v1')) {
+        urlPath = urlPath.replace('/api/v1', '');
+      }
+      
+      // Ensure path starts with /
+      if (!urlPath.startsWith('/')) {
+        urlPath = `/${urlPath}`;
+      }
+      
+      // Construct full URL - ensure base URL has protocol and no trailing slash
+      let baseUrl = API_BASE_URL.trim();
+      if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+        baseUrl = `http://${baseUrl}`;
+      }
+      // Remove trailing slash from base URL
+      baseUrl = baseUrl.replace(/\/+$/, '');
+      
+      // Construct the full URL
+      const imageUrl = `${baseUrl}${urlPath}`;
+      
+      // Validate URL format before setting
+      try {
+        const url = new URL(imageUrl);
+        // Ensure it's a valid HTTP/HTTPS URL
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          throw new Error('Invalid protocol');
+        }
+        // URL is valid, set it
+        console.log('Setting imageUrl:', imageUrl); // Debug log
+        setValue('imageUrl', imageUrl, { shouldDirty: true, shouldTouch: true });
+      } catch (error) {
+        console.error('Invalid URL constructed:', { imageUrl, baseUrl, urlPath, result }, error);
+        setErrorMessage(`Failed to construct valid image URL: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`);
+      }
+      setUploadingImage(false);
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to upload image. Please try again.';
+      setErrorMessage(errorMessage);
+      setUploadingImage(false);
+    },
+  });
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Please select an image file');
+      return;
+    }
+
+    // Validate file size (10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setErrorMessage('Image size must be less than 10MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    uploadImageMutation.mutate(file);
+    
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const handleImageDriveFileSelect = (file: DriveFile) => {
+    // Convert Google Drive file to URL
+    // The backend will convert this to a proxy URL when saving
+    const driveUrl = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
+    setValue('imageUrl', driveUrl, { shouldDirty: true, shouldTouch: true });
+    setShowImageDrivePicker(false);
   };
 
   const createMutation = useMutation({
@@ -188,6 +301,8 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
       currency: values.currency || undefined,
       notes: values.notes || undefined,
       tags,
+      imageUrl: values.imageUrl?.trim() || undefined, // Only send if not empty
+      featured: values.featured || false,
       driveFolderId: values.driveFolderId || undefined,
       driveFolderUrl: values.driveFolderUrl || undefined,
       odooId: values.odooId || undefined,
@@ -477,6 +592,101 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
             </div>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-muted-foreground">Company Logo</label>
+              <div className="space-y-2">
+                {/* Logo Preview */}
+                {watch('imageUrl') && (
+                  <div className="relative w-full overflow-hidden rounded-lg border border-border">
+                    <img
+                      src={watch('imageUrl')}
+                      alt="Company Logo"
+                      className="h-32 w-full object-contain bg-muted/50"
+                      onError={(e) => {
+                        // Hide image on error
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setValue('imageUrl', '', { shouldDirty: true, shouldTouch: true })}
+                      className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white transition hover:bg-black/70"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+                
+                {/* Upload Controls */}
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploadingImage}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3 w-3" />
+                        Upload
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImageDrivePicker(true)}
+                    disabled={uploadingImage}
+                    className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                  >
+                    <FolderOpen className="h-3 w-3" />
+                    Pick from Drive
+                  </button>
+                </div>
+                
+                {/* URL Input (for manual entry) */}
+                <input
+                  type="url"
+                  {...register('imageUrl')}
+                  placeholder="Or paste image URL or Google Drive link"
+                  className="w-full rounded-lg border border-border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Upload a logo, pick from Google Drive, or paste a URL. Google Drive images will be automatically converted.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  {...register('featured')}
+                  id="featured-customer"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="featured-customer" className="text-sm font-medium text-muted-foreground">
+                  Featured Customer
+                </label>
+              </div>
+              <p className="ml-2 text-xs text-muted-foreground">
+                Show on public website
+              </p>
+            </div>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-muted-foreground">Notes</label>
             <MentionInput
@@ -518,6 +728,18 @@ export function CustomerForm({ customer, onClose, onSuccess }: CustomerFormProps
         onSelectFolder={handleSelectDriveFolder}
         onUseCurrentFolder={handleUseCurrentFolder}
       />
+
+      {/* Drive Picker for Company Logo */}
+      <DrivePicker
+        open={showImageDrivePicker}
+        mode="file"
+        fileTypeFilter="image"
+        title="Select Company Logo from Google Drive"
+        description="Choose a logo from your Google Drive to use as the company logo."
+        onClose={() => setShowImageDrivePicker(false)}
+        onSelectFile={handleImageDriveFileSelect}
+      />
+
       {successMessage && (
         <FeedbackToast
           message={successMessage}

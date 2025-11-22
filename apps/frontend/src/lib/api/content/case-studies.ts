@@ -7,6 +7,19 @@ import type {
   PaginatedResponse,
 } from '@/types/content';
 
+export interface UploadFileResult {
+  id: string;
+  filename: string;
+  storedName: string;
+  mimeType: string;
+  size: number;
+  category: 'IMAGE' | 'DOCUMENT' | 'OTHER';
+  url: string;
+  path: string;
+}
+
+const multipartHeaders = { 'Content-Type': 'multipart/form-data' };
+
 export const caseStudiesApi = {
   async list(filters?: CaseStudyFilters) {
     const { data } = await apiClient.get<PaginatedResponse<CaseStudy>>(
@@ -44,6 +57,19 @@ export const caseStudiesApi = {
   async delete(id: string) {
     const { data } = await apiClient.delete<{ message: string }>(
       `/content/case-studies/${id}`,
+    );
+    return data;
+  },
+
+  async uploadImage(caseStudyId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await apiClient.post<UploadFileResult>(
+      `/content/case-studies/${caseStudyId}/upload-image`,
+      formData,
+      {
+        headers: multipartHeaders,
+      },
     );
     return data;
   },

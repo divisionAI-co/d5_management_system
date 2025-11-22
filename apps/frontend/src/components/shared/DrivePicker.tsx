@@ -17,6 +17,7 @@ interface DrivePickerProps {
   initialFolderId?: string | null;
   title?: string;
   description?: string;
+  fileTypeFilter?: 'image' | 'all'; // Filter files by type (images only or all files)
   onClose: () => void;
   onSelectFile?: (file: DriveFile) => void;
   onSelectFolder?: (folder: DriveFile) => void;
@@ -29,6 +30,7 @@ export function DrivePicker({
   initialFolderId,
   title,
   description,
+  fileTypeFilter = 'all',
   onClose,
   onSelectFile,
   onSelectFolder,
@@ -40,12 +42,13 @@ export function DrivePicker({
   ]);
 
   const driveFilesQuery = useQuery({
-    queryKey: ['drive-picker', currentFolderId],
+    queryKey: ['drive-picker', currentFolderId, fileTypeFilter],
     enabled: open,
     queryFn: () =>
       googleDriveApi.listFiles({
         parentId: currentFolderId ?? undefined,
         pageSize: 100,
+        mimeTypeFilter: fileTypeFilter === 'image' ? 'image' : undefined,
       }),
   });
 
@@ -269,30 +272,41 @@ export function DrivePicker({
                 <div>
                   {folders.length > 0 && <h4 className="mb-2 mt-4 text-xs font-semibold uppercase text-muted-foreground">Files</h4>}
                   <div className="space-y-1">
-                    {fileItems.map((file) => (
-                      <button
-                        key={file.id}
-                        type="button"
-                        onClick={() => handleSelectFile(file)}
-                        className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition hover:border-blue-500 hover:bg-blue-50/60"
-                      >
-                        <FileText className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-foreground">{file.name}</p>
-                          {file.modifiedTime && (
-                            <p className="text-xs text-muted-foreground">
-                              Modified {new Date(file.modifiedTime).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
+                    {fileItems.map((file) => {
+                      const isImage = file.mimeType?.startsWith('image/') ?? false;
+                      return (
                         <button
+                          key={file.id}
                           type="button"
-                          className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+                          onClick={() => handleSelectFile(file)}
+                          className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition hover:border-blue-500 hover:bg-blue-50/60"
                         >
-                          Select
+                          {isImage && file.thumbnailLink ? (
+                            <img
+                              src={file.thumbnailLink}
+                              alt={file.name || 'Image'}
+                              className="h-10 w-10 flex-shrink-0 rounded object-cover"
+                            />
+                          ) : (
+                            <FileText className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-foreground">{file.name}</p>
+                            {file.modifiedTime && (
+                              <p className="text-xs text-muted-foreground">
+                                Modified {new Date(file.modifiedTime).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+                          >
+                            Select
+                          </button>
                         </button>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}

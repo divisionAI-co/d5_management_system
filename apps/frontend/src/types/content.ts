@@ -8,6 +8,7 @@ export interface Blog {
   excerpt?: string | null;
   content: string;
   featuredImage?: string | null;
+  featured: boolean;
   status: BlogStatus;
   publishedAt?: string | null;
   authorId: string;
@@ -30,6 +31,7 @@ export interface CaseStudy {
   excerpt?: string | null;
   content: string;
   featuredImage?: string | null;
+  featured: boolean;
   status: CaseStudyStatus;
   publishedAt?: string | null;
   authorId: string;
@@ -59,6 +61,7 @@ export interface CreateBlogDto {
   excerpt?: string;
   content: string;
   featuredImage?: string;
+  featured?: boolean;
   status?: BlogStatus;
   publishedAt?: string;
   metaTitle?: string;
@@ -72,6 +75,7 @@ export interface BlogFilters {
   pageSize?: number;
   search?: string;
   status?: BlogStatus;
+  featured?: boolean;
   sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'publishedAt';
   sortOrder?: 'asc' | 'desc';
 }
@@ -82,6 +86,7 @@ export interface CreateCaseStudyDto {
   excerpt?: string;
   content: string;
   featuredImage?: string;
+  featured?: boolean;
   status?: CaseStudyStatus;
   publishedAt?: string;
   challenge?: string;
@@ -104,6 +109,7 @@ export interface CaseStudyFilters {
   search?: string;
   status?: CaseStudyStatus;
   industry?: string;
+  featured?: boolean;
   sortBy?: 'createdAt' | 'updatedAt' | 'title' | 'publishedAt' | 'projectDate';
   sortOrder?: 'asc' | 'desc';
 }

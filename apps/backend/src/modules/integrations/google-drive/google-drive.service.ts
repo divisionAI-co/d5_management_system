@@ -34,6 +34,7 @@ export interface ListDriveFilesOptions {
   search?: string;
   recursive?: boolean;
   userEmail?: string; // Filter files by user's view permissions
+  mimeTypeFilter?: string; // Filter by mime type (e.g., 'image' for images only)
 }
 
 export interface DrivePermission {
@@ -206,6 +207,11 @@ export class GoogleDriveService extends BaseService {
     if (options.search) {
       const sanitized = options.search.replace(/'/g, "\\'");
       queryParts.push(`name contains '${sanitized}'`);
+    }
+
+    // Filter by mime type (e.g., 'image' for images only)
+    if (options.mimeTypeFilter === 'image') {
+      queryParts.push("mimeType contains 'image/'");
     }
 
     return queryParts.join(' and ');

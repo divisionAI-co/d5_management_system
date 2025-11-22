@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X, Upload, FolderOpen } from 'lucide-react';
 import { positionsApi } from '@/lib/api/recruitment';
 import { opportunitiesApi } from '@/lib/api/crm/opportunities';
+import { storageApi } from '@/lib/api/storage';
+import { googleDriveApi } from '@/lib/api/google-drive';
 import type { Opportunity } from '@/types/crm';
 import type {
   CreatePositionDto,
@@ -12,7 +14,9 @@ import type {
   OpenPosition,
   UpdatePositionDto,
 } from '@/types/recruitment';
+import type { DriveFile } from '@/types/integrations';
 import { RichTextEditor } from '@/components/shared/RichTextEditor';
+import { DrivePicker } from '@/components/shared/DrivePicker';
 import { FeedbackToast } from '@/components/ui/feedback-toast';
 
 interface CreatePositionModalProps {
@@ -50,6 +54,9 @@ export function CreatePositionModal({
   const [isOpportunityDropdownOpen, setIsOpportunityDropdownOpen] = useState(false);
   const opportunityDropdownRef = useRef<HTMLDivElement>(null);
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [showImageDrivePicker, setShowImageDrivePicker] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const isEditMode = Boolean(position);
 
   const {
@@ -176,6 +183,68 @@ export function CreatePositionModal({
     },
   });
 
+  const uploadImageMutation = useMutation({
+    mutationFn: (file: File) => {
+      return storageApi.upload(file);
+    },
+    onSuccess: (result) => {
+      // Construct full URL for image
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      let urlPath = result.url;
+      if (urlPath.startsWith('/api/v1')) {
+        urlPath = urlPath.replace('/api/v1', '');
+      }
+      if (!urlPath.startsWith('/')) {
+        urlPath = `/${urlPath}`;
+      }
+      const imageUrl = `${API_BASE_URL}${urlPath}`;
+      setValue('imageUrl', imageUrl);
+      setUploadingImage(false);
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to upload image. Please try again.';
+      setErrorFeedback(errorMessage);
+      setUploadingImage(false);
+    },
+  });
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setErrorFeedback('Please select an image file');
+      return;
+    }
+
+    // Validate file size (10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setErrorFeedback('Image size must be less than 10MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    uploadImageMutation.mutate(file);
+    
+    // Reset input
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  };
+
+  const handleImageDriveFileSelect = (file: DriveFile) => {
+    // Convert Google Drive file to URL
+    // The backend will convert this to a proxy URL when saving
+    const driveUrl = file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`;
+    setValue('imageUrl', driveUrl);
+    setShowImageDrivePicker(false);
+  };
+
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   const onSubmit = (values: FormValues) => {
@@ -277,17 +346,81 @@ export function CreatePositionModal({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-muted-foreground">
-              Position Image URL
+              Position Image
             </label>
-            <input
-              type="url"
-              {...register('imageUrl')}
-              className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              placeholder="https://example.com/image.jpg or Google Drive link"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Image URL for the position card. Supports Google Drive links.
-            </p>
+            <div className="space-y-2">
+              {/* Image Preview */}
+              {watch('imageUrl') && (
+                <div className="relative w-full overflow-hidden rounded-lg border border-border">
+                  <img
+                    src={watch('imageUrl')}
+                    alt="Position"
+                    className="h-48 w-full object-cover"
+                    onError={(e) => {
+                      // Hide image on error
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setValue('imageUrl', '')}
+                    className="absolute right-2 top-2 rounded-full bg-black/50 p-1.5 text-white transition hover:bg-black/70"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              
+              {/* Upload Controls */}
+              <div className="flex items-center gap-2">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  disabled={uploadingImage}
+                />
+                <button
+                  type="button"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                >
+                  {uploadingImage ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-3 w-3" />
+                      Upload Image
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowImageDrivePicker(true)}
+                  disabled={uploadingImage}
+                  className="flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+                >
+                  <FolderOpen className="h-3 w-3" />
+                  Pick from Drive
+                </button>
+              </div>
+              
+              {/* URL Input (for manual entry) */}
+              <input
+                type="url"
+                {...register('imageUrl')}
+                className="w-full rounded-lg border border-border px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                placeholder="Or paste image URL or Google Drive link"
+              />
+              <p className="text-xs text-muted-foreground">
+                Upload an image, pick from Google Drive, or paste a URL. Google Drive images will be automatically converted.
+              </p>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -496,6 +629,17 @@ export function CreatePositionModal({
           </div>
         </form>
       </div>
+
+      {/* Drive Picker for Position Image */}
+      <DrivePicker
+        open={showImageDrivePicker}
+        mode="file"
+        fileTypeFilter="image"
+        title="Select Position Image from Google Drive"
+        description="Choose an image from your Google Drive to use as the position image."
+        onClose={() => setShowImageDrivePicker(false)}
+        onSelectFile={handleImageDriveFileSelect}
+      />
     </div>
     </>
   );

@@ -113,6 +113,8 @@ export class CustomersService extends BaseService {
         notes: createCustomerDto.notes,
         tags: createCustomerDto.tags ?? [],
         odooId: createCustomerDto.odooId,
+        imageUrl: createCustomerDto.imageUrl,
+        featured: createCustomerDto.featured ?? false,
       };
 
       if (createCustomerDto.monthlyValue !== undefined) {
@@ -298,6 +300,8 @@ export class CustomersService extends BaseService {
       notes: updateCustomerDto.notes,
       tags: updateCustomerDto.tags,
       odooId: updateCustomerDto.odooId,
+      imageUrl: updateCustomerDto.imageUrl,
+      featured: updateCustomerDto.featured,
     };
 
     if (updateCustomerDto.monthlyValue !== undefined) {
@@ -417,6 +421,33 @@ export class CustomersService extends BaseService {
       ...opportunity,
       value: Number(opportunity.value),
     }));
+  }
+
+  /**
+   * Public method for website showcase - returns customer logos
+   * Only returns active customers with logos
+   */
+  async getPublicLogos() {
+    const customers = await this.prisma.customer.findMany({
+      where: {
+        status: CustomerStatus.ACTIVE,
+        featured: true, // Only return featured customers
+        imageUrl: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        imageUrl: true,
+        website: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+
+    return customers.filter((customer) => customer.imageUrl !== null);
   }
 }
 

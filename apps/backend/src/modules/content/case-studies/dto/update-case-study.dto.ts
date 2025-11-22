@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength, IsDateString, IsObject } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength, IsDateString, IsObject, IsBoolean } from 'class-validator';
 import { CaseStudyStatus } from '@prisma/client';
 
 export class UpdateCaseStudyDto {
@@ -39,6 +39,13 @@ export class UpdateCaseStudyDto {
   @IsOptional()
   @IsString()
   featuredImage?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether this case study is featured',
+  })
+  @IsOptional()
+  @IsBoolean()
+  featured?: boolean;
 
   @ApiPropertyOptional({
     description: 'Status of the case study',

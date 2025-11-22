@@ -126,6 +126,7 @@ export class CaseStudiesService extends BaseService {
       excerpt: createDto.excerpt,
       content: processedContent,
       featuredImage: processedFeaturedImage,
+      featured: createDto.featured ?? false,
       status: createDto.status ?? CaseStudyStatus.DRAFT,
       publishedAt: createDto.publishedAt ? new Date(createDto.publishedAt) : null,
       challenge: processedChallenge,
@@ -170,6 +171,7 @@ export class CaseStudiesService extends BaseService {
       search,
       status,
       industry,
+      featured,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = filters;
@@ -191,6 +193,10 @@ export class CaseStudiesService extends BaseService {
 
     if (industry) {
       where.industry = { contains: industry, mode: Prisma.QueryMode.insensitive };
+    }
+
+    if (featured !== undefined) {
+      where.featured = featured;
     }
 
     const [data, total] = await Promise.all([
@@ -319,6 +325,10 @@ export class CaseStudiesService extends BaseService {
 
     if (updateDto.featuredImage !== undefined) {
       updateData.featuredImage = convertGoogleDriveUrl(updateDto.featuredImage);
+    }
+
+    if (updateDto.featured !== undefined) {
+      updateData.featured = updateDto.featured;
     }
 
     if (updateDto.status !== undefined) {
